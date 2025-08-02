@@ -32,11 +32,13 @@ class PromisingContext:
         if self._parent is not None:
             self._parent._child_contexts.add(self)
 
-        self._child_contexts: set["PromisingContext"] = set()
+        self._child_contexts: set["PromisingContext"] = set()  # TODO Do we really need to track child contexts ?
 
         if loop is None:
-            # TODO Get event loop from the outer PromisingContext when possible ?
-            self._loop = asyncio.get_event_loop()
+            if self._parent is not None:
+                self._loop = self._parent.get_loop()
+            else:
+                self._loop = asyncio.get_event_loop()
         else:
             # TODO Should it be disallowed to set an event loop that is different from the outer one ?
             self._loop = loop

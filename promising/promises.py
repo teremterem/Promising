@@ -29,10 +29,6 @@ class PromisingContext:
         #  higher-level ones) ?
 
         self._parent: Optional["PromisingContext"] = self.get_current()
-        if self._parent is not None:
-            self._parent._child_contexts.add(self)
-
-        self._child_contexts: set["PromisingContext"] = set()  # TODO Do we really need to track child contexts ?
 
         if loop is None:
             if self._parent is not None:
@@ -69,14 +65,14 @@ class PromisingContext:
     def get_parent(self) -> Optional["PromisingContext"]:
         return self._parent
 
-    def get_child_contexts(self) -> list["PromisingContext"]:
-        return list(self._child_contexts)
-
     def get_loop(self) -> asyncio.AbstractEventLoop:
         return self._loop
 
     def get_name(self) -> str:
         return self._name
+
+    def is_active(self) -> bool:
+        return self._previous_ctx_token is not None
 
     def activate(self) -> "PromisingContext":
         """

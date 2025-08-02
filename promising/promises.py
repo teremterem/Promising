@@ -4,9 +4,15 @@ from contextvars import ContextVar
 import itertools
 from typing import Optional
 
+from promising.errors import (
+    ContextAlreadyActiveError,
+    ContextNotActiveError,
+    NoCurrentContextError,
+)
+
 
 _promise_name_counter = itertools.count(1).__next__
-# TODO Also maintain UUIDs for promises ?
+# TODO [DEFERRED] Also maintain UUIDs for promises ?
 
 
 def get_promising_context() -> "PromisingContext":
@@ -18,13 +24,13 @@ class PromisingContext:
     _current: ContextVar[Optional["PromisingContext"]] = ContextVar("PromisingContext._current", default=None)
 
     def __init__(self, *, loop: Optional[AbstractEventLoop] = None, name: Optional[str] = None) -> None:
-        # TODO Introduce PromisingConfig (should support "chaining" with deeper-level configs overriding higher-level
-        #  ones)
+        # TODO [DEFERRED] Introduce PromisingConfig (should support "chaining" with deeper-level configs overriding
+        #  higher-level ones) ?
         if loop is None:
-            # TODO Get event loop from the outer PromisingContext when possible
+            # TODO [DEFERRED] Get event loop from the outer PromisingContext when possible ?
             self._loop = asyncio.get_event_loop()
         else:
-            # TODO Should it be disallowed to set an event loop that is different from the outer one ?
+            # TODO [DEFERRED] Should it be disallowed to set an event loop that is different from the outer one ?
             self._loop = loop
         if name is None:
             self._name = f"PromisingContext-{_promise_name_counter()}"
@@ -33,9 +39,20 @@ class PromisingContext:
         self._previous_ctx_token = None
 
     @classmethod
-    def get_current(cls) -> Optional["PromisingContext"]:
-        # TODO Raise an error if there is no current context
-        return cls._current.get()
+    def get_current(cls) -> "PromisingContext":
+        """
+        Get the current PromisingContext.
+
+        Returns:
+            The current PromisingContext instance.
+
+        Raises:
+            NoCurrentContextError: If no current context exists.
+        """
+        current = cls._current.get()
+        if current is None:
+            raise NoCurrentContextError("No current PromisingContext is active")
+        return current
 
     def get_loop(self) -> asyncio.AbstractEventLoop:
         return self._loop
@@ -44,13 +61,31 @@ class PromisingContext:
         return self._name
 
     def activate(self) -> "PromisingContext":
-        # TODO Raise an error if this context is already active (token attribute is not None)
+        """
+        Activate this PromisingContext.
+
+        Returns:
+            This PromisingContext instance.
+
+        Raises:
+            ContextAlreadyActiveError: If this context is already active.
+        """
+        if self._previous_ctx_token is not None:
+            raise ContextAlreadyActiveError(f"PromisingContext '{self._name}' is already active")
         self._previous_ctx_token = self._current.set(self)
         return self
 
     async def afinalize(self) -> None:
-        # TODO Raise an error if this context is not active (token attribute is None)
+        """
+        Finalize this PromisingContext and restore the previous context.
+
+        Raises:
+            ContextNotActiveError: If this context is not currently active.
+        """
+        if self._previous_ctx_token is None:
+            raise ContextNotActiveError(f"PromisingContext '{self._name}' is not currently active")
         self._current.reset(self._previous_ctx_token)
+        self._previous_ctx_token = None
 
     async def __aenter__(self) -> "PromisingContext":
         return self.activate()

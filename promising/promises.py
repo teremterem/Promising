@@ -6,7 +6,6 @@ from typing import Optional
 _promise_name_counter = itertools.count(1).__next__
 # TODO Also maintain UUIDs for promises ?
 
-
 # TODO There should be a global default PromisingContext instance
 
 

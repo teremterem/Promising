@@ -1,7 +1,8 @@
-from asyncio import AbstractEventLoop
 import asyncio
-from contextvars import ContextVar
+import contextvars
 import itertools
+from asyncio import AbstractEventLoop
+from contextvars import ContextVar
 from typing import Optional
 
 from promising.errors import (
@@ -12,7 +13,7 @@ from promising.errors import (
 
 
 _promise_name_counter = itertools.count(1).__next__
-# TODO [DEFERRED] Also maintain UUIDs for promises ?
+# TODO Also maintain UUIDs for promises ?
 
 
 def get_promising_context() -> "PromisingContext":
@@ -24,19 +25,22 @@ class PromisingContext:
     _current: ContextVar[Optional["PromisingContext"]] = ContextVar("PromisingContext._current", default=None)
 
     def __init__(self, *, loop: Optional[AbstractEventLoop] = None, name: Optional[str] = None) -> None:
-        # TODO [DEFERRED] Introduce PromisingConfig (should support "chaining" with deeper-level configs overriding
+        # TODO Introduce PromisingConfig (should support "chaining" with deeper-level configs overriding
         #  higher-level ones) ?
+
         if loop is None:
-            # TODO [DEFERRED] Get event loop from the outer PromisingContext when possible ?
+            # TODO Get event loop from the outer PromisingContext when possible ?
             self._loop = asyncio.get_event_loop()
         else:
-            # TODO [DEFERRED] Should it be disallowed to set an event loop that is different from the outer one ?
+            # TODO Should it be disallowed to set an event loop that is different from the outer one ?
             self._loop = loop
+
         if name is None:
             self._name = f"PromisingContext-{_promise_name_counter()}"
         else:
             self._name = name
-        self._previous_ctx_token = None
+
+        self._previous_ctx_token: Optional[contextvars.Token] = None
 
     @classmethod
     def get_current(cls) -> "PromisingContext":
@@ -91,4 +95,5 @@ class PromisingContext:
         return self.activate()
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        # TODO How to treat errors ?
         await self.afinalize()

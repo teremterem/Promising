@@ -34,6 +34,7 @@ class PromisingContext:
 
     @classmethod
     def get_current(cls) -> Optional["PromisingContext"]:
+        # TODO Raise an error if there is no current context
         return cls._current.get()
 
     def get_loop(self) -> asyncio.AbstractEventLoop:
@@ -56,8 +57,3 @@ class PromisingContext:
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
         await self.afinalize()
-
-
-_global_promising_context: PromisingContext = PromisingContext()
-_global_promising_context.activate()
-# TODO How and when to deactivate the global promising context ? (Should we care about it at all ?)

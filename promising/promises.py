@@ -28,6 +28,12 @@ class PromisingContext:
         # TODO Introduce PromisingConfig (should support "chaining" with deeper-level configs overriding
         #  higher-level ones) ?
 
+        self._parent: Optional["PromisingContext"] = self.get_current()
+        if self._parent is not None:
+            self._parent._child_contexts.add(self)
+
+        self._child_contexts: set["PromisingContext"] = set()
+
         if loop is None:
             # TODO Get event loop from the outer PromisingContext when possible ?
             self._loop = asyncio.get_event_loop()
@@ -57,6 +63,12 @@ class PromisingContext:
         if current is None:
             raise NoCurrentContextError("No current PromisingContext is active")
         return current
+
+    def get_parent(self) -> Optional["PromisingContext"]:
+        return self._parent
+
+    def get_child_contexts(self) -> list["PromisingContext"]:
+        return list(self._child_contexts)
 
     def get_loop(self) -> asyncio.AbstractEventLoop:
         return self._loop

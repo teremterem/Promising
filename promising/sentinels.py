@@ -4,4 +4,4 @@ class Sentinel:
         raise RuntimeError("Sentinels should not be used in boolean expressions.")
 
 
-NO_VALUE = Sentinel()
+NOT_SET = Sentinel()

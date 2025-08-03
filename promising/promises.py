@@ -4,6 +4,7 @@ import itertools
 from asyncio import AbstractEventLoop
 from contextvars import ContextVar
 from typing import Optional
+import weakref
 
 from promising.errors import (
     ContextAlreadyActiveError,
@@ -20,6 +21,7 @@ def get_promising_context() -> "PromisingContext":
     return PromisingContext.get_current()
 
 
+# TODO Merge this class with the Promise itself that extends asyncio.Future
 class PromisingContext:
 
     _current: ContextVar[Optional["PromisingContext"]] = ContextVar("PromisingContext._current", default=None)
@@ -29,6 +31,8 @@ class PromisingContext:
         #  higher-level ones) ?
 
         self._parent: Optional["PromisingContext"] = self.get_current()
+        self._children: set[PromisingContext] = weakref.WeakSet()  # TODO TODO TODO
+        # TODO It should be set at the level of the child Promise, whether it should be waited by parent or not
 
         if loop is None:
             if self._parent is not None:
@@ -107,3 +111,5 @@ class PromisingContext:
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
         # TODO How to treat errors ?
         await self.afinalize()
+
+    # TODO TODO TODO Various methods to run stuff directly like in MiniAgents ?

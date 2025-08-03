@@ -1,18 +1,6 @@
-from promising.obsolete_errors import (
-    BasePromisingError,
-    ContextAlreadyActiveError,
-    ContextNotActiveError,
-    NoCurrentContextError,
-    PromisingContextError,
-)
-from promising.obsolete_promises import PromisingContext
+from promising.promises import Promise
 
 
 __all__ = [
-    "BasePromisingError",
-    "ContextAlreadyActiveError",
-    "ContextNotActiveError",
-    "NoCurrentContextError",
-    "PromisingContext",
-    "PromisingContextError",
+    "Promise",
 ]

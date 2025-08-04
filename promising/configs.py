@@ -86,6 +86,9 @@ class PromiseConfig:
     def is_config_inheritable(self) -> bool:
         return self._config_inheritable
 
+    def get_wrong_event_loop(self) -> bool:  # TODO Will be switched to RAISE(Default)|WARN|SUPPRESS, hence "get"
+        return self._wrong_event_loop
+
     def find_inheritable_config(self) -> "PromiseConfig":
         # pylint: disable=protected-access
         config = self

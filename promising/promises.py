@@ -39,6 +39,8 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ):
+        if coro is None and prefill_result is NOT_SET and prefill_exception is None:
+            raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
         if coro is not None and (prefill_result is not NOT_SET or prefill_exception is not None):
             raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
         if coro is not None and not coroutines.iscoroutine(coro):
@@ -84,9 +86,15 @@ class Promise(Future, Generic[T_co]):
         )
 
         self._coro = coro
-        # TODO handle prefill_result and prefill_exception
+        if self._coro is None:
+            if prefill_exception is None:
+                self.set_result(prefill_result)
+            else:
+                self.set_exception(prefill_exception)
 
         # TODO Implement "start_soon" logic with regular loop.create_task() (for now ? forever ?)
+
+        # TODO Implement activate() and afinalize() together with async context manager
 
         # TODO Support cancellation of the whole Promise tree
 

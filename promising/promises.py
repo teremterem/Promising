@@ -86,7 +86,7 @@ class Promise(Future, Generic[T_co]):
         self._coro = coro
         # TODO handle prefill_result and prefill_exception
 
-        # TODO TODO TODO
+        # TODO Implement "start_soon" logic with regular loop.create_task() (for now ? forever ?)
 
         # TODO Support cancellation of the whole Promise tree
 

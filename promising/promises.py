@@ -109,7 +109,8 @@ class Promise(Future, Generic[T_co]):
         if self.done():
             return False  # TODO Raise an error instead ?
         try:
-            self.set_result(await self._coro)
+            async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
+                self.set_result(await self._coro)
             return True
         except BaseException as exc:  # pylint: disable=broad-except
             self.set_exception(exc)

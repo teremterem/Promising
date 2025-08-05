@@ -1,7 +1,7 @@
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from contextvars import ContextVar
 import itertools
-from typing import Any, Coroutine, Generic, Optional
+from typing import Any, Coroutine, Generator, Generic, Optional
 from weakref import WeakSet
 
 from promising.configs import PromiseConfig
@@ -30,8 +30,9 @@ class Promise(Future, Generic[T_co]):
         *,
         loop: Optional[AbstractEventLoop] = None,
         name: Optional[str] = None,
-        parent: Optional["Promise[Any]"] = None,
+        parent: Optional["Promise[Any]"] | Sentinel = NOT_SET,
         config: Optional[PromiseConfig] = None,
+        # TODO Support optional `children_config` too ?
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
         wrong_event_loop: bool | Sentinel = NOT_SET,
@@ -39,6 +40,9 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ):
+        # TODO Fix the following linting error:
+        # pylint: disable=too-many-branches
+
         if coro is None and prefill_result is NOT_SET and prefill_exception is None:
             raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
         if coro is not None and (prefill_result is not NOT_SET or prefill_exception is not None):
@@ -51,7 +55,11 @@ class Promise(Future, Generic[T_co]):
         # TODO Does it make sense to set the parent Promise upon creation or should it be done upon "activation" ?
         # TODO What to do about tracing the real way Promise calls are nested ? Maintain _real_parent that is set upon
         #  Promise activation and is not affected by manual choice of a parent or by the loop mismatch ?
-        self._parent = parent or self.get_current(raise_if_none=False)
+        if parent is NOT_SET:
+            self._parent = self.get_current(raise_if_none=False)
+        else:
+            self._parent = parent
+
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
@@ -92,13 +100,34 @@ class Promise(Future, Generic[T_co]):
             else:
                 self.set_exception(prefill_exception)
 
-        # TODO Implement "start_soon" logic with regular loop.create_task() (for now ? forever ?)
+        elif self._config.is_start_soon():
+            # TODO Should regular loop.create_task() be replaced with something more sophisticated ?
+            self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+
+    async def _afulfill(self) -> bool:
+        # TODO Raise an error if there is no coroutine ?
+        if self.done():
+            return False  # TODO Raise an error instead ?
+        try:
+            self.set_result(await self._coro)
+            return True
+        except BaseException as exc:  # pylint: disable=broad-except
+            self.set_exception(exc)
+            return False  # TODO Does this make sense ?
 
         # TODO Implement activate() and afinalize() together with async context manager
 
         # TODO Support cancellation of the whole Promise tree
 
         # TODO Where to propagate errors raised from the children ?
+
+    def __await__(self) -> Generator[T_co, None, None]:
+        if not self.done():
+            if self._task is None:
+                yield from self._afulfill().__await__()  # pylint: disable=no-member
+            else:
+                yield self._task
+        return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
         # TODO If config is provided and any of the kwarg values are not NOT_SET, raise an error

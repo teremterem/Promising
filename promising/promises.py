@@ -107,7 +107,7 @@ class Promise(Future, Generic[T_co]):
     async def _afulfill(self) -> bool:
         # TODO Raise an error if there is no coroutine ?
         if self.done():
-            return False  # TODO Raise an error instead ?
+            return False  # TODO Raise an error instead ? Yes, how else will you debug ? (No one is reading the result)
         try:
             async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
                 self.set_result(await self._coro)
@@ -121,6 +121,8 @@ class Promise(Future, Generic[T_co]):
         # TODO Support cancellation of the whole Promise tree
 
         # TODO Where to propagate errors raised from the children ?
+
+        # TODO Also, make sure the Promise is thread-safe - we want to support multiple paradigms
 
     def __await__(self) -> Generator[T_co, None, None]:
         if not self.done():

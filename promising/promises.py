@@ -3,6 +3,7 @@ import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from contextvars import ContextVar
+from types import TracebackType
 from typing import Any, Coroutine, Generator, Generic, Optional
 from weakref import WeakSet
 
@@ -26,11 +27,9 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
-    # TODO Implement activate() and afinalize() together with async context manager
-
     # TODO Support cancellation of the whole Promise tree
 
-    # TODO Where to propagate errors raised from the children ?
+    # TODO Should we somehow keep track of the errors raised by the child promises ?
 
     # TODO Expose it as concurrent.Future somehow so it could be accessed from threads outside of the event loop ?
     #  (e.g. as_concurrent_future() method ?)
@@ -71,6 +70,8 @@ class Promise(Future, Generic[T_co]):
         else:
             self._parent = parent
 
+        # TODO Weak set will not allow us to keep track of ALL the errors raised from the children.
+        #  Do we need to do something about it ?
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
@@ -115,19 +116,16 @@ class Promise(Future, Generic[T_co]):
             # TODO Should regular loop.create_task() be replaced with something more sophisticated ?
             self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
 
-    async def _afulfill(self) -> bool:
+    async def _afulfill(self) -> None:
         # TODO Raise an error if there is no coroutine ?
         if self.done():
-            return False  # TODO Raise an error instead ? Yes, how else will you debug ? (No one is reading the result)
-        try:
-            async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
-                # TODO If we decide to throw child promise errors from afinalize(), then we need to make sure they
-                #  don't obscure possible errors raised from the coroutine itself
+            raise RuntimeError("Promise is already done")  # TODO Come up with a better error message
+
+        async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
+            try:
                 self.set_result(await self._coro)
-            return True
-        except BaseException as exc:  # pylint: disable=broad-except
-            self.set_exception(exc)
-            return False  # TODO Does this make sense ?
+            except BaseException as exc:  # pylint: disable=broad-except
+                self.set_exception(exc)
 
     def __await__(self) -> Generator[T_co, None, None]:
         if not self.done():
@@ -159,6 +157,9 @@ class Promise(Future, Generic[T_co]):
         if raise_if_none and self._parent is None:
             raise NoParentPromiseError("No parent Promise found")
         return self._parent
+
+    def is_active(self) -> bool:
+        return self._previous_token is not None
 
     def get_name(self) -> str:
         return self._name
@@ -193,10 +194,23 @@ class Promise(Future, Generic[T_co]):
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
-        promises_to_await.append(self)
+        promises_to_await.append(self)  # TODO Use tests to make sure there is no deadlock under any configuration
 
         await asyncio.gather(*promises_to_await, return_exceptions=True)
         # TODO What to do with the gathered exceptions
 
         self._current.reset(self._previous_token)
         self._previous_token = None
+
+    async def __aenter__(self) -> "Promise[Any]":
+        self.activate()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
+        # TODO How to treat errors ?
+        await self.afinalize()

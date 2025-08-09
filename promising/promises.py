@@ -1,3 +1,5 @@
+import asyncio
+import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from contextvars import ContextVar
@@ -20,6 +22,7 @@ def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
 
 class Promise(Future, Generic[T_co]):
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
+    _previous_token: Optional[contextvars.Token] = None
 
     _task: Optional[Task[T_co]] = None
 
@@ -118,6 +121,8 @@ class Promise(Future, Generic[T_co]):
             return False  # TODO Raise an error instead ? Yes, how else will you debug ? (No one is reading the result)
         try:
             async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
+                # TODO If we decide to throw child promise errors from afinalize(), then we need to make sure they
+                #  don't obscure possible errors raised from the coroutine itself
                 self.set_result(await self._coro)
             return True
         except BaseException as exc:  # pylint: disable=broad-except
@@ -173,3 +178,25 @@ class Promise(Future, Generic[T_co]):
                     raise
             else:
                 return {child for child in children if not child.done()}
+
+    def activate(self) -> bool:
+        current = self._current.get()
+        if current is self:
+            return False
+        self._previous_token = self._current.set(self)
+        return True
+
+    async def afinalize(self) -> None:
+        # TODO Raise an error if no promise is currently active
+        # TODO Raise an error if the current promise is not self
+
+        promises_to_await = [
+            child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
+        ]
+        promises_to_await.append(self)
+
+        await asyncio.gather(*promises_to_await, return_exceptions=True)
+        # TODO What to do with the gathered exceptions
+
+        self._current.reset(self._previous_token)
+        self._previous_token = None

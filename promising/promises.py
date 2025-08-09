@@ -1,6 +1,6 @@
+import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from contextvars import ContextVar
-import itertools
 from typing import Any, Coroutine, Generator, Generic, Optional
 from weakref import WeakSet
 
@@ -31,7 +31,7 @@ class Promise(Future, Generic[T_co]):
     # TODO Where to propagate errors raised from the children ?
 
     # TODO Expose it as concurrent.Future somehow so it could be accessed from threads outside of the event loop ?
-    #  (e.g. from a thread that is not the one that created the Promise)
+    #  (e.g. as_concurrent_future() method ?)
 
     def __init__(
         self,

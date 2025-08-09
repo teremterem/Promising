@@ -24,6 +24,15 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
+    # TODO Implement activate() and afinalize() together with async context manager
+
+    # TODO Support cancellation of the whole Promise tree
+
+    # TODO Where to propagate errors raised from the children ?
+
+    # TODO Expose it as concurrent.Future somehow so it could be accessed from threads outside of the event loop ?
+    #  (e.g. from a thread that is not the one that created the Promise)
+
     def __init__(
         self,
         coro: Optional[Coroutine[Any, Any, T_co]] = None,
@@ -115,14 +124,6 @@ class Promise(Future, Generic[T_co]):
         except BaseException as exc:  # pylint: disable=broad-except
             self.set_exception(exc)
             return False  # TODO Does this make sense ?
-
-        # TODO Implement activate() and afinalize() together with async context manager
-
-        # TODO Support cancellation of the whole Promise tree
-
-        # TODO Where to propagate errors raised from the children ?
-
-        # TODO Also, make sure the Promise is thread-safe - we want to support multiple paradigms
 
     def __await__(self) -> Generator[T_co, None, None]:
         if not self.done():

@@ -31,7 +31,7 @@ class Promise(Future, Generic[T_co]):
 
     # TODO Should we somehow keep track of the errors raised by the child promises ?
 
-    # TODO Expose it as concurrent.Future somehow so it could be accessed from threads outside of the event loop ?
+    # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop ?
     #  (e.g. as_concurrent_future() method ?)
 
     def __init__(
@@ -117,15 +117,17 @@ class Promise(Future, Generic[T_co]):
             self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
 
     async def _afulfill(self) -> None:
-        # TODO Raise an error if there is no coroutine ?
+        # TODO Raise an error if there is no coroutine
         if self.done():
             raise RuntimeError("Promise is already done")  # TODO Come up with a better error message
 
-        async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
-            try:
-                self.set_result(await self._coro)
-            except BaseException as exc:  # pylint: disable=broad-except
-                self.set_exception(exc)
+        try:
+            async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
+                result = await self._coro
+        except BaseException as exc:  # pylint: disable=broad-except
+            self.set_exception(exc)
+        else:
+            self.set_result(result)
 
     def __await__(self) -> Generator[T_co, None, None]:
         if not self.done():
@@ -181,23 +183,26 @@ class Promise(Future, Generic[T_co]):
                 return {child for child in children if not child.done()}
 
     def activate(self) -> bool:
-        current = self._current.get()
-        if current is self:
-            return False
+        # TODO Rename to make_current() ?
+        # TODO What's the point of this method being public ? Can it ever be called directly ?
+        # TODO Raise an error if the promise is already active
         self._previous_token = self._current.set(self)
         return True
 
     async def afinalize(self) -> None:
-        # TODO Raise an error if no promise is currently active
-        # TODO Raise an error if the current promise is not self
+        # TODO What's the point of this method being public ? Can it ever be called directly ?
+        # TODO Test what happens if afinalize() is called in the context where no promise is active
+        # TODO Test what happens if afinalize() is called in the context of a child promise
+        # TODO Test what happens if afinalize() is called in the context where this promise is not present even as a
+        #  parent, grandparent, etc.
 
+        # TODO Move this to wait_for_children() public method
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
-        promises_to_await.append(self)  # TODO Use tests to make sure there is no deadlock under any configuration
-
-        await asyncio.gather(*promises_to_await, return_exceptions=True)
-        # TODO What to do with the gathered exceptions
+        if promises_to_await:
+            await asyncio.gather(*promises_to_await, return_exceptions=True)
+            # TODO What to do with the gathered exceptions ?
 
         self._current.reset(self._previous_token)
         self._previous_token = None

@@ -20,7 +20,3 @@ class NoParentPromiseError(BasePromiseError):
 
 class NoParentConfigError(BasePromiseConfigError):
     pass
-
-
-class NoInheritableParentConfigError(BasePromiseConfigError):
-    pass

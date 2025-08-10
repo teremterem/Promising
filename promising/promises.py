@@ -3,7 +3,6 @@ import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from contextvars import ContextVar
-from types import TracebackType
 from typing import Any, Coroutine, Generator, Generic, Optional
 from weakref import WeakSet
 
@@ -26,10 +25,10 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
-    # TODO Support cancellation of the whole Promise tree
-
     # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop
     #  (e.g. as_concurrent_future() method ?)
+
+    # TODO Support cancellation of the whole Promise tree
 
     def __init__(
         self,
@@ -58,9 +57,6 @@ class Promise(Future, Generic[T_co]):
         if prefill_result is not NOT_SET and prefill_exception is not None:
             raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
 
-        # TODO Does it make sense to set the parent Promise upon creation or should it be done upon "activation" ?
-        # TODO What to do about tracing the real way Promise calls are nested ? Maintain _real_parent that is set upon
-        #  Promise activation and is not affected by manual choice of a parent or by the loop mismatch ?
         if parent is NOT_SET:
             self._parent = self.get_current(raise_if_none=False)
         else:
@@ -106,13 +102,21 @@ class Promise(Future, Generic[T_co]):
         if self.done():
             raise RuntimeError("Promise is already done")  # TODO Come up with a better error message
 
+        result = NOT_SET
+        exception = NOT_SET
+
+        self._activate()
         try:
-            async with self:  # Let's "activate" the Promise for the duration of the coroutine execution
-                result = await self._coro
+            result = await self._coro
         except BaseException as exc:  # pylint: disable=broad-except
-            self.set_exception(exc)
-        else:
-            self.set_result(result)
+            exception = exc
+        finally:
+            await self._afinalize()  # TODO Should we try-except this line too ?
+
+            if exception is not NOT_SET:
+                self.set_exception(exception)
+            else:
+                self.set_result(result)
 
     def __await__(self) -> Generator[T_co, None, None]:
         if not self.done():
@@ -123,7 +127,7 @@ class Promise(Future, Generic[T_co]):
         return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
-        # TODO If config is provided and any of the kwarg values are not NOT_SET, raise an error
+        # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
 
         if config is not None:
             return config
@@ -167,21 +171,10 @@ class Promise(Future, Generic[T_co]):
             else:
                 return {child for child in children if not child.done()}
 
-    def activate(self) -> bool:
-        # TODO What's the point of this method being public ? Can it ever be called directly ?
-        #  We'll figure it out when we try to base `async with MiniAgents():` on the Promise.
-        # TODO Raise an error if the promise is already active
+    def _activate(self) -> None:
         self._previous_token = self._current.set(self)
-        return True
 
-    async def afinalize(self) -> None:
-        # TODO What's the point of this method being public ? Can it ever be called directly ?
-        #  We'll figure it out when we try to base `async with MiniAgents():` on the Promise.
-        # TODO Test what happens if afinalize() is called in the context where no promise is active
-        # TODO Test what happens if afinalize() is called in the context of a child promise
-        # TODO Test what happens if afinalize() is called in the context where this promise is not present even as a
-        #  parent, grandparent, etc.
-
+    async def _afinalize(self) -> None:
         # TODO Move this to wait_for_children() public method
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
@@ -194,16 +187,3 @@ class Promise(Future, Generic[T_co]):
 
         self._current.reset(self._previous_token)
         self._previous_token = None
-
-    async def __aenter__(self) -> "Promise[Any]":
-        self.activate()
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: Optional[type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
-    ) -> None:
-        # TODO Do anything with errors raised from within the `async with` block ?
-        await self.afinalize()

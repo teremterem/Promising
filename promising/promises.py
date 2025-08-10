@@ -30,8 +30,9 @@ class Promise(Future, Generic[T_co]):
     # TODO Support cancellation of the whole Promise tree
 
     # TODO Should we somehow keep track of the errors raised by the child promises ?
+    #  Turn this into a non-todo comment that we will not (for now).
 
-    # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop ?
+    # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop
     #  (e.g. as_concurrent_future() method ?)
 
     def __init__(
@@ -42,10 +43,9 @@ class Promise(Future, Generic[T_co]):
         name: Optional[str] = None,
         parent: Optional["Promise[Any]"] | Sentinel = NOT_SET,
         config: Optional[PromiseConfig] = None,
-        # TODO Support optional `children_config` too ?
+        # TODO Support optional `children_config` too
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
-        wrong_event_loop: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
@@ -70,22 +70,13 @@ class Promise(Future, Generic[T_co]):
         else:
             self._parent = parent
 
-        # TODO Weak set will not allow us to keep track of ALL the errors raised from the children.
-        #  Do we need to do something about it ?
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
             if loop is None:
                 loop = self._parent._loop
             elif loop is not self._parent._loop:
-                # TODO Issue a warning about the loop mismatch, as long as config.wrong_event_loop is False.
-                #  Or, maybe, even raise an error when we switch to wrong_loop_warnings=WARN(default)|RAISE|SUPPRESS.
-                #  Also, in all cases make sure to include into the message how to change the handling of
-                #  warning/error.
-                #  (P.S. You don't have to do all that right here, do it when the config is already available.)
-
-                # There is a mismatch between the loop provided and the loop of the parent Promise - let's not
-                # establish the parent-child relationship.
+                # TODO Raise a ValueError instead of setting the parent to None
                 self._parent = None
 
         if self._parent is not None:
@@ -101,7 +92,6 @@ class Promise(Future, Generic[T_co]):
             config,
             start_soon=start_soon,
             make_parent_wait=make_parent_wait,
-            wrong_event_loop=wrong_event_loop,
             config_inheritable=config_inheritable,
         )
 
@@ -113,7 +103,6 @@ class Promise(Future, Generic[T_co]):
                 self.set_exception(prefill_exception)
 
         elif self._config.is_start_soon():
-            # TODO Should regular loop.create_task() be replaced with something more sophisticated ?
             self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
 
     async def _afulfill(self) -> None:
@@ -202,8 +191,9 @@ class Promise(Future, Generic[T_co]):
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
         if promises_to_await:
+            # TODO What to do with the gathered exceptions ? Just add a comment about them being lost (for now).
+            #  Actually, no! We should log them somehow, so they aren't completely hidden from the library users.
             await asyncio.gather(*promises_to_await, return_exceptions=True)
-            # TODO What to do with the gathered exceptions ?
 
         self._current.reset(self._previous_token)
         self._previous_token = None
@@ -218,5 +208,5 @@ class Promise(Future, Generic[T_co]):
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
-        # TODO How to treat errors ?
+        # TODO Do anything with errors raised from within the `async with` block ?
         await self.afinalize()

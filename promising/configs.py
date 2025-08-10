@@ -11,9 +11,6 @@ class PromisingDefaults:
     #  true or false
     START_SOON = os.getenv("PROMISING_DEFAULT_START_SOON", "true").lower() == "true"
     MAKE_PARENT_WAIT = os.getenv("PROMISING_DEFAULT_MAKE_PARENT_WAIT", "false").lower() == "true"
-    # TODO Switch it to RAISE(Default)|WARN|SUPPRESS (Make a utility function that validates the value is in the list
-    #  of allowed values ? Or, maybe, use Enum somehow ?)
-    WRONG_EVENT_LOOP = os.getenv("PROMISING_DEFAULT_WRONG_EVENT_LOOP", "true").lower() == "true"
     CONFIGS_INHERITABLE = os.getenv("PROMISING_DEFAULT_CONFIGS_INHERITABLE", "true").lower() == "true"
 
 
@@ -27,7 +24,6 @@ class PromiseConfig:
         *,
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
-        wrong_event_loop: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
     ) -> None:
         if parent_config is NOT_SET:
@@ -49,7 +45,6 @@ class PromiseConfig:
 
             self._start_soon = get_concrete_value(start_soon, PromisingDefaults.START_SOON)
             self._make_parent_wait = get_concrete_value(make_parent_wait, PromisingDefaults.MAKE_PARENT_WAIT)
-            self._wrong_event_loop = get_concrete_value(wrong_event_loop, PromisingDefaults.WRONG_EVENT_LOOP)
             self._config_inheritable = True  # Root PromiseConfig is always inheritable
         else:
             # This is NOT a root PromiseConfig
@@ -57,9 +52,6 @@ class PromiseConfig:
             self._start_soon = get_concrete_value(start_soon, self._inheritable_parent_config.is_start_soon())
             self._make_parent_wait = get_concrete_value(
                 make_parent_wait, self._inheritable_parent_config.is_make_parent_wait()
-            )
-            self._wrong_event_loop = get_concrete_value(
-                wrong_event_loop, self._inheritable_parent_config.is_wrong_event_loop()
             )
             self._config_inheritable = get_concrete_value(
                 config_inheritable, self._inheritable_parent_config.is_config_inheritable()
@@ -75,17 +67,14 @@ class PromiseConfig:
             raise NoParentConfigError("No inheritable parent PromiseConfig found")
         return self._inheritable_parent_config
 
-    def is_start_soon(self) -> bool:
+    def is_start_soon(self) -> bool:  # TODO Rename to should_start_soon() ? Ask AI, or maybe check Trio
         return self._start_soon
 
-    def is_make_parent_wait(self) -> bool:
+    def is_make_parent_wait(self) -> bool:  # TODO Rename to should_make_parent_wait() ?
         return self._make_parent_wait
 
-    def is_config_inheritable(self) -> bool:
+    def is_config_inheritable(self) -> bool:  # TODO Rename to should_config_inheritable() ?
         return self._config_inheritable
-
-    def get_wrong_event_loop(self) -> bool:  # TODO Will be switched to RAISE(Default)|WARN|SUPPRESS, hence "get"
-        return self._wrong_event_loop
 
     def find_inheritable_config(self) -> "PromiseConfig":
         # pylint: disable=protected-access

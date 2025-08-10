@@ -8,3 +8,7 @@ class NoCurrentPromiseError(BasePromisingError):
 
 class NoParentPromiseError(BasePromisingError):
     pass
+
+
+class NoParentConfigError(BasePromisingError):
+    pass

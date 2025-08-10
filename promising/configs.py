@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from promising.errors import NoCurrentPromiseError, NoParentPromiseError
+from promising.errors import NoCurrentPromiseError, NoParentConfigError
 from promising.sentinels import NOT_SET, Sentinel
 from promising.utils import get_concrete_value
 
@@ -36,7 +36,7 @@ class PromiseConfig:
                 from promising.promises import get_current_promise
 
                 self._parent_config = get_current_promise().get_config()
-            except (NoCurrentPromiseError, NoParentPromiseError):
+            except NoCurrentPromiseError:
                 pass
         else:
             # TODO Do we really need to maintain _parent_config and _inheritable_parent_config separately ?
@@ -67,14 +67,12 @@ class PromiseConfig:
 
     def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         if raise_if_none and self._parent_config is None:
-            # TODO Dedicated error for this case ?
-            raise NoParentPromiseError("No parent PromiseConfig found")
+            raise NoParentConfigError("No parent PromiseConfig found")
         return self._parent_config
 
     def get_inheritable_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         if raise_if_none and self._inheritable_parent_config is None:
-            # TODO Dedicated error for this case ?
-            raise NoParentPromiseError("No inheritable parent PromiseConfig found")
+            raise NoParentConfigError("No inheritable parent PromiseConfig found")
         return self._inheritable_parent_config
 
     def is_start_soon(self) -> bool:

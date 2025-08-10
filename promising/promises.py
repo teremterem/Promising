@@ -17,7 +17,6 @@ _promise_name_counter = itertools.count(1)
 
 
 def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
-    # TODO Do we really need this function ?
     return Promise.get_current(raise_if_none=raise_if_none)
 
 
@@ -28,9 +27,6 @@ class Promise(Future, Generic[T_co]):
     _task: Optional[Task[T_co]] = None
 
     # TODO Support cancellation of the whole Promise tree
-
-    # TODO Should we somehow keep track of the errors raised by the child promises ?
-    #  Turn this into a non-todo comment that we will not (for now).
 
     # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop
     #  (e.g. as_concurrent_future() method ?)
@@ -191,8 +187,9 @@ class Promise(Future, Generic[T_co]):
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
         if promises_to_await:
-            # TODO What to do with the gathered exceptions ? Just add a comment about them being lost (for now).
-            #  Actually, no! We should log them somehow, so they aren't completely hidden from the library users.
+            # TODO Do errors disappear from stdout/stderr when they are "gathered" like this ? Do they make it to
+            #  stdout/stderr only when the whole python process exits ? We should somehow show the errors to the user
+            #  as soon as they happen (for all children, not just the ones that make the parent wait).
             await asyncio.gather(*promises_to_await, return_exceptions=True)
 
         self._current.reset(self._previous_token)

@@ -67,13 +67,13 @@ class PromiseConfig:
             raise NoParentConfigError("No inheritable parent PromiseConfig found")
         return self._inheritable_parent_config
 
-    def is_start_soon(self) -> bool:  # TODO Rename to should_start_soon() ? Ask AI, or maybe check Trio
+    def is_start_soon(self) -> bool:
         return self._start_soon
 
-    def is_make_parent_wait(self) -> bool:  # TODO Rename to should_make_parent_wait() ?
+    def is_make_parent_wait(self) -> bool:
         return self._make_parent_wait
 
-    def is_config_inheritable(self) -> bool:  # TODO Rename to should_config_inheritable() ?
+    def is_config_inheritable(self) -> bool:
         return self._config_inheritable
 
     def find_inheritable_config(self) -> "PromiseConfig":

@@ -2,13 +2,25 @@ class BasePromisingError(Exception):
     pass
 
 
-class NoCurrentPromiseError(BasePromisingError):
+class BasePromiseError(BasePromisingError):
     pass
 
 
-class NoParentPromiseError(BasePromisingError):
+class BasePromiseConfigError(BasePromisingError):
     pass
 
 
-class NoParentConfigError(BasePromisingError):
+class NoCurrentPromiseError(BasePromiseError):
+    pass
+
+
+class NoParentPromiseError(BasePromiseError):
+    pass
+
+
+class NoParentConfigError(BasePromiseConfigError):
+    pass
+
+
+class NoInheritableParentConfigError(BasePromiseConfigError):
     pass

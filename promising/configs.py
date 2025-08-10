@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from promising.errors import NoCurrentPromiseError, NoParentConfigError
+from promising.errors import NoCurrentPromiseError, NoInheritableParentConfigError, NoParentConfigError
 from promising.sentinels import NOT_SET, Sentinel
 from promising.utils import get_concrete_value
 
@@ -72,7 +72,7 @@ class PromiseConfig:
 
     def get_inheritable_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         if raise_if_none and self._inheritable_parent_config is None:
-            raise NoParentConfigError("No inheritable parent PromiseConfig found")
+            raise NoInheritableParentConfigError("No inheritable parent PromiseConfig found")
         return self._inheritable_parent_config
 
     def is_start_soon(self) -> bool:

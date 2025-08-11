@@ -8,7 +8,7 @@ from promising.utils import get_concrete_value
 
 class PromisingDefaults:
     # TODO Introduce a utility function that reads booleans from env vars and also raises errors if .lower() is not
-    #  true or false
+    #  true or false.
     START_SOON = os.getenv("PROMISING_DEFAULT_START_SOON", "true").lower() == "true"
     MAKE_PARENT_WAIT = os.getenv("PROMISING_DEFAULT_MAKE_PARENT_WAIT", "false").lower() == "true"
     CONFIGS_INHERITABLE = os.getenv("PROMISING_DEFAULT_CONFIGS_INHERITABLE", "true").lower() == "true"

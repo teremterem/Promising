@@ -1,33 +1,22 @@
-"""
-Error classes for the promising library.
-"""
-
-
 class BasePromisingError(Exception):
-    """
-    Base exception class for all promising library errors.
-    """
+    pass
 
 
-class PromisingContextError(BasePromisingError):
-    """
-    Base exception class for PromisingContext related errors.
-    """
+class BasePromiseError(BasePromisingError):
+    pass
 
 
-class NoCurrentContextError(PromisingContextError):
-    """
-    Raised when trying to get the current context but none exists.
-    """
+class BasePromiseConfigError(BasePromisingError):
+    pass
 
 
-class ContextAlreadyActiveError(PromisingContextError):
-    """
-    Raised when trying to activate a context that is already active.
-    """
+class NoCurrentPromiseError(BasePromiseError):
+    pass
 
 
-class ContextNotActiveError(PromisingContextError):
-    """
-    Raised when trying to finalize a context that is not currently active.
-    """
+class NoParentPromiseError(BasePromiseError):
+    pass
+
+
+class NoParentConfigError(BasePromiseConfigError):
+    pass

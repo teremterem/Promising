@@ -1,18 +1,9 @@
-from promising.errors import (
-    BasePromisingError,
-    ContextAlreadyActiveError,
-    ContextNotActiveError,
-    NoCurrentContextError,
-    PromisingContextError,
-)
-from promising.promises import PromisingContext
+from promising.configs import PromiseConfig
+from promising.promises import Promise, get_current_promise
 
 
 __all__ = [
-    "BasePromisingError",
-    "ContextAlreadyActiveError",
-    "ContextNotActiveError",
-    "NoCurrentContextError",
-    "PromisingContext",
-    "PromisingContextError",
+    "Promise",
+    "PromiseConfig",
+    "get_current_promise",
 ]

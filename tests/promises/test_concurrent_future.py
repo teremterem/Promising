@@ -11,7 +11,7 @@ from promising.promises import Promise
 
 async def test_as_concurrent_future():
     """
-    Test the as_concurrent_future method.
+    Test Promise.as_concurrent_future().
     """
 
     async def sample_coro():
@@ -37,7 +37,7 @@ async def test_as_concurrent_future():
 
 async def test_with_exception():
     """
-    Test as_concurrent_future with exceptions.
+    Test Promise.as_concurrent_future() with exceptions.
     """
 
     async def failing_coro():
@@ -58,28 +58,49 @@ async def test_with_exception():
 
 async def test_from_thread():
     """
-    Test accessing from a different thread.
+    Test accessing Promise result from different threads.
     """
 
     async def sample_coro():
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
         return "Result from thread test!"
 
     promise = Promise(sample_coro())
     concurrent_future = promise.as_concurrent_future()
 
-    result = None
+    result1 = None
+    result2 = None
+    result3 = None
 
-    def thread_function():
-        # This runs in a separate thread
-        nonlocal result
-        result = concurrent_future.result(timeout=0.2)
+    def thread_function1():
+        nonlocal result1
+        result1 = concurrent_future.result(timeout=0.3)
 
-    thread = threading.Thread(target=thread_function)
-    thread.start()
+    def thread_function2():
+        nonlocal result2
+        result2 = concurrent_future.result(timeout=0.3)
+
+    def thread_function3():
+        nonlocal result3
+        try:
+            concurrent_future.result(timeout=0.1)
+        except concurrent.futures.TimeoutError as e:
+            result3 = e
+
+    thread1 = threading.Thread(target=thread_function1)
+    thread2 = threading.Thread(target=thread_function2)
+    thread3 = threading.Thread(target=thread_function3)
+    thread1.start()
+    thread2.start()
+    thread3.start()
 
     # Let the promise complete
     await promise
-    thread.join()
 
-    assert result == "Result from thread test!"
+    thread1.join()
+    thread2.join()
+    thread3.join()
+
+    assert result1 == "Result from thread test!"
+    assert result2 == "Result from thread test!"
+    assert isinstance(result3, concurrent.futures.TimeoutError)

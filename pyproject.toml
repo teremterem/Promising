@@ -22,7 +22,7 @@ dev = [
     "hatch",
     "ipython",
     # "jupyterlab",
-    # "notebook",  # this is needed for notebooks to work in PyCharm
+    # "notebook",  # This is needed for notebooks to work in PyCharm
     "pre-commit",
     "pylint",
     "pytest",

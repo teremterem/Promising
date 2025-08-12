@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
@@ -24,9 +25,6 @@ class Promise(Future, Generic[T_co]):
     _previous_token: Optional[contextvars.Token] = None
 
     _task: Optional[Task[T_co]] = None
-
-    # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop
-    #  (e.g. as_concurrent_future() method ?)
 
     # TODO Support cancellation of the whole Promise tree
 
@@ -68,8 +66,7 @@ class Promise(Future, Generic[T_co]):
             if loop is None:
                 loop = self._parent._loop
             elif loop is not self._parent._loop:
-                # TODO Raise a ValueError instead of setting the parent to None
-                self._parent = None
+                raise ValueError("Parent and child Promises must share the same event loop")
 
         if self._parent is not None:
             self._parent._children.add(self)
@@ -123,13 +120,15 @@ class Promise(Future, Generic[T_co]):
             if self._task is None:
                 yield from self._afulfill().__await__()  # pylint: disable=no-member
             else:
-                yield self._task
+                yield from self._task
         return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
         # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
 
         if config is not None:
+            if any(value is not NOT_SET for value in kwargs.values()):
+                raise ValueError("Cannot provide both a 'config' object and explicit config kwargs")
             return config
 
         if self._parent is not None and all(value is NOT_SET for value in kwargs.values()):
@@ -170,6 +169,34 @@ class Promise(Future, Generic[T_co]):
                     raise
             else:
                 return {child for child in children if not child.done()}
+
+    def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
+        # TODO Convert into _init_concurrent_future() method called from __init__()
+        """
+        Create a concurrent.Future that can be accessed from threads outside of the event loop.
+
+        This method creates a bridge between the asyncio-based Promise and a concurrent.Future
+        that can be safely used from other threads.
+        """
+        concurrent_future = concurrent.futures.Future()
+
+        def transfer_result():
+            """Transfer the result from the asyncio Future to the concurrent Future."""
+            if self.cancelled():
+                concurrent_future.cancel()
+            elif self.exception() is not None:
+                concurrent_future.set_exception(self.exception())
+            else:
+                concurrent_future.set_result(self.result())
+
+        # If already done, transfer immediately
+        if self.done():
+            transfer_result()
+        else:
+            # Schedule the transfer when this Promise completes
+            self.add_done_callback(lambda _: transfer_result())
+
+        return concurrent_future
 
     def _activate(self) -> None:
         self._previous_token = self._current.set(self)

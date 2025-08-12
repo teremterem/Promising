@@ -46,15 +46,6 @@ class Promise(Future, Generic[T_co]):
         # TODO Fix the following linting error:
         # pylint: disable=too-many-branches
 
-        if coro is None and prefill_result is NOT_SET and prefill_exception is None:
-            raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
-        if coro is not None and (prefill_result is not NOT_SET or prefill_exception is not None):
-            raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
-        if coro is not None and not coroutines.iscoroutine(coro):
-            raise TypeError(f"Promise must be created with a coroutine. Got {type(coro)}.")
-        if prefill_result is not NOT_SET and prefill_exception is not None:
-            raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
-
         if parent is NOT_SET:
             self._parent = self.get_current(raise_if_none=False)
         else:
@@ -65,11 +56,16 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             if loop is None:
                 loop = self._parent._loop
+                # TODO What if both, loop and parent loop are None ? That would NOT necessarily mean that they end up
+                #  in the same loop !
             elif loop is not self._parent._loop:
                 raise ValueError("Parent and child Promises must share the same event loop")
 
         if self._parent is not None:
             self._parent._children.add(self)
+
+        # TODO Should we have a config setting to disable multithreading support ? Is there any speed benefit ?
+        self._concurrent_future = concurrent.futures.Future()
 
         super().__init__(loop=loop)
 
@@ -86,13 +82,32 @@ class Promise(Future, Generic[T_co]):
 
         self._coro = coro
         if self._coro is None:
-            if prefill_exception is None:
+            if prefill_result is not NOT_SET and prefill_exception is not None:
+                raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
+
+            if prefill_result is not NOT_SET:
                 self.set_result(prefill_result)
-            else:
+            elif prefill_exception is not None:
                 self.set_exception(prefill_exception)
 
-        elif self._config.is_start_soon():
-            self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+            else:
+                raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
+        else:
+            if not coroutines.iscoroutine(coro):
+                raise TypeError(f"Promise must be created with a coroutine. Got {type(coro)}.")
+            if prefill_result is not NOT_SET or prefill_exception is not None:
+                raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
+
+            if self._config.is_start_soon():
+                self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+
+    def set_result(self, result: T_co) -> None:
+        super().set_result(result)
+        self._concurrent_future.set_result(result)
+
+    def set_exception(self, exception: BaseException) -> None:
+        super().set_exception(exception)
+        self._concurrent_future.set_exception(exception)
 
     async def _afulfill(self) -> None:
         # TODO Raise an error if there is no coroutine
@@ -171,32 +186,7 @@ class Promise(Future, Generic[T_co]):
                 return {child for child in children if not child.done()}
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
-        # TODO Convert into _init_concurrent_future() method called from __init__()
-        """
-        Create a concurrent.Future that can be accessed from threads outside of the event loop.
-
-        This method creates a bridge between the asyncio-based Promise and a concurrent.Future
-        that can be safely used from other threads.
-        """
-        concurrent_future = concurrent.futures.Future()
-
-        def transfer_result():
-            """Transfer the result from the asyncio Future to the concurrent Future."""
-            if self.cancelled():
-                concurrent_future.cancel()
-            elif self.exception() is not None:
-                concurrent_future.set_exception(self.exception())
-            else:
-                concurrent_future.set_result(self.result())
-
-        # If already done, transfer immediately
-        if self.done():
-            transfer_result()
-        else:
-            # Schedule the transfer when this Promise completes
-            self.add_done_callback(lambda _: transfer_result())
-
-        return concurrent_future
+        return self._concurrent_future
 
     def _activate(self) -> None:
         self._previous_token = self._current.set(self)

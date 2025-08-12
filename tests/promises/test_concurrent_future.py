@@ -5,6 +5,7 @@ Simple test script to verify the as_concurrent_future() method works.
 import asyncio
 import concurrent.futures
 import threading
+import pytest
 from promising.promises import Promise
 
 
@@ -47,17 +48,13 @@ async def test_with_exception():
     promise = Promise(failing_coro())
     concurrent_future = promise.as_concurrent_future()
 
-    try:
+    with pytest.raises(ValueError):
         await promise
-    except ValueError:
-        pass  # Expected
 
     assert concurrent_future.done()
-    try:
+    with pytest.raises(ValueError) as exc_info:
         concurrent_future.result()
-        assert False, "Should have raised an exception"
-    except ValueError as e:
-        assert str(e) == "Test error"
+    assert str(exc_info.value) == "Test error"
 
     print("✓ Exception handling works correctly!")
 
@@ -88,18 +85,3 @@ async def test_from_thread():
 
     assert result_container["result"] == "Result from thread test!"
     print("✓ Thread access works correctly!")
-
-
-async def main():
-    """Run all tests."""
-    print("Testing as_concurrent_future() method...")
-
-    await test_as_concurrent_future()
-    await test_with_exception()
-    await test_from_thread()
-
-    print("All tests passed! 🎉")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

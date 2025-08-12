@@ -83,6 +83,7 @@ async def test_from_thread():
     def thread_function3():
         nonlocal result3
         try:
+            # Time out earlier than the promise is completed
             concurrent_future.result(timeout=0.1)
         except concurrent.futures.TimeoutError as e:
             result3 = e

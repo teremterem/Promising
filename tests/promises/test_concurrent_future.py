@@ -121,6 +121,7 @@ async def test_from_thread():
     """
     Test accessing Promise result from different threads.
     """
+    # TODO Parametrize this test the same way as the other tests in this file
 
     async def sample_coro():
         await asyncio.sleep(0.2)

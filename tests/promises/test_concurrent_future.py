@@ -9,11 +9,10 @@ import pytest
 from promising.promises import Promise
 
 
-# TODO Review this AI generated test script
-
-
 async def test_as_concurrent_future():
-    """Test the as_concurrent_future method."""
+    """
+    Test the as_concurrent_future method.
+    """
 
     async def sample_coro():
         await asyncio.sleep(0.1)
@@ -35,11 +34,11 @@ async def test_as_concurrent_future():
     assert concurrent_future.done()
     assert concurrent_future.result() == "Hello from Promise!"
 
-    print("✓ as_concurrent_future() method works correctly!")
-
 
 async def test_with_exception():
-    """Test as_concurrent_future with exceptions."""
+    """
+    Test as_concurrent_future with exceptions.
+    """
 
     async def failing_coro():
         await asyncio.sleep(0.1)
@@ -56,25 +55,25 @@ async def test_with_exception():
         concurrent_future.result()
     assert str(exc_info.value) == "Test error"
 
-    print("✓ Exception handling works correctly!")
-
 
 async def test_from_thread():
-    """Test accessing from a different thread."""
+    """
+    Test accessing from a different thread.
+    """
 
     async def sample_coro():
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.1)
         return "Result from thread test!"
 
     promise = Promise(sample_coro())
     concurrent_future = promise.as_concurrent_future()
 
-    result_container = {}
+    result = None
 
     def thread_function():
         # This runs in a separate thread
-        result = concurrent_future.result(timeout=1.0)
-        result_container["result"] = result
+        nonlocal result
+        result = concurrent_future.result(timeout=0.2)
 
     thread = threading.Thread(target=thread_function)
     thread.start()
@@ -83,5 +82,4 @@ async def test_from_thread():
     await promise
     thread.join()
 
-    assert result_container["result"] == "Result from thread test!"
-    print("✓ Thread access works correctly!")
+    assert result == "Result from thread test!"

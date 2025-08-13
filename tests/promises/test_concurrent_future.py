@@ -117,6 +117,7 @@ async def test_with_exception(
         assert str(exc_info.value) == "Test error from Promise!"
 
 
+# TODO Apply parametrizations here as well
 async def test_from_thread():
     """
     Test accessing Promise result from different threads.
@@ -167,3 +168,4 @@ async def test_from_thread():
     assert result1 == "Result from thread test!"
     assert result2 == "Result from thread test!"
     assert isinstance(result3, concurrent.futures.TimeoutError)
+    # TODO Also test that the sample_coro() is called exactly once in total

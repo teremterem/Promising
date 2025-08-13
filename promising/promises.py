@@ -186,6 +186,7 @@ class Promise(Future, Generic[T_co]):
                 return {child for child in children if not child.done()}
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
+        # TODO When is the best time to copy the context vars to the caller's thread ?
         return self._concurrent_future
 
     def _activate(self) -> None:

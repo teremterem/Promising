@@ -126,18 +126,28 @@ async def test_with_exception(
         assert str(exc_info.value) == "Test error from Promise!"
 
 
-# TODO Apply parametrizations here as well
-async def test_from_threads():
+@pytest.mark.parametrize("start_soon", [True, False, None])
+@pytest.mark.parametrize("await_promise", [True, False, None])
+async def test_from_threads(
+    start_soon: Optional[bool],
+    await_promise: Optional[bool],
+):
     """
     Test accessing Promise result from different threads.
     """
-    # TODO Parametrize this test the same way as the other tests in this file
 
-    async def sample_coro():
-        await asyncio.sleep(0.2)
-        return "Result from thread test!"
+    # Create a Promise
+    if start_soon is None:
+        # `start_soon=None` in our test means that we want to create a prefilled promise
+        promise = Promise(prefill_result="Result from thread test!")
+    else:
 
-    promise = Promise(sample_coro())
+        async def sample_coro():
+            await asyncio.sleep(0.2)
+            return "Result from thread test!"
+
+        promise = Promise(sample_coro(), start_soon=start_soon)
+
     concurrent_future = promise.as_concurrent_future()
 
     result1 = None
@@ -146,11 +156,11 @@ async def test_from_threads():
 
     def thread_function1():
         nonlocal result1
-        result1 = concurrent_future.result(timeout=0.3)
+        result1 = concurrent_future.result(timeout=0.4)
 
     def thread_function2():
         nonlocal result2
-        result2 = concurrent_future.result(timeout=0.3)
+        result2 = concurrent_future.result(timeout=0.4)
 
     def thread_function3():
         nonlocal result3
@@ -167,8 +177,12 @@ async def test_from_threads():
     thread2.start()
     thread3.start()
 
-    # Let the promise complete
-    await promise
+    if await_promise is True:
+        await promise
+    elif await_promise is False:
+        # Let's await in general, but not for the promise specifically
+        await asyncio.sleep(0.3)
+    # `await_promise=None` in our test means that we don't want to await for anything at all (no task switching)
 
     thread1.join()
     thread2.join()

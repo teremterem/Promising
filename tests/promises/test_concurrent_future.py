@@ -56,6 +56,8 @@ async def test_as_concurrent_future(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+
+        await promise
     else:
         # In all other scenarios the promise should be done
         assert concurrent_future.done()

@@ -42,7 +42,7 @@ class Promise(Future, Generic[T_co]):
         config_inheritable: bool | Sentinel = NOT_SET,
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
-    ):
+    ) -> None:
         # TODO Fix the following linting error:
         # pylint: disable=too-many-branches
 
@@ -65,7 +65,7 @@ class Promise(Future, Generic[T_co]):
             self._parent._children.add(self)
 
         # TODO Should we have a config setting to disable multithreading support ? Is there any speed benefit ?
-        self._concurrent_future = concurrent.futures.Future()
+        self._concurrent_future = _PromiseBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
 
@@ -205,3 +205,44 @@ class Promise(Future, Generic[T_co]):
 
         self._current.reset(self._previous_token)
         self._previous_token = None
+
+
+class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
+    def __init__(self, promise: "Promise[Any]") -> None:
+        super().__init__()
+        self._promise = promise
+
+    def result(self, timeout: Optional[float] = None) -> Any:
+        try:
+            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
+            # Future)
+            result = super().result(timeout=timeout)
+        finally:
+            # Let's return the result from the Promise directly, so the Promise also knows that its result has been
+            # consumed
+            try:
+                self._promise.result()
+            except BaseException:  # pylint: disable=broad-except
+                # Suppress the error if any - if there's an error, it should come from super().result(), not from here
+                pass
+        # For consistency, let's return the result from this concurrent Future, even though it's supposed to be the
+        # same as the result from the Promise
+        return result
+
+    def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
+        try:
+            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
+            # Future)
+            exception = super().exception(timeout=timeout)
+        finally:
+            # Let's return the exception from the Promise directly, so the Promise also knows that its exception has
+            # been consumed
+            try:
+                self._promise.exception()
+            except BaseException:  # pylint: disable=broad-except
+                # Suppress the error if any - if there's an error, it should come from super().exception(), not from
+                # here
+                pass
+        # For consistency, let's return the exception from this concurrent Future, even though it's supposed to be the
+        # same as the exception from the Promise
+        return exception

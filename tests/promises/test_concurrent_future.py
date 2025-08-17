@@ -127,7 +127,7 @@ async def test_with_exception(
 
 
 # TODO Apply parametrizations here as well
-async def test_from_thread():
+async def test_from_threads():
     """
     Test accessing Promise result from different threads.
     """

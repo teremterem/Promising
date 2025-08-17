@@ -109,6 +109,13 @@ async def test_with_exception(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+
+        with pytest.raises(ValueError) as exc_info:
+            # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
+            #  directly, so we don't get the asyncio warning about the exception not ever being retrieved
+            await promise
+        assert str(exc_info.value) == "Test error from Promise!"
+
     else:
         # In all other scenarios the promise should be done (with exception)
         assert concurrent_future.done()

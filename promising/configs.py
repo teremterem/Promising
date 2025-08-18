@@ -1,17 +1,14 @@
-import os
 from typing import Optional
 
 from promising.errors import NoCurrentPromiseError, NoParentConfigError
 from promising.sentinels import NOT_SET, Sentinel
-from promising.utils import get_concrete_value
+from promising.utils import get_bool_env, get_concrete_value
 
 
 class PromisingDefaults:
-    # TODO Introduce a utility function that reads booleans from env vars and also raises errors if .lower() is not
-    #  true or false
-    START_SOON = os.getenv("PROMISING_DEFAULT_START_SOON", "true").lower() == "true"
-    MAKE_PARENT_WAIT = os.getenv("PROMISING_DEFAULT_MAKE_PARENT_WAIT", "false").lower() == "true"
-    CONFIGS_INHERITABLE = os.getenv("PROMISING_DEFAULT_CONFIGS_INHERITABLE", "true").lower() == "true"
+    START_SOON = get_bool_env("PROMISING_DEFAULT_START_SOON", True)
+    MAKE_PARENT_WAIT = get_bool_env("PROMISING_DEFAULT_MAKE_PARENT_WAIT", False)
+    CONFIGS_INHERITABLE = get_bool_env("PROMISING_DEFAULT_CONFIGS_INHERITABLE", True)
 
 
 class PromiseConfig:

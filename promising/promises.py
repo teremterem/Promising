@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
@@ -25,9 +26,6 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
-    # TODO Expose it as concurrent.Future so it could be accessed from threads outside of the event loop
-    #  (e.g. as_concurrent_future() method ?)
-
     # TODO Support cancellation of the whole Promise tree
 
     def __init__(
@@ -44,18 +42,9 @@ class Promise(Future, Generic[T_co]):
         config_inheritable: bool | Sentinel = NOT_SET,
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
-    ):
+    ) -> None:
         # TODO Fix the following linting error:
         # pylint: disable=too-many-branches
-
-        if coro is None and prefill_result is NOT_SET and prefill_exception is None:
-            raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
-        if coro is not None and (prefill_result is not NOT_SET or prefill_exception is not None):
-            raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
-        if coro is not None and not coroutines.iscoroutine(coro):
-            raise TypeError(f"Promise must be created with a coroutine. Got {type(coro)}.")
-        if prefill_result is not NOT_SET and prefill_exception is not None:
-            raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
 
         if parent is NOT_SET:
             self._parent = self.get_current(raise_if_none=False)
@@ -67,12 +56,16 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             if loop is None:
                 loop = self._parent._loop
+                # TODO What if both, loop and parent loop are None ? That would NOT necessarily mean that they end up
+                #  in the same loop !
             elif loop is not self._parent._loop:
-                # TODO Raise a ValueError instead of setting the parent to None
-                self._parent = None
+                raise ValueError("Parent and child Promises must share the same event loop")
 
         if self._parent is not None:
             self._parent._children.add(self)
+
+        # TODO Should we have a config setting to disable multithreading support ? Is there any speed benefit ?
+        self._concurrent_future = _PromiseBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
 
@@ -89,13 +82,32 @@ class Promise(Future, Generic[T_co]):
 
         self._coro = coro
         if self._coro is None:
-            if prefill_exception is None:
+            if prefill_result is not NOT_SET and prefill_exception is not None:
+                raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
+
+            if prefill_result is not NOT_SET:
                 self.set_result(prefill_result)
-            else:
+            elif prefill_exception is not None:
                 self.set_exception(prefill_exception)
 
-        elif self._config.is_start_soon():
-            self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+            else:
+                raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
+        else:
+            if not coroutines.iscoroutine(coro):
+                raise TypeError(f"Promise must be created with a coroutine. Got {type(coro)}.")
+            if prefill_result is not NOT_SET or prefill_exception is not None:
+                raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
+
+            if self._config.is_start_soon():
+                self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+
+    def set_result(self, result: T_co) -> None:
+        super().set_result(result)
+        self._concurrent_future.set_result(result)
+
+    def set_exception(self, exception: BaseException) -> None:
+        super().set_exception(exception)
+        self._concurrent_future.set_exception(exception)
 
     async def _afulfill(self) -> None:
         # TODO Raise an error if there is no coroutine
@@ -123,13 +135,15 @@ class Promise(Future, Generic[T_co]):
             if self._task is None:
                 yield from self._afulfill().__await__()  # pylint: disable=no-member
             else:
-                yield self._task
+                yield from self._task
         return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
         # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
 
         if config is not None:
+            if any(value is not NOT_SET for value in kwargs.values()):
+                raise ValueError("Cannot provide both a 'config' object and explicit config kwargs")
             return config
 
         if self._parent is not None and all(value is NOT_SET for value in kwargs.values()):
@@ -171,6 +185,10 @@ class Promise(Future, Generic[T_co]):
             else:
                 return {child for child in children if not child.done()}
 
+    def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
+        # TODO When is the best time to copy the context vars to the caller's thread ?
+        return self._concurrent_future
+
     def _activate(self) -> None:
         self._previous_token = self._current.set(self)
 
@@ -187,3 +205,44 @@ class Promise(Future, Generic[T_co]):
 
         self._current.reset(self._previous_token)
         self._previous_token = None
+
+
+class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
+    def __init__(self, promise: "Promise[Any]") -> None:
+        super().__init__()
+        self._promise = promise
+
+    def result(self, timeout: Optional[float] = None) -> Any:
+        try:
+            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
+            # Future)
+            result = super().result(timeout=timeout)
+        finally:
+            # Let's return the result from the Promise directly, so the Promise also knows that its result has been
+            # consumed
+            try:
+                self._promise.result()
+            except BaseException:  # pylint: disable=broad-except
+                # Suppress the error if any - if there's an error, it should come from super().result(), not from here
+                pass
+        # For consistency, let's return the result from this concurrent Future, even though it's supposed to be the
+        # same as the result from the Promise
+        return result
+
+    def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
+        try:
+            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
+            # Future)
+            exception = super().exception(timeout=timeout)
+        finally:
+            # Let's return the exception from the Promise directly, so the Promise also knows that its exception has
+            # been consumed
+            try:
+                self._promise.exception()
+            except BaseException:  # pylint: disable=broad-except
+                # Suppress the error if any - if there's an error, it should come from super().exception(), not from
+                # here
+                pass
+        # For consistency, let's return the exception from this concurrent Future, even though it's supposed to be the
+        # same as the exception from the Promise
+        return exception

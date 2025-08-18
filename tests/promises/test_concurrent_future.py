@@ -156,17 +156,23 @@ async def test_from_threads(
 
     def thread_function1():
         nonlocal result1
-        result1 = concurrent_future.result(timeout=0.4)
+        try:
+            result1 = concurrent_future.result(timeout=0.4)
+        except concurrent.futures.TimeoutError as e:
+            result1 = e
 
     def thread_function2():
         nonlocal result2
-        result2 = concurrent_future.result(timeout=0.4)
+        try:
+            result2 = concurrent_future.result(timeout=0.4)
+        except concurrent.futures.TimeoutError as e:
+            result2 = e
 
     def thread_function3():
         nonlocal result3
         try:
             # Time out earlier than the promise is completed
-            concurrent_future.result(timeout=0.1)
+            result3 = concurrent_future.result(timeout=0.1)
         except concurrent.futures.TimeoutError as e:
             result3 = e
 
@@ -188,7 +194,22 @@ async def test_from_threads(
     thread2.join()
     thread3.join()
 
-    assert result1 == "Result from thread test!"
-    assert result2 == "Result from thread test!"
-    assert isinstance(result3, concurrent.futures.TimeoutError)
+    if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
+        # Two scenarios when the promise is not expected to be done:
+        # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
+        # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
+        assert isinstance(result1, concurrent.futures.TimeoutError)
+        assert isinstance(result2, concurrent.futures.TimeoutError)
+        assert isinstance(result3, concurrent.futures.TimeoutError)
+
+    else:
+        assert result1 == "Result from thread test!"
+        assert result2 == "Result from thread test!"
+        if start_soon is None:
+            # The promise was prefilled, so the result should be available even for the thread that did not wait long
+            # enough
+            assert result3 == "Result from thread test!"
+        else:
+            assert isinstance(result3, concurrent.futures.TimeoutError)
+
     # TODO Also test that the sample_coro() is called exactly once in total

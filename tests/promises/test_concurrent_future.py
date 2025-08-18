@@ -57,6 +57,8 @@ async def test_as_concurrent_future(
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
 
+        # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
+        #  directly, so we don't get the asyncio warning about it never being awaited
         await promise
     else:
         # In all other scenarios the promise should be done
@@ -114,7 +116,7 @@ async def test_with_exception(
 
         with pytest.raises(ValueError) as exc_info:
             # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
-            #  directly, so we don't get the asyncio warning about the exception not ever being retrieved
+            # directly, so we don't get the asyncio warning about the exception not ever being retrieved
             await promise
         assert str(exc_info.value) == "Test error from Promise!"
 
@@ -201,6 +203,10 @@ async def test_from_threads(
         assert isinstance(result1, concurrent.futures.TimeoutError)
         assert isinstance(result2, concurrent.futures.TimeoutError)
         assert isinstance(result3, concurrent.futures.TimeoutError)
+
+        # Now, that we ensured that concurrent_future is not done no matter the waiting time out, let's await for the
+        # promise directly, so we don't get the asyncio warning about it never being awaited
+        await promise
 
     else:
         assert result1 == "Result from thread test!"

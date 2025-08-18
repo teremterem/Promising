@@ -1,3 +1,7 @@
+"""
+Promise primitives built on top of asyncio Futures.
+"""
+
 import asyncio
 import concurrent.futures
 import contextvars
@@ -17,10 +21,17 @@ _promise_name_counter = itertools.count(1)
 
 
 def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+    """
+    Return the current active Promise or None.
+    """
     return Promise.get_current(raise_if_none=raise_if_none)
 
 
 class Promise(Future, Generic[T_co]):
+    """
+    A Future-like object that tracks parent/child relationships and configuration.
+    """
+
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
     _previous_token: Optional[contextvars.Token] = None
 
@@ -43,6 +54,9 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ) -> None:
+        """
+        Initialize a Promise with optional coroutine, parent, and configuration.
+        """
         # TODO Fix the following linting error:
         # pylint: disable=too-many-branches
 
@@ -102,14 +116,23 @@ class Promise(Future, Generic[T_co]):
                 self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
 
     def set_result(self, result: T_co) -> None:
+        """
+        Set the Promise result and mirror it to the concurrent Future.
+        """
         super().set_result(result)
         self._concurrent_future.set_result(result)
 
     def set_exception(self, exception: BaseException) -> None:
+        """
+        Set the Promise exception and mirror it to the concurrent Future.
+        """
         super().set_exception(exception)
         self._concurrent_future.set_exception(exception)
 
     async def _afulfill(self) -> None:
+        """
+        Execute the coroutine, manage activation/finalization, and settle outcome.
+        """
         # TODO Raise an error if there is no coroutine
         if self.done():
             raise RuntimeError("Promise is already done")  # TODO Come up with a better error message
@@ -131,6 +154,9 @@ class Promise(Future, Generic[T_co]):
                 self.set_result(result)
 
     def __await__(self) -> Generator[T_co, None, None]:
+        """
+        Await the Promise, starting execution if needed, then return result.
+        """
         if not self.done():
             if self._task is None:
                 yield from self._afulfill().__await__()  # pylint: disable=no-member
@@ -139,6 +165,9 @@ class Promise(Future, Generic[T_co]):
         return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
+        """
+        Compute the effective PromiseConfig from explicit or inherited values.
+        """
         # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
 
         if config is not None:
@@ -153,26 +182,44 @@ class Promise(Future, Generic[T_co]):
 
     @classmethod
     def get_current(cls, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+        """
+        Return the current active Promise for this context var.
+        """
         current = cls._current.get()
         if raise_if_none and current is None:
             raise NoCurrentPromiseError("No current Promise found")
         return current
 
     def get_parent(self, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+        """
+        Return the parent Promise or None.
+        """
         if raise_if_none and self._parent is None:
             raise NoParentPromiseError("No parent Promise found")
         return self._parent
 
     def is_active(self) -> bool:
+        """
+        Return True if this Promise is the current active one.
+        """
         return self._previous_token is not None
 
     def get_name(self) -> str:
+        """
+        Return the Promise name.
+        """
         return self._name
 
     def get_config(self) -> PromiseConfig:
+        """
+        Return this Promise's configuration.
+        """
         return self._config
 
     def get_pending_children(self) -> set["Promise[Any]"]:
+        """
+        Return a set of child Promises that are not done.
+        """
         # TODO Copy the explanation from asyncio.tasks::all_children() here
         i = 0
         while True:
@@ -186,13 +233,22 @@ class Promise(Future, Generic[T_co]):
                 return {child for child in children if not child.done()}
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
+        """
+        Return a concurrent.futures.Future view of this Promise.
+        """
         # TODO Should we ever copy the context vars to the caller's thread ?
         return self._concurrent_future
 
     def _activate(self) -> None:
+        """
+        Mark this Promise as current in the context var.
+        """
         self._previous_token = self._current.set(self)
 
     async def _afinalize(self) -> None:
+        """
+        Await children that must complete, then reset current context.
+        """
         # TODO Move this to wait_for_children() public method
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
@@ -208,11 +264,21 @@ class Promise(Future, Generic[T_co]):
 
 
 class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
+    """
+    A concurrent.futures.Future that mirrors a Promise's outcome.
+    """
+
     def __init__(self, promise: "Promise[Any]") -> None:
+        """
+        Initialize with the backing Promise whose state is mirrored.
+        """
         super().__init__()
         self._promise = promise
 
     def result(self, timeout: Optional[float] = None) -> Any:
+        """
+        Block for completion and return the result, notifying the Promise.
+        """
         try:
             # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
             # Future)
@@ -231,6 +297,9 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
         return result
 
     def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
+        """
+        Block for completion and return the exception, notifying the Promise.
+        """
         try:
             # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
             # Future)

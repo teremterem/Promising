@@ -1,3 +1,7 @@
+"""
+Configuration objects and defaults for Promises.
+"""
+
 from typing import Optional
 
 from promising.errors import NoCurrentPromiseError, NoParentConfigError
@@ -6,12 +10,20 @@ from promising.utils import get_bool_env, get_concrete_value
 
 
 class PromisingDefaults:
+    """
+    Process-wide default values loaded from environment variables.
+    """
+
     START_SOON = get_bool_env("PROMISING_DEFAULT_START_SOON", True)
     MAKE_PARENT_WAIT = get_bool_env("PROMISING_DEFAULT_MAKE_PARENT_WAIT", False)
     CONFIGS_INHERITABLE = get_bool_env("PROMISING_DEFAULT_CONFIGS_INHERITABLE", True)
 
 
 class PromiseConfig:
+    """
+    Immutable-like configuration for Promise behavior and inheritance.
+    """
+
     _parent_config: Optional["PromiseConfig"] = None
     _inheritable_parent_config: Optional["PromiseConfig"] = None
 
@@ -23,6 +35,9 @@ class PromiseConfig:
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
     ) -> None:
+        """
+        Build a PromiseConfig, inheriting values from the nearest inheritable parent.
+        """
         if parent_config is NOT_SET:
             try:
                 # pylint: disable=import-outside-toplevel,cyclic-import
@@ -55,25 +70,43 @@ class PromiseConfig:
             )
 
     def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+        """
+        Return this config's direct parent or None.
+        """
         if raise_if_none and self._parent_config is None:
             raise NoParentConfigError("No parent PromiseConfig found")
         return self._parent_config
 
     def get_inheritable_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+        """
+        Return nearest inheritable parent config or None.
+        """
         if raise_if_none and self._inheritable_parent_config is None:
             raise NoParentConfigError("No inheritable parent PromiseConfig found")
         return self._inheritable_parent_config
 
     def is_start_soon(self) -> bool:
+        """
+        True if Promises should start execution eagerly.
+        """
         return self._start_soon
 
     def is_make_parent_wait(self) -> bool:
+        """
+        True if parents should await eligible children on finalize.
+        """
         return self._make_parent_wait
 
     def is_config_inheritable(self) -> bool:
+        """
+        True if this config participates in inheritance chain.
+        """
         return self._config_inheritable
 
     def find_inheritable_config(self) -> "PromiseConfig":
+        """
+        Walk up parents to find the nearest inheritable configuration.
+        """
         # pylint: disable=protected-access
         config = self
         while config is not None:

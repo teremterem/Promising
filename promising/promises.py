@@ -186,7 +186,7 @@ class Promise(Future, Generic[T_co]):
                 return {child for child in children if not child.done()}
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
-        # TODO When is the best time to copy the context vars to the caller's thread ?
+        # TODO Should we ever copy the context vars to the caller's thread ?
         return self._concurrent_future
 
     def _activate(self) -> None:
@@ -218,14 +218,15 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             # Future)
             result = super().result(timeout=timeout)
         finally:
-            # Let's return the result from the Promise directly, so the Promise also knows that its result has been
-            # consumed
+            # Let's also read the result from the Promise directly, so it knows that its result has been consumed and
+            # there is no need to issue a warning about the promise not having been awaited for (which, by this point,
+            # would be done already)
             try:
                 self._promise.result()
             except BaseException:  # pylint: disable=broad-except
                 # Suppress the error if any - if there's an error, it should come from super().result(), not from here
                 pass
-        # For consistency, let's return the result from this concurrent Future, even though it's supposed to be the
+        # For consistency, let's return the result from this concurrent Future, even though it's going to be the
         # same as the result from the Promise
         return result
 
@@ -235,14 +236,15 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             # Future)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's return the exception from the Promise directly, so the Promise also knows that its exception has
-            # been consumed
+            # Let's also read the exception from the Promise directly, so it knows that its exception has been consumed
+            # and there is no need to issue a warning about the exception never being retrieved from the promise
+            # (which, by this point, would be done already)
             try:
                 self._promise.exception()
             except BaseException:  # pylint: disable=broad-except
                 # Suppress the error if any - if there's an error, it should come from super().exception(), not from
                 # here
                 pass
-        # For consistency, let's return the exception from this concurrent Future, even though it's supposed to be the
+        # For consistency, let's return the exception from this concurrent Future, even though it's going to be the
         # same as the exception from the Promise
         return exception

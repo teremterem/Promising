@@ -59,6 +59,8 @@ class Promise(Future, Generic[T_co]):
         _coro: The coroutine to execute for this Promise.
     """
 
+    # TODO Separate concerns: Promise vs PromiseContext (single responsibility principle) ? Is it worth it, though ?
+
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
     _previous_token: Optional[contextvars.Token] = None
 

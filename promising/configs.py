@@ -12,17 +12,14 @@ class PromisingDefaults:
     These defaults can be overridden via environment variables:
     - PROMISING_DEFAULT_START_SOON: Whether Promises start execution immediately
     - PROMISING_DEFAULT_MAKE_PARENT_WAIT: Whether parent Promises wait for children
-    - PROMISING_DEFAULT_CONFIGS_INHERITABLE: Whether configurations are inherited by children
 
     Attributes:
         START_SOON: Default value for whether Promises start immediately (default: True).
         MAKE_PARENT_WAIT: Default value for whether parents wait for children (default: False).
-        CONFIGS_INHERITABLE: Default value for config inheritance (default: True).
     """
 
     START_SOON = get_bool_env("PROMISING_DEFAULT_START_SOON", True)
     MAKE_PARENT_WAIT = get_bool_env("PROMISING_DEFAULT_MAKE_PARENT_WAIT", False)
-    CONFIGS_INHERITABLE = get_bool_env("PROMISING_DEFAULT_CONFIGS_INHERITABLE", True)
 
 
 class PromiseConfig:
@@ -36,8 +33,9 @@ class PromiseConfig:
         _parent_config: Direct parent configuration.
         _inheritable_parent_config: Nearest inheritable parent configuration.
         _start_soon: Whether the Promise starts execution immediately.
-        _make_parent_wait: Whether parent Promises wait for this Promise.
-        _config_inheritable: Whether child Promises can inherit this configuration.
+        _make_parent_wait: Whether parent Promises should wait for Promises with this config.
+        _config_inheritable: Whether child Promises can inherit this configuration. If False, child Promises will look
+            for an inheritable config up the hierarchy, and if none is found, will use the root config.
     """
 
     _parent_config: Optional["PromiseConfig"] = None
@@ -77,6 +75,9 @@ class PromiseConfig:
             self._parent_config = parent_config
 
         if self._parent_config is None:
+            # TODO Instead of turning this config into a root config, just create a static root config object globally
+            #  and use it as parent if there is no parent config.
+
             # This is a root PromiseConfig
             if config_inheritable is False:
                 raise ValueError("Cannot set config_inheritable to False for the root PromiseConfig")
@@ -91,9 +92,8 @@ class PromiseConfig:
             self._make_parent_wait = get_concrete_value(
                 make_parent_wait, self._inheritable_parent_config.is_make_parent_wait()
             )
-            self._config_inheritable = get_concrete_value(
-                config_inheritable, self._inheritable_parent_config.is_config_inheritable()
-            )
+            # TODO Separate it into `config_inheritable` and `child_configs_inheritable` ?
+            self._config_inheritable = get_concrete_value(config_inheritable, True)
 
     def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         """

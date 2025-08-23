@@ -98,6 +98,13 @@ class Promise(Future, Generic[T_co]):
         else:
             self._parent = parent
 
+        # TODO Is WeakSet below really going to work ? What about those child Promises that don't start_soon and the
+        #  user did not keep a reference to them so they could be awaited later (and let's say they were marked as
+        #  make_parent_wait) ? On one hand, they should not block the parent, because the parent will end up being
+        #  blocked forever. On the other hand, what are implications of ignoring such promises ? This should be
+        #  reconsidered when the library is used by MiniAgents and real life scenarios become clear.
+        # TODO Issue a warning if start_soon is False, but make_parent_wait is True ? Prohibit such combinations
+        #  altogether ?
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:

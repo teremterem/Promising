@@ -36,14 +36,16 @@ def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
 
 class Promise(Future, Generic[T_co]):
     """
-    A Promise implementation that extends asyncio.Future with context management and tree structure.
+    A Promise combines asyncio Future functionality with hierarchical context management.
 
-    Promise provides a context-aware asynchronous execution model where promises can form
-    hierarchical relationships with parent-child dependencies. Each Promise can be configured
-    with behavior settings that control execution timing and inheritance patterns.
+    Promises extend asyncio Futures to provide:
+    - Parent-child relationships between asynchronous operations
+    - Configuration inheritance from parent Promises
+    - Automatic child task management and waiting
+    - Thread-safe concurrent.futures compatibility
 
-    The Promise maintains context variables to track the currently active promise and supports
-    concurrent execution through both asyncio and concurrent.futures interfaces.
+    Type Parameters:
+        T_co: The covariant type of the Promise's result.
     """
 
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)

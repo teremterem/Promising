@@ -231,10 +231,11 @@ class Promise(Future, Generic[T_co]):
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
         """
-        Initialize the Promise configuration.
+        Initialize the Promise configuration by either returning an already constructed config or creating a new one
+        from the provided kwargs.
 
         Args:
-            config: Explicit configuration object.
+            config: An already existing configuration object.
             **kwargs: Individual configuration parameters.
 
         Returns:

@@ -277,7 +277,7 @@ class Promise(Future, Generic[T_co]):
 
     def get_parent(self, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
         """
-        Get the parent Promise of this instance.
+        Get the parent Promise of this Promise.
 
         Args:
             raise_if_none: If True, raises an exception when no parent exists.
@@ -294,25 +294,23 @@ class Promise(Future, Generic[T_co]):
 
     def is_active(self) -> bool:
         """
-        Check if this Promise is currently active in the context.
+        TODO It is unclear what this method is going to be used for. Is this information going to be useful outside of
+         the Promise class itself ?
 
         Returns:
-            True if the Promise is currently active (has set context), False otherwise.
+            True if the Promise is currently active, False otherwise.
         """
         return self._previous_token is not None
 
     def get_name(self) -> str:
         """
         Get the human-readable name of this Promise.
-
-        Returns:
-            The Promise's name string.
         """
         return self._name
 
     def get_config(self) -> PromiseConfig:
         """
-        Get the configuration object for this Promise.
+        Get the configuration object that controls the behavior of this Promise.
 
         Returns:
             The PromiseConfig instance associated with this Promise.
@@ -321,18 +319,19 @@ class Promise(Future, Generic[T_co]):
 
     def get_pending_children(self) -> set["Promise[Any]"]:
         """
-        Get all child Promises that are not yet completed.
+        Get child Promises that haven't completed yet (provided they are still reachable and weren't garbage collected
+        yet).
 
-        This method safely iterates through the WeakSet of children, handling
-        potential RuntimeError exceptions that can occur during iteration.
+        Handles potential race conditions when iterating over the WeakSet of children by retrying if the set changes
+        during iteration.
 
         Returns:
-            A set of child Promise instances that are still pending.
+            Set of child Promises that are not done.
 
         Raises:
-            RuntimeError: If unable to safely iterate children after 1000 attempts.
+            RuntimeError: If unable to get a stable view of children after 1000 attempts.
         """
-        # TODO Copy the explanation from asyncio.tasks::all_children() here
+        # TODO Copy the explanation from asyncio.tasks::all_children() here ?
         i = 0
         while True:
             try:
@@ -346,7 +345,7 @@ class Promise(Future, Generic[T_co]):
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
-        Get a concurrent.futures.Future interface to this Promise.
+        Get a thread-safe concurrent.futures.Future view of this Promise.
 
         This allows the Promise to be used in multi-threaded contexts where
         concurrent.futures.Future objects are expected.
@@ -354,7 +353,7 @@ class Promise(Future, Generic[T_co]):
         Returns:
             A concurrent.futures.Future that mirrors this Promise's state.
         """
-        # TODO Should we ever copy the context vars to the caller's thread ?
+        # TODO Should we ever copy the context vars to the caller's thread (if this even makes sense) ?
         return self._concurrent_future
 
     def _activate(self) -> None:
@@ -369,8 +368,8 @@ class Promise(Future, Generic[T_co]):
         """
         Finalize the Promise execution by waiting for children and restoring context.
 
-        Waits for all child promises that have make_parent_wait=True, then
-        restores the previous context state.
+        Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
+        the context (and restoring the previous value for the respective context var).
         """
         # TODO Move this to wait_for_children() public method
         promises_to_await = [
@@ -388,29 +387,25 @@ class Promise(Future, Generic[T_co]):
 
 class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
     """
-    A concurrent.futures.Future implementation backed by a Promise.
+    A thread-safe concurrent.futures.Future backed by a Promise.
 
-    This class provides a bridge between asyncio-based Promises and the
-    concurrent.futures interface, allowing Promises to be used in multi-threaded
-    contexts while maintaining proper result/exception synchronization.
+    This class provides a bridge between asyncio-based Promises and the concurrent.futures interface, allowing Promises
+    to be used in multi-threaded contexts while maintaining proper result/exception synchronization.
+
+    Args:
+        promise: The Promise instance that backs this concurrent future.
     """
 
     def __init__(self, promise: "Promise[Any]") -> None:
-        """
-        Initialize the concurrent future with a backing Promise.
-
-        Args:
-            promise: The Promise instance that backs this concurrent future.
-        """
         super().__init__()
         self._promise = promise
 
     def result(self, timeout: Optional[float] = None) -> Any:
         """
-        Get the result of the Promise, blocking until completion.
+        Get the result of the Promise.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's result is properly consumed.
+        This method blocks until the underlying Promise is done and ensures that the Promise's result is properly
+        consumed (asyncio will not issue a warning about the Promise not having been awaited for).
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
@@ -428,7 +423,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             result = super().result(timeout=timeout)
         finally:
             # Let's also read the result from the Promise directly, so it knows that its result has been consumed and
-            # there is no need to issue a warning about the promise not having been awaited for (which, by this point,
+            # there is no need to issue a warning about the Promise not having been awaited for (which, by this point,
             # would be done already)
             try:
                 self._promise.result()
@@ -443,8 +438,8 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
         """
         Get the exception that occurred during Promise execution, if any.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's exception is properly consumed.
+        This method blocks until the underlying Promise is done and ensures that the Promise's exception is properly
+        consumed (asyncio will not issue a warning about the exception not having been retrieved from the Promise).
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
@@ -461,7 +456,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             exception = super().exception(timeout=timeout)
         finally:
             # Let's also read the exception from the Promise directly, so it knows that its exception has been consumed
-            # and there is no need to issue a warning about the exception never being retrieved from the promise
+            # and there is no need to issue a warning about the exception never being retrieved from the Promise
             # (which, by this point, would be done already)
             try:
                 self._promise.exception()

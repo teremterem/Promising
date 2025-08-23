@@ -183,17 +183,20 @@ class Promise(Future, Generic[T_co]):
 
     async def _afulfill(self) -> None:
         """
-        Internal method to execute the Promise's coroutine and handle completion.
+        Execute the Promise's coroutine and manage its lifecycle.
 
-        This method activates the Promise context, executes the coroutine, handles any
-        exceptions, and finalizes by waiting for child promises and cleaning up context.
+        This method:
+        1. Activates the Promise as the current context
+        2. Executes the coroutine
+        3. Waits for child Promises if configured
+        4. Sets the result or exception
 
         Raises:
             RuntimeError: If the Promise is already done.
         """
         # TODO Raise an error if there is no coroutine
         if self.done():
-            raise RuntimeError("Promise is already done")  # TODO Come up with a better error message
+            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
 
         result = NOT_SET
         exception = NOT_SET

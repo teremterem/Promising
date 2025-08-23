@@ -216,13 +216,11 @@ class Promise(Future, Generic[T_co]):
 
     def __await__(self) -> Generator[T_co, None, None]:
         """
-        Make Promise awaitable by implementing the await protocol.
-
-        If the Promise hasn't started execution, starts it immediately.
-        Otherwise awaits the existing task.
+        If the Promise hasn't started yet, start execution of the coro via _afullfil() and run it to completion.
+        If already started via start_soon, wait for the existing task to complete.
 
         Returns:
-            Generator that yields the Promise result when complete.
+            A generator for the await protocol that eventually returns the result of the Promise.
         """
         if not self.done():
             if self._task is None:

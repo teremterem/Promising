@@ -347,8 +347,8 @@ class Promise(Future, Generic[T_co]):
         """
         Get a thread-safe concurrent.futures.Future view of this Promise.
 
-        This allows the Promise to be used in multi-threaded contexts where
-        concurrent.futures.Future objects are expected.
+        This allows the Promise to be used in multi-threaded contexts where concurrent.futures.Future objects are
+        expected.
 
         Returns:
             A concurrent.futures.Future that mirrors this Promise's state.

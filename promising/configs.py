@@ -14,6 +14,7 @@ class PromisingDefaults:
     All defaults can be overridden via environment variables prefixed with 'PROMISING_DEFAULT_'.
     """
 
+    # TODO Are we sure it even makes sense to read these defaults from environment variables in real systems ?
     START_SOON = get_bool_env("PROMISING_DEFAULT_START_SOON", True)
     MAKE_PARENT_WAIT = get_bool_env("PROMISING_DEFAULT_MAKE_PARENT_WAIT", False)
     CONFIGS_INHERITABLE = get_bool_env("PROMISING_DEFAULT_CONFIGS_INHERITABLE", True)
@@ -82,8 +83,8 @@ class PromiseConfig:
             self._make_parent_wait = get_concrete_value(
                 make_parent_wait, self._inheritable_parent_config.is_make_parent_wait()
             )
-            # TODO Separate it into `config_inheritable` and `child_configs_inheritable` ?
-            self._config_inheritable = get_concrete_value(config_inheritable, True)
+            # TODO Split it into `config_inheritable` and `child_configs_inheritable` ?
+            self._config_inheritable = get_concrete_value(config_inheritable, PromisingDefaults.CONFIGS_INHERITABLE)
 
     def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         """

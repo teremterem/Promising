@@ -157,7 +157,10 @@ class Promise(Future, Generic[T_co]):
 
     def set_result(self, result: T_co) -> None:
         """
-        Set the result of the Promise and its concurrent future.
+        Set the result of the Promise.
+
+        Also sets the result on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
+        method).
 
         Args:
             result: The result value to set.
@@ -167,7 +170,10 @@ class Promise(Future, Generic[T_co]):
 
     def set_exception(self, exception: BaseException) -> None:
         """
-        Set an exception on the Promise and its concurrent future.
+        Set an exception on the Promise.
+
+        Also sets the exception on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
+        method).
 
         Args:
             exception: The exception to set.

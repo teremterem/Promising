@@ -32,8 +32,12 @@ class PromiseConfig:
         start_soon: Whether Promises with this config should start execution immediately. More specifically, they are
                    scheduled to run at the next opportunity the asyncio event loop provides. If NOT_SET, inherits the
                    value from the nearest "inheritable" parent config.
-        make_parent_wait: Whether parent Promises should wait for Promises with this config. If NOT_SET, inherits the
-                         value from the nearest "inheritable" parent config.
+        make_parent_wait: Whether parent Promises should wait for Promises with this config. This is not about
+                         dependency waiting: if a Promise depends on other Promises, it will always wait for them
+                         regardless of configuration. This flag is about execution timing/ordering only—use it when a
+                         parent Promise must not finish earlier than certain child Promises for sequencing or user
+                         experience reasons. If NOT_SET, inherits the value from the nearest "inheritable" parent
+                         config.
         config_inheritable: Whether this configuration can be inherited by child Promises.
 
     Raises:

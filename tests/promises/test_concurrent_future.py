@@ -144,7 +144,11 @@ async def test_from_threads(
         promise = Promise(prefill_result="Result from thread test!")
     else:
 
+        call_count = 0
+
         async def sample_coro():
+            nonlocal call_count
+            call_count += 1
             await asyncio.sleep(0.2)
             return "Result from thread test!"
 
@@ -218,4 +222,5 @@ async def test_from_threads(
         else:
             assert isinstance(result3, concurrent.futures.TimeoutError)
 
-    # TODO [READY] Assert that the sample_coro() is called exactly once in this test method
+    if start_soon is not None:
+        assert call_count == 1

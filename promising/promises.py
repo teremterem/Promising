@@ -80,7 +80,7 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
-    # TODO Support cancellation of the whole Promise tree
+    # TODO [READY] Support cancellation of the whole Promise tree
 
     def __init__(
         self,
@@ -97,7 +97,7 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ) -> None:
-        # TODO Fix the following linting error:
+        # TODO [READY] Fix the following linting error:
         # pylint: disable=too-many-branches
 
         if parent is NOT_SET:
@@ -117,8 +117,6 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             if loop is None:
                 loop = self._parent._loop
-                # TODO What if both, loop and parent loop are None ? That would NOT necessarily mean that they end up
-                #  in the same loop !
             elif loop is not self._parent._loop:
                 raise ValueError("Parent and child Promises must share the same event loop")
 
@@ -203,7 +201,7 @@ class Promise(Future, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done.
         """
-        # TODO Raise an error if there is no coroutine
+        # TODO [READY] Raise an error if there is no coroutine
         if self.done():
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
 
@@ -216,12 +214,13 @@ class Promise(Future, Generic[T_co]):
         except BaseException as exc:  # pylint: disable=broad-except
             exception = exc
         finally:
-            await self._afinalize()  # TODO Should we try-except this line too ?
-
-            if exception is not NOT_SET:
-                self.set_exception(exception)
-            else:
-                self.set_result(result)
+            try:
+                await self._afinalize()
+            finally:
+                if exception is not NOT_SET:
+                    self.set_exception(exception)
+                else:
+                    self.set_result(result)
 
     def __await__(self) -> Generator[T_co, None, None]:
         """
@@ -258,8 +257,6 @@ class Promise(Future, Generic[T_co]):
         Raises:
             ValueError: If both a config object and any explicit config kwargs are provided.
         """
-        # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
-
         if config is not None:
             if any(value is not NOT_SET for value in kwargs.values()):
                 raise ValueError("Cannot provide both a 'config' object and explicit config kwargs")
@@ -345,11 +342,16 @@ class Promise(Future, Generic[T_co]):
         Raises:
             RuntimeError: If unable to get a stable view of children after 1000 attempts.
         """
-        # TODO Copy the explanation from asyncio.tasks::all_children() here ?
+        # # COPIED FROM asyncio.tasks::all_tasks():
+        # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
+        # thread while we do so. Therefore we cast it to list prior to filtering. The list
+        # cast itself requires iteration, so we repeat it several times ignoring
+        # RuntimeErrors (which are not very likely to occur). See issues 34970 and 36607 for
+        # details.
         i = 0
         while True:
             try:
-                children = list(self._children)
+                children = list(self._children)  # In `asyncio.tasks` it was `_all_tasks` instead of `self._children`
             except RuntimeError:
                 i += 1
                 if i > 1000:
@@ -385,7 +387,7 @@ class Promise(Future, Generic[T_co]):
         Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
         the context (and restoring the previous value for the respective context var).
         """
-        # TODO Move this to wait_for_children() public method
+        # TODO [READY] Move this to wait_for_children() public method
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]

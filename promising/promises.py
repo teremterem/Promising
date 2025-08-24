@@ -80,7 +80,7 @@ class Promise(Future, Generic[T_co]):
 
     _task: Optional[Task[T_co]] = None
 
-    # TODO [READY] Support cancellation of the whole Promise tree
+    # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
     def __init__(
         self,

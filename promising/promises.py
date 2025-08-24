@@ -201,7 +201,8 @@ class Promise(Future, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done.
         """
-        # TODO [READY] Raise an error if there is no coroutine
+        if self._coro is None:
+            raise RuntimeError(f"Cannot fulfill a Promise without a coroutine: {self.get_name()}")
         if self.done():
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
 
@@ -359,6 +360,22 @@ class Promise(Future, Generic[T_co]):
             else:
                 return {child for child in children if not child.done()}
 
+    async def await_for_children(self) -> None:
+        """
+        Wait for all child Promises that have make_parent_wait=True.
+
+        This method gathers and waits for all child Promises that are configured to make their parent wait.
+        Exceptions from child Promises are caught and returned but do not propagate to interrupt the waiting process.
+        """
+        promises_to_await = [
+            child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
+        ]
+        if promises_to_await:
+            # TODO Do errors disappear from stdout/stderr when they are "gathered" like this ? Do they make it to
+            #  stdout/stderr only when the whole python process exits ? We should somehow show the errors to the user
+            #  as soon as they happen (for all children, not just the ones that make the parent wait).
+            await asyncio.gather(*promises_to_await, return_exceptions=True)
+
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
         Get a thread-safe concurrent.futures.Future view of this Promise.
@@ -387,15 +404,7 @@ class Promise(Future, Generic[T_co]):
         Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
         the context (and restoring the previous value for the respective context var).
         """
-        # TODO [READY] Move this to await_for_children() public method
-        promises_to_await = [
-            child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
-        ]
-        if promises_to_await:
-            # TODO Do errors disappear from stdout/stderr when they are "gathered" like this ? Do they make it to
-            #  stdout/stderr only when the whole python process exits ? We should somehow show the errors to the user
-            #  as soon as they happen (for all children, not just the ones that make the parent wait).
-            await asyncio.gather(*promises_to_await, return_exceptions=True)
+        await self.await_for_children()
 
         self._current.reset(self._previous_token)
         self._previous_token = None

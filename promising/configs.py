@@ -108,8 +108,7 @@ class PromiseConfig:
             raise_if_none: If True, raises an exception when no inheritable parent exists.
 
         Returns:
-            The nearest inheritable parent PromiseConfig, or None if none exists and
-            raise_if_none is False.
+            The nearest inheritable parent PromiseConfig, or None if none exists and raise_if_none is False.
 
         Raises:
             NoParentConfigError: If no inheritable parent exists and raise_if_none is True.
@@ -120,7 +119,8 @@ class PromiseConfig:
 
     def is_start_soon(self) -> bool:
         """
-        Check if Promises with this config should start execution immediately.
+        Check if Promises with this config should start execution immediately, or more specifically, at the nearest
+        opportunity the asyncio event loop provides.
 
         Returns:
             True if Promises should start soon, False otherwise.
@@ -129,10 +129,10 @@ class PromiseConfig:
 
     def is_make_parent_wait(self) -> bool:
         """
-        Check if parent Promises should wait for Promises with this config.
+        Check if a parent Promise should wait for a Promise (or Promises) with this config.
 
         Returns:
-            True if parents should wait, False otherwise.
+            True if a parent should wait, False otherwise.
         """
         return self._make_parent_wait
 

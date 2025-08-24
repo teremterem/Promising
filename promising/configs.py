@@ -29,12 +29,14 @@ class PromiseConfig:
     Args:
         parent_config: Parent configuration to inherit from. If NOT_SET, uses currently active Promise's config as a
                       parent.
-        start_soon: Whether Promises with this config should start execution immediately.
-        make_parent_wait: Whether parent Promises should wait for Promises with this config.
+        start_soon: Whether Promises with this config should start execution immediately. If NOT_SET, inherits the
+                   value from the nearest "inheritable" parent config.
+        make_parent_wait: Whether parent Promises should wait for Promises with this config. If NOT_SET, inherits the
+                         value from the nearest "inheritable" parent config.
         config_inheritable: Whether this configuration can be inherited by child Promises.
 
     Raises:
-        ValueError: If config_inheritable is False for a root config, or invalid combinations.
+        ValueError: If config_inheritable is False for a root configuration.
     """
 
     _parent_config: Optional["PromiseConfig"] = None

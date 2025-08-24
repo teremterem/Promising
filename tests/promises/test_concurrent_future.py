@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import threading
 from typing import Optional
+from unittest.mock import AsyncMock
 import pytest
 from promising.promises import Promise
 
@@ -139,14 +140,16 @@ async def test_from_threads(
     """
 
     # Create a Promise
+    sample_coro_mock = None
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a prefilled promise
         promise = Promise(prefill_result="Result from thread test!")
     else:
+        sample_coro_mock = AsyncMock(return_value="Result from thread test!")
 
         async def sample_coro():
             await asyncio.sleep(0.2)
-            return "Result from thread test!"
+            return await sample_coro_mock()
 
         promise = Promise(sample_coro(), start_soon=start_soon)
 
@@ -218,4 +221,6 @@ async def test_from_threads(
         else:
             assert isinstance(result3, concurrent.futures.TimeoutError)
 
-    # TODO [READY] Assert that the sample_coro() is called exactly once in this test method
+    # Assert that the sample_coro() is called exactly once in this test method
+    if sample_coro_mock is not None:
+        sample_coro_mock.assert_called_once()

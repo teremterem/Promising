@@ -18,7 +18,7 @@ _promise_name_counter = itertools.count(1)
 
 def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
     """
-    Get the currently active Promise in the current context.
+    Get the currently active Promise from context.
 
     Args:
         raise_if_none: If True, raises NoCurrentPromiseError when no current Promise is found.
@@ -43,8 +43,33 @@ class Promise(Future, Generic[T_co]):
     - Automatic child task management and waiting
     - Thread-safe concurrent.futures compatibility
 
+    Parent-child relationships semantics:
+    - If the coroutine of a Promise creates other Promise instances during its execution, those Promises are
+      attached as children of that Promise.
+    - The exact time when a child's execution starts, finishes, or when its resolution is triggered does not matter
+      (it may occur outside of the parent's execution window); it is still registered as a child of the Promise whose
+      coroutine created it.
+    - If a parent is explicitly specified at creation time, that explicit parent takes precedence.
+
     Type Parameters:
         T_co: The covariant type of the Promise's result.
+
+    Args:
+        coro: The coroutine to execute. If None, the Promise must be prefilled with a result or exception.
+        loop: The event loop to use. If not provided, inherits from the parent Promise. If no parent Promise, uses the
+        current running loop.
+        name: Human-readable name for the Promise. If None, generates a unique name.
+        parent: Parent Promise instance. If NOT_SET, uses current Promise as parent.
+        config: Configuration object. Cannot be combined with explicit config parameters.
+        start_soon: Whether to start execution immediately. Defaults to config or parent setting.
+        make_parent_wait: Whether parent should wait for this Promise. Defaults to config.
+        config_inheritable: Whether this config can be inherited by children.
+        prefill_result: Pre-set result value. Cannot be combined with coro or prefill_exception.
+        prefill_exception: Pre-set exception. Cannot be combined with coro or prefill_result.
+
+    Raises:
+        ValueError: If invalid parameter combinations are provided.
+        TypeError: If coro is not a coroutine when provided.
     """
 
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
@@ -69,26 +94,6 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ) -> None:
-        """
-        Initialize a new Promise instance.
-
-        Args:
-            coro: The coroutine to execute. If None, the Promise must be prefilled with a result
-                 or exception.
-            loop: The event loop to use. If not provided, inherits from parent or uses default.
-            name: Human-readable name for the Promise. If None, generates a unique name.
-            parent: Parent Promise instance. If NOT_SET, uses current Promise as parent.
-            config: Configuration object. Cannot be combined with explicit config parameters.
-            start_soon: Whether to start execution immediately. Defaults to config or parent setting.
-            make_parent_wait: Whether parent should wait for this Promise. Defaults to config.
-            config_inheritable: Whether this config can be inherited by children.
-            prefill_result: Pre-set result value. Cannot be combined with coro or prefill_exception.
-            prefill_exception: Pre-set exception. Cannot be combined with coro or prefill_result.
-
-        Raises:
-            ValueError: If invalid parameter combinations are provided.
-            TypeError: If coro is not a coroutine when provided.
-        """
         # TODO Fix the following linting error:
         # pylint: disable=too-many-branches
 

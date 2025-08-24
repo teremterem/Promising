@@ -387,7 +387,7 @@ class Promise(Future, Generic[T_co]):
         Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
         the context (and restoring the previous value for the respective context var).
         """
-        # TODO [READY] Move this to wait_for_children() public method
+        # TODO [READY] Move this to await_for_children() public method
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]

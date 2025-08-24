@@ -57,18 +57,21 @@ class Promise(Future, Generic[T_co]):
     Args:
         coro: The coroutine to execute. If None, the Promise must be prefilled with a result or exception.
         loop: The event loop to use. If not provided, inherits from the parent Promise. If no parent Promise, uses the
-        current running loop.
-        name: Human-readable name for the Promise. If None, generates a unique name.
-        parent: Parent Promise instance. If NOT_SET, uses current Promise as parent.
+             current running loop. If provided explicitly and a parent Promise exists, must be the same event loop as
+             the parent's loop.
+        name: Human-readable name for the Promise. If None, generates a unique name ("Promise-N", where N is a number).
+        parent: Parent Promise instance. If NOT_SET, uses the currently active Promise as parent.
         config: Configuration object. Cannot be combined with explicit config parameters.
-        start_soon: Whether to start execution immediately. Defaults to config or parent setting.
-        make_parent_wait: Whether parent should wait for this Promise. Defaults to config.
-        config_inheritable: Whether this config can be inherited by children.
+        start_soon: Whether to start execution immediately. If NOT_SET, uses [inheritable] parent config setting.
+        make_parent_wait: Whether parent should wait for this Promise. If NOT_SET, uses [inheritable] parent config
+                         setting.
+        config_inheritable: Whether this config can be inherited by children. If NOT_SET, defaults to True (unless the
+                           default is overridden via PROMISING_DEFAULT_CONFIGS_INHERITABLE environment variable).
         prefill_result: Pre-set result value. Cannot be combined with coro or prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro or prefill_result.
 
     Raises:
-        ValueError: If invalid parameter combinations are provided.
+        ValueError: If invalid parameter combinations are provided. See parameter descriptions above.
         TypeError: If coro is not a coroutine when provided.
     """
 
@@ -161,7 +164,8 @@ class Promise(Future, Generic[T_co]):
 
     def set_result(self, result: T_co) -> None:
         """
-        Set the result of the Promise.
+        Set the result of the Promise. This method is not intended to be called directly by users; it is managed by the
+        Promise's lifecycle.
 
         Also sets the result on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
         method).
@@ -174,7 +178,8 @@ class Promise(Future, Generic[T_co]):
 
     def set_exception(self, exception: BaseException) -> None:
         """
-        Set an exception on the Promise.
+        Set an exception on the Promise. This method is not intended to be called directly by users; it is managed by
+        the Promise's lifecycle.
 
         Also sets the exception on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
         method).
@@ -192,7 +197,7 @@ class Promise(Future, Generic[T_co]):
         This method:
         1. Activates the Promise as the current context
         2. Executes the coroutine
-        3. Waits for child Promises if configured
+        3. Waits for child Promises that have make_parent_wait=True
         4. Sets the result or exception
 
         Raises:

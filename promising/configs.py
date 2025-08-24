@@ -9,9 +9,9 @@ class PromisingDefaults:
     """
     Default configuration values for the Promising library.
 
-    This class defines environment-variable-backed default settings that control
-    the behavior of Promise instances when no explicit configuration is provided.
-    All defaults can be overridden via environment variables prefixed with 'PROMISING_DEFAULT_'.
+    This class defines environment-variable-backed default settings that control the behavior of Promise instances when
+    no explicit configuration is provided. All defaults can be overridden via environment variables prefixed with
+    'PROMISING_DEFAULT_'.
     """
 
     # TODO Are we sure it even makes sense to read these defaults from environment variables in real systems ?

@@ -25,6 +25,16 @@ class PromiseConfig:
     Configuration object for Promise behavior.
 
     Configurations can form hierarchical relationships where child configs inherit settings from their parents.
+
+    Args:
+        parent_config: Parent configuration to inherit from. If NOT_SET, uses currently active Promise's config as a
+                      parent.
+        start_soon: Whether Promises with this config should start execution immediately.
+        make_parent_wait: Whether parent Promises should wait for Promises with this config.
+        config_inheritable: Whether this configuration can be inherited by child Promises.
+
+    Raises:
+        ValueError: If config_inheritable is False for a root config, or invalid combinations.
     """
 
     _parent_config: Optional["PromiseConfig"] = None
@@ -38,18 +48,6 @@ class PromiseConfig:
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
     ) -> None:
-        """
-        Initialize a new PromiseConfig instance.
-
-        Args:
-            parent_config: Parent configuration to inherit from. If NOT_SET, uses current Promise's config.
-            start_soon: Whether Promises with this config should start execution immediately.
-            make_parent_wait: Whether parent Promises should wait for Promises with this config.
-            config_inheritable: Whether this configuration can be inherited by child Promises.
-
-        Raises:
-            ValueError: If config_inheritable is False for a root config, or invalid combinations.
-        """
         if parent_config is NOT_SET:
             try:
                 # pylint: disable=import-outside-toplevel,cyclic-import

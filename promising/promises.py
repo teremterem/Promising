@@ -97,7 +97,7 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ) -> None:
-        # TODO [READY] Fix the following linting error:
+        # TODO [ALMOST READY] Fix the following linting error:
         # pylint: disable=too-many-branches
 
         if parent is NOT_SET:

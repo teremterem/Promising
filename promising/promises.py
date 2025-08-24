@@ -22,7 +22,6 @@ def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
 
     Args:
         raise_if_none: If True, raises NoCurrentPromiseError when no current Promise is found.
-                      If False, returns None instead.
 
     Returns:
         The currently active Promise instance, or None if no Promise is active and

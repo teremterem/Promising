@@ -22,12 +22,9 @@ class PromisingDefaults:
 
 class PromiseConfig:
     """
-    Configuration object for Promise behavior and inheritance.
+    Configuration object for Promise behavior.
 
-    PromiseConfig manages the behavioral settings for Promise instances, including
-    execution timing, parent-child relationships, and configuration inheritance.
-    Configurations can form hierarchical relationships where child configs inherit
-    settings from their parents.
+    Configurations can form hierarchical relationships where child configs inherit settings from their parents.
     """
 
     _parent_config: Optional["PromiseConfig"] = None

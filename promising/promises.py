@@ -240,18 +240,23 @@ class Promise(Future, Generic[T_co]):
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
         """
-        Initialize the Promise configuration by either returning an already constructed config or creating a new one
-        from the provided kwargs.
+        Initialize the Promise configuration.
+
+        Behavior:
+        - If an explicit config object is provided, return it (as is).
+        - Else, if all individual config kwargs are NOT_SET and a parent Promise exists, return the nearest inheritable
+          parent configuration.
+        - Else, construct and return a new PromiseConfig from the provided kwargs.
 
         Args:
-            config: An already existing configuration object.
+            config: Explicit configuration object.
             **kwargs: Individual configuration parameters.
 
         Returns:
-            The initialized PromiseConfig instance.
+            A PromiseConfig instance.
 
         Raises:
-            ValueError: If both config object and kwargs are provided.
+            ValueError: If both a config object and any explicit config kwargs are provided.
         """
         # TODO If config is provided and any of the kwarg values are not NOT_SET, raise a ValueError
 

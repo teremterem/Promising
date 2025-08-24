@@ -22,6 +22,8 @@ async def test_as_concurrent_future(
     Test Promise.as_concurrent_future().
     """
 
+    call_count = 0
+
     # Create a Promise
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a prefilled promise
@@ -29,6 +31,8 @@ async def test_as_concurrent_future(
     else:
 
         async def sample_coro():
+            nonlocal call_count
+            call_count += 1
             await asyncio.sleep(0.1)
             return "Hello from Promise!"
 
@@ -64,6 +68,9 @@ async def test_as_concurrent_future(
         # In all other scenarios the promise should be done
         assert concurrent_future.done()
         assert concurrent_future.result() == "Hello from Promise!"
+
+    if start_soon is not None:
+        assert call_count == 1
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
@@ -130,6 +137,7 @@ async def test_with_exception(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
+# pylint: disable=too-many-statements
 async def test_from_threads(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
@@ -138,6 +146,8 @@ async def test_from_threads(
     Test accessing Promise result from different threads.
     """
 
+    call_count = 0
+
     # Create a Promise
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a prefilled promise
@@ -145,6 +155,8 @@ async def test_from_threads(
     else:
 
         async def sample_coro():
+            nonlocal call_count
+            call_count += 1
             await asyncio.sleep(0.2)
             return "Result from thread test!"
 
@@ -218,4 +230,5 @@ async def test_from_threads(
         else:
             assert isinstance(result3, concurrent.futures.TimeoutError)
 
-    # TODO [READY] Assert that the sample_coro() is called exactly once in this test method
+    if start_soon is not None:
+        assert call_count == 1

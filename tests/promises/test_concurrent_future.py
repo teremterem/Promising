@@ -139,12 +139,15 @@ async def test_from_threads(
     """
 
     # Create a Promise
+    call_count = 0
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a prefilled promise
         promise = Promise(prefill_result="Result from thread test!")
     else:
 
         async def sample_coro():
+            nonlocal call_count
+            call_count += 1
             await asyncio.sleep(0.2)
             return "Result from thread test!"
 
@@ -152,38 +155,25 @@ async def test_from_threads(
 
     concurrent_future = promise.as_concurrent_future()
 
-    result1 = None
-    result2 = None
-    result3 = None
+    results = [None, None, None]
 
-    def thread_function1():
-        nonlocal result1
-        try:
-            result1 = concurrent_future.result(timeout=0.4)
-        except concurrent.futures.TimeoutError as e:
-            result1 = e
+    def make_thread(idx, timeout):
+        def run():
+            nonlocal results
+            try:
+                results[idx] = concurrent_future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError as e:
+                results[idx] = e
 
-    def thread_function2():
-        nonlocal result2
-        try:
-            result2 = concurrent_future.result(timeout=0.4)
-        except concurrent.futures.TimeoutError as e:
-            result2 = e
+        return threading.Thread(target=run)
 
-    def thread_function3():
-        nonlocal result3
-        try:
-            # Time out earlier than the promise is completed
-            result3 = concurrent_future.result(timeout=0.1)
-        except concurrent.futures.TimeoutError as e:
-            result3 = e
-
-    thread1 = threading.Thread(target=thread_function1)
-    thread2 = threading.Thread(target=thread_function2)
-    thread3 = threading.Thread(target=thread_function3)
-    thread1.start()
-    thread2.start()
-    thread3.start()
+    threads = [
+        make_thread(0, 0.4),
+        make_thread(1, 0.4),
+        make_thread(2, 0.1),
+    ]
+    for t in threads:
+        t.start()
 
     if await_promise is True:
         await promise
@@ -192,30 +182,32 @@ async def test_from_threads(
         await asyncio.sleep(0.3)
     # `await_promise=None` in our test means that we don't want to await for anything at all (no task switching)
 
-    thread1.join()
-    thread2.join()
-    thread3.join()
+    for t in threads:
+        t.join()
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
-        assert isinstance(result1, concurrent.futures.TimeoutError)
-        assert isinstance(result2, concurrent.futures.TimeoutError)
-        assert isinstance(result3, concurrent.futures.TimeoutError)
+        assert isinstance(results[0], concurrent.futures.TimeoutError)
+        assert isinstance(results[1], concurrent.futures.TimeoutError)
+        assert isinstance(results[2], concurrent.futures.TimeoutError)
 
         # Now, that we ensured that concurrent_future is not done no matter the waiting time out, let's await for the
         # promise directly, so we don't get the asyncio warning about it never being awaited
         await promise
 
     else:
-        assert result1 == "Result from thread test!"
-        assert result2 == "Result from thread test!"
+        assert results[0] == "Result from thread test!"
+        assert results[1] == "Result from thread test!"
         if start_soon is None:
             # The promise was prefilled, so the result should be available even for the thread that did not wait long
             # enough
-            assert result3 == "Result from thread test!"
+            assert results[2] == "Result from thread test!"
         else:
-            assert isinstance(result3, concurrent.futures.TimeoutError)
+            assert isinstance(results[2], concurrent.futures.TimeoutError)
 
-    # TODO [READY] Assert that the sample_coro() is called exactly once in this test method
+    if start_soon is None:
+        assert call_count == 0
+    else:
+        assert call_count == 1

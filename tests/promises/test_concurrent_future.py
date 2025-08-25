@@ -139,12 +139,17 @@ async def test_from_threads(
     """
 
     # Create a Promise
+    calls = 0
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a prefilled promise
         promise = Promise(prefill_result="Result from thread test!")
     else:
 
+        calls = 0
+
         async def sample_coro():
+            nonlocal calls
+            calls += 1
             await asyncio.sleep(0.2)
             return "Result from thread test!"
 
@@ -212,10 +217,9 @@ async def test_from_threads(
         assert result1 == "Result from thread test!"
         assert result2 == "Result from thread test!"
         if start_soon is None:
-            # The promise was prefilled, so the result should be available even for the thread that did not wait long
-            # enough
             assert result3 == "Result from thread test!"
         else:
             assert isinstance(result3, concurrent.futures.TimeoutError)
 
-    # TODO [READY] Assert that the sample_coro() is called exactly once in this test method
+    if start_soon is not None:
+        assert calls == 1

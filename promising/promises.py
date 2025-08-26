@@ -199,11 +199,14 @@ class Promise(Future, Generic[T_co]):
         4. Sets the result or exception
 
         Raises:
-            RuntimeError: If the Promise is already done.
+            RuntimeError: If the Promise is already done or has no coroutine.
         """
-        # TODO [READY] Raise an error if there is no coroutine
         if self.done():
+            # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
+        if self._coro is None:
+            # Should not happen
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self.get_name()}")
 
         result = NOT_SET
         exception = NOT_SET
@@ -387,7 +390,15 @@ class Promise(Future, Generic[T_co]):
         Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
         the context (and restoring the previous value for the respective context var).
         """
-        # TODO [READY] Move this to await_for_children() public method
+        await self.await_for_children()
+
+        self._current.reset(self._previous_token)
+        self._previous_token = None
+
+    async def await_for_children(self) -> None:
+        """
+        Wait for child Promises that require the parent to wait.
+        """
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
@@ -396,9 +407,6 @@ class Promise(Future, Generic[T_co]):
             #  stdout/stderr only when the whole python process exits ? We should somehow show the errors to the user
             #  as soon as they happen (for all children, not just the ones that make the parent wait).
             await asyncio.gather(*promises_to_await, return_exceptions=True)
-
-        self._current.reset(self._previous_token)
-        self._previous_token = None
 
 
 class _PromiseBackedConcurrentFuture(concurrent.futures.Future):

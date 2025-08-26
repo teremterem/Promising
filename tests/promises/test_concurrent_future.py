@@ -218,8 +218,8 @@ async def test_from_threads(
         assert results[0] == "Result from thread test!"
         assert results[1] == "Result from thread test!"
         if start_soon is None:
-            # The promise was prefilled, so the result should be available even for the thread that did not wait long
-            # enough
+            # The promise was prefilled, so the result should be available even for the thread that did not wait for
+            # too long
             assert results[2] == "Result from thread test!"
         else:
             assert isinstance(results[2], concurrent.futures.TimeoutError)

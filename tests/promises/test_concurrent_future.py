@@ -70,6 +70,7 @@ async def test_as_concurrent_future(
         assert concurrent_future.result() == "Hello from Promise!"
 
     if start_soon is None:
+        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
         assert call_count == 0
     else:
         assert call_count == 1
@@ -141,6 +142,7 @@ async def test_with_exception(
         assert str(exc_info.value) == "Test error from Promise!"
 
     if start_soon is None:
+        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
         assert call_count == 0
     else:
         assert call_count == 1
@@ -148,7 +150,6 @@ async def test_with_exception(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-# pylint: disable=too-many-statements
 async def test_from_threads(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
@@ -224,6 +225,7 @@ async def test_from_threads(
             assert isinstance(results[2], concurrent.futures.TimeoutError)
 
     if start_soon is None:
+        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
         assert call_count == 0
     else:
         assert call_count == 1

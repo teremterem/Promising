@@ -199,7 +199,7 @@ class Promise(Future, Generic[T_co]):
         4. Sets the result or exception
 
         Raises:
-            RuntimeError: If the Promise is already done.
+            RuntimeError: If the Promise is already done or has no coroutine.
         """
         if self.done():
             # Should not happen

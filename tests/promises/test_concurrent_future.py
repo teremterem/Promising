@@ -19,7 +19,43 @@ async def test_as_concurrent_future(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future().
+    Test Promise.as_concurrent_future() method functionality across various execution scenarios.
+
+    This test validates that the concurrent.futures.Future wrapper returned by Promise.as_concurrent_future()
+    correctly mirrors the Promise's state and result. It tests different combinations of:
+    - Promise creation modes (immediate start, lazy start, prefilled)
+    - Promise awaiting behaviors (direct await, indirect await, no await)
+    - Future retrieval timing (before or after awaiting)
+
+    Test Parameters:
+        start_soon: Controls Promise execution timing:
+            - True: Promise starts execution immediately upon creation
+            - False: Promise starts only when awaited
+            - None: Creates prefilled Promise with result (no coroutine execution)
+        await_promise: Controls awaiting behavior:
+            - True: Directly awaits the Promise
+            - False: Performs general async sleep without awaiting Promise
+            - None: No async operations (no task switching)
+        get_future_before_await: Whether to retrieve concurrent future before or after awaiting
+
+    Step-by-step test execution:
+    1. Initialize call counter to track coroutine execution
+    2. Create Promise based on start_soon parameter:
+       - If None: Create prefilled Promise with "Hello from Promise!" result
+       - Otherwise: Create Promise with sample_coro() that sleeps 0.1s and returns result
+    3. Optionally get concurrent future before any awaiting (if get_future_before_await=True)
+    4. Execute awaiting behavior based on await_promise parameter:
+       - True: Await the Promise directly
+       - False: Sleep 0.2s without awaiting Promise
+       - None: No async operations
+    5. Optionally get concurrent future after awaiting (if get_future_before_await=False)
+    6. Verify concurrent future is instance of concurrent.futures.Future
+    7. Check Promise completion status based on execution scenario:
+       - Not done: When Promise doesn't start soon and isn't awaited directly, or no task switching occurs
+       - Done: In all other scenarios, verify result equals "Hello from Promise!"
+    8. Validate coroutine execution count:
+       - 0 calls for prefilled Promises
+       - 1 call for coroutine-based Promises
     """
 
     call_count = 0
@@ -85,7 +121,43 @@ async def test_with_exception(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future() with exceptions.
+    Test Promise.as_concurrent_future() exception handling across various execution scenarios.
+
+    This test validates that the concurrent.futures.Future wrapper correctly propagates exceptions
+    from the underlying Promise. It mirrors test_as_concurrent_future but focuses on exception
+    scenarios, ensuring that exceptions are properly handled whether the Promise is prefilled
+    with an exception or raises during coroutine execution.
+
+    Test Parameters:
+        start_soon: Controls Promise execution timing:
+            - True: Promise starts execution immediately upon creation
+            - False: Promise starts only when awaited
+            - None: Creates prefilled Promise with ValueError exception
+        await_promise: Controls awaiting behavior:
+            - True: Directly awaits the Promise (expects ValueError)
+            - False: Performs general async sleep without awaiting Promise
+            - None: No async operations (no task switching)
+        get_future_before_await: Whether to retrieve concurrent future before or after awaiting
+
+    Step-by-step test execution:
+    1. Initialize call counter to track coroutine execution
+    2. Create Promise based on start_soon parameter:
+       - If None: Create prefilled Promise with ValueError("Test error from Promise!")
+       - Otherwise: Create Promise with failing_coro() that sleeps 0.1s then raises ValueError
+    3. Optionally get concurrent future before any awaiting (if get_future_before_await=True)
+    4. Execute awaiting behavior based on await_promise parameter:
+       - True: Await the Promise directly, expecting ValueError to be raised
+       - False: Sleep 0.2s without awaiting Promise
+       - None: No async operations
+    5. Optionally get concurrent future after awaiting (if get_future_before_await=False)
+    6. Verify concurrent future is instance of concurrent.futures.Future
+    7. Check Promise completion and exception status based on execution scenario:
+       - Not done: When Promise doesn't start soon and isn't awaited directly, or no task switching occurs
+         - Await Promise directly to consume exception and prevent asyncio warnings
+       - Done: In all other scenarios, verify concurrent future raises ValueError with expected message
+    8. Validate coroutine execution count:
+       - 0 calls for prefilled Promises with exceptions
+       - 1 call for coroutine-based Promises that raise exceptions
     """
 
     call_count = 0
@@ -155,7 +227,54 @@ async def test_from_threads(
     await_promise: Optional[bool],
 ):
     """
-    Test accessing Promise result from different threads.
+    Test concurrent access to Promise results from multiple threads using as_concurrent_future().
+
+    This test validates the thread-safety of the concurrent.futures.Future wrapper by accessing
+    the Promise result from multiple threads simultaneously. It ensures that the Promise's
+    as_concurrent_future() method provides proper thread-safe access to results while respecting
+    timeout constraints and Promise execution timing.
+
+    Test Parameters:
+        start_soon: Controls Promise execution timing:
+            - True: Promise starts execution immediately upon creation
+            - False: Promise starts only when awaited
+            - None: Creates prefilled Promise with result (no coroutine execution)
+        await_promise: Controls main thread awaiting behavior:
+            - True: Main thread directly awaits the Promise
+            - False: Main thread sleeps 0.3s without awaiting Promise
+            - None: Main thread performs no async operations (no task switching)
+
+    Step-by-step test execution:
+    1. Initialize call counter to track coroutine execution
+    2. Create Promise based on start_soon parameter:
+       - If None: Create prefilled Promise with "Result from thread test!" result
+       - Otherwise: Create Promise with sample_coro() that sleeps 0.2s and returns result
+    3. Get concurrent future for thread access
+    4. Initialize results list to store outcomes from 3 worker threads
+    5. Define thread_function that attempts to get result with specified timeout:
+       - Stores successful result or TimeoutError in results array
+    6. Create and start 3 threads with different timeout values:
+       - Thread 0: 0.4s timeout (should succeed if Promise completes)
+       - Thread 1: 0.4s timeout (should succeed if Promise completes)
+       - Thread 2: 0.1s timeout (may timeout for slow Promises)
+    7. Execute main thread awaiting behavior based on await_promise parameter:
+       - True: Await the Promise directly
+       - False: Sleep 0.3s (allows Promise to complete if start_soon=True)
+       - None: No async operations
+    8. Wait for all threads to complete using join()
+    9. Verify thread results based on execution scenario:
+       - Promise not done: All threads should get TimeoutError
+         - Await Promise directly to prevent asyncio warnings
+       - Promise done: Threads with sufficient timeout get result, others may timeout
+    10. Validate coroutine execution count:
+        - 0 calls for prefilled Promises
+        - 1 call for coroutine-based Promises
+
+    Thread Safety Validation:
+    - Multiple threads can safely access the same concurrent future
+    - Timeouts work correctly across thread boundaries
+    - Results are consistently available to all threads once Promise completes
+    - No race conditions occur during concurrent access
     """
 
     call_count = 0

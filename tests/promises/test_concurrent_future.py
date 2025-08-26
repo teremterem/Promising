@@ -19,7 +19,27 @@ async def test_as_concurrent_future(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future().
+    Test Promise.as_concurrent_future() end-to-end.
+
+    Steps:
+    1. Parametrize over start_soon (True/False/None), await_promise (True/False/None),
+       and whether the concurrent future is retrieved before or after any awaiting occurs.
+    2. If start_soon is None, create a prefilled Promise with a result; otherwise create a coroutine-based Promise that
+       sleeps briefly and returns a string, passing the start_soon parameter through.
+    3. Optionally call as_concurrent_future() before any awaiting to obtain a concurrent.futures.Future view.
+    4. Depending on await_promise:
+       - True: explicitly await the Promise
+       - False: perform unrelated await (sleep) to allow task switching without directly awaiting the Promise
+       - None: perform no await at all (no task switching)
+    5. If the future was not obtained earlier, obtain it now via as_concurrent_future().
+    6. Assert the returned object is an instance of concurrent.futures.Future.
+    7. Determine whether the Promise should be done based on parameters:
+       - Not done when: (a) Promise is not prefilled and no awaiting occurs at all,
+         or (b) start_soon is False and we did not explicitly await the Promise.
+       - Otherwise it should be done and its result available.
+    8. If not done, assert the future is not done, then explicitly await the Promise to avoid un-awaited coroutine
+       warnings. If done, assert the future is done and its result equals the expected string.
+    9. Finally, verify the coroutine call count: 0 for prefilled case (start_soon is None), otherwise 1.
     """
 
     call_count = 0
@@ -85,7 +105,24 @@ async def test_with_exception(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future() with exceptions.
+    Test Promise.as_concurrent_future() behavior when the Promise fails.
+
+    Steps:
+    1. Parametrize over start_soon (True/False/None), await_promise (True/False/None),
+       and whether the concurrent future is retrieved before or after any awaiting occurs.
+    2. If start_soon is None, create a prefilled Promise with a ValueError; otherwise create a
+       coroutine-based Promise that sleeps briefly and then raises ValueError, passing start_soon through.
+    3. Optionally call as_concurrent_future() before any awaiting to obtain a concurrent.futures.Future view.
+    4. Depending on await_promise:
+       - True: explicitly await the Promise and assert the ValueError is raised
+       - False: perform unrelated await (sleep) to allow task switching without directly awaiting the Promise
+       - None: perform no await at all (no task switching)
+    5. If the future was not obtained earlier, obtain it now via as_concurrent_future().
+    6. Assert the returned object is an instance of concurrent.futures.Future.
+    7. Determine whether the Promise should be done based on parameters (same logic as the success test). If not done,
+       assert the future is not done, then explicitly await the Promise and assert the ValueError message. If done,
+       assert the future is done and that calling result() raises ValueError with the expected message.
+    8. Finally, verify the coroutine call count: 0 for prefilled case (start_soon is None), otherwise 1.
     """
 
     call_count = 0
@@ -155,7 +192,27 @@ async def test_from_threads(
     await_promise: Optional[bool],
 ):
     """
-    Test accessing Promise result from different threads.
+    Test reading Promise results from multiple threads via as_concurrent_future().
+
+    Steps:
+    1. Parametrize over start_soon (True/False/None) and await_promise (True/False/None).
+    2. If start_soon is None, create a prefilled Promise with a known result; otherwise create a
+       coroutine-based Promise that sleeps briefly and returns a string, passing start_soon through.
+    3. Obtain the concurrent.futures.Future via as_concurrent_future().
+    4. Spawn three threads that call result(timeout=...) on the concurrent future with different timeouts, capturing
+       either the result string or TimeoutError in a shared results list.
+    5. Depending on await_promise:
+       - True: explicitly await the Promise
+       - False: perform unrelated await (sleep) to allow task switching without directly awaiting the Promise
+       - None: perform no await at all (no task switching)
+    6. Join all threads.
+    7. Assert expected outcomes:
+       - If the Promise is not expected to be done (not prefilled and no awaits, or start_soon is False without direct
+         await), all threads should hit TimeoutError. Then explicitly await the Promise to avoid un-awaited warnings.
+       - Otherwise the first two threads should obtain the expected result; the third thread's outcome
+         depends on whether the Promise was prefilled (immediate availability) or needed time to complete
+         (may timeout).
+    8. Finally, verify the coroutine call count: 0 for prefilled case (start_soon is None), otherwise 1.
     """
 
     call_count = 0

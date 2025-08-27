@@ -73,7 +73,7 @@ async def test_as_concurrent_future(
         - No asyncio warnings are generated for unawaited Promises
     """
 
-    call_count = 0
+    coro_call_count = 0
 
     # Create a Promise
     if start_soon is None:
@@ -82,8 +82,8 @@ async def test_as_concurrent_future(
     else:
 
         async def sample_coro():
-            nonlocal call_count
-            call_count += 1
+            nonlocal coro_call_count
+            coro_call_count += 1
             await asyncio.sleep(0.1)
             return "Hello from Promise!"
 
@@ -111,6 +111,7 @@ async def test_as_concurrent_future(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+        assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
         #  directly, so we don't get the asyncio warning about it never being awaited
@@ -122,9 +123,9 @@ async def test_as_concurrent_future(
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
-        assert call_count == 0
+        assert coro_call_count == 0
     else:
-        assert call_count == 1
+        assert coro_call_count == 1
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
@@ -193,7 +194,7 @@ async def test_with_exception(
         - Exception messages are preserved correctly
     """
 
-    call_count = 0
+    coro_call_count = 0
 
     # Create a Promise
     if start_soon is None:
@@ -202,8 +203,8 @@ async def test_with_exception(
     else:
 
         async def failing_coro():
-            nonlocal call_count
-            call_count += 1
+            nonlocal coro_call_count
+            coro_call_count += 1
             await asyncio.sleep(0.1)
             raise ValueError("Test error from Promise!")
 
@@ -232,6 +233,7 @@ async def test_with_exception(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+        assert coro_call_count == 0
 
         with pytest.raises(ValueError) as exc_info:
             # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
@@ -248,9 +250,9 @@ async def test_with_exception(
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
-        assert call_count == 0
+        assert coro_call_count == 0
     else:
-        assert call_count == 1
+        assert coro_call_count == 1
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
@@ -323,7 +325,7 @@ async def test_from_threads(
         - No race conditions when multiple threads access the same Promise
     """
 
-    call_count = 0
+    coro_call_count = 0
 
     # Create a Promise
     if start_soon is None:
@@ -332,8 +334,8 @@ async def test_from_threads(
     else:
 
         async def sample_coro():
-            nonlocal call_count
-            call_count += 1
+            nonlocal coro_call_count
+            coro_call_count += 1
             await asyncio.sleep(0.2)
             return "Result from thread test!"
 
@@ -374,6 +376,7 @@ async def test_from_threads(
         assert isinstance(results[0], concurrent.futures.TimeoutError)
         assert isinstance(results[1], concurrent.futures.TimeoutError)
         assert isinstance(results[2], concurrent.futures.TimeoutError)
+        assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done no matter the waiting time out, let's await for the
         # promise directly, so we don't get the asyncio warning about it never being awaited
@@ -391,6 +394,6 @@ async def test_from_threads(
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
-        assert call_count == 0
+        assert coro_call_count == 0
     else:
-        assert call_count == 1
+        assert coro_call_count == 1

@@ -21,9 +21,11 @@ async def test_as_concurrent_future(
     """
     Test Promise.as_concurrent_future() method's behavior under various timing and execution conditions.
 
-    This test verifies that the concurrent.futures.Future returned by as_concurrent_future() correctly
-    mirrors the Promise's state and results across different scenarios of Promise creation, execution,
-    and awaiting patterns.
+    This test validates that the concurrent.futures.Future wrapper returned by Promise.as_concurrent_future()
+    correctly mirrors the Promise's state and result. It tests different combinations of:
+    - Promise creation modes (immediate start, lazy start, prefilled)
+    - Promise awaiting behaviors (direct await, indirect await, no await)
+    - Future retrieval timing (before or after awaiting)
 
     Test Parameters:
         start_soon: Controls Promise execution timing:
@@ -33,7 +35,8 @@ async def test_as_concurrent_future(
 
         await_promise: Controls whether and how the test awaits the Promise:
             - True: Explicitly awaits the Promise
-            - False: Awaits for some time (0.2s) without directly awaiting the Promise
+            - False: Awaits for some time (0.2s) without directly awaiting the Promise (allows asyncio task switching
+              to happen)
             - None: No awaiting at all (no task switching occurs)
 
         get_future_before_await: Controls when to obtain the concurrent.futures.Future:
@@ -44,33 +47,38 @@ async def test_as_concurrent_future(
         1. Create a Promise based on start_soon parameter:
            - If None: Create a prefilled Promise with "Hello from Promise!" result
            - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s and returns "Hello from Promise!"
+             (start_soon, which is either True or False in this case, is passed to the Promise constructor)
 
-        2. Optionally get the concurrent future (based on get_future_before_await)
+        2. Get the concurrent future if get_future_before_await is True
 
         3. Handle awaiting based on await_promise parameter:
            - If True: Directly await the Promise
-           - If False: Sleep for 0.2s (allowing started Promises to complete)
+           - If False: Sleep for 0.2s (allowing the Promise to complete asynchronously if it was started)
            - If None: Skip all awaiting (no task switching)
 
-        4. Optionally get the concurrent future (if not already obtained)
+        4. If get_future_before_await was False, get the concurrent future at this point
 
         5. Verify the concurrent future's state:
            - Check it's a proper concurrent.futures.Future instance
            - Verify done() status matches expected state based on parameters
+              - Not done: When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no
+                task switching occurs and, as a result, it does not have a chance to complete
+              - Done: In all other scenarios, verify result equals "Hello from Promise!"
            - If done, verify the result is "Hello from Promise!"
 
         6. Ensure Promise is awaited if it wasn't already (to avoid asyncio warnings)
 
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
-           - 1 if Promise had a coroutine
+           - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
+             test it is still awaited after, as was mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled Promises are immediately done
-        - Promises with start_soon=True begin execution immediately
-        - Promises with start_soon=False only execute when awaited
+        - Promises with start_soon=True begin execution immediately (or, at the nearest opportunity the async event
+          loop gives them, to be precise)
+        - Promises with start_soon=False only execute when awaited for directly
         - The concurrent future correctly reflects Promise state at different points
-        - No asyncio warnings are generated for unawaited Promises
     """
 
     coro_call_count = 0
@@ -151,7 +159,8 @@ async def test_with_exception(
 
         await_promise: Controls whether and how the test awaits the Promise:
             - True: Explicitly awaits the Promise (expecting ValueError to be raised)
-            - False: Awaits for some time (0.2s) without directly awaiting the Promise
+            - False: Awaits for some time (0.2s) without directly awaiting the Promise (allows asyncio task switching
+              to happen)
             - None: No awaiting at all (no task switching occurs)
 
         get_future_before_await: Controls when to obtain the concurrent.futures.Future:
@@ -175,7 +184,9 @@ async def test_with_exception(
         5. Verify the concurrent future's state:
            - Check it's a proper concurrent.futures.Future instance
            - Verify done() status matches expected state based on parameters
-           - If done, verify calling result() raises ValueError with correct message
+              - Not done: When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no
+                task switching occurs and, as a result, it does not have a chance to complete
+              - Done: In all other scenarios, verify calling result() raises ValueError with correct message
 
         6. Handle incomplete Promises:
            - If Promise isn't done, await it within pytest.raises context
@@ -183,14 +194,15 @@ async def test_with_exception(
 
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled with exception (start_soon=None)
-           - 1 if Promise had a coroutine that raised exception
+           - 1 if Promise had a coroutine that raised exception (even if it did not have a chance to complete before
+             the assertions of the test it is still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled exception Promises are immediately done with exception
         - Exceptions are properly propagated through concurrent.futures interface
-        - Promises with start_soon=True raise exceptions after async execution
-        - Promises with start_soon=False only raise when awaited
-        - No asyncio warnings for unretrieved exceptions
+        - Promises with start_soon=True raise exceptions after async execution (or, at the nearest opportunity the
+          async event loop gives them, to be precise)
+        - Promises with start_soon=False only raise when awaited for directly
         - Exception messages are preserved correctly
     """
 
@@ -276,7 +288,8 @@ async def test_from_threads(
 
         await_promise: Controls whether and how the test awaits the Promise:
             - True: Explicitly awaits the Promise
-            - False: Awaits for some time (0.3s) without directly awaiting the Promise
+            - False: Awaits for some time (0.3s) without directly awaiting the Promise (allows asyncio task switching
+              to happen)
             - None: No awaiting at all (no task switching occurs)
 
     Test Flow:
@@ -301,7 +314,9 @@ async def test_from_threads(
         6. Join all threads to ensure they complete
 
         7. Verify thread results based on Promise completion state:
-           - If Promise not expected to be done (no start_soon and no await):
+           - If Promise not expected to be done:
+             * When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no task
+               switching occurs and, as a result, it does not have a chance to complete
              * All threads should timeout (concurrent.futures.TimeoutError)
            - If Promise expected to be done:
              * Threads 0 and 1 should get "Result from thread test!"
@@ -313,14 +328,17 @@ async def test_from_threads(
 
         9. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
-           - 1 if Promise had a coroutine
+           - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
+             test it is still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Thread-safe concurrent access to Promise results
         - Timeout behavior when Promise isn't ready
         - Multiple threads can successfully retrieve the same result
         - Prefilled Promises provide immediate results to all threads
-        - Async Promise execution correctly synchronizes with thread access
+        - Promises with start_soon=True begin execution immediately (or, at the nearest opportunity the async event
+          loop gives them, to be precise)
+        - Promises with start_soon=False only execute when awaited for directly
         - Different timeout values properly control thread waiting behavior
         - No race conditions when multiple threads access the same Promise
     """

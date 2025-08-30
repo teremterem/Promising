@@ -316,21 +316,21 @@ async def test_from_threads(
 
         7. Verify thread results based on Promise completion state:
            - If Promise not expected to be done:
-             * When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no task
-               switching occurs and, as a result, it does not have a chance to complete
-             * All threads should timeout (concurrent.futures.TimeoutError)
+              - When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no task
+                switching occurs and, as a result, it does not have a chance to complete
+              - All threads should timeout (concurrent.futures.TimeoutError)
            - If Promise expected to be done:
-             * Threads 0 and 1 should get "Result from thread test!"
-             * Thread 2 behavior depends on timing:
-               - Gets result if Promise was prefilled (immediate availability)
-               - Times out if Promise needed 0.2s to complete (only had 0.1s timeout)
+              - Threads 0 and 1 should get "Result from thread test!"
+              - Thread 2 behavior depends on timing:
+                 - Gets result if Promise was prefilled (immediate availability)
+                 - Times out if Promise needed 0.2s to complete (only had 0.1s timeout)
 
-        8. Ensure Promise is awaited if not already done (prevent asyncio warnings)
+        8. Ensure Promise is awaited if not already done (to avoid asyncio warnings)
 
         9. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
            - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
-             test it is still awaited after, as mentioned above, to avoid asyncio warnings)
+             test it was still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Thread-safe concurrent access to Promise results
@@ -341,7 +341,6 @@ async def test_from_threads(
           loop gives them, to be precise)
         - Promises with start_soon=False only execute when awaited for directly
         - Different timeout values properly control thread waiting behavior
-        - No race conditions when multiple threads access the same Promise
     """
 
     coro_call_count = 0

@@ -71,7 +71,7 @@ async def test_as_concurrent_future(
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
            - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
-             test it is still awaited after, as was mentioned above, to avoid asyncio warnings)
+             test it was still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled Promises are immediately done
@@ -147,9 +147,10 @@ async def test_with_exception(
     """
     Test Promise.as_concurrent_future() method's exception handling across various timing conditions.
 
-    This test verifies that the concurrent.futures.Future returned by as_concurrent_future() correctly
-    propagates exceptions from the Promise and maintains proper exception state across different
-    scenarios of Promise creation, execution, and awaiting patterns.
+    This test verifies that the concurrent.futures.Future returned by as_concurrent_future() correctly propagates
+    exceptions from the underlying Promise. It mirrors test_as_concurrent_future but focuses on exception scenarios,
+    ensuring that exceptions are properly handled whether the Promise is prefilled with an exception or raises during
+    coroutine execution.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:
@@ -170,16 +171,17 @@ async def test_with_exception(
     Test Flow:
         1. Create a Promise based on start_soon parameter:
            - If None: Create a prefilled Promise with ValueError("Test error from Promise!")
-           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s then raises ValueError
+           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s then raises ValueError (start_soon,
+             which is either True or False in this case, is passed to the Promise constructor)
 
-        2. Optionally get the concurrent future (based on get_future_before_await)
+        2. Get the concurrent future if get_future_before_await is True
 
         3. Handle awaiting based on await_promise parameter:
            - If True: Await the Promise within pytest.raises(ValueError) context
-           - If False: Sleep for 0.2s (allowing started Promises to complete with exception)
+           - If False: Sleep for 0.2s  (allowing the Promise to run asynchronously if it was started)
            - If None: Skip all awaiting (no task switching)
 
-        4. Optionally get the concurrent future (if not already obtained)
+        4. If get_future_before_await was False, get the concurrent future at this point
 
         5. Verify the concurrent future's state:
            - Check it's a proper concurrent.futures.Future instance
@@ -194,16 +196,15 @@ async def test_with_exception(
 
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled with exception (start_soon=None)
-           - 1 if Promise had a coroutine that raised exception (even if it did not have a chance to complete before
-             the assertions of the test it is still awaited after, as mentioned above, to avoid asyncio warnings)
+           - 1 if Promise had a coroutine that raised exception (even if it did not have a chance to run before
+             the assertions of the test it was still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled exception Promises are immediately done with exception
         - Exceptions are properly propagated through concurrent.futures interface
-        - Promises with start_soon=True raise exceptions after async execution (or, at the nearest opportunity the
-          async event loop gives them, to be precise)
+        - Promises with start_soon=True get to the point where they raise exceptions as long as there is task switching
+          (either by being awaited for directly, or because of asyncio task switching for other reasong)
         - Promises with start_soon=False only raise when awaited for directly
-        - Exception messages are preserved correctly
     """
 
     coro_call_count = 0

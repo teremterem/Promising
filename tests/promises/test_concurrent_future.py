@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-"""
-Simple test script to verify the as_concurrent_future() method works.
-"""
+# pylint: disable=duplicate-code
 import asyncio
 import concurrent.futures
 import threading
@@ -17,7 +14,7 @@ async def test_as_concurrent_future(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's behavior under various timing and execution conditions.
 
@@ -80,7 +77,6 @@ async def test_as_concurrent_future(
         - Promises with start_soon=False only execute when awaited for directly
         - The concurrent future correctly reflects Promise state at different points
     """
-
     coro_call_count = 0
 
     # Create a Promise
@@ -143,7 +139,7 @@ async def test_with_exception(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's exception handling across various timing conditions.
 
@@ -206,7 +202,6 @@ async def test_with_exception(
           (either by being awaited for directly, or because of asyncio task switching for other reasong)
         - Promises with start_soon=False only raise when awaited for directly
     """
-
     coro_call_count = 0
 
     # Create a Promise
@@ -273,7 +268,7 @@ async def test_with_exception(
 async def test_from_threads(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
-):
+) -> None:
     """
     Test thread-safe access to Promise results through concurrent.futures.Future interface.
 
@@ -342,7 +337,6 @@ async def test_from_threads(
         - Promises with start_soon=False only execute when awaited for directly
         - Different timeout values properly control thread waiting behavior
     """
-
     coro_call_count = 0
 
     # Create a Promise

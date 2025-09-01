@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# pylint: disable=duplicate-code
 """
 Simple test script to verify the as_concurrent_future() method works.
 """
@@ -17,7 +17,7 @@ async def test_as_concurrent_future(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's behavior under various timing and execution conditions.
 
@@ -143,7 +143,7 @@ async def test_with_exception(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's exception handling across various timing conditions.
 
@@ -273,7 +273,7 @@ async def test_with_exception(
 async def test_from_threads(
     start_soon: Optional[bool],
     await_promise: Optional[bool],
-):
+) -> None:
     """
     Test thread-safe access to Promise results through concurrent.futures.Future interface.
 

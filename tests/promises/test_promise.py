@@ -1,7 +1,7 @@
+# pylint: disable=duplicate-code
 """
 Asyncio-based tests verifying Promise behavior directly, mirroring tests for as_concurrent_future.
 """
-
 import asyncio
 from typing import Optional
 
@@ -12,16 +12,10 @@ from promising.promises import Promise
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-@pytest.mark.parametrize("get_promise_before_await", [True, False])
-async def test_promise_direct(
-    start_soon: Optional[bool],
-    await_promise: Optional[bool],
-    get_promise_before_await: bool,
-):
+async def test_promise_direct(start_soon: Optional[bool], await_promise: Optional[bool]) -> None:
     """
     Test Promise behavior under various timing and execution conditions using asyncio directly.
     """
-
     coro_call_count = 0
 
     if start_soon is None:
@@ -36,16 +30,10 @@ async def test_promise_direct(
 
         promise = Promise(sample_coro(), start_soon=start_soon)
 
-    if get_promise_before_await:
-        _p = promise
-
     if await_promise is True:
         await promise
     elif await_promise is False:
         await asyncio.sleep(0.2)
-
-    if not get_promise_before_await:
-        _p = promise
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         assert not promise.done()
@@ -63,16 +51,10 @@ async def test_promise_direct(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-@pytest.mark.parametrize("get_promise_before_await", [True, False])
-async def test_promise_with_exception(
-    start_soon: Optional[bool],
-    await_promise: Optional[bool],
-    get_promise_before_await: bool,
-):
+async def test_promise_with_exception(start_soon: Optional[bool], await_promise: Optional[bool]) -> None:
     """
     Test Promise exception handling across various timing conditions using asyncio directly.
     """
-
     coro_call_count = 0
 
     if start_soon is None:
@@ -87,17 +69,11 @@ async def test_promise_with_exception(
 
         promise = Promise(failing_coro(), start_soon=start_soon)
 
-    if get_promise_before_await:
-        _p = promise
-
     if await_promise is True:
         with pytest.raises(ValueError):
             await promise
     elif await_promise is False:
         await asyncio.sleep(0.2)
-
-    if not get_promise_before_await:
-        _p = promise
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         assert not promise.done()
@@ -126,7 +102,6 @@ async def test_from_tasks(
     """
     Test concurrent access to Promise results using asyncio tasks and timeout behaviors.
     """
-
     coro_call_count = 0
 
     if start_soon is None:

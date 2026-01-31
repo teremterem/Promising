@@ -86,6 +86,7 @@ class PromiseConfig:
                 make_parent_wait, self._inheritable_parent_config.is_make_parent_wait()
             )
             # TODO Split it into `config_inheritable` and `child_configs_inheritable` ?
+            #  (I don't remember what would be the use case for this, thought)
             self._config_inheritable = get_concrete_value(config_inheritable, PromisingDefaults.CONFIGS_INHERITABLE)
 
     def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
@@ -125,7 +126,8 @@ class PromiseConfig:
     def is_start_soon(self) -> bool:
         """
         Check if Promises with this config should start execution immediately, or more specifically, at the nearest
-        opportunity the asyncio event loop provides.
+        opportunity the asyncio event loop provides. If False, the execution will start only when the Promise is
+        explicitly awaited.
 
         Returns:
             True if Promises should start soon, False otherwise.
@@ -171,6 +173,6 @@ class PromiseConfig:
                 return config
             config = config._parent_config
         raise RuntimeError(
-            "No inheritable parent PromiseConfig found (at least the root PromiseConfig should have been inheritable, "
+            "No inheritable PromiseConfig found (at least the root PromiseConfig should have been inheritable, "
             "but it's not)"
         )

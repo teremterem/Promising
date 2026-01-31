@@ -12,7 +12,6 @@ from promising.errors import NoCurrentPromiseError, NoParentPromiseError
 from promising.sentinels import NOT_SET, Sentinel
 from promising.types import T_co
 
-
 _promise_name_counter = itertools.count(1)
 
 
@@ -21,14 +20,14 @@ def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
     Get the currently active Promise from context.
 
     Args:
-        raise_if_none: If True, raises NoCurrentPromiseError when no current Promise is found.
+        raise_if_none: If True, raises NoCurrentPromiseError when no active Promise is found.
 
     Returns:
         The currently active Promise instance, or None if no Promise is active and
         raise_if_none is False.
 
     Raises:
-        NoCurrentPromiseError: If no current Promise is found and raise_if_none is True.
+        NoCurrentPromiseError: If no active Promise is found and raise_if_none is True.
     """
     return Promise.get_current(raise_if_none=raise_if_none)
 
@@ -111,7 +110,7 @@ class Promise(Future, Generic[T_co]):
         #  blocked forever. On the other hand, what are implications of ignoring such promises ? This should be
         #  reconsidered when the library is used by MiniAgents and real life scenarios become clear.
         # TODO Issue a warning if start_soon is False, but make_parent_wait is True ? Prohibit such combinations
-        #  altogether ?
+        #  altogether ? I'd say let's prohibit it altogether.
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
@@ -276,17 +275,17 @@ class Promise(Future, Generic[T_co]):
         Get the currently active Promise from context variables.
 
         Args:
-            raise_if_none: If True, raises an exception when no current Promise is found.
+            raise_if_none: If True, raises an exception when no active Promise is found.
 
         Returns:
             The currently active Promise, or None if none exists and raise_if_none is False.
 
         Raises:
-            NoCurrentPromiseError: If no current Promise exists and raise_if_none is True.
+            NoCurrentPromiseError: If no active Promise exists and raise_if_none is True.
         """
         current = cls._current.get()
         if raise_if_none and current is None:
-            raise NoCurrentPromiseError("No current Promise found")
+            raise NoCurrentPromiseError("No active Promise found")
         return current
 
     def get_parent(self, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:

@@ -326,69 +326,83 @@ async def test_from_threads(
     await_promise: Optional[bool],
 ):
     """
-    Test thread-safe access to Promise results through concurrent.futures.Future interface.
+    Test thread-safe access to Promise results through the
+    concurrent.futures.Future interface.
 
-    This test verifies that multiple threads can safely access a Promise's result through its
-    concurrent.futures.Future interface, testing various timing scenarios and timeout behaviors.
-    The test demonstrates the bridge between asyncio Promises and thread-based concurrent.futures.
+    This test verifies that multiple threads can safely access a Promise's
+    result through its concurrent.futures.Future interface, testing various
+    timing scenarios and timeout behaviors. The test demonstrates the bridge
+    between asyncio Promises and thread-based concurrent.futures.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:
             - True: Promise starts execution immediately upon creation
             - False: Promise delays execution until explicitly awaited
-            - None: Creates a prefilled Promise with immediate result availability
+            - None: Creates a prefilled Promise with immediate result
+              availability
 
         await_promise: Controls whether and how the test awaits the Promise:
             - True: Explicitly awaits the Promise
-            - False: Awaits for some time (0.3s) without directly awaiting the Promise (allows asyncio task switching
-              to happen)
+            - False: Awaits for some time (0.3s) without directly awaiting the
+              Promise (allows asyncio task switching to happen)
             - None: No awaiting at all (no task switching occurs)
 
     Test Flow:
         1. Create a Promise based on start_soon parameter:
-           - If None: Create a prefilled Promise with "Result from thread test!" (immediate result)
-           - Otherwise: Create a Promise with a coroutine that sleeps for 0.2s then returns result
+           - If None: Create a prefilled Promise with
+             "Result from thread test!" (immediate result)
+           - Otherwise: Create a Promise with a coroutine that sleeps for 0.2s
+             then returns result
 
         2. Get the concurrent.futures.Future interface for the Promise
 
         3. Create three threads that will attempt to get the result:
            - Thread 0: Waits up to 0.4s for result (generous timeout)
            - Thread 1: Waits up to 0.4s for result (generous timeout)
-           - Thread 2: Waits up to 0.1s for result (tight timeout for testing timeout behavior)
+           - Thread 2: Waits up to 0.1s for result (tight timeout for testing
+             timeout behavior)
 
         4. Start all threads concurrently
 
         5. Handle awaiting based on await_promise parameter:
            - If True: Directly await the Promise (ensures completion)
-           - If False: Sleep for 0.3s (enough time for Promise to complete if started)
-           - If None: No awaiting (tests thread behavior with incomplete Promise)
+           - If False: Sleep for 0.3s (enough time for Promise to complete if
+             started)
+           - If None: No awaiting (tests thread behavior with incomplete
+             Promise)
 
         6. Join all threads to ensure they finish their work
 
         7. Verify thread results based on Promise completion state:
-           - Promise is NOT expected to be done - if Promise doesn't "start soon" and isn't awaited directly, or it
-             does "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
+           - Promise is NOT expected to be done - if Promise doesn't
+             "start soon" and isn't awaited directly, or it does "start soon"
+             but no task switching occurs and, as a result, it does not have a
+             chance to complete
               - All threads should timeout (concurrent.futures.TimeoutError)
            - Promise IS expected to be done - in all other scenarios
               - Threads 0 and 1 should get "Result from thread test!"
               - Thread 2 behavior depends on timing:
-                 - Gets result if Promise was prefilled (immediate availability)
-                 - Times out if Promise needed 0.2s to complete (only had 0.1s timeout)
+                 - Gets result if Promise was prefilled (immediate
+                   availability)
+                 - Times out if Promise needed 0.2s to complete (only had 0.1s
+                   timeout)
 
-        8. Ensure Promise is awaited if not already done (to avoid asyncio warnings)
+        8. Ensure Promise is awaited if not already done (to avoid asyncio
+           warnings)
 
         9. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
-           - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
-             test it was still awaited after, as mentioned above, to avoid asyncio warnings)
+           - 1 if Promise had a coroutine (even if it did not have a chance to
+             complete before the assertions of the test it was still awaited
+             after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Thread-safe concurrent access to Promise results
         - Timeout behavior when Promise isn't ready
         - Multiple threads can successfully retrieve the same result
         - Prefilled Promises provide immediate results to all threads
-        - Promises with start_soon=True begin execution immediately (or, at the nearest opportunity the async event
-          loop gives them, to be precise)
+        - Promises with start_soon=True begin execution immediately (or, at the
+          nearest opportunity the async event loop gives them, to be precise)
         - Promises with start_soon=False only execute when awaited for directly
         - Different timeout values properly control thread waiting behavior
     """
@@ -397,7 +411,8 @@ async def test_from_threads(
 
     # Create a Promise
     if start_soon is None:
-        # `start_soon=None` in our test means that we want to create a prefilled promise
+        # `start_soon=None` in our test means that we want to create a
+        # prefilled promise
         promise = Promise(prefill_result="Result from thread test!")
     else:
 
@@ -432,15 +447,18 @@ async def test_from_threads(
     elif await_promise is False:
         # Let's await in general, but not for the promise specifically
         await asyncio.sleep(0.3)
-    # `await_promise=None` in our test means that we don't want to await for anything at all (no task switching)
+    # `await_promise=None` in our test means that we don't want to await for
+    # anything at all (no task switching)
 
     for t in threads:
         t.join()
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         # Two scenarios when the promise is not expected to be done:
-        # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
-        # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
+        # 1. The promise is not prefilled and we don't await for anything at
+        #    all (no task switching happens)
+        # 2. The promise does not start soon (and is not prefilled), but we
+        #    don't await for it directly
         assert isinstance(results[0], concurrent.futures.TimeoutError)
         assert isinstance(results[1], concurrent.futures.TimeoutError)
         assert isinstance(results[2], concurrent.futures.TimeoutError)
@@ -448,22 +466,24 @@ async def test_from_threads(
         # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
-        # Now, that we ensured that concurrent_future is not done no matter the waiting time out, let's await for the
-        # promise directly, so we don't get the asyncio warning about it never being awaited
+        # Now, that we ensured that concurrent_future is not done no matter the
+        # waiting time out, let's await for the promise directly, so we don't
+        # get the asyncio warning about it never being awaited
         await promise
 
     else:
         assert results[0] == "Result from thread test!"
         assert results[1] == "Result from thread test!"
         if start_soon is None:
-            # The promise was prefilled, so the result should be available even in the thread that did not wait long
-            # enough
+            # The promise was prefilled, so the result should be available
+            # even in the thread that did not wait long enough
             assert results[2] == "Result from thread test!"
         else:
             assert isinstance(results[2], concurrent.futures.TimeoutError)
 
     if start_soon is None:
-        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
+        # `start_soon=None` means that the promise was prefilled, so the
+        # coroutine should not have been called
         assert coro_call_count == 0
     else:
         assert coro_call_count == 1

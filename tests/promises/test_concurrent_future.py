@@ -19,10 +19,12 @@ async def test_as_concurrent_future(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future() method's behavior under various timing and execution conditions.
+    Test Promise.as_concurrent_future() method's behavior under various timing
+    and execution conditions.
 
-    This test validates that the concurrent.futures.Future wrapper returned by Promise.as_concurrent_future()
-    correctly mirrors the Promise's state and result. It tests different combinations of:
+    This test validates that the concurrent.futures.Future wrapper returned by
+    Promise.as_concurrent_future() correctly mirrors the Promise's state and
+    result. It tests different combinations of:
     - Promise creation modes (immediate start, lazy start, prefilled)
     - Promise awaiting behaviors (direct await, indirect await, no await)
     - Future retrieval timing (before or after awaiting)
@@ -31,52 +33,63 @@ async def test_as_concurrent_future(
         start_soon: Controls Promise execution timing:
             - True: Promise starts execution immediately upon creation
             - False: Promise delays execution until explicitly awaited
-            - None: Creates a prefilled Promise with a result (no coroutine execution)
+            - None: Creates a prefilled Promise with a result (no coroutine
+              execution)
 
         await_promise: Controls whether and how the test awaits the Promise:
             - True: Explicitly awaits the Promise
-            - False: Awaits for some time (0.2s) without directly awaiting the Promise (allows asyncio task switching
-              to happen)
+            - False: Awaits for some time (0.2s) without directly awaiting the
+              Promise (allows asyncio task switching to happen)
             - None: No awaiting at all (no task switching occurs)
 
-        get_future_before_await: Controls when to obtain the concurrent.futures.Future:
+        get_future_before_await: Controls when to obtain the
+        concurrent.futures.Future:
             - True: Get the future before any await operations
             - False: Get the future after await operations
 
     Test Flow:
         1. Create a Promise based on start_soon parameter:
-           - If None: Create a prefilled Promise with "Hello from Promise!" result
-           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s and returns "Hello from Promise!"
-             (start_soon, which is either True or False in this case, is passed to the Promise constructor)
+           - If None: Create a prefilled Promise with "Hello from Promise!"
+             result
+           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s
+             and returns "Hello from Promise!" (start_soon, which is either
+             True or False in this case, is passed to the Promise constructor)
 
         2. Get the concurrent future if get_future_before_await is True
 
         3. Handle awaiting based on await_promise parameter:
            - If True: Directly await the Promise
-           - If False: Sleep for 0.2s (allowing the Promise to complete asynchronously if it was started)
+           - If False: Sleep for 0.2s (allowing the Promise to complete
+             asynchronously if it was started)
            - If None: Skip all awaiting (no task switching)
 
-        4. If get_future_before_await was False, get the concurrent future at this point
+        4. If get_future_before_await was False, get the concurrent future at
+           this point
 
         5. Verify the concurrent future's state:
-           - Check it's a proper concurrent.futures.Future instance
-           - Verify that done() status matches expected state based on parameters
-              - Expected not to be done - when Promise doesn't "start soon" and isn't awaited directly, or it does
-                "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
+           - Check that it's a proper concurrent.futures.Future instance
+           - Verify that done() status matches expected state based on
+             parameters
+              - Expected not to be done - if Promise doesn't "start soon" and
+                isn't awaited directly, or it does "start soon" but no task
+                switching occurs and, as a result, it does not have a chance
+                to complete
               - Expected to be done - in all other scenarios
            - If done, verify that the result is "Hello from Promise!"
 
-        6. Ensure Promise is awaited if it wasn't already (to avoid asyncio warnings)
+        6. Ensure Promise is awaited if it wasn't already (to avoid asyncio
+           warnings)
 
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled (start_soon=None)
-           - 1 if Promise had a coroutine (even if it did not have a chance to complete before the assertions of the
-             test it was still awaited after, as mentioned above, to avoid asyncio warnings)
+           - 1 if Promise had a coroutine (even if it did not have a chance to
+             complete before the assertions of the test it was still awaited
+             after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled Promises are immediately done
-        - Promises with start_soon=True begin execution immediately (or, to be precise, at the nearest opportunity the
-          async event loop gives them)
+        - Promises with start_soon=True begin execution immediately (or, to be
+          precise, at the nearest opportunity the async event loop gives them)
         - Promises with start_soon=False only execute when awaited for directly
         - The concurrent future correctly reflects Promise state at different points
     """
@@ -85,7 +98,8 @@ async def test_as_concurrent_future(
 
     # Create a Promise
     if start_soon is None:
-        # `start_soon=None` in our test means that we want to create a prefilled promise
+        # `start_soon=None` in our test means that we want to create a
+        # prefilled promise
         promise = Promise(prefill_result="Hello from Promise!")
     else:
 
@@ -106,25 +120,30 @@ async def test_as_concurrent_future(
     elif await_promise is False:
         # Let's await in general, but not for the promise specifically
         await asyncio.sleep(0.2)
-    # `await_promise=None` in our test means that we don't want to await for anything at all (no task switching)
+    # `await_promise=None` in our test means that we don't want to await for
+    # anything at all (no task switching)
 
     if not get_future_before_await:
         # Get the concurrent future after we await for anything
         concurrent_future = promise.as_concurrent_future()
 
-    assert isinstance(concurrent_future, concurrent.futures.Future)  # pylint: disable=possibly-used-before-assignment
+    # pylint: disable=possibly-used-before-assignment
+    assert isinstance(concurrent_future, concurrent.futures.Future)
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         # Two scenarios when the promise is not expected to be done:
-        # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
-        # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
+        # 1. The promise is not prefilled and we don't await for anything at
+        #    all (no task switching happens)
+        # 2. The promise does not start soon (and is not prefilled), but we
+        #    don't await for it directly
         assert not concurrent_future.done()
 
         # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
-        # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
-        #  directly, so we don't get the asyncio warning about it never being awaited
+        # Now, that we ensured that concurrent_future is not done in these
+        # scenarios, let's await for the promise directly, so we don't get the
+        # asyncio warning about it never being awaited
         await promise
     else:
         # In all other scenarios the promise should be done
@@ -132,7 +151,8 @@ async def test_as_concurrent_future(
         assert concurrent_future.result() == "Hello from Promise!"
 
     if start_soon is None:
-        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
+        # `start_soon=None` means that the promise was prefilled, so the
+        # coroutine should not have been called
         assert coro_call_count == 0
     else:
         assert coro_call_count == 1
@@ -186,7 +206,7 @@ async def test_with_exception(
         4. If get_future_before_await was False, get the concurrent future at this point
 
         5. Verify the concurrent future's state:
-           - Check it's a proper concurrent.futures.Future instance
+           - Check that it's a proper concurrent.futures.Future instance
            - Verify that done() status matches expected state based on parameters
               - Expected not to be done - when Promise doesn't "start soon" and isn't awaited directly, or it does
                 "start soon" but no task switching occurs and, as a result, it does not have a chance to complete

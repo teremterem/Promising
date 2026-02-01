@@ -20,21 +20,24 @@ def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
     Get the currently active Promise from context.
 
     Args:
-        raise_if_none: If True, raises NoCurrentPromiseError when no active Promise is found.
+        raise_if_none: If True, raises NoCurrentPromiseError when no active
+            Promise is found.
 
     Returns:
-        The currently active Promise instance, or None if no Promise is active and
-        raise_if_none is False.
+        The currently active Promise instance, or None if no Promise is active
+        and raise_if_none is False.
 
     Raises:
-        NoCurrentPromiseError: If no active Promise is found and raise_if_none is True.
+        NoCurrentPromiseError: If no active Promise is found and raise_if_none
+            is True.
     """
     return Promise.get_current(raise_if_none=raise_if_none)
 
 
 class Promise(Future, Generic[T_co]):
     """
-    A Promise combines asyncio Future functionality with hierarchical context management.
+    A Promise combines asyncio Future functionality with hierarchical context
+    management.
 
     Promises extend asyncio Futures to provide:
     - Parent-child relationships between asynchronous operations
@@ -43,34 +46,46 @@ class Promise(Future, Generic[T_co]):
     - Thread-safe concurrent.futures compatibility
 
     Parent-child relationships semantics:
-    - If the coroutine of a Promise creates other Promise instances during its execution, those Promises are
-      attached as children of that Promise.
-    - The exact time when a child's execution starts, finishes, or when its resolution is triggered does not matter
-      (it may occur outside of the parent's execution window); it is still registered as a child of the Promise whose
-      coroutine created it.
-    - If a parent is explicitly specified at creation time, that explicit parent takes precedence.
+    - If the coroutine of a Promise creates other Promise instances during its
+      execution, those Promises are attached as children of that Promise.
+    - The exact time when a child's execution starts, finishes, or when its
+      resolution is triggered does not matter (it may occur outside of the
+      parent's execution window); it is still registered as a child of the
+      Promise whose coroutine created it.
+    - If a parent is explicitly specified at creation time, that explicit
+      parent takes precedence.
 
     Type Parameters:
         T_co: The covariant type of the Promise's result.
 
     Args:
-        coro: The coroutine to execute. If None, the Promise must be prefilled with a result or exception.
-        loop: The event loop to use. If not provided, inherits from the parent Promise. If no parent Promise, uses the
-             current running loop. If provided explicitly and a parent Promise exists, must be the same event loop as
-             the parent's loop.
-        name: Human-readable name for the Promise. If None, generates a unique name ("Promise-N", where N is a number).
-        parent: Parent Promise instance. If NOT_SET, uses the currently active Promise as parent.
-        config: Configuration object. Cannot be combined with explicit config parameters.
-        start_soon: Whether to start execution immediately. If NOT_SET, uses [inheritable] parent config setting.
-        make_parent_wait: Whether parent should wait for this Promise. If NOT_SET, uses [inheritable] parent config
-                         setting.
-        config_inheritable: Whether this config can be inherited by children. If NOT_SET, defaults to True (unless the
-                           default is overridden via PROMISING_DEFAULT_CONFIGS_INHERITABLE environment variable).
-        prefill_result: Pre-set result value. Cannot be combined with coro or prefill_exception.
-        prefill_exception: Pre-set exception. Cannot be combined with coro or prefill_result.
+        coro: The coroutine to execute. If None, the Promise must be prefilled
+            with a result or exception.
+        loop: The event loop to use. If not provided, inherits from the parent
+            Promise. If no parent Promise, uses the current running loop. If
+            provided explicitly and a parent Promise exists, must be the same
+            event loop as the parent's loop.
+        name: Human-readable name for the Promise. If None, generates a unique
+            name ("Promise-N", where N is a number).
+        parent: Parent Promise instance. If NOT_SET, uses the currently active
+            Promise as parent.
+        config: Configuration object. Cannot be combined with explicit config
+            parameters.
+        start_soon: Whether to start execution immediately. If NOT_SET, uses
+            [inheritable] parent config setting.
+        make_parent_wait: Whether parent should wait for this Promise. If
+            NOT_SET, uses [inheritable] parent config setting.
+        config_inheritable: Whether this config can be inherited by children.
+            If NOT_SET, defaults to True (unless the default is overridden via
+            PROMISING_DEFAULT_CONFIGS_INHERITABLE environment variable).
+        prefill_result: Pre-set result value. Cannot be combined with coro or
+            prefill_exception.
+        prefill_exception: Pre-set exception. Cannot be combined with coro or
+            prefill_result.
 
     Raises:
-        ValueError: If invalid parameter combinations are provided. See parameter descriptions above.
+        ValueError: If invalid parameter combinations are provided. See
+            parameter descriptions above.
         TypeError: If coro is not a coroutine when provided.
     """
 
@@ -104,13 +119,17 @@ class Promise(Future, Generic[T_co]):
         else:
             self._parent = parent
 
-        # TODO Is WeakSet below really going to work ? What about those child Promises that don't start_soon and the
-        #  user did not keep a reference to them so they could be awaited later (and let's say they were marked as
-        #  make_parent_wait) ? On one hand, they should not block the parent, because the parent will end up being
-        #  blocked forever. On the other hand, what are implications of ignoring such promises ? This should be
-        #  reconsidered when the library is used by MiniAgents and real life scenarios become clear.
-        # TODO Issue a warning if start_soon is False, but make_parent_wait is True ? Prohibit such combinations
-        #  altogether ? I'd say let's prohibit it altogether.
+        # TODO Is WeakSet below really going to work ? What about those child
+        #  Promises that don't start_soon and the user did not keep a reference
+        #  to them so they could be awaited later (and let's say they were
+        #  marked as make_parent_wait) ? On one hand, they should not block the
+        #  parent, because the parent will end up being blocked forever. On the
+        #  other hand, what are implications of ignoring such promises ? This
+        #  should be reconsidered when the library is used by MiniAgents and
+        #  real life scenarios become clear.
+        # TODO Issue a warning if start_soon is False, but make_parent_wait is
+        #  True ? Prohibit such combinations altogether ? I'd say let's
+        #  prohibit it altogether.
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
@@ -122,7 +141,8 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             self._parent._children.add(self)
 
-        # TODO Should we have a config setting to disable multithreading support ? Is there any speed benefit ?
+        # TODO Should we have a config setting to disable multithreading
+        #  support ? Is there any speed benefit ?
         self._concurrent_future = _PromiseBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
@@ -161,11 +181,11 @@ class Promise(Future, Generic[T_co]):
 
     def set_result(self, result: T_co) -> None:
         """
-        Set the result of the Promise. This method is not intended to be called directly by users; it is managed by the
-        Promise's lifecycle.
+        Set the result of the Promise. This method is not intended to be called
+        directly by users; it is managed by the Promise's lifecycle.
 
-        Also sets the result on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
-        method).
+        Also sets the result on the concurrent.futures.Future for thread
+        compatibility (see as_concurrent_future() method).
 
         Args:
             result: The result value to set.
@@ -175,11 +195,11 @@ class Promise(Future, Generic[T_co]):
 
     def set_exception(self, exception: BaseException) -> None:
         """
-        Set an exception on the Promise. This method is not intended to be called directly by users; it is managed by
-        the Promise's lifecycle.
+        Set an exception on the Promise. This method is not intended to be
+        called directly by users; it is managed by the Promise's lifecycle.
 
-        Also sets the exception on the concurrent.futures.Future for thread compatibility (see as_concurrent_future()
-        method).
+        Also sets the exception on the concurrent.futures.Future for thread
+        compatibility (see as_concurrent_future() method).
 
         Args:
             exception: The exception to set.
@@ -226,11 +246,13 @@ class Promise(Future, Generic[T_co]):
 
     def __await__(self) -> Generator[T_co, None, None]:
         """
-        If the Promise hasn't started yet, start execution of the coro via _afullfil() and run it to completion.
-        If already started via start_soon, wait for the existing task to complete.
+        If the Promise hasn't started yet, start execution of the coro via
+        _afullfil() and run it to completion. If already started via
+        start_soon, wait for the existing task to complete.
 
         Returns:
-            A generator for the await protocol that eventually returns the result of the Promise.
+            A generator for the await protocol that eventually returns the
+            result of the Promise.
         """
         if not self.done():
             if self._task is None:
@@ -245,9 +267,10 @@ class Promise(Future, Generic[T_co]):
 
         Behavior:
         - If an explicit config object is provided, return it (as is).
-        - Else, if all individual config kwargs are NOT_SET and a parent Promise exists, return the nearest inheritable
-          parent configuration.
-        - Else, construct and return a new PromiseConfig from the provided kwargs.
+        - Else, if all individual config kwargs are NOT_SET and a parent
+          Promise exists, return the nearest inheritable parent configuration.
+        - Else, construct and return a new PromiseConfig from the provided
+          kwargs.
 
         Args:
             config: Explicit configuration object.
@@ -257,7 +280,8 @@ class Promise(Future, Generic[T_co]):
             A PromiseConfig instance.
 
         Raises:
-            ValueError: If both a config object and any explicit config kwargs are provided.
+            ValueError: If both a config object and any explicit config kwargs
+                are provided.
         """
         if config is not None:
             if any(value is not NOT_SET for value in kwargs.values()):
@@ -275,13 +299,16 @@ class Promise(Future, Generic[T_co]):
         Get the currently active Promise from context variables.
 
         Args:
-            raise_if_none: If True, raises an exception when no active Promise is found.
+            raise_if_none: If True, raises an exception when no active Promise
+                is found.
 
         Returns:
-            The currently active Promise, or None if none exists and raise_if_none is False.
+            The currently active Promise, or None if none exists and
+            raise_if_none is False.
 
         Raises:
-            NoCurrentPromiseError: If no active Promise exists and raise_if_none is True.
+            NoCurrentPromiseError: If no active Promise exists and
+                raise_if_none is True.
         """
         current = cls._current.get()
         if raise_if_none and current is None:
@@ -296,10 +323,12 @@ class Promise(Future, Generic[T_co]):
             raise_if_none: If True, raises an exception when no parent exists.
 
         Returns:
-            The parent Promise, or None if no parent exists and raise_if_none is False.
+            The parent Promise, or None if no parent exists and raise_if_none
+            is False.
 
         Raises:
-            NoParentPromiseError: If no parent exists and raise_if_none is True.
+            NoParentPromiseError: If no parent exists and raise_if_none is
+                True.
         """
         if raise_if_none and self._parent is None:
             raise NoParentPromiseError("No parent Promise found")
@@ -307,8 +336,8 @@ class Promise(Future, Generic[T_co]):
 
     def is_active(self) -> bool:
         """
-        TODO It is unclear what this method is going to be used for. Is this information going to be useful outside of
-         the Promise class itself ?
+        TODO It is unclear what this method is going to be used for. Is this
+         information going to be useful outside of the Promise class itself ?
 
         Returns:
             True if the Promise is currently active, False otherwise.
@@ -323,7 +352,8 @@ class Promise(Future, Generic[T_co]):
 
     def get_config(self) -> PromiseConfig:
         """
-        Get the configuration object that controls the behavior of this Promise.
+        Get the configuration object that controls the behavior of this
+        Promise.
 
         Returns:
             The PromiseConfig instance associated with this Promise.
@@ -332,17 +362,18 @@ class Promise(Future, Generic[T_co]):
 
     def get_pending_children(self) -> set["Promise[Any]"]:
         """
-        Get child Promises that haven't completed yet (provided they are still reachable and weren't garbage collected
-        yet).
+        Get child Promises that haven't completed yet (provided they are still
+        reachable and weren't garbage collected yet).
 
-        Handles potential race conditions when iterating over the WeakSet of children by retrying if the set changes
-        during iteration.
+        Handles potential race conditions when iterating over the WeakSet of
+        children by retrying if the set changes during iteration.
 
         Returns:
             Set of child Promises that are not done.
 
         Raises:
-            RuntimeError: If unable to get a stable view of children after 1000 attempts.
+            RuntimeError: If unable to get a stable view of children after 1000
+                attempts.
         """
         # # COPIED FROM asyncio.tasks::all_tasks():
         # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
@@ -353,7 +384,9 @@ class Promise(Future, Generic[T_co]):
         i = 0
         while True:
             try:
-                children = list(self._children)  # In `asyncio.tasks` it was `_all_tasks` instead of `self._children`
+                # In `asyncio.tasks` it was `_all_tasks` instead of
+                # `self._children`
+                children = list(self._children)
             except RuntimeError:
                 i += 1
                 if i > 1000:
@@ -365,13 +398,14 @@ class Promise(Future, Generic[T_co]):
         """
         Get a thread-safe concurrent.futures.Future view of this Promise.
 
-        This allows the Promise to be used in multi-threaded contexts where concurrent.futures.Future objects are
-        expected.
+        This allows the Promise to be used in multi-threaded contexts where
+        concurrent.futures.Future objects are expected.
 
         Returns:
             A concurrent.futures.Future that mirrors this Promise's state.
         """
-        # TODO Should we ever copy the context vars to the caller's thread (if this even makes sense) ?
+        # TODO Should we ever copy the context vars to the caller's thread
+        #  (if this even makes sense) ?
         return self._concurrent_future
 
     def _activate(self) -> None:
@@ -386,8 +420,9 @@ class Promise(Future, Generic[T_co]):
         """
         Finalize the Promise execution by waiting for children and restoring context.
 
-        Waits for all child Promises that have make_parent_wait=True, then deactivates this Promise by removing it from
-        the context (and restoring the previous value for the respective context var).
+        Waits for all child Promises that have make_parent_wait=True, then
+        deactivates this Promise by removing it from the context (and restoring
+        the previous value for the respective context var).
         """
         await self.await_for_children()
 
@@ -402,9 +437,11 @@ class Promise(Future, Generic[T_co]):
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
         if promises_to_await:
-            # TODO Do errors disappear from stdout/stderr when they are "gathered" like this ? Do they make it to
-            #  stdout/stderr only when the whole python process exits ? We should somehow show the errors to the user
-            #  as soon as they happen (for all children, not just the ones that make the parent wait).
+            # TODO Do errors disappear from stdout/stderr when they are
+            #  "gathered" like this ? Do they make it to stdout/stderr only
+            #  when the whole python process exits ? We should somehow show the
+            #  errors to the user as soon as they happen (for all children, not
+            #  just the ones that make the parent wait).
             await asyncio.gather(*promises_to_await, return_exceptions=True)
 
 
@@ -412,8 +449,10 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
     """
     A thread-safe concurrent.futures.Future backed by a Promise.
 
-    This class provides a bridge between asyncio-based Promises and the concurrent.futures interface, allowing Promises
-    to be used in multi-threaded contexts while maintaining proper result/exception synchronization.
+    This class provides a bridge between asyncio-based Promises and the
+    concurrent.futures interface, allowing Promises to be used in
+    multi-threaded contexts while maintaining proper result/exception
+    synchronization.
 
     Args:
         promise: The Promise instance that backs this concurrent future.
@@ -427,8 +466,9 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
         """
         Get the result of the Promise.
 
-        This method blocks until the underlying Promise is done and ensures that the Promise's result is properly
-        consumed (asyncio will not issue a warning about the Promise not having been awaited for).
+        This method blocks until the underlying Promise is done and ensures
+        that the Promise's result is properly consumed (asyncio will not issue
+        a warning about the Promise not having been awaited for).
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
@@ -437,56 +477,65 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             The result value from the Promise.
 
         Raises:
-            concurrent.futures.TimeoutError: If timeout expires before completion.
+            concurrent.futures.TimeoutError: If timeout expires before
+                completion.
             Exception: Any exception that occurred during Promise execution.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
-            # Future)
+            # Let's block until the underlying Promise is done (it will set the
+            # result/exception on this concurrent Future)
             result = super().result(timeout=timeout)
         finally:
-            # Let's also read the result from the Promise directly, so it knows that its result has been consumed and
-            # there is no need to issue a warning about the Promise not having been awaited for (which, by this point,
-            # would be done already)
+            # Let's also read the result from the Promise directly, so it knows
+            # that its result has been consumed and there is no need to issue a
+            # warning about the Promise not having been awaited for (which, by
+            # this point, would be done already)
             try:
                 self._promise.result()
             except BaseException:  # pylint: disable=broad-except
-                # Suppress the error if any - if there's an error, it should come from super().result(), not from here
+                # Suppress the error if any - if there's an error, it should
+                # come from super().result(), not from here
                 pass
-        # For consistency, let's return the result from this concurrent Future, even though it's going to be the
-        # same as the result from the Promise
+        # For consistency, let's return the result from this concurrent Future,
+        # even though it's going to be the same as the result from the Promise
         return result
 
     def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
         """
         Get the exception that occurred during Promise execution, if any.
 
-        This method blocks until the underlying Promise is done and ensures that the Promise's exception is properly
-        consumed (asyncio will not issue a warning about the exception not having been retrieved from the Promise).
+        This method blocks until the underlying Promise is done and ensures
+        that the Promise's exception is properly consumed (asyncio will not
+        issue a warning about the exception not having been retrieved from the
+        Promise).
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
 
         Returns:
-            The exception that occurred, or None if the Promise completed successfully.
+            The exception that occurred, or None if the Promise completed
+            successfully.
 
         Raises:
-            concurrent.futures.TimeoutError: If timeout expires before completion.
+            concurrent.futures.TimeoutError: If timeout expires before
+                completion.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set the result/exception on this concurrent
-            # Future)
+            # Let's block until the underlying Promise is done (it will set
+            # the result/exception on this concurrent Future)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also read the exception from the Promise directly, so it knows that its exception has been consumed
-            # and there is no need to issue a warning about the exception never being retrieved from the Promise
-            # (which, by this point, would be done already)
+            # Let's also read the exception from the Promise directly, so it
+            # knows that its exception has been consumed and there is no need
+            # to issue a warning about the exception never being retrieved from
+            # the Promise (which, by this point, would be done already)
             try:
                 self._promise.exception()
             except BaseException:  # pylint: disable=broad-except
-                # Suppress the error if any - if there's an error, it should come from super().exception(), not from
-                # here
+                # Suppress the error if any - if there's an error, it should
+                # come from super().exception(), not from here
                 pass
-        # For consistency, let's return the exception from this concurrent Future, even though it's going to be the
-        # same as the exception from the Promise
+        # For consistency, let's return the exception from this concurrent
+        # Future, even though it's going to be the same as the exception from
+        # the Promise
         return exception

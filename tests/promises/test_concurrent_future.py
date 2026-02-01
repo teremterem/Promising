@@ -60,11 +60,11 @@ async def test_as_concurrent_future(
 
         5. Verify the concurrent future's state:
            - Check it's a proper concurrent.futures.Future instance
-           - Verify done() status matches expected state based on parameters
-              - Not done: When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no
-                task switching occurs and, as a result, it does not have a chance to complete
-              - Done: In all other scenarios, verify result equals "Hello from Promise!"
-           - If done, verify the result is "Hello from Promise!"
+           - Verify that done() status matches expected state based on parameters
+              - Expected not to be done - when Promise doesn't "start soon" and isn't awaited directly, or it does
+                "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
+              - Expected to be done - in all other scenarios
+           - If done, verify that the result is "Hello from Promise!"
 
         6. Ensure Promise is awaited if it wasn't already (to avoid asyncio warnings)
 
@@ -75,8 +75,8 @@ async def test_as_concurrent_future(
 
     Key Scenarios Tested:
         - Prefilled Promises are immediately done
-        - Promises with start_soon=True begin execution immediately (or, at the nearest opportunity the async event
-          loop gives them, to be precise)
+        - Promises with start_soon=True begin execution immediately (or, to be precise, at the nearest opportunity the
+          async event loop gives them)
         - Promises with start_soon=False only execute when awaited for directly
         - The concurrent future correctly reflects Promise state at different points
     """
@@ -119,6 +119,8 @@ async def test_as_concurrent_future(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+
+        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
@@ -185,10 +187,11 @@ async def test_with_exception(
 
         5. Verify the concurrent future's state:
            - Check it's a proper concurrent.futures.Future instance
-           - Verify done() status matches expected state based on parameters
-              - Not done: When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no
-                task switching occurs and, as a result, it does not have a chance to complete
-              - Done: In all other scenarios, verify calling result() raises ValueError with correct message
+           - Verify that done() status matches expected state based on parameters
+              - Expected not to be done - when Promise doesn't "start soon" and isn't awaited directly, or it does
+                "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
+              - Expected to be done - in all other scenarios
+           - If done, verify that calling result() raises ValueError with correct message
 
         6. Handle incomplete Promises:
            - If Promise isn't done, await it within pytest.raises context
@@ -246,6 +249,8 @@ async def test_with_exception(
         # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
         assert not concurrent_future.done()
+
+        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         with pytest.raises(ValueError) as exc_info:
@@ -312,14 +317,13 @@ async def test_from_threads(
            - If False: Sleep for 0.3s (enough time for Promise to complete if started)
            - If None: No awaiting (tests thread behavior with incomplete Promise)
 
-        6. Join all threads to ensure they complete
+        6. Join all threads to ensure they finish their work
 
         7. Verify thread results based on Promise completion state:
-           - If Promise not expected to be done:
-              - When Promise doesn't "start soon" and isn't awaited directly, or it does "start soon" but no task
-                switching occurs and, as a result, it does not have a chance to complete
+           - Promise is NOT expected to be done - if Promise doesn't "start soon" and isn't awaited directly, or it
+             does "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
               - All threads should timeout (concurrent.futures.TimeoutError)
-           - If Promise expected to be done:
+           - Promise IS expected to be done - in all other scenarios
               - Threads 0 and 1 should get "Result from thread test!"
               - Thread 2 behavior depends on timing:
                  - Gets result if Promise was prefilled (immediate availability)
@@ -394,6 +398,8 @@ async def test_from_threads(
         assert isinstance(results[0], concurrent.futures.TimeoutError)
         assert isinstance(results[1], concurrent.futures.TimeoutError)
         assert isinstance(results[2], concurrent.futures.TimeoutError)
+
+        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done no matter the waiting time out, let's await for the
@@ -404,8 +410,8 @@ async def test_from_threads(
         assert results[0] == "Result from thread test!"
         assert results[1] == "Result from thread test!"
         if start_soon is None:
-            # The promise was prefilled, so the result should be available even for the thread that did not wait for
-            # too long
+            # The promise was prefilled, so the result should be available even in the thread that did not wait long
+            # enough
             assert results[2] == "Result from thread test!"
         else:
             assert isinstance(results[2], concurrent.futures.TimeoutError)

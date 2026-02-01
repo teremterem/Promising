@@ -167,66 +167,85 @@ async def test_with_exception(
     get_future_before_await: bool,
 ):
     """
-    Test Promise.as_concurrent_future() method's exception handling across various timing conditions.
+    Test Promise.as_concurrent_future() method's exception handling across
+    various timing conditions.
 
-    This test verifies that the concurrent.futures.Future returned by as_concurrent_future() correctly propagates
-    exceptions from the underlying Promise. It mirrors test_as_concurrent_future but focuses on exception scenarios,
-    ensuring that exceptions are properly handled whether the Promise is prefilled with an exception or raises during
-    coroutine execution.
+    This test verifies that the concurrent.futures.Future returned by
+    as_concurrent_future() correctly propagates exceptions from the underlying
+    Promise. It mirrors test_as_concurrent_future but focuses on exception
+    scenarios, ensuring that exceptions are properly handled whether the
+    Promise is prefilled with an exception or raises during coroutine
+    execution.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:
             - True: Promise starts execution immediately upon creation
             - False: Promise delays execution until explicitly awaited
-            - None: Creates a prefilled Promise with an exception (no coroutine execution)
+            - None: Creates a prefilled Promise with an exception (no coroutine
+              execution)
 
         await_promise: Controls whether and how the test awaits the Promise:
-            - True: Explicitly awaits the Promise (expecting ValueError to be raised)
-            - False: Awaits for some time (0.2s) without directly awaiting the Promise (allows asyncio task switching
-              to happen)
+            - True: Explicitly awaits the Promise (expecting ValueError to be
+              raised)
+            - False: Awaits for some time (0.2s) without directly awaiting the
+              Promise (allows asyncio task switching to happen)
             - None: No awaiting at all (no task switching occurs)
 
-        get_future_before_await: Controls when to obtain the concurrent.futures.Future:
+        get_future_before_await: Controls when to obtain the
+            concurrent.futures.Future:
             - True: Get the future before any await operations
             - False: Get the future after await operations
 
     Test Flow:
         1. Create a Promise based on start_soon parameter:
-           - If None: Create a prefilled Promise with ValueError("Test error from Promise!")
-           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s then raises ValueError (start_soon,
-             which is either True or False in this case, is passed to the Promise constructor)
+           - If None: Create a prefilled Promise with
+             ValueError("Test error from Promise!")
+           - Otherwise: Create a Promise with a coroutine that sleeps for 0.1s
+             then raises ValueError (start_soon, which is either True or False
+             in this case, is passed to the Promise constructor)
 
         2. Get the concurrent future if get_future_before_await is True
 
         3. Handle awaiting based on await_promise parameter:
            - If True: Await the Promise within pytest.raises(ValueError) context
-           - If False: Sleep for 0.2s  (allowing the Promise to run asynchronously if it was started)
+           - If False: Sleep for 0.2s  (allowing the Promise to run
+             asynchronously if it was started)
            - If None: Skip all awaiting (no task switching)
 
-        4. If get_future_before_await was False, get the concurrent future at this point
+        4. If get_future_before_await was False, get the concurrent future at
+           this point
 
         5. Verify the concurrent future's state:
            - Check that it's a proper concurrent.futures.Future instance
-           - Verify that done() status matches expected state based on parameters
-              - Expected not to be done - when Promise doesn't "start soon" and isn't awaited directly, or it does
-                "start soon" but no task switching occurs and, as a result, it does not have a chance to complete
+           - Verify that done() status matches expected state based on
+             parameters
+              - Expected not to be done - if Promise doesn't "start soon" and
+                isn't awaited directly, or it does "start soon" but no task
+                switching occurs and, as a result, it does not have a chance to
+                complete
               - Expected to be done - in all other scenarios
-           - If done, verify that calling result() raises ValueError with correct message
+           - If done, verify that calling result() raises ValueError with
+             the correct message
 
         6. Handle incomplete Promises:
            - If Promise isn't done, await it within pytest.raises context
-           - This ensures proper exception retrieval and prevents asyncio warnings
+           - This ensures proper exception retrieval and prevents asyncio
+             warnings
 
         7. Verify coroutine execution count:
            - 0 if Promise was prefilled with exception (start_soon=None)
-           - 1 if Promise had a coroutine that raised exception (even if it did not have a chance to run before
-             the assertions of the test it was still awaited after, as mentioned above, to avoid asyncio warnings)
+           - 1 if Promise had a coroutine that raised exception (even if it did
+             not have a chance to run before the assertions of the test it was
+             still awaited after, as mentioned above, to avoid asyncio warnings)
 
     Key Scenarios Tested:
         - Prefilled exception Promises are immediately done with exception
-        - Exceptions are properly propagated through concurrent.futures interface
-        - Promises with start_soon=True get to the point where they raise exceptions as long as there is task switching
-          (either by being awaited for directly, or because of asyncio task switching for other reasong)
+        - Exceptions are properly propagated through concurrent.futures
+          interface
+        - Promises with start_soon=True get to the point where they raise
+          exceptions as long as there is task switching (either by being
+          awaited for directly, or because of asyncio task switching for other
+          reasong)
         - Promises with start_soon=False only raise when awaited for directly
     """
 
@@ -234,7 +253,8 @@ async def test_with_exception(
 
     # Create a Promise
     if start_soon is None:
-        # `start_soon=None` in our test means that we want to create a prefilled promise with exception
+        # `start_soon=None` in our test means that we want to create a
+        # prefilled promise with exception
         promise = Promise(prefill_exception=ValueError("Test error from Promise!"))
     else:
 
@@ -256,26 +276,31 @@ async def test_with_exception(
     elif await_promise is False:
         # Let's await in general, but not for the promise specifically
         await asyncio.sleep(0.2)
-    # `await_promise=None` in our test means that we don't want to await for anything at all (no task switching)
+    # `await_promise=None` in our test means that we don't want to await for
+    # anything at all (no task switching)
 
     if not get_future_before_await:
         # Get the concurrent future after we await for anything
         concurrent_future = promise.as_concurrent_future()
 
-    assert isinstance(concurrent_future, concurrent.futures.Future)  # pylint: disable=possibly-used-before-assignment
+    # pylint: disable=possibly-used-before-assignment
+    assert isinstance(concurrent_future, concurrent.futures.Future)
 
     if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
         # Two scenarios when the promise is not expected to be done:
-        # 1. The promise is not prefilled and we don't await for anything at all (no task switching happens)
-        # 2. The promise does not start soon (and is not prefilled), but we don't await for it directly
+        # 1. The promise is not prefilled and we don't await for anything at
+        #    all (no task switching happens)
+        # 2. The promise does not start soon (and is not prefilled), but we
+        #    don't await for it directly
         assert not concurrent_future.done()
 
         # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         with pytest.raises(ValueError) as exc_info:
-            # Now, that we ensured that concurrent_future is not done in these scenarios, let's await for the promise
-            # directly, so we don't get the asyncio warning about the exception not ever being retrieved
+            # Now, that we ensured that concurrent_future is not done in these
+            # scenarios, let's await for the promise directly, so we don't get
+            # the asyncio warning about the exception not ever being retrieved
             await promise
         assert str(exc_info.value) == "Test error from Promise!"
 
@@ -287,7 +312,8 @@ async def test_with_exception(
         assert str(exc_info.value) == "Test error from Promise!"
 
     if start_soon is None:
-        # `start_soon=None` means that the promise was prefilled, so the coroutine should not have been called
+        # `start_soon=None` means that the promise was prefilled, so the
+        # coroutine should not have been called
         assert coro_call_count == 0
     else:
         assert coro_call_count == 1

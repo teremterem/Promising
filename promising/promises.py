@@ -91,9 +91,9 @@ class Promise(Future, Generic[T_co]):
     """
 
     _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
-    _previous_token: Optional[contextvars.Token] = None
 
-    _task: Optional[Task[T_co]] = None
+    _previous_token: Optional[contextvars.Token]
+    _task: Optional[Task[T_co]]
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
@@ -114,6 +114,8 @@ class Promise(Future, Generic[T_co]):
     ) -> None:
         # TODO [ALMOST READY] Fix the following linting error:
         # pylint: disable=too-many-branches
+        self._previous_token = None
+        self._task = None
 
         if parent is NOT_SET:
             self._parent = self.get_current(raise_if_none=False)

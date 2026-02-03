@@ -49,8 +49,8 @@ class PromiseConfig:
         ValueError: If config_inheritable is False for a root configuration.
     """
 
-    _parent_config: Optional["PromiseConfig"] = None
-    _inheritable_parent_config: Optional["PromiseConfig"] = None
+    _parent_config: Optional["PromiseConfig"]
+    _inheritable_parent_config: Optional["PromiseConfig"]
 
     def __init__(
         self,
@@ -60,6 +60,9 @@ class PromiseConfig:
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
     ) -> None:
+        self._parent_config = None
+        self._inheritable_parent_config = None
+
         if parent_config is NOT_SET:
             try:
                 # pylint: disable=import-outside-toplevel,cyclic-import

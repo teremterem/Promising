@@ -97,7 +97,7 @@ class Promise(Future, Generic[T_co]):
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
-    def __init__(
+    def __init__(  # noqa: PLR0912 (too-many-branches)
         self,
         coro: Optional[Coroutine[Any, Any, T_co]] = None,
         *,
@@ -112,8 +112,7 @@ class Promise(Future, Generic[T_co]):
         prefill_result: Optional[T_co] | Sentinel = NOT_SET,
         prefill_exception: Optional[BaseException] = None,
     ) -> None:
-        # TODO [ALMOST READY] Fix the following linting error:
-        # pylint: disable=too-many-branches
+        # TODO [ALMOST READY] Fix the following linting error - too many branches
         self._previous_token = None
         self._task = None
 
@@ -239,7 +238,7 @@ class Promise(Future, Generic[T_co]):
         self._activate()
         try:
             result = await self._coro
-        except BaseException as exc:  # pylint: disable=broad-except
+        except BaseException as exc:  # noqa: BLE001 (blind-except)
             exception = exc
         finally:
             try:
@@ -397,7 +396,7 @@ class Promise(Future, Generic[T_co]):
                 children = list(self._children)
             except RuntimeError:
                 i += 1
-                if i > 1000:
+                if i > 1000:  # noqa: PLR2004 (magic-value-comparison)
                     raise
             else:
                 return {child for child in children if not child.done()}
@@ -500,7 +499,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             # this point, would be done already)
             try:
                 self._promise.result()
-            except BaseException:  # pylint: disable=broad-except
+            except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here
                 pass
@@ -539,7 +538,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
             # the Promise (which, by this point, would be done already)
             try:
                 self._promise.exception()
-            except BaseException:  # pylint: disable=broad-except
+            except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
                 pass

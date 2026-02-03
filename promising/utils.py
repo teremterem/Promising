@@ -1,4 +1,4 @@
-# pylint: disable=import-outside-toplevel
+# ruff: noqa: PLC0415 (import-outside-top-level)
 import typing
 from typing import Any
 

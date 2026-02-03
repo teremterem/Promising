@@ -19,10 +19,10 @@ pytest tests/promises/test_concurrent_future.py
 pytest --cov=promising
 
 # Format code
-black .
+ruff format .
 
 # Lint code
-pylint promising/
+ruff check promising/
 
 # Run pre-commit hooks manually
 pre-commit run --all-files
@@ -53,6 +53,6 @@ pre-commit run --all-files
 
 ## Code Style
 
-- Line length: 119 characters (Black)
+- Line length: 119 characters (Ruff)
 - Python version: 3.10+
-- Pre-commit hooks enforce: trailing whitespace, YAML validation, Black formatting, Pylint
+- Pre-commit hooks enforce: trailing whitespace, YAML validation, Ruff formatting and linting

@@ -130,7 +130,6 @@ async def test_as_concurrent_future(
         # Get the concurrent future after we await for anything
         concurrent_future = promise.as_concurrent_future()
 
-    # pylint: disable=possibly-used-before-assignment
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
     if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
@@ -287,7 +286,6 @@ async def test_with_exception(
         # Get the concurrent future after we await for anything
         concurrent_future = promise.as_concurrent_future()
 
-    # pylint: disable=possibly-used-before-assignment
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
     if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):

@@ -11,24 +11,13 @@ repos:
       - id: check-added-large-files
   - repo: local
     hooks:
-      - id: black
-        name: black
-        entry: black
+      - id: ruff
+        name: ruff
+        entry: ruff check --fix
         language: system
         types: [python]
-      - id: black-jupyter
-        name: black-jupyter
-        entry: black
-        language: system
-        types: [jupyter]
-  - repo: local
-    hooks:
-      - id: pylint
-        name: pylint
-        entry: pylint
+      - id: ruff-format
+        name: ruff-format
+        entry: ruff format
         language: system
         types: [python]
-#  - repo: https://github.com/nbQA-dev/nbQA
-#    rev: 1.9.1
-#    hooks:
-#      - id: nbqa-pylint

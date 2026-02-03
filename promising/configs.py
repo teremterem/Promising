@@ -63,8 +63,7 @@ class PromiseConfig:
 
         if parent_config is NOT_SET:
             try:
-                # pylint: disable=import-outside-toplevel,cyclic-import
-                from promising.promises import get_current_promise
+                from promising.promises import get_current_promise  # noqa: PLC0415 (import-outside-top-level)
 
                 self._parent_config = get_current_promise().get_config()
             except NoCurrentPromiseError:
@@ -185,13 +184,11 @@ class PromiseConfig:
             RuntimeError: If no inheritable config is found (should never happen as
                 root configs are always inheritable).
         """
-        # pylint: disable=protected-access
         config = self
         while config is not None:
             if config._config_inheritable:
                 return config
             config = config._parent_config
         raise RuntimeError(
-            "No inheritable PromiseConfig found - at least the root "
-            "PromiseConfig should be inheritable, but it isn't"
+            "No inheritable PromiseConfig found - at least the root PromiseConfig should be inheritable, but it isn't"
         )

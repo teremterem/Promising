@@ -19,10 +19,10 @@ pytest tests/promises/test_concurrent_future.py
 pytest --cov=promising
 
 # Format code
-ruff format .
+ruff format
 
 # Lint code
-ruff check promising/
+ruff check
 
 # Run pre-commit hooks manually
 pre-commit run --all-files

@@ -268,7 +268,7 @@ class Promise(Future, Generic[T_co]):
         yield from self._task
         return (yield from super().__await__())
 
-    def _init_config(self, config: PromiseConfig | None, **kwargs) -> PromiseConfig:
+    def _init_config(self, config: PromiseConfig | None, **kwargs: Any | Sentinel) -> PromiseConfig:
         """
         Initialize the Promise configuration.
 

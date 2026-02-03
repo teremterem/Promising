@@ -177,7 +177,10 @@ class Promise(Future, Generic[T_co]):
                 raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
 
             if self._config.is_start_soon():
-                self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+                self._create_task()
+
+    def _create_task(self) -> None:
+        self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
 
     def set_result(self, result: T_co) -> None:
         """
@@ -254,11 +257,13 @@ class Promise(Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
-        if not self.done():
-            if self._task is None:
-                yield from self._afulfill().__await__()  # pylint: disable=no-member
-            else:
-                yield from self._task
+        if self.done():
+            return self.result()
+
+        if self._task is None:
+            self._create_task()
+
+        yield from self._task
         return (yield from super().__await__())
 
     def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:

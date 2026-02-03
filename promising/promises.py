@@ -16,7 +16,7 @@ from promising.types import T_co
 _promise_name_counter = itertools.count(1)
 
 
-def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any]" | None:
+def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     """
     Get the currently active Promise from context.
 
@@ -90,7 +90,7 @@ class Promise(Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
-    _current: ContextVar["Promise[Any]" | None] = ContextVar("Promise._current", default=None)
+    _current: ContextVar["Promise[Any] | None"] = ContextVar("Promise._current", default=None)
 
     _previous_token: contextvars.Token | None
     _task: Task[T_co] | None
@@ -103,7 +103,7 @@ class Promise(Future, Generic[T_co]):
         *,
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
-        parent: "Promise[Any]" | Sentinel | None = NOT_SET,
+        parent: "Promise[Any] | Sentinel | None" = NOT_SET,
         config: PromiseConfig | None = None,
         # TODO Support optional `children_config` too
         start_soon: bool | Sentinel = NOT_SET,
@@ -301,7 +301,7 @@ class Promise(Future, Generic[T_co]):
         return PromiseConfig(**kwargs)
 
     @classmethod
-    def get_current(cls, *, raise_if_none: bool = True) -> "Promise[Any]" | None:
+    def get_current(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
         Get the currently active Promise from context variables.
 
@@ -322,7 +322,7 @@ class Promise(Future, Generic[T_co]):
             raise NoCurrentPromiseError("No active Promise found")
         return current
 
-    def get_parent(self, *, raise_if_none: bool = True) -> "Promise[Any]" | None:
+    def get_parent(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
         Get the parent Promise of this Promise.
 

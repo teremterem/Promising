@@ -63,7 +63,8 @@ class PromiseConfig:
 
         if parent_config is NOT_SET:
             try:
-                from promising.promises import get_current_promise  # noqa: PLC0415 (import-outside-top-level)
+                # ruff: noqa: PLC0415 (import-outside-top-level)
+                from promising.promises import get_current_promise
 
                 self._parent_config = get_current_promise().get_config()
             except NoCurrentPromiseError:

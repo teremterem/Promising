@@ -2,7 +2,7 @@ class BasePromisingError(Exception):
     pass
 
 
-class BasePromiseError(BasePromisingError):
+class PromiseError(BasePromisingError):
     # TODO This name can be easily confused with BasePromisingError name above
     pass
 
@@ -11,11 +11,11 @@ class BasePromiseConfigError(BasePromisingError):
     pass
 
 
-class NoCurrentPromiseError(BasePromiseError):
+class NoCurrentPromiseError(PromiseError):
     pass
 
 
-class NoParentPromiseError(BasePromiseError):
+class NoParentPromiseError(PromiseError):
     pass
 
 

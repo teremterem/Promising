@@ -9,10 +9,8 @@ class PromisingDefaults:
     """
     Default configuration values for the Promising library.
 
-    This class defines environment-variable-backed default settings that
-    control the behavior of Promise instances when no explicit configuration is
-    provided. All defaults can be overridden via environment variables prefixed
-    with 'PROMISING_DEFAULT_'.
+    This class defines default settings that control the behavior of Promise
+    instances when no explicit configuration is provided.
     """
 
     START_SOON = True
@@ -101,7 +99,7 @@ class PromiseConfig:
             #  the use case for this, thought)
             self._config_inheritable = get_concrete_value(config_inheritable, PromisingDefaults.CONFIGS_INHERITABLE)
 
-    def get_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+    def get_parent_config(self, *, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         """
         Get the parent config of this config.
 
@@ -121,7 +119,7 @@ class PromiseConfig:
             raise NoParentConfigError("No parent PromiseConfig found")
         return self._parent_config
 
-    def get_inheritable_parent_config(self, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+    def get_inheritable_parent_config(self, *, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
         """
         Get the nearest inheritable parent configuration.
 

@@ -16,7 +16,7 @@ from promising.types import T_co
 _promise_name_counter = itertools.count(1)
 
 
-def get_current_promise(raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+def get_current_promise(*, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
     """
     Get the currently active Promise from context.
 

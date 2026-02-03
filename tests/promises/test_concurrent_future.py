@@ -5,8 +5,10 @@ Simple test script to verify the as_concurrent_future() method works.
 import asyncio
 import concurrent.futures
 import threading
-from typing import Optional
+from typing import NoReturn, Optional
+
 import pytest
+
 from promising.promises import Promise
 
 
@@ -14,6 +16,7 @@ from promising.promises import Promise
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
 async def test_as_concurrent_future(
+    *,
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
@@ -103,7 +106,7 @@ async def test_as_concurrent_future(
         promise = Promise(prefill_result="Hello from Promise!")
     else:
 
-        async def sample_coro():
+        async def sample_coro() -> str:
             nonlocal coro_call_count
             coro_call_count += 1
             await asyncio.sleep(0.1)
@@ -162,6 +165,7 @@ async def test_as_concurrent_future(
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
 async def test_with_exception(
+    *,
     start_soon: Optional[bool],
     await_promise: Optional[bool],
     get_future_before_await: bool,
@@ -258,7 +262,7 @@ async def test_with_exception(
         promise = Promise(prefill_exception=ValueError("Test error from Promise!"))
     else:
 
-        async def failing_coro():
+        async def failing_coro() -> NoReturn:
             nonlocal coro_call_count
             coro_call_count += 1
             await asyncio.sleep(0.1)
@@ -320,6 +324,7 @@ async def test_with_exception(
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 async def test_from_threads(
+    *,
     start_soon: Optional[bool],
     await_promise: Optional[bool],
 ):
@@ -414,7 +419,7 @@ async def test_from_threads(
         promise = Promise(prefill_result="Result from thread test!")
     else:
 
-        async def sample_coro():
+        async def sample_coro() -> str:
             nonlocal coro_call_count
             coro_call_count += 1
             await asyncio.sleep(0.2)
@@ -426,7 +431,7 @@ async def test_from_threads(
 
     results = [None, None, None]
 
-    def thread_function(idx: int, timeout: float):
+    def thread_function(idx: int, timeout: float) -> None:
         try:
             results[idx] = concurrent_future.result(timeout=timeout)
         except concurrent.futures.TimeoutError as e:

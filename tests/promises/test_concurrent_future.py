@@ -245,7 +245,7 @@ async def test_with_exception(
         - Promises with start_soon=True get to the point where they raise
           exceptions as long as there is task switching (either by being
           awaited for directly, or because of asyncio task switching for other
-          reasong)
+          reasons)
         - Promises with start_soon=False only raise when awaited for directly
     """
 

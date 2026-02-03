@@ -3,8 +3,9 @@ import concurrent.futures
 import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
+from collections.abc import Coroutine, Generator
 from contextvars import ContextVar
-from typing import Any, Coroutine, Generator, Generic, Optional
+from typing import Any, Generic, Optional
 from weakref import WeakSet
 
 from promising.configs import PromiseConfig
@@ -250,7 +251,7 @@ class Promise(Future, Generic[T_co]):
     def __await__(self) -> Generator[T_co, None, None]:
         """
         If the Promise hasn't started yet, start execution of the coro via
-        _afullfil() and run it to completion. If already started via
+        _afulfill() and run it to completion. If already started via
         start_soon, wait for the existing task to complete.
 
         Returns:

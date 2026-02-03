@@ -2,7 +2,7 @@ from typing import Optional
 
 from promising.errors import NoCurrentPromiseError, NoParentConfigError
 from promising.sentinels import NOT_SET, Sentinel
-from promising.utils import get_bool_env, get_concrete_value
+from promising.utils import get_concrete_value
 
 
 class PromisingDefaults:
@@ -15,11 +15,9 @@ class PromisingDefaults:
     with 'PROMISING_DEFAULT_'.
     """
 
-    # TODO Are we sure it even makes sense to read these defaults from
-    #  environment variables in real systems ?
-    START_SOON = get_bool_env("PROMISING_DEFAULT_START_SOON", True)
-    MAKE_PARENT_WAIT = get_bool_env("PROMISING_DEFAULT_MAKE_PARENT_WAIT", False)
-    CONFIGS_INHERITABLE = get_bool_env("PROMISING_DEFAULT_CONFIGS_INHERITABLE", True)
+    START_SOON = True
+    MAKE_PARENT_WAIT = False
+    CONFIGS_INHERITABLE = True
 
 
 class PromiseConfig:

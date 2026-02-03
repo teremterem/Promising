@@ -130,7 +130,7 @@ async def test_as_concurrent_future(
     # pylint: disable=possibly-used-before-assignment
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
-    if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
+    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -271,7 +271,7 @@ async def test_with_exception(
         concurrent_future = promise.as_concurrent_future()
 
     if await_promise is True:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Test error from Promise!"):
             await promise
     elif await_promise is False:
         # Let's await in general, but not for the promise specifically
@@ -286,7 +286,7 @@ async def test_with_exception(
     # pylint: disable=possibly-used-before-assignment
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
-    if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
+    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -297,19 +297,17 @@ async def test_with_exception(
         # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Test error from Promise!"):
             # Now, that we ensured that concurrent_future is not done in these
             # scenarios, let's await for the promise directly, so we don't get
             # the asyncio warning about the exception not ever being retrieved
             await promise
-        assert str(exc_info.value) == "Test error from Promise!"
 
     else:
         # In all other scenarios the promise should be done (with exception)
         assert concurrent_future.done()
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Test error from Promise!"):
             concurrent_future.result()
-        assert str(exc_info.value) == "Test error from Promise!"
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the
@@ -453,7 +451,7 @@ async def test_from_threads(
     for t in threads:
         t.join()
 
-    if (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True):
+    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -487,3 +485,12 @@ async def test_from_threads(
         assert coro_call_count == 0
     else:
         assert coro_call_count == 1
+
+
+def _promise_expected_incomplete(*, start_soon: Optional[bool], await_promise: Optional[bool]) -> bool:
+    """
+    Return True when the promise is NOT expected to be done:
+    1. Not prefilled and no task switching occurs (await_promise is None)
+    2. Does not start soon, not prefilled, and not awaited directly
+    """
+    return (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True)

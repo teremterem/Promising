@@ -19,7 +19,9 @@ source = ["promising"]
 [project]
 name = "promising"
 version = "0.0.1"
-description = """TODO"""
+description = """\
+TODO\
+"""
 authors = [{name = "Oleksandr Tereshchenko", email = "toporok@gmail.com"}]
 readme = "README.md"
 license = {text = "MIT"}

@@ -28,28 +28,31 @@ ruff check promising/
 pre-commit run --all-files
 ```
 
+Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`.
+
 ## Architecture
 
 **Core Components:**
 
-- `Promise[T]` (`promising/promises.py`) - Main class extending `asyncio.Future` with hierarchical context management. Uses `ContextVar` to track parent-child relationships via `WeakSet`. Supports automatic child waiting and thread-safe `concurrent.futures.Future` compatibility.
+- `Promise[T]` (`promising/promises.py`) - Main class extending `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise and `WeakSet` for parent-child relationships. Key behavior: when a Promise's coroutine creates other Promises during execution, those become children of the active Promise (regardless of when they complete).
 
 - `PromiseConfig` (`promising/configs.py`) - Configuration system with inheritance. Key settings:
-  - `start_soon`: Execute immediately vs defer until awaited
-  - `make_parent_wait`: Parent waits for child completion
-  - `config_inheritable`: Config inheritance to children
+  - `start_soon`: Execute immediately vs defer until awaited (default: True)
+  - `make_parent_wait`: Parent waits for child completion (default: False)
+  - `config_inheritable`: Config inheritance to children (default: True)
 
 - `_PromiseBackedConcurrentFuture` (`promising/promises.py`) - Bridges asyncio Promises to `concurrent.futures.Future` for multi-threaded contexts.
+
+**Supporting modules:**
+
+- `sentinels.py` - `NOT_SET` sentinel for distinguishing unset values from None
+- `errors.py` - Custom exceptions (`NoCurrentPromiseError`, `NoParentPromiseError`, `NoParentConfigError`)
+- `utils.py` - Helper functions like `get_concrete_value()`
 
 **Public API** (exported from `promising/__init__.py`):
 - `Promise` - Main Promise class
 - `PromiseConfig` - Configuration class
 - `get_current_promise()` - Get active Promise from context
-
-**Configuration via Environment Variables:**
-- `PROMISING_DEFAULT_START_SOON`
-- `PROMISING_DEFAULT_MAKE_PARENT_WAIT`
-- `PROMISING_DEFAULT_CONFIGS_INHERITABLE`
 
 ## Code Style
 

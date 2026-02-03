@@ -38,8 +38,8 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 - `PromiseConfig` (`promising/configs.py`) - Configuration system with inheritance. Key settings:
   - `start_soon`: Execute immediately vs defer until awaited (default: True)
-  - `make_parent_wait`: Parent waits for child completion (default: False)
-  - `config_inheritable`: Config inheritance to children (default: True)
+  - `make_parent_wait`: Parent waits for completion of "this" Promise (default: False)
+  - `config_inheritable`: Config inheritance from "this" Promise to children (default: True)
 
 - `_PromiseBackedConcurrentFuture` (`promising/promises.py`) - Bridges asyncio Promises to `concurrent.futures.Future` for multi-threaded contexts.
 

@@ -5,7 +5,7 @@ Simple test script to verify the as_concurrent_future() method works.
 import asyncio
 import concurrent.futures
 import threading
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 import pytest
 
@@ -17,8 +17,8 @@ from promising.promises import Promise
 @pytest.mark.parametrize("get_future_before_await", [True, False])
 async def test_as_concurrent_future(
     *,
-    start_soon: Optional[bool],
-    await_promise: Optional[bool],
+    start_soon: bool | None,
+    await_promise: bool | None,
     get_future_before_await: bool,
 ):
     """
@@ -165,8 +165,8 @@ async def test_as_concurrent_future(
 @pytest.mark.parametrize("get_future_before_await", [True, False])
 async def test_with_exception(
     *,
-    start_soon: Optional[bool],
-    await_promise: Optional[bool],
+    start_soon: bool | None,
+    await_promise: bool | None,
     get_future_before_await: bool,
 ):
     """
@@ -323,8 +323,8 @@ async def test_with_exception(
 @pytest.mark.parametrize("await_promise", [True, False, None])
 async def test_from_threads(
     *,
-    start_soon: Optional[bool],
-    await_promise: Optional[bool],
+    start_soon: bool | None,
+    await_promise: bool | None,
 ):
     """
     Test thread-safe access to Promise results through the
@@ -490,7 +490,7 @@ async def test_from_threads(
         assert coro_call_count == 1
 
 
-def _promise_expected_incomplete(*, start_soon: Optional[bool], await_promise: Optional[bool]) -> bool:
+def _promise_expected_incomplete(*, start_soon: bool | None, await_promise: bool | None) -> bool:
     """
     Return True when the promise is NOT expected to be done:
     1. Not prefilled and no task switching occurs (await_promise is None)

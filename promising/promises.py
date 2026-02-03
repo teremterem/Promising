@@ -5,7 +5,7 @@ import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
 from contextvars import ContextVar
-from typing import Any, Generic, Optional
+from typing import Any, Generic
 from weakref import WeakSet
 
 from promising.configs import PromiseConfig
@@ -16,7 +16,7 @@ from promising.types import T_co
 _promise_name_counter = itertools.count(1)
 
 
-def get_current_promise(*, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any]" | None:
     """
     Get the currently active Promise from context.
 
@@ -90,27 +90,27 @@ class Promise(Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
-    _current: ContextVar[Optional["Promise[Any]"]] = ContextVar("Promise._current", default=None)
+    _current: ContextVar["Promise[Any]" | None] = ContextVar("Promise._current", default=None)
 
-    _previous_token: Optional[contextvars.Token]
-    _task: Optional[Task[T_co]]
+    _previous_token: contextvars.Token | None
+    _task: Task[T_co] | None
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
-    def __init__(  # noqa: PLR0912 (too-many-branches)
+    def __init__(  # noqa: PLR0912, PLR0913 (too-many-branches, too-many-arguments)
         self,
-        coro: Optional[Coroutine[Any, Any, T_co]] = None,
+        coro: Coroutine[Any, Any, T_co] | None = None,
         *,
-        loop: Optional[AbstractEventLoop] = None,
-        name: Optional[str] = None,
-        parent: Optional["Promise[Any]"] | Sentinel = NOT_SET,
-        config: Optional[PromiseConfig] = None,
+        loop: AbstractEventLoop | None = None,
+        name: str | None = None,
+        parent: "Promise[Any]" | Sentinel | None = NOT_SET,
+        config: PromiseConfig | None = None,
         # TODO Support optional `children_config` too
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
-        prefill_result: Optional[T_co] | Sentinel = NOT_SET,
-        prefill_exception: Optional[BaseException] = None,
+        prefill_result: T_co | Sentinel | None = NOT_SET,
+        prefill_exception: BaseException | None = None,
     ) -> None:
         # TODO [ALMOST READY] Fix the following linting error - too many branches
         self._previous_token = None
@@ -268,7 +268,7 @@ class Promise(Future, Generic[T_co]):
         yield from self._task
         return (yield from super().__await__())
 
-    def _init_config(self, config: Optional[PromiseConfig], **kwargs) -> PromiseConfig:
+    def _init_config(self, config: PromiseConfig | None, **kwargs) -> PromiseConfig:
         """
         Initialize the Promise configuration.
 
@@ -301,7 +301,7 @@ class Promise(Future, Generic[T_co]):
         return PromiseConfig(**kwargs)
 
     @classmethod
-    def get_current(cls, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+    def get_current(cls, *, raise_if_none: bool = True) -> "Promise[Any]" | None:
         """
         Get the currently active Promise from context variables.
 
@@ -322,7 +322,7 @@ class Promise(Future, Generic[T_co]):
             raise NoCurrentPromiseError("No active Promise found")
         return current
 
-    def get_parent(self, *, raise_if_none: bool = True) -> Optional["Promise[Any]"]:
+    def get_parent(self, *, raise_if_none: bool = True) -> "Promise[Any]" | None:
         """
         Get the parent Promise of this Promise.
 
@@ -469,7 +469,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
         super().__init__()
         self._promise = promise
 
-    def result(self, timeout: Optional[float] = None) -> Any:
+    def result(self, timeout: float | None = None) -> Any:
         """
         Get the result of the Promise.
 
@@ -507,7 +507,7 @@ class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
         # even though it's going to be the same as the result from the Promise
         return result
 
-    def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
+    def exception(self, timeout: float | None = None) -> BaseException | None:
         """
         Get the exception that occurred during Promise execution, if any.
 

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from promising.errors import NoCurrentPromiseError, NoParentConfigError
 from promising.sentinels import NOT_SET, Sentinel
 from promising.utils import get_concrete_value
@@ -47,12 +45,12 @@ class PromiseConfig:
         ValueError: If config_inheritable is False for a root configuration.
     """
 
-    _parent_config: Optional["PromiseConfig"]
-    _inheritable_parent_config: Optional["PromiseConfig"]
+    _parent_config: "PromiseConfig" | None
+    _inheritable_parent_config: "PromiseConfig" | None
 
     def __init__(
         self,
-        parent_config: Optional["PromiseConfig"] | Sentinel = NOT_SET,
+        parent_config: "PromiseConfig" | Sentinel | None = NOT_SET,
         *,
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
@@ -99,7 +97,7 @@ class PromiseConfig:
             #  the use case for this, thought)
             self._config_inheritable = get_concrete_value(config_inheritable, PromisingDefaults.CONFIGS_INHERITABLE)
 
-    def get_parent_config(self, *, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+    def get_parent_config(self, *, raise_if_none: bool = True) -> "PromiseConfig" | None:
         """
         Get the parent config of this config.
 
@@ -119,7 +117,7 @@ class PromiseConfig:
             raise NoParentConfigError("No parent PromiseConfig found")
         return self._parent_config
 
-    def get_inheritable_parent_config(self, *, raise_if_none: bool = True) -> Optional["PromiseConfig"]:
+    def get_inheritable_parent_config(self, *, raise_if_none: bool = True) -> "PromiseConfig" | None:
         """
         Get the nearest inheritable parent configuration.
 

@@ -76,7 +76,8 @@ async def test_as_concurrent_future(
               - Expected not to be done - if Promise doesn't "start soon" and
                 isn't awaited directly, or it does "start soon" but no task
                 switching occurs and, as a result, it does not have a chance
-                to complete
+                to complete. In these cases, the coroutine was never scheduled,
+                so coro_call_count must be 0.
               - Expected to be done - in all other scenarios
            - If done, verify that the result is "Hello from Promise!"
 
@@ -140,7 +141,6 @@ async def test_as_concurrent_future(
         #    don't await for it directly
         assert not concurrent_future.done()
 
-        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done in these
@@ -225,7 +225,8 @@ async def test_with_exception(
               - Expected not to be done - if Promise doesn't "start soon" and
                 isn't awaited directly, or it does "start soon" but no task
                 switching occurs and, as a result, it does not have a chance to
-                complete
+                complete. In these cases, the coroutine was never scheduled,
+                so coro_call_count must be 0.
               - Expected to be done - in all other scenarios
            - If done, verify that calling result() raises ValueError with
              the correct message
@@ -296,7 +297,6 @@ async def test_with_exception(
         #    don't await for it directly
         assert not concurrent_future.done()
 
-        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         with pytest.raises(ValueError, match="Test error from Promise!"):
@@ -378,7 +378,8 @@ async def test_from_threads(
            - Promise is NOT expected to be done - if Promise doesn't
              "start soon" and isn't awaited directly, or it does "start soon"
              but no task switching occurs and, as a result, it does not have a
-             chance to complete
+             chance to complete. In these cases, the coroutine was never
+             scheduled, so coro_call_count must be 0.
               - All threads should timeout (concurrent.futures.TimeoutError)
            - Promise IS expected to be done - in all other scenarios
               - Threads 0 and 1 should get "Result from thread test!"
@@ -464,7 +465,6 @@ async def test_from_threads(
         assert isinstance(results[1], concurrent.futures.TimeoutError)
         assert isinstance(results[2], concurrent.futures.TimeoutError)
 
-        # TODO This check is not mentioned in the docstring
         assert coro_call_count == 0
 
         # Now, that we ensured that concurrent_future is not done no matter the

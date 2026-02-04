@@ -46,8 +46,9 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 **Supporting modules:**
 
 - `sentinels.py` - `NOT_SET` sentinel for distinguishing unset values from None
-- `errors.py` - Custom exceptions (`NoCurrentPromiseError`, `NoParentPromiseError`, `NoParentConfigError`)
+- `errors.py` - Custom exceptions (`NoCurrentPromiseError`, `NoParentPromiseError`, `NoParentConfigError`) inheriting from `PromiseError` and `BasePromisingError`
 - `utils.py` - Helper functions like `get_concrete_value()`
+- `types.py` - Type definitions (`T_co` covariant TypeVar used by Promise)
 
 **Public API** (exported from `promising/__init__.py`):
 - `Promise` - Main Promise class

@@ -3,7 +3,6 @@ class BasePromisingError(Exception):
 
 
 class PromiseError(BasePromisingError):
-    # TODO This name can be easily confused with BasePromisingError name above
     pass
 
 

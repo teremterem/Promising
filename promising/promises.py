@@ -249,7 +249,7 @@ class Promise(Future, Generic[T_co]):
                 else:
                     self.set_result(result)
 
-    def __await__(self) -> Generator[T_co, None, None]:
+    def __await__(self) -> Generator[Any, None, T_co]:
         """
         If the Promise hasn't started yet, start execution of the coro via
         _afulfill() and run it to completion. If already started via

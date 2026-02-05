@@ -1,5 +1,13 @@
-[tool.black]
+[tool.ruff]
 line-length = 119
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "PL"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.coverage.run]
 branch = true
@@ -7,31 +15,29 @@ source = ["promising"]
 
 [project]
 name = "promising"
-version = "0.0.0"
-description = """TODO"""
+version = "0.0.1"
+description = """\
+TODO\
+"""
 authors = [{name = "Oleksandr Tereshchenko", email = "toporok@gmail.com"}]
-homepage = "https://github.com/teremterem/Promising"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.10"
-dependencies = [
-    "pydantic>=2.0.0,<3.0.0",
-]
+requires-python = ">=3.10,<4.0"
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "black",
     "hatch",
     "ipython",
-    "jupyterlab",
-    "notebook",  # this is needed for notebooks to work in PyCharm
+    # "jupyterlab",
+    # "notebook",  # This is needed for notebooks to work in PyCharm
     "pre-commit",
-    "pylint",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
     "pytest-dotenv",
     "python-dotenv",
+    "ruff",
 ]
 
 [build-system]

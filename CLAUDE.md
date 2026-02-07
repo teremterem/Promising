@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Promising is a hierarchical asynchronous Promise/coroutine management library that extends `asyncio.Future`. It provides parent-child relationships between asynchronous operations via context variables.
+Promising is a hierarchical asynchronous Promise/coroutine management library that extends `asyncio.Future`. It provides parent-child relationships between asynchronous operations via context variables. Zero core dependencies — pure asyncio/stdlib only.
 
 ## Common Commands
 
@@ -26,6 +26,9 @@ ruff check
 
 # Run pre-commit hooks manually
 pre-commit run --all-files
+
+# Install dependencies (uses uv with Hatchling build backend)
+uv sync --all-extras
 ```
 
 Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`.
@@ -45,18 +48,23 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 **Supporting modules:**
 
-- `sentinels.py` - `NOT_SET` sentinel for distinguishing unset values from None
+- `sentinels.py` - `NOT_SET` sentinel for distinguishing unset values from None (raises on boolean coercion to prevent misuse)
 - `errors.py` - Custom exceptions (`NoCurrentPromiseError`, `NoParentPromiseError`, `NoParentConfigError`) inheriting from `PromiseError` and `BasePromisingError`
 - `utils.py` - Helper functions like `get_concrete_value()`
 - `types.py` - Type definitions (`T_co` covariant TypeVar used by Promise)
+- `ext/` - Extension modules directory (placeholder for future extensions)
 
 **Public API** (exported from `promising/__init__.py`):
 - `Promise` - Main Promise class
 - `PromiseConfig` - Configuration class
 - `get_current_promise()` - Get active Promise from context
 
+**Examples** (`examples/`):
+- `htmx_ui/` - FastHTML web app demonstrating Promise integration with HTMX, DaisyUI, and optional Langfuse observability. Install example deps with `uv sync --extra examples`.
+
 ## Code Style
 
 - Line length: 119 characters (Ruff)
 - Python version: 3.10+
+- Ruff lint rules: E, F, W, I, N, UP, B, C4, PL
 - Pre-commit hooks enforce: trailing whitespace, YAML validation, Ruff formatting and linting

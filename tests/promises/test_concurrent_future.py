@@ -20,7 +20,7 @@ async def test_as_concurrent_future(
     start_soon: bool | None,
     await_promise: bool | None,
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's behavior under various timing
     and execution conditions.
@@ -168,7 +168,7 @@ async def test_with_exception(
     start_soon: bool | None,
     await_promise: bool | None,
     get_future_before_await: bool,
-):
+) -> None:
     """
     Test Promise.as_concurrent_future() method's exception handling across
     various timing conditions.
@@ -321,11 +321,7 @@ async def test_with_exception(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_from_threads(
-    *,
-    start_soon: bool | None,
-    await_promise: bool | None,
-):
+async def test_from_threads(*, start_soon: bool | None, await_promise: bool | None) -> None:
     """
     Test thread-safe access to Promise results through the
     concurrent.futures.Future interface.

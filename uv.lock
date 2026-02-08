@@ -2089,6 +2089,7 @@ dev = [
 examples = [
     { name = "langfuse" },
     { name = "litellm" },
+    { name = "pydantic" },
     { name = "python-fasthtml" },
 ]
 
@@ -2099,6 +2100,7 @@ requires-dist = [
     { name = "langfuse", marker = "extra == 'examples'" },
     { name = "litellm", marker = "extra == 'examples'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
+    { name = "pydantic", marker = "extra == 'examples'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },

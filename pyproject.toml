@@ -43,6 +43,7 @@ dev = [
 examples = [
     "langfuse",
     "litellm",
+    "pydantic",
     "python-fasthtml",
 ]
 

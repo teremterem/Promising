@@ -47,3 +47,11 @@ async def extract_keywords(thought: str) -> list[str]:
 
     keyword_response = KeywordResponse.model_validate_json(response.choices[0].message.content)
     return keyword_response.keywords
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    thought = input("Enter a thought: ")
+    keywords = asyncio.run(extract_keywords(thought))
+    print(keywords)

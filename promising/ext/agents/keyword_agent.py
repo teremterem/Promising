@@ -1,3 +1,4 @@
+from aiohttp import ClientSession
 from litellm import acompletion
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ class KeywordResponse(BaseModel):
     )
 
 
-async def extract_keywords(thought: str) -> list[str]:
+async def extract_keywords(thought: str, *, litellm_session: ClientSession | None = None) -> list[str]:
     """Extract keywords from a user's thought for semantic similarity search enhancement."""
     model = "openrouter/openai/gpt-5-mini"
     temperature = 0
@@ -43,10 +44,10 @@ async def extract_keywords(thought: str) -> list[str]:
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         response_format=KeywordResponse,
+        shared_session=litellm_session,
     )
 
     keyword_response = KeywordResponse.model_validate_json(response.choices[0].message.content)
-    await asyncio.sleep(1)
     return keyword_response.keywords
 
 
@@ -54,17 +55,18 @@ if __name__ == "__main__":
     import asyncio
 
     async def main():
-        try:
-            while True:
-                thought = input("Enter a thought:\n")
-                if thought == "exit":
-                    break
-                elif not thought.strip():
-                    continue
-                keywords = await extract_keywords(thought)
-                print(keywords)
-                print()
-        except KeyboardInterrupt:
-            pass
+        async with ClientSession() as litellm_session:
+            try:
+                while True:
+                    thought = input("Enter a thought:\n")
+                    if thought == "exit":
+                        break
+                    elif not thought.strip():
+                        continue
+                    keywords = await extract_keywords(thought, litellm_session=litellm_session)
+                    print(keywords)
+                    print()
+            except KeyboardInterrupt:
+                pass
 
     asyncio.run(main())

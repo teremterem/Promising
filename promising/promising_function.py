@@ -41,6 +41,9 @@ class PromisingFunction(Generic[T_co]):
         if self.original_func_or_class is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
+        # TODO TODO TODO Put the logic here and use backend only for
+        #  persistence ?
+
         return self.backend.call_function(self, *args, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Promise[T_co]:

@@ -39,7 +39,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 - `Promise[T]` (`promising/promises.py`) - Main class extending `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise and `WeakSet` for parent-child relationships. Key behavior: when a Promise's coroutine creates other Promises during execution, those become children of the active Promise (regardless of when they complete).
 
-- `PromiseConfig` (`promising/configs.py`) - Configuration system with inheritance. Key settings:
+- `PromisingConfig` (`promising/configs.py`) - Configuration system with inheritance. Key settings:
   - `start_soon`: Execute immediately vs defer until awaited (default: True)
   - `make_parent_wait`: Parent waits for completion of "this" Promise (default: False)
   - `config_inheritable`: Config inheritance from "this" Promise to children (default: True)
@@ -56,7 +56,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 **Public API** (exported from `promising/__init__.py`):
 - `Promise` - Main Promise class
-- `PromiseConfig` - Configuration class
+- `PromisingConfig` - Configuration class
 - `get_current_promise()` - Get active Promise from context
 
 **Examples** (`examples/`):

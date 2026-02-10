@@ -7,3 +7,4 @@ class Sentinel:
 
 
 NOT_SET = Sentinel()
+INHERIT = Sentinel()

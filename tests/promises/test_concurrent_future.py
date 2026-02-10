@@ -3,13 +3,13 @@ Simple test script to verify the as_concurrent_future() method works.
 """
 
 import asyncio
-import concurrent.futures
+import concurrent
 import threading
 from typing import NoReturn
 
 import pytest
 
-from promising.promises import Promise
+from promising.promise import Promise
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])

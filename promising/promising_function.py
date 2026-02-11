@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.backends import PromisingBackend
 from promising.config import PromisingConfig
 from promising.errors import PromiseFunctionNotCallableError
 from promising.promise import Promise
@@ -16,7 +15,6 @@ class PromisingFunction(Generic[T_co]):
         self,
         func_or_class: Callable[..., T_co] | type | None = None,
         *,
-        backend: PromisingBackend,
         config: PromisingConfig | None = None,
         # TODO Support optional `children_config` too ?
         start_soon: bool | Sentinel = NOT_SET,
@@ -24,7 +22,6 @@ class PromisingFunction(Generic[T_co]):
         config_inheritable: bool | Sentinel = NOT_SET,
     ):
         self.original_func_or_class = func_or_class
-        self.backend = backend
 
         # TODO Is maintaining all these attributes here like this directly a
         #  good idea ?
@@ -48,7 +45,6 @@ class PromisingFunction(Generic[T_co]):
             def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co]":
                 return PromisingFunction[F_co](
                     f_or_cls,
-                    backend=self.backend,
                     config=config,
                     start_soon=start_soon,
                     make_parent_wait=make_parent_wait,
@@ -61,12 +57,19 @@ class PromisingFunction(Generic[T_co]):
         # function call
         return PromisingFunction[F_co](
             func_or_class,
-            backend=self.backend,
             config=config,
             start_soon=start_soon,
             make_parent_wait=make_parent_wait,
             config_inheritable=config_inheritable,
         )
+
+    def __call__(
+        self,
+        *args: Any,
+        **kwargs: Any,
+        # TODO Add promise config parameters ?
+    ) -> Promise[T_co]:
+        return self.call(*args, **kwargs)
 
     def call(
         self,
@@ -77,15 +80,4 @@ class PromisingFunction(Generic[T_co]):
         if self.original_func_or_class is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
-        # TODO TODO TODO Put the logic here and use backend only for
-        #  persistence ?
-
-        return self.backend.call_function(self, *args, **kwargs)
-
-    def __call__(
-        self,
-        *args: Any,
-        **kwargs: Any,
-        # TODO Add promise config parameters ?
-    ) -> Promise[T_co]:
-        return self.call(*args, **kwargs)
+        # TODO TODO TODO

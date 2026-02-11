@@ -80,4 +80,15 @@ class PromisingFunction(Generic[T_co]):
         if self.original_func_or_class is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
-        # TODO TODO TODO
+        # TODO TODO TODO Support synchronous functions ?
+        # TODO TODO TODO Introduce "backends"
+        # TODO Develop a convenient and idiomatic (whatever that would mean)
+        #  way of serializing/deserializing the arguments and ensuring
+        #  immutability
+        return Promise[T_co](
+            coro=self.original_func_or_class(*args, **kwargs),
+            config=self.config,
+            start_soon=self.start_soon,
+            make_parent_wait=self.make_parent_wait,
+            config_inheritable=self.config_inheritable,
+        )

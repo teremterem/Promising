@@ -1,3 +1,4 @@
+import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
@@ -80,13 +81,24 @@ class PromisingFunction(Generic[T_co]):
         if self.original_func_or_class is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
-        # TODO TODO TODO Support synchronous functions ?
-        # TODO TODO TODO Introduce "backends"
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
+        if isinstance(self.original_func_or_class, type):
+            # It's a class - let's instantiate it
+            actual_func = self.original_func_or_class(*args, **kwargs)
+        else:
+            # Otherwise, assume it is already a function
+            actual_func = functools.partial(self.original_func_or_class, *args, **kwargs)
+
+        # Assume the function is asynchronous and get the coroutine out of it
+        # TODO TODO TODO Support synchronous functions too. (How to identify
+        #  them without trying to get the coroutine, thought ?)
+        coro = actual_func()
+
+        # TODO TODO TODO Introduce "backends"
         return Promise[T_co](
-            coro=self.original_func_or_class(*args, **kwargs),
+            coro=coro,
             config=self.config,
             start_soon=self.start_soon,
             make_parent_wait=self.make_parent_wait,

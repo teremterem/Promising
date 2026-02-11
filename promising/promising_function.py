@@ -15,11 +15,17 @@ class PromisingFunction(Generic[T_co]):
         func_or_class: Callable[..., T_co] | type | None = None,
         *,
         backend: PromisingBackend,
+        # TODO Add promise config parameters
     ):
         self.original_func_or_class = func_or_class
         self.backend = backend
 
-    def function(self, func_or_class: Callable[..., F_co] | type | None = None) -> "PromisingFunction[F_co]":
+    def function(
+        self,
+        func_or_class: Callable[..., F_co] | type | None = None,
+        # *,
+        # TODO Add promise config parameters
+    ) -> "PromisingFunction[F_co]":
         if func_or_class is None:
             # the decorator `@miniagent(...)` was used with arguments
             def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co]":
@@ -37,7 +43,12 @@ class PromisingFunction(Generic[T_co]):
             backend=self.backend,
         )
 
-    def call(self, *args: Any, **kwargs: Any) -> Promise[T_co]:
+    def call(
+        self,
+        *args: Any,
+        **kwargs: Any,
+        # TODO Add promise config parameters ?
+    ) -> Promise[T_co]:
         if self.original_func_or_class is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
@@ -46,5 +57,10 @@ class PromisingFunction(Generic[T_co]):
 
         return self.backend.call_function(self, *args, **kwargs)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Promise[T_co]:
+    def __call__(
+        self,
+        *args: Any,
+        **kwargs: Any,
+        # TODO Add promise config parameters ?
+    ) -> Promise[T_co]:
         return self.call(*args, **kwargs)

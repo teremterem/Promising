@@ -2,7 +2,7 @@ import typing
 from typing import Any
 
 from promising.promise import Promise
-from promising.sentinels import NOT_SET
+from promising.sentinels import NOT_SET, Sentinel
 from promising.types import F_co
 
 if typing.TYPE_CHECKING:
@@ -27,7 +27,7 @@ class PromisingBackend:
         promising_function: "PromisingFunction[F_co]",
         *args: Any,
         **kwargs: Any,
-    ) -> F_co | NOT_SET:
+    ) -> F_co | Sentinel:
         return NOT_SET
 
     def _persist_result(

@@ -56,6 +56,9 @@ class PromisingConfig:
         make_parent_wait: bool | Sentinel = INHERIT,
         config_inheritable: bool | Sentinel = INHERIT,
     ) -> None:
+        # TODO It might make more sense to resolve values when they are
+        #  requested, rather than upon construction (a Promise could turn it
+        #  into ConcretePromisingConfig upon Promise construction instead ?)
         self._parent_config = None
         self._inheritable_parent_config = None
 

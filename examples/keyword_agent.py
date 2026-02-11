@@ -2,6 +2,8 @@ from aiohttp import ClientSession
 from litellm import acompletion
 from pydantic import BaseModel, Field
 
+import promising
+
 
 class KeywordResponse(BaseModel):
     """Keywords extracted from a user's thought for enhancing semantic similarity search."""
@@ -17,6 +19,10 @@ class KeywordResponse(BaseModel):
     )
 
 
+promising_root = promising.PromisingFunction()
+
+
+@promising_root.function()
 async def extract_keywords(thought: str, *, litellm_session: ClientSession | None = None) -> list[str]:
     """Extract keywords from a user's thought for semantic similarity search enhancement."""
     model = "openrouter/openai/gpt-5-mini"

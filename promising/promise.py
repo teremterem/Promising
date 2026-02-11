@@ -97,7 +97,7 @@ class Promise(Future, Generic[T_co]):
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
-    def __init__(  # noqa: PLR0912, PLR0913 (too-many-branches, too-many-arguments)
+    def __init__(  # noqa: PLR0912 (too-many-branches)
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
@@ -105,7 +105,7 @@ class Promise(Future, Generic[T_co]):
         name: str | None = None,
         parent: "Promise[Any] | Sentinel | None" = NOT_SET,
         config: PromisingConfig | None = None,
-        # TODO Support optional `children_config` too
+        # TODO Support optional `children_config` too ?
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,

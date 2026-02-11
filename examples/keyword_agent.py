@@ -19,10 +19,7 @@ class KeywordResponse(BaseModel):
     )
 
 
-promising_root = promising.PromisingFunction()
-
-
-@promising_root.function()
+@promising.function
 async def extract_keywords(thought: str, *, litellm_session: ClientSession | None = None) -> list[str]:
     """Extract keywords from a user's thought for semantic similarity search enhancement."""
     model = "openrouter/openai/gpt-5-mini"

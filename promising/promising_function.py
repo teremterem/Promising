@@ -27,7 +27,7 @@ class PromisingFunction(Generic[T_co]):
         # TODO Add promise config parameters
     ) -> "PromisingFunction[F_co]":
         if func_or_class is None:
-            # the decorator `@miniagent(...)` was used with arguments
+            # The decorator was used with arguments
             def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co]":
                 return PromisingFunction[F_co](
                     f_or_cls,
@@ -36,7 +36,7 @@ class PromisingFunction(Generic[T_co]):
 
             return _decorator
 
-        # the decorator was used either without arguments or as a direct
+        # The decorator was used either without arguments or as a direct
         # function call
         return PromisingFunction[F_co](
             func_or_class,

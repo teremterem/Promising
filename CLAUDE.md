@@ -35,39 +35,32 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 ## Architecture
 
-**Core Components:**
+**Core hierarchy flow:** `PromisingFunction` wraps an async function/class → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises created during that execution become its children via `WeakSet`.
 
-- `Promise[T]` (`promising/promise.py`) - Main class extending `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise and `WeakSet` for parent-child relationships. Key behavior: when a Promise's coroutine creates other Promises during execution, those become children of the active Promise (regardless of when they complete).
+**Key components:**
 
-- `PromisingConfig` (`promising/config.py`) - Configuration system with inheritance. Config values use `INHERIT` sentinel to inherit from the nearest inheritable parent config. Key settings:
+- `Promise[T]` (`promising/promise.py`) - Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_create_task()` (if `start_soon`) → `_afulfill()` (activates context, runs coro, waits for `make_parent_wait` children, sets result) → `_afinalize()` (resets context). Also contains `_PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
+
+- `PromisingConfig` (`promising/config.py`) - Configuration with inheritance. Values use `INHERIT` sentinel to inherit from the nearest inheritable parent config. Key settings:
   - `start_soon`: Execute immediately vs defer until awaited (default: True)
   - `make_parent_wait`: Parent waits for completion of "this" Promise (default: False)
   - `config_inheritable`: Config inheritance from "this" Promise to children (default: True)
 
-- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions or classes into Promise-producing callables. Supports both `@promising.function(...)` decorator syntax (with config args) and direct `PromisingFunction(func)` construction. Calling a `PromisingFunction` returns a `Promise[T]`.
+- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions or classes into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
 
-- `PromisingBackend` (`promising/backends.py`) - WIP abstraction for pluggable backends that can intercept function calls to provide persisted/cached results. Has `_try_persisted_result` / `_persist_result` hooks.
+- `PromisingBackend` (`promising/backends.py`) - WIP abstraction for pluggable backends with `_try_persisted_result` / `_persist_result` hooks.
 
-- `_PromiseBackedConcurrentFuture` (`promising/promise.py`) - Bridges asyncio Promises to `concurrent.futures.Future` for multi-threaded contexts.
-
-**Supporting modules:**
-
-- `sentinels.py` - `NOT_SET` and `INHERIT` sentinels (raise on boolean coercion to prevent misuse)
-- `errors.py` - Exception hierarchy: `BasePromisingError` → `PromiseError` → `NoCurrentPromiseError`, `NoParentPromiseError`; `BasePromisingError` → `BasePromiseConfigError` → `NoParentConfigError`; `PromiseError` → `PromiseFunctionError` → `PromiseFunctionNotCallableError`
-- `utils.py` - `get_concrete_value()` resolves sentinel-or-concrete to concrete
-- `types.py` - `T_co` (covariant TypeVar for Promise results), `F_co` (covariant TypeVar for function return types)
+**Sentinel pattern:** `NOT_SET` and `INHERIT` in `sentinels.py` raise on boolean coercion to prevent misuse. `NOT_SET` means "use default", `INHERIT` means "inherit from parent config".
 
 **Public API** (exported from `promising/__init__.py`):
-- `Promise`, `PromisingConfig`, `PromisingFunction`, `get_current_promise()`
+- `Promise`, `PromisingConfig`, `PromisingFunction`, `function`, `get_current_promise()`
+- `function()` is the decorator: use as `@promising.function()` with config args or `@promising.function` bare.
 
-**Examples** (`examples/`):
-- `htmx_ui/` - FastHTML web app demonstrating Promise integration with HTMX, DaisyUI, and optional Langfuse observability.
-- `keyword_agent.py` - Demonstrates `PromisingFunction` usage: creates a `PromisingFunction` root, registers an async function via `@promising_root.function()`, and calls it to get a `Promise`. Uses litellm + pydantic for structured LLM output.
-- Install example deps with `uv sync --extra examples`.
+**Example usage** (`examples/keyword_agent.py`): Shows idiomatic `@promising.function` decorator usage — decorate an async function, call it to get a `Promise`, await it for the result. Install example deps with `uv sync --extra examples`.
 
 ## Code Style
 
 - Line length: 119 characters (Ruff)
 - Python version: 3.10+
-- Ruff lint rules: E, F, W, I, N, UP, B, C4, PL
+- Ruff lint rules: E, F, W, I, N, UP, B, C4, PL (PLR0913 ignored)
 - Pre-commit hooks enforce: trailing whitespace, YAML validation, Ruff formatting and linting

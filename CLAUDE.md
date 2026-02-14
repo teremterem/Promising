@@ -31,7 +31,7 @@ pre-commit run --all-files
 uv sync --all-extras
 ```
 
-Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`.
+Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests are organized into subdirectories by component (e.g., `tests/promises/`, `tests/promising_function/`).
 
 ## Architecture
 
@@ -41,14 +41,12 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 - `Promise[T]` (`promising/promise.py`) - Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_create_task()` (if `start_soon`) → `_afulfill()` (activates context, runs coro, waits for `make_parent_wait` children, sets result) → `_afinalize()` (resets context). Also contains `_PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
-- `PromisingConfig` (`promising/config.py`) - Configuration with inheritance. Values use `INHERIT` sentinel to inherit from the nearest inheritable parent config. Key settings:
+- `PromisingConfig` (`promising/promising_config.py`) - Configuration with inheritance. Values use `INHERIT` sentinel to inherit from the nearest inheritable parent config. Key settings:
   - `start_soon`: Execute immediately vs defer until awaited (default: True)
   - `make_parent_wait`: Parent waits for completion of "this" Promise (default: False)
   - `config_inheritable`: Config inheritance from "this" Promise to children (default: True)
 
 - `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions or classes into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
-
-- `PromisingBackend` (`promising/backends.py`) - WIP abstraction for pluggable backends with `_try_persisted_result` / `_persist_result` hooks.
 
 **Sentinel pattern:** `NOT_SET` and `INHERIT` in `sentinels.py` raise on boolean coercion to prevent misuse. `NOT_SET` means "use default", `INHERIT` means "inherit from parent config".
 

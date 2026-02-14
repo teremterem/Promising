@@ -15,6 +15,9 @@ pytest
 # Run a single test file
 pytest tests/promises/test_concurrent_future.py
 
+# Run a single test function
+pytest tests/promising_function/test_promising_function.py::test_decorator_bare
+
 # Run tests with coverage
 pytest --cov=promising
 
@@ -31,7 +34,7 @@ pre-commit run --all-files
 uv sync --all-extras
 ```
 
-Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests are organized into subdirectories by component (e.g., `tests/promises/`, `tests/promising_function/`).
+Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests run in parallel by default via pytest-xdist (`-n auto`); use `-n0` to disable parallelism for debugging. Tests are organized into subdirectories by component (e.g., `tests/promises/`, `tests/promising_function/`).
 
 ## Architecture
 

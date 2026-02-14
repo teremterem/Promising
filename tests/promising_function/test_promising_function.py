@@ -251,6 +251,8 @@ async def test_exception_in_class_init() -> None:
     """
     An exception in __init__ raises synchronously
     (before Promise creation).
+
+    TODO We might want to deviate from this later, though.
     """
 
     @promising.function
@@ -570,17 +572,19 @@ async def test_promise_has_no_parent_outside_context() -> None:
     await promise
 
 
-async def test_make_parent_wait_integration() -> None:
+@pytest.mark.parametrize("make_parent_wait", [True, False])
+async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
     """
-    With make_parent_wait=True and start_soon=True,
-    the child must complete before the parent promise
-    resolves. Verified via execution-order tracking:
-    the parent coro body finishes first, then
-    _afinalize waits for the child.
+    Parametrized over make_parent_wait={True, False}.
+    With True: the child completes before the parent
+    promise resolves (parent coro body finishes first,
+    then _afinalize waits for the child). With False:
+    the parent resolves without waiting for the child.
     """
     execution_order: list[str] = []
+    child_promise = None
 
-    @promising.function(start_soon=True, make_parent_wait=True)
+    @promising.function(start_soon=True, make_parent_wait=make_parent_wait)
     async def child_func() -> str:
         await asyncio.sleep(0.1)
         execution_order.append("child_done")
@@ -588,14 +592,20 @@ async def test_make_parent_wait_integration() -> None:
 
     @promising.function
     async def parent_func() -> str:
-        child_func()
+        nonlocal child_promise
+        child_promise = child_func()
         execution_order.append("parent_coro_done")
         return "parent"
 
     parent_promise = parent_func()
     await parent_promise
 
-    # Parent waits for child, so child_done comes before
-    # the parent promise resolves. The parent coro body
-    # finishes first, then _afinalize waits for children.
-    assert execution_order == ["parent_coro_done", "child_done"]
+    if make_parent_wait:
+        assert execution_order == ["parent_coro_done", "child_done"]
+    else:
+        assert execution_order == ["parent_coro_done"]
+
+    # Let's await for the child promise to complete, so that we don't get any
+    # asyncio warnings about the child promise being not awaited (or being
+    # cancelled).
+    await child_promise

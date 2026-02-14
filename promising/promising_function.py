@@ -5,7 +5,7 @@ from typing import Any, Generic
 from promising.errors import PromisingFunctionNotCallableError
 from promising.promise import Promise
 from promising.sentinels import NOT_SET, Sentinel
-from promising.types import F_co, T_co
+from promising.types import T_co
 
 
 class PromisingFunction(Generic[T_co]):
@@ -74,21 +74,21 @@ class PromisingFunction(Generic[T_co]):
 
 
 def function(
-    func_or_class: Callable[..., F_co] | type | None = None,
+    func_or_class: Callable[..., T_co] | type | None = None,
     *,
     start_soon: bool | Sentinel = NOT_SET,
     make_parent_wait: bool | Sentinel = NOT_SET,
     config_inheritable: bool | Sentinel = NOT_SET,
     # TODO Mention in a comment that the real return type is
-    #  `PromisingFunction[F_co]` only (as long as we eventually settle on
+    #  `PromisingFunction[T_co]` only (as long as we eventually settle on
     #  it being the case, and not start returning the original function or
     #  class with duck-typed functionality instead)
-) -> "PromisingFunction[F_co] | Callable[..., F_co]":
+) -> "PromisingFunction[T_co] | Callable[..., T_co]":
     if func_or_class is None:
         # The decorator was used with arguments
         # TODO Same thing about a comment for the return type as above
-        def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co] | Callable[..., F_co]":
-            return PromisingFunction[F_co](
+        def _decorator(f_or_cls: Callable[..., T_co] | type) -> "PromisingFunction[T_co] | Callable[..., T_co]":
+            return PromisingFunction[T_co](
                 f_or_cls,
                 start_soon=start_soon,
                 make_parent_wait=make_parent_wait,
@@ -99,7 +99,7 @@ def function(
 
     # The decorator was used either without arguments or as a direct function
     # call
-    return PromisingFunction[F_co](
+    return PromisingFunction[T_co](
         func_or_class,
         start_soon=start_soon,
         make_parent_wait=make_parent_wait,

@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 import promising
-from promising.errors import PromiseFunctionNotCallableError
+from promising.errors import PromisingFunctionNotCallableError
 from promising.sentinels import NOT_SET
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
@@ -144,13 +144,13 @@ async def test_callable_class_execution_count() -> None:
 
 async def test_none_raises_on_call() -> None:
     pf = promising.PromisingFunction(None)
-    with pytest.raises(PromiseFunctionNotCallableError):
+    with pytest.raises(PromisingFunctionNotCallableError):
         pf()
 
 
 async def test_none_raises_on_call_with_args() -> None:
     pf = promising.PromisingFunction(None)
-    with pytest.raises(PromiseFunctionNotCallableError):
+    with pytest.raises(PromisingFunctionNotCallableError):
         pf(1, 2, key="v")
 
 

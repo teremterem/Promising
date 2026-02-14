@@ -2,7 +2,7 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.errors import PromiseFunctionNotCallableError
+from promising.errors import PromisingFunctionNotCallableError
 from promising.promise import Promise
 from promising.sentinels import NOT_SET, Sentinel
 from promising.types import F_co, T_co
@@ -42,7 +42,7 @@ class PromisingFunction(Generic[T_co]):
         # TODO Add PromisingConfig parameters ?
     ) -> Promise[T_co]:
         if self.original is None:
-            raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
+            raise PromisingFunctionNotCallableError("This PromisingFunction is not callable")
 
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring

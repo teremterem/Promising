@@ -79,10 +79,15 @@ def function(
     start_soon: bool | Sentinel = NOT_SET,
     make_parent_wait: bool | Sentinel = NOT_SET,
     config_inheritable: bool | Sentinel = NOT_SET,
-) -> "PromisingFunction[F_co]":
+    # TODO Mention in a comment that the real return type is
+    #  `PromisingFunction[F_co]` only (as long as we eventually settle on
+    #  it being the case, and not start returning the original function or
+    #  class with duck-typed functionality instead)
+) -> "PromisingFunction[F_co] | Callable[..., F_co]":
     if func_or_class is None:
         # The decorator was used with arguments
-        def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co]":
+        # TODO Same thing about a comment for the return type as above
+        def _decorator(f_or_cls: Callable[..., F_co] | type) -> "PromisingFunction[F_co] | Callable[..., F_co]":
             return PromisingFunction[F_co](
                 f_or_cls,
                 start_soon=start_soon,

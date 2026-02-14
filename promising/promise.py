@@ -8,8 +8,8 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising.config import PromisingConfig
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError
+from promising.promising_config import PromisingConfig
 from promising.sentinels import NOT_SET, Sentinel
 from promising.types import T_co
 

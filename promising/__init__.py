@@ -1,5 +1,5 @@
-from promising.config import PromisingConfig
 from promising.promise import Promise, get_current_promise
+from promising.promising_config import PromisingConfig
 from promising.promising_function import PromisingFunction, function
 
 __all__ = [

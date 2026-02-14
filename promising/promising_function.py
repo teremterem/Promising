@@ -9,7 +9,7 @@ from promising.types import F_co, T_co
 
 
 class PromisingFunction(Generic[T_co]):
-    original_func_or_class: Callable[..., T_co] | type | None = None
+    original: Callable[..., T_co] | type | None = None
 
     def __init__(
         self,
@@ -19,7 +19,7 @@ class PromisingFunction(Generic[T_co]):
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
     ):
-        self.original_func_or_class = func_or_class
+        self.original = func_or_class
 
         # TODO Is maintaining all these attributes here like this directly a
         #  good idea ?
@@ -41,18 +41,18 @@ class PromisingFunction(Generic[T_co]):
         **kwargs: Any,
         # TODO Add PromisingConfig parameters ?
     ) -> Promise[T_co]:
-        if self.original_func_or_class is None:
+        if self.original is None:
             raise PromiseFunctionNotCallableError("This PromisingFunction is not callable")
 
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
-        if isinstance(self.original_func_or_class, type):
+        if isinstance(self.original, type):
             # It's a class - let's instantiate it
-            actual_func = self.original_func_or_class(*args, **kwargs)
+            actual_func = self.original(*args, **kwargs)
         else:
             # Otherwise, assume it is already a function
-            actual_func = functools.partial(self.original_func_or_class, *args, **kwargs)
+            actual_func = functools.partial(self.original, *args, **kwargs)
 
         # TODO TODO TODO Create a PromisingConfig object beforehand, so its
         #  validations are passed before we create any coroutines and get the

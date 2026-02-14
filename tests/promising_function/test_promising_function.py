@@ -266,7 +266,7 @@ async def test_preserves_original_func() -> None:
         return "preserved"
 
     decorated = function(original)
-    assert decorated.original_func_or_class is original
+    assert decorated.original is original
 
 
 # ── 5. Config Forwarding (Parametrized) ─────────────────────────────

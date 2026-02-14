@@ -80,9 +80,19 @@ async def test_coroutine_executes_once() -> None:
         call_count += 1
         return "done"
 
-    assert await counted() == "done"
+    promise_one = counted()
+    # Awaiting a promise multiple times should not result in the function being
+    # called multiple times
+    assert await promise_one == "done"
+    assert await promise_one == "done"
     assert call_count == 1
-    assert await counted() == "done"
+
+    promise_two = counted()
+    # Awaiting a promise multiple times should not result in the function being
+    # called multiple times
+    assert await promise_two == "done"
+    assert await promise_two == "done"
+    assert await promise_two == "done"
     assert call_count == 2
 
 

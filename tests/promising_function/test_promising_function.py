@@ -14,6 +14,11 @@ from promising.sentinels import NOT_SET
 
 
 async def test_calling_promising_function_returns_promise() -> None:
+    """
+    Calling a decorated function returns a Promise;
+    awaiting it returns the expected value.
+    """
+
     @promising.function
     async def greet() -> str:
         return "hello"
@@ -24,6 +29,11 @@ async def test_calling_promising_function_returns_promise() -> None:
 
 
 async def test_forwards_positional_args() -> None:
+    """
+    Positional args are correctly forwarded to the
+    wrapped async function.
+    """
+
     @promising.function
     async def add(a: int, b: int) -> int:
         return a + b
@@ -32,6 +42,11 @@ async def test_forwards_positional_args() -> None:
 
 
 async def test_forwards_keyword_args() -> None:
+    """
+    Keyword-only params are correctly forwarded to the
+    wrapped async function.
+    """
+
     @promising.function
     async def greet(*, greeting: str, name: str) -> str:
         return f"{greeting}, {name}"
@@ -40,6 +55,11 @@ async def test_forwards_keyword_args() -> None:
 
 
 async def test_forwards_mixed_args() -> None:
+    """
+    A mix of positional and keyword args is forwarded
+    correctly.
+    """
+
     @promising.function
     async def mixed(a: int, b: int, *, suffix: str = "!") -> str:
         return f"{a + b}{suffix}"
@@ -48,6 +68,10 @@ async def test_forwards_mixed_args() -> None:
 
 
 async def test_coroutine_executes_once() -> None:
+    """
+    A nonlocal counter confirms the coroutine runs
+    exactly once per call; second call increments to 2.
+    """
     call_count = 0
 
     @promising.function
@@ -63,6 +87,11 @@ async def test_coroutine_executes_once() -> None:
 
 
 async def test_no_args_function() -> None:
+    """
+    Wrapping a zero-argument async function and calling
+    it with no args works.
+    """
+
     @promising.function
     async def constant() -> int:
         return 42
@@ -71,6 +100,11 @@ async def test_no_args_function() -> None:
 
 
 async def test_default_args() -> None:
+    """
+    Calling with no args uses defaults; calling with
+    explicit args overrides them.
+    """
+
     @promising.function
     async def with_defaults(x: int = 10, y: int = 20) -> int:
         return x + y
@@ -80,6 +114,11 @@ async def test_default_args() -> None:
 
 
 async def test_star_args_and_kwargs() -> None:
+    """
+    *args and **kwargs are forwarded to the wrapped
+    async function correctly.
+    """
+
     @promising.function
     async def variadic(*args: int, **kwargs: str) -> tuple:
         return (args, kwargs)
@@ -92,6 +131,11 @@ async def test_star_args_and_kwargs() -> None:
 
 
 async def test_with_callable_class() -> None:
+    """
+    A class with __init__(name) and async __call__()
+    is instantiated with args and awaited for the result.
+    """
+
     @promising.function
     class Greeter:
         def __init__(self, name: str) -> None:
@@ -104,6 +148,11 @@ async def test_with_callable_class() -> None:
 
 
 async def test_with_callable_class_kwargs() -> None:
+    """
+    A class with keyword-only __init__ params works
+    when decorated with @promising.function.
+    """
+
     @promising.function
     class Greeter:
         def __init__(self, *, greeting: str, name: str) -> None:
@@ -117,6 +166,10 @@ async def test_with_callable_class_kwargs() -> None:
 
 
 async def test_callable_class_execution_count() -> None:
+    """
+    Each call creates a new instance — tracked via
+    nonlocal counters for __init__ and __call__.
+    """
     init_count = 0
     call_count = 0
 
@@ -143,18 +196,31 @@ async def test_callable_class_execution_count() -> None:
 
 
 async def test_none_raises_on_call() -> None:
+    """
+    PromisingFunction(None) raises
+    PromisingFunctionNotCallableError when called.
+    """
     pf = promising.PromisingFunction(None)
     with pytest.raises(PromisingFunctionNotCallableError):
         pf()
 
 
 async def test_none_raises_on_call_with_args() -> None:
+    """
+    Same error even when passing args to a
+    PromisingFunction wrapping None.
+    """
     pf = promising.PromisingFunction(None)
     with pytest.raises(PromisingFunctionNotCallableError):
         pf(1, 2, key="v")
 
 
 async def test_exception_propagates_through_promise() -> None:
+    """
+    An exception raised inside the async function
+    propagates through the Promise when awaited.
+    """
+
     @promising.function
     async def failing() -> None:
         raise ValueError("test error")
@@ -164,6 +230,11 @@ async def test_exception_propagates_through_promise() -> None:
 
 
 async def test_exception_from_class_callable() -> None:
+    """
+    An exception raised in a class's __call__ method
+    propagates through the Promise when awaited.
+    """
+
     @promising.function
     class Failing:
         def __init__(self) -> None:
@@ -177,6 +248,11 @@ async def test_exception_from_class_callable() -> None:
 
 
 async def test_exception_in_class_init() -> None:
+    """
+    An exception in __init__ raises synchronously
+    (before Promise creation).
+    """
+
     @promising.function
     class FailingInit:
         def __init__(self) -> None:
@@ -194,6 +270,11 @@ async def test_exception_in_class_init() -> None:
     [ValueError, TypeError, RuntimeError, KeyError],
 )
 async def test_various_exception_types(*, exc_type: type) -> None:
+    """
+    Parametrized: each exception type propagates
+    through the Promise correctly.
+    """
+
     @promising.function
     async def failing() -> None:
         raise exc_type("specific error")
@@ -206,6 +287,12 @@ async def test_various_exception_types(*, exc_type: type) -> None:
 
 
 async def test_decorator_bare() -> None:
+    """
+    @promising.function (no parens) produces a
+    PromisingFunction; calling returns a Promise;
+    awaiting yields the result.
+    """
+
     @promising.function
     async def greet() -> str:
         return "hello"
@@ -217,6 +304,11 @@ async def test_decorator_bare() -> None:
 
 
 async def test_decorator_with_empty_parens() -> None:
+    """
+    @promising.function() (empty parens) behaves
+    identically to bare @promising.function.
+    """
+
     @promising.function()
     async def greet() -> str:
         return "hello"
@@ -226,6 +318,12 @@ async def test_decorator_with_empty_parens() -> None:
 
 
 async def test_decorator_with_config() -> None:
+    """
+    @promising.function(start_soon=False,
+    make_parent_wait=True) forwards config to the
+    resulting Promise.
+    """
+
     @promising.function(start_soon=False, make_parent_wait=True)
     async def worker() -> str:
         return "done"
@@ -239,6 +337,11 @@ async def test_decorator_with_config() -> None:
 
 
 async def test_decorator_with_class() -> None:
+    """
+    @promising.function applied to a class works
+    end-to-end.
+    """
+
     @promising.function
     class Greeter:
         def __init__(self, name: str) -> None:
@@ -252,6 +355,11 @@ async def test_decorator_with_class() -> None:
 
 
 async def test_used_as_direct_call() -> None:
+    """
+    promising.function(my_func) used as a direct call
+    (non-decorator) works.
+    """
+
     async def my_func() -> str:
         return "direct"
 
@@ -261,6 +369,11 @@ async def test_used_as_direct_call() -> None:
 
 
 async def test_preserves_original_func() -> None:
+    """
+    decorated.original is the original function passed
+    to the decorator.
+    """
+
     async def original() -> str:
         return "preserved"
 
@@ -285,10 +398,16 @@ async def test_config_forwarding(
     config_inheritable: bool,
 ) -> None:
     """
-    config_inheritable=False is excluded because root configs
-    (Promises created outside a parent context) disallow it.
-    See test_config_inheritable_false_on_root_raises for that
-    case.
+    Parametrized over start_soon, make_parent_wait,
+    and config_inheritable. Asserts resolved config
+    values match expectations. NOT_SET falls back to
+    defaults: start_soon=True, make_parent_wait=False,
+    config_inheritable=True.
+
+    config_inheritable=False is excluded because root
+    configs (Promises created outside a parent context)
+    disallow it. See
+    test_config_inheritable_false_on_root_raises.
     """
 
     async def noop() -> None:
@@ -318,7 +437,8 @@ async def test_config_forwarding(
 
 async def test_config_inheritable_false_on_root_raises() -> None:
     """
-    Root configs (no parent) cannot have config_inheritable=False.
+    Root configs (no parent) cannot have
+    config_inheritable=False.
     """
 
     async def noop() -> None:
@@ -331,6 +451,11 @@ async def test_config_inheritable_false_on_root_raises() -> None:
 
 @pytest.mark.parametrize("start_soon", [True, False])
 async def test_start_soon_behavior(*, start_soon: bool) -> None:
+    """
+    With start_soon=True: after calling + sleeping,
+    the coroutine has already executed. With False:
+    it hasn't executed until explicitly awaited.
+    """
     executed = False
 
     async def worker() -> str:
@@ -357,6 +482,11 @@ async def test_start_soon_behavior(*, start_soon: bool) -> None:
 
 
 async def test_call_delegates_to_call_method() -> None:
+    """
+    Calling via __call__ and via .call() produce
+    equivalent results.
+    """
+
     @promising.function
     async def add(a: int, b: int) -> int:
         return a + b
@@ -368,6 +498,11 @@ async def test_call_delegates_to_call_method() -> None:
 
 
 async def test_multiple_calls_produce_independent_promises() -> None:
+    """
+    Each call produces a distinct Promise with an
+    independent result.
+    """
+
     @promising.function
     async def identity(x: int) -> int:
         return x
@@ -380,6 +515,11 @@ async def test_multiple_calls_produce_independent_promises() -> None:
 
 
 async def test_result_is_awaitable_promise() -> None:
+    """
+    The return value is both an instance of Promise
+    and an instance of asyncio.Future.
+    """
+
     @promising.function
     async def noop() -> None:
         pass
@@ -391,6 +531,10 @@ async def test_result_is_awaitable_promise() -> None:
 
 
 async def test_promise_has_parent_when_created_in_context() -> None:
+    """
+    A child Promise created inside a parent Promise's
+    execution has get_parent() pointing to the parent.
+    """
     child_promise = None
 
     @promising.function
@@ -412,6 +556,11 @@ async def test_promise_has_parent_when_created_in_context() -> None:
 
 
 async def test_promise_has_no_parent_outside_context() -> None:
+    """
+    A Promise created at top level (outside any parent
+    context) has no parent.
+    """
+
     @promising.function
     async def noop() -> None:
         pass
@@ -422,6 +571,13 @@ async def test_promise_has_no_parent_outside_context() -> None:
 
 
 async def test_make_parent_wait_integration() -> None:
+    """
+    With make_parent_wait=True and start_soon=True,
+    the child must complete before the parent promise
+    resolves. Verified via execution-order tracking:
+    the parent coro body finishes first, then
+    _afinalize waits for the child.
+    """
     execution_order: list[str] = []
 
     @promising.function(start_soon=True, make_parent_wait=True)

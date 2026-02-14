@@ -121,6 +121,13 @@ class Promise(Future, Generic[T_co]):
         else:
             self._parent = parent
 
+        self._config = self._init_config(
+            config,
+            start_soon=start_soon,
+            make_parent_wait=make_parent_wait,
+            config_inheritable=config_inheritable,
+        )
+
         # TODO Is WeakSet below really going to work ? What about those child
         #  Promises that don't start_soon and the user did not keep a reference
         #  to them so they could be awaited later (and let's say they were
@@ -152,13 +159,6 @@ class Promise(Future, Generic[T_co]):
         if name is None:
             name = f"Promise-{next(_promise_name_counter)}"
         self._name = name
-
-        self._config = self._init_config(
-            config,
-            start_soon=start_soon,
-            make_parent_wait=make_parent_wait,
-            config_inheritable=config_inheritable,
-        )
 
         self._coro = coro
         if self._coro is None:

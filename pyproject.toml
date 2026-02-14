@@ -8,6 +8,11 @@ ignore = [
     "PLR0913",  # too-many-arguments
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "PLR2004",  # magic-value-comparison
+]
+
 [tool.ruff.format]
 quote-style = "double"
 

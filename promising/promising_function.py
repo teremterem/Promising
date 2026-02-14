@@ -54,6 +54,11 @@ class PromisingFunction(Generic[T_co]):
             # Otherwise, assume it is already a function
             actual_func = functools.partial(self.original_func_or_class, *args, **kwargs)
 
+        # TODO TODO TODO Create a PromisingConfig object beforehand, so its
+        #  validations are passed before we create any coroutines and get the
+        #  `Coroutine was not awaited` warning as a result of such validation
+        #  errors.
+
         # Assume the function is asynchronous and get the coroutine out of it
         # TODO TODO TODO Support synchronous functions too. (How to identify
         #  them without trying to get the coroutine, thought ?)

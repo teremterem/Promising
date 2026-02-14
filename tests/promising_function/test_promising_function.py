@@ -11,7 +11,6 @@ from promising.promise import Promise
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import NOT_SET
 
-
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
 
 
@@ -275,13 +274,24 @@ async def test_preserves_original_func() -> None:
 
 @pytest.mark.parametrize("start_soon", [True, False, NOT_SET])
 @pytest.mark.parametrize("make_parent_wait", [True, False, NOT_SET])
-@pytest.mark.parametrize("config_inheritable", [True, False, NOT_SET])
+@pytest.mark.parametrize(
+    "config_inheritable",
+    [True, NOT_SET],
+    ids=["inheritable_true", "inheritable_not_set"],
+)
 async def test_config_forwarding(
     *,
     start_soon: bool,
     make_parent_wait: bool,
     config_inheritable: bool,
 ) -> None:
+    """
+    config_inheritable=False is excluded because root configs
+    (Promises created outside a parent context) disallow it.
+    See test_config_inheritable_false_on_root_raises for that
+    case.
+    """
+
     async def noop() -> None:
         pass
 
@@ -297,18 +307,27 @@ async def test_config_forwarding(
     # NOT_SET → defaults: start_soon=True,
     # make_parent_wait=False, config_inheritable=True
     expected_start_soon = True if start_soon is NOT_SET else start_soon
-    expected_make_parent_wait = (
-        False if make_parent_wait is NOT_SET else make_parent_wait
-    )
-    expected_config_inheritable = (
-        True if config_inheritable is NOT_SET else config_inheritable
-    )
+    expected_make_parent_wait = False if make_parent_wait is NOT_SET else make_parent_wait
 
     assert config.is_start_soon() is expected_start_soon
     assert config.is_make_parent_wait() is expected_make_parent_wait
-    assert config.is_config_inheritable() is expected_config_inheritable
+    # Both True and NOT_SET resolve to True for root configs
+    assert config.is_config_inheritable() is True
 
     await promise
+
+
+async def test_config_inheritable_false_on_root_raises() -> None:
+    """
+    Root configs (no parent) cannot have config_inheritable=False.
+    """
+
+    async def noop() -> None:
+        pass
+
+    pf = PromisingFunction(noop, config_inheritable=False)
+    with pytest.raises(ValueError, match="Cannot set config_inheritable to False"):
+        pf()
 
 
 @pytest.mark.parametrize("start_soon", [True, False])

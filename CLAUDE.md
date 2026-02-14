@@ -60,8 +60,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 ## Code Style
 
-- Line length: 119 characters (Ruff)
-- Line length specifically for docstrings and comments: 80 characters (to make them easily readable even when code snippets are taken as markdown blocks for documentation)
+- Line length for all the code: 119 characters (Ruff)
+- Line length for docstrings and comments specifically: 80 characters (to make them easily readable even when they are put in markdown blocks for documentation)
 - Python version: 3.10+
-- Ruff lint rules: E, F, W, I, N, UP, B, C4, PL (PLR0913 ignored)
 - Pre-commit hooks enforce: trailing whitespace, YAML validation, Ruff formatting and linting

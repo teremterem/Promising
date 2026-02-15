@@ -6,7 +6,7 @@ class PromiseError(BasePromisingError):
     pass
 
 
-class BasePromiseConfigError(BasePromisingError):
+class BasePromisingConfigError(BasePromisingError):
     pass
 
 
@@ -18,5 +18,13 @@ class NoParentPromiseError(PromiseError):
     pass
 
 
-class NoParentConfigError(BasePromiseConfigError):
+class NoParentConfigError(BasePromisingConfigError):
+    pass
+
+
+class PromisingFunctionError(PromiseError):
+    pass
+
+
+class PromisingFunctionNotCallableError(PromisingFunctionError):
     pass

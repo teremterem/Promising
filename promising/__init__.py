@@ -1,8 +1,11 @@
-from promising.configs import PromiseConfig
-from promising.promises import Promise, get_current_promise
+from promising.promise import Promise, get_current_promise
+from promising.promising_config import PromisingConfig
+from promising.promising_function import PromisingFunction, function
 
 __all__ = [
     "Promise",
-    "PromiseConfig",
+    "PromisingConfig",
+    "PromisingFunction",
+    "function",
     "get_current_promise",
 ]

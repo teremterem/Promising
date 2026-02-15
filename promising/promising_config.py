@@ -1,5 +1,5 @@
 from promising.errors import NoCurrentPromiseError, NoParentConfigError
-from promising.sentinels import NOT_SET, Sentinel
+from promising.sentinels import INHERIT, Sentinel
 from promising.utils import get_concrete_value
 
 
@@ -16,7 +16,7 @@ class PromisingDefaults:
     CONFIGS_INHERITABLE = True
 
 
-class PromiseConfig:
+class PromisingConfig:
     """
     Configuration object for Promise behavior.
 
@@ -24,11 +24,11 @@ class PromiseConfig:
     inherit settings from their parents.
 
     Args:
-        parent_config: Parent configuration to inherit from. If NOT_SET, uses
+        parent_config: Parent configuration to inherit from. If INHERIT, uses
             the currently active Promise's config as parent.
         start_soon: Whether Promises with this config should start execution
             immediately. More specifically, they are scheduled to run at the
-            next opportunity the asyncio event loop provides. If NOT_SET,
+            next opportunity the asyncio event loop provides. If INHERIT,
             inherits the value from the nearest "inheritable" parent config.
         make_parent_wait: Whether parent Promises should wait for Promises with
             this config. This is not about dependency waiting - if a Promise
@@ -36,7 +36,7 @@ class PromiseConfig:
             of configuration. This flag is about execution timing/ordering
             only - use it when a parent Promise must NOT finish earlier than
             certain child Promises for sequencing or user experience reasons.
-            If NOT_SET, inherits the value from the nearest "inheritable"
+            If INHERIT, inherits the value from the nearest "inheritable"
             parent config.
         config_inheritable: Whether this configuration can be inherited by
             child Promises.
@@ -45,24 +45,27 @@ class PromiseConfig:
         ValueError: If config_inheritable is False for a root configuration.
     """
 
-    _parent_config: "PromiseConfig | None"
-    _inheritable_parent_config: "PromiseConfig | None"
+    _parent_config: "PromisingConfig | None"
+    _inheritable_parent_config: "PromisingConfig | None"
 
     def __init__(
         self,
-        parent_config: "PromiseConfig | Sentinel | None" = NOT_SET,
+        parent_config: "PromisingConfig | Sentinel | None" = INHERIT,
         *,
-        start_soon: bool | Sentinel = NOT_SET,
-        make_parent_wait: bool | Sentinel = NOT_SET,
-        config_inheritable: bool | Sentinel = NOT_SET,
+        start_soon: bool | Sentinel = INHERIT,
+        make_parent_wait: bool | Sentinel = INHERIT,
+        config_inheritable: bool | Sentinel = INHERIT,
     ) -> None:
+        # TODO It might make more sense to resolve values when they are
+        #  requested, rather than upon construction (a Promise could turn it
+        #  into ConcretePromisingConfig upon Promise construction instead ?)
         self._parent_config = None
         self._inheritable_parent_config = None
 
-        if parent_config is NOT_SET:
+        if parent_config is INHERIT:
             try:
                 # ruff: noqa: PLC0415 (import-outside-top-level)
-                from promising.promises import get_current_promise
+                from promising.promise import get_current_promise
 
                 self._parent_config = get_current_promise().get_config()
             except NoCurrentPromiseError:
@@ -77,16 +80,16 @@ class PromiseConfig:
             #  create a static root config object globally and use it as parent
             #  if there is no parent config.
 
-            # This is the root PromiseConfig
+            # This is the root PromisingConfig
             if config_inheritable is False:
-                raise ValueError("Cannot set config_inheritable to False for the root PromiseConfig")
+                raise ValueError("Cannot set config_inheritable to False for the root PromisingConfig")
 
             self._start_soon = get_concrete_value(start_soon, PromisingDefaults.START_SOON)
             self._make_parent_wait = get_concrete_value(make_parent_wait, PromisingDefaults.MAKE_PARENT_WAIT)
-            # The root PromiseConfig is always inheritable
+            # The root PromisingConfig is always inheritable
             self._config_inheritable = True
         else:
-            # This is NOT the root PromiseConfig
+            # This is NOT the root PromisingConfig
             self._inheritable_parent_config = self._parent_config.find_inheritable_config()
             self._start_soon = get_concrete_value(start_soon, self._inheritable_parent_config.is_start_soon())
             self._make_parent_wait = get_concrete_value(
@@ -97,7 +100,7 @@ class PromiseConfig:
             #  the use case for this, thought)
             self._config_inheritable = get_concrete_value(config_inheritable, PromisingDefaults.CONFIGS_INHERITABLE)
 
-    def get_parent_config(self, *, raise_if_none: bool = True) -> "PromiseConfig | None":
+    def get_parent_config(self, *, raise_if_none: bool = True) -> "PromisingConfig | None":
         """
         Get the parent config of this config.
 
@@ -106,7 +109,7 @@ class PromiseConfig:
                 config exists.
 
         Returns:
-            The parent PromiseConfig, or None if no parent exists and
+            The parent PromisingConfig, or None if no parent exists and
             raise_if_none is False.
 
         Raises:
@@ -114,10 +117,10 @@ class PromiseConfig:
                 is True.
         """
         if raise_if_none and self._parent_config is None:
-            raise NoParentConfigError("No parent PromiseConfig found")
+            raise NoParentConfigError("No parent PromisingConfig found")
         return self._parent_config
 
-    def get_inheritable_parent_config(self, *, raise_if_none: bool = True) -> "PromiseConfig | None":
+    def get_inheritable_parent_config(self, *, raise_if_none: bool = True) -> "PromisingConfig | None":
         """
         Get the nearest inheritable parent configuration.
 
@@ -126,7 +129,7 @@ class PromiseConfig:
                 inheritable parent exists.
 
         Returns:
-            The nearest inheritable parent PromiseConfig, or None if none
+            The nearest inheritable parent PromisingConfig, or None if none
             exists and raise_if_none is False.
 
         Raises:
@@ -134,7 +137,7 @@ class PromiseConfig:
                 raise_if_none is True.
         """
         if raise_if_none and self._inheritable_parent_config is None:
-            raise NoParentConfigError("No inheritable parent PromiseConfig found")
+            raise NoParentConfigError("No inheritable parent PromisingConfig found")
         return self._inheritable_parent_config
 
     def is_start_soon(self) -> bool:
@@ -168,7 +171,7 @@ class PromiseConfig:
         """
         return self._config_inheritable
 
-    def find_inheritable_config(self) -> "PromiseConfig":
+    def find_inheritable_config(self) -> "PromisingConfig":
         """
         Find the nearest inheritable config in the parent chain.
 
@@ -177,7 +180,7 @@ class PromiseConfig:
 
         Returns:
             Either self (if inheritable) or the nearest inheritable
-            PromiseConfig in the parent chain.
+            PromisingConfig in the parent chain.
 
         Raises:
             RuntimeError: If no inheritable config is found (should never happen as
@@ -189,5 +192,6 @@ class PromiseConfig:
                 return config
             config = config._parent_config
         raise RuntimeError(
-            "No inheritable PromiseConfig found - at least the root PromiseConfig should be inheritable, but it isn't"
+            "No inheritable PromisingConfig found - at least the root "
+            "PromisingConfig should be inheritable, but it isn't"
         )

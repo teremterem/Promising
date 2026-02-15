@@ -8,8 +8,8 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising.configs import PromiseConfig
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError
+from promising.promising_config import PromisingConfig
 from promising.sentinels import NOT_SET, Sentinel
 from promising.types import T_co
 
@@ -97,15 +97,15 @@ class Promise(Future, Generic[T_co]):
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
-    def __init__(  # noqa: PLR0912, PLR0913 (too-many-branches, too-many-arguments)
+    def __init__(  # noqa: PLR0912 (too-many-branches)
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
         parent: "Promise[Any] | Sentinel | None" = NOT_SET,
-        config: PromiseConfig | None = None,
-        # TODO Support optional `children_config` too
+        config: PromisingConfig | None = None,
+        # TODO Support optional `children_config` too ?
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
@@ -120,6 +120,13 @@ class Promise(Future, Generic[T_co]):
             self._parent = self.get_current(raise_if_none=False)
         else:
             self._parent = parent
+
+        self._config = self._init_config(
+            config,
+            start_soon=start_soon,
+            make_parent_wait=make_parent_wait,
+            config_inheritable=config_inheritable,
+        )
 
         # TODO Is WeakSet below really going to work ? What about those child
         #  Promises that don't start_soon and the user did not keep a reference
@@ -152,13 +159,6 @@ class Promise(Future, Generic[T_co]):
         if name is None:
             name = f"Promise-{next(_promise_name_counter)}"
         self._name = name
-
-        self._config = self._init_config(
-            config,
-            start_soon=start_soon,
-            make_parent_wait=make_parent_wait,
-            config_inheritable=config_inheritable,
-        )
 
         self._coro = coro
         if self._coro is None:
@@ -268,7 +268,7 @@ class Promise(Future, Generic[T_co]):
         yield from self._task
         return (yield from super().__await__())
 
-    def _init_config(self, config: PromiseConfig | None, **kwargs: Any | Sentinel) -> PromiseConfig:
+    def _init_config(self, config: PromisingConfig | None, **kwargs: Any | Sentinel) -> PromisingConfig:
         """
         Initialize the Promise configuration.
 
@@ -276,7 +276,7 @@ class Promise(Future, Generic[T_co]):
         - If an explicit config object is provided, return it (as is).
         - Else, if all individual config kwargs are NOT_SET and a parent
           Promise exists, return the nearest inheritable parent configuration.
-        - Else, construct and return a new PromiseConfig from the provided
+        - Else, construct and return a new PromisingConfig from the provided
           kwargs.
 
         Args:
@@ -284,7 +284,7 @@ class Promise(Future, Generic[T_co]):
             **kwargs: Individual configuration parameters.
 
         Returns:
-            A PromiseConfig instance.
+            A PromisingConfig instance.
 
         Raises:
             ValueError: If both a config object and any explicit config kwargs
@@ -298,7 +298,7 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None and all(value is NOT_SET for value in kwargs.values()):
             return self._parent.get_config().find_inheritable_config()
 
-        return PromiseConfig(**kwargs)
+        return PromisingConfig(**kwargs)
 
     @classmethod
     def get_current(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -357,13 +357,13 @@ class Promise(Future, Generic[T_co]):
         """
         return self._name
 
-    def get_config(self) -> PromiseConfig:
+    def get_config(self) -> PromisingConfig:
         """
         Get the configuration object that controls the behavior of this
         Promise.
 
         Returns:
-            The PromiseConfig instance associated with this Promise.
+            The PromisingConfig instance associated with this Promise.
         """
         return self._config
 

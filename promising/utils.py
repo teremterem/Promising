@@ -7,8 +7,8 @@ if typing.TYPE_CHECKING:
 
 
 def get_concrete_value(value: Any | "Sentinel", default_value: Any) -> Any:
-    from promising.sentinels import NOT_SET
+    from promising.sentinels import INHERIT, NOT_SET
 
-    if value is NOT_SET:
+    if value in (NOT_SET, INHERIT):
         return default_value
     return value

@@ -1,3 +1,10 @@
+.DS_Store
+
+# FastHTML
+# # TODO Get rid of this when the htmx_ui example is moved outside of this
+# #  project
+.sesskey
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -84,6 +84,31 @@ def function(
     #  it being the case, and not start returning the original function or
     #  class with duck-typed functionality instead)
 ) -> "PromisingFunction[T_co] | Callable[..., T_co]":
+    """
+    TODO Finalize this docstring by explaining why we need the
+     PromisingFunction wrapper at all. List the advantages it provides:
+
+    - Decorated functions (as well as decorated callable classes) always return
+      Promises.
+    - Returned Promises can be awaited any number of times without
+      re-executing the function or class.
+    - TODO Should input parameters always be passed as promises as well ?
+       All of them ? Only those, that were typehinted as `Promise` explicitly ?
+    - Both, input parameters and results are strictly serializable and are
+      serialized/deserialized in transit
+    - All these interactions are stored/storable in graph databases, or any
+      other kinds of databases or caches that can handle the data sturctures.
+    """
+    # TODO Stop returning PromisingFunction, return another function instead
+    #  (just "instrument" it with some attribute to access PromisingFunction
+    #  object ?)
+    # TODO Also, don't let this decorator be used as a class decorator, allow
+    #  it as a method decorator instead.
+    # TODO Or is it impossible ? (Will we want to have some sort of function
+    #  registry to find and call functions dynamically ?)
+    # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
+    #  resolve postponed type hints correctly as well, when you implement
+    #  input params as Promises.
     if func_or_class is None:
         # The decorator was used with arguments
         # TODO Same thing about a comment for the return type as above

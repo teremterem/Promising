@@ -8,7 +8,7 @@ import pytest
 
 import promising
 from promising.errors import PromisingFunctionNotCallableError
-from promising.sentinels import NOT_SET
+from promising.sentinels import NOT_SET, Sentinel
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
 
@@ -405,9 +405,9 @@ async def test_preserves_original_func() -> None:
 )
 async def test_config_forwarding(
     *,
-    start_soon: bool,
-    make_parent_wait: bool,
-    config_inheritable: bool,
+    start_soon: bool | Sentinel,
+    make_parent_wait: bool | Sentinel,
+    config_inheritable: bool | Sentinel,
 ) -> None:
     """
     Parametrized over start_soon, make_parent_wait,

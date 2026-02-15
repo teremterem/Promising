@@ -261,8 +261,6 @@ async def test_exception_in_class_init() -> None:
     """
     An exception in __init__ raises synchronously
     (before Promise creation).
-
-    TODO We might want to deviate from this later, though.
     """
 
     @promising.function

@@ -21,8 +21,8 @@ class PromisingFunction(Generic[T_co]):
     ):
         self.original = func_or_class
 
-        # TODO Is maintaining all these attributes here like this directly a
-        #  good idea ?
+        # TODO Is maintaining these attributes here like this directly a good
+        #  idea ?
         self.start_soon = start_soon
         self.make_parent_wait = make_parent_wait
         self.config_inheritable = config_inheritable

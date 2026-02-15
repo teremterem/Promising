@@ -97,7 +97,7 @@ def function(
     - Both, input parameters and results are strictly serializable and are
       serialized/deserialized in transit
     - All these interactions are stored/storable in graph databases, or any
-      other kinds of databases or caches that can handle the data sturctures.
+      other kinds of databases or caches that can handle the data structures.
     """
     # TODO Stop returning PromisingFunction, return another function instead
     #  (just "instrument" it with some attribute to access PromisingFunction

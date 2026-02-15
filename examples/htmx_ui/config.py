@@ -1,6 +1,9 @@
+import logging
 import os
 
 import dotenv
+
+logger = logging.getLogger(__name__)
 
 # Let's load the environment variables from the .env file before importing any
 # other modules
@@ -18,15 +21,8 @@ langfuse_host = os.getenv("LANGFUSE_HOST")
 
 
 if langfuse_secret_key or langfuse_public_key or langfuse_host:
-    try:
-        import langfuse  # noqa: F401 (unused-import)
-    except ImportError:
-        print(
-            "\033[1;31mLangfuse is not installed. Please install it with either `uv sync --extra langfuse` or "
-            "`uv sync --all-extras`.\033[0m"
-        )
-    else:
-        # TODO Replace with a logger ?
-        print("\033[1;34mEnabling Langfuse logging...\033[0m")
-        litellm.success_callback = ["langfuse"]
-        litellm.failure_callback = ["langfuse"]
+    import langfuse  # noqa: F401 (unused-import)
+
+    logger.info("Enabling Langfuse logging")
+    litellm.success_callback = ["langfuse"]
+    litellm.failure_callback = ["langfuse"]

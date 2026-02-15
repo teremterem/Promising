@@ -18,7 +18,7 @@ class PromisingFunction(Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         make_parent_wait: bool | Sentinel = NOT_SET,
         config_inheritable: bool | Sentinel = NOT_SET,
-    ):
+    ) -> None:
         self.original = func_or_class
 
         # TODO Is maintaining these attributes here like this directly a good

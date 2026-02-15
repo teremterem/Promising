@@ -62,9 +62,9 @@ window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
         document.querySelectorAll('[data-disabled-by-htmx]').forEach(function(el) {
             el.removeAttribute('data-disabled-by-htmx');
-            });
-        }
-    });
+        });
+    }
+});
 """)
             if reenable_controls_upon_back
             else None,

@@ -8,7 +8,6 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising import should_start_soon_by_default
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
@@ -362,6 +361,8 @@ class Promise(Future, Generic[T_co]):
             await asyncio.gather(*promises_to_await, return_exceptions=True)
 
     def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
+        from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
+
         if isinstance(children_start_soon, bool):
             self._children_start_soon = children_start_soon
         elif children_start_soon is INHERIT:

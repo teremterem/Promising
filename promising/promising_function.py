@@ -4,7 +4,7 @@ from typing import Any, Generic
 
 from promising.errors import PromisingFunctionNotCallableError
 from promising.promise import Promise
-from promising.sentinels import NOT_SET, Sentinel
+from promising.sentinels import INHERIT, Sentinel
 from promising.types import T_co
 
 
@@ -15,16 +15,20 @@ class PromisingFunction(Generic[T_co]):
         self,
         func_or_class: Callable[..., T_co] | type | None = None,
         *,
-        start_soon: bool | Sentinel = NOT_SET,
+        start_soon: bool | Sentinel = INHERIT,
+        children_start_soon: bool | Sentinel = INHERIT,
     ) -> None:
         self.original = func_or_class
         self.start_soon = start_soon
+        self.children_start_soon = children_start_soon
 
     def __call__(
         self,
         *args: Any,
         **kwargs: Any,
-        # TODO Add PromisingConfig parameters ?
+        # TODO Add start_soon and children_start_soon parameters here too.
+        #  They should take precedence over the ones passed to the
+        #  PromisingFunction constructor.
     ) -> Promise[T_co]:
         return self.call(*args, **kwargs)
 
@@ -32,7 +36,9 @@ class PromisingFunction(Generic[T_co]):
         self,
         *args: Any,
         **kwargs: Any,
-        # TODO Add PromisingConfig parameters ?
+        # TODO Add start_soon and children_start_soon parameters here too.
+        #  They should take precedence over the ones passed to the
+        #  PromisingFunction constructor.
     ) -> Promise[T_co]:
         if self.original is None:
             raise PromisingFunctionNotCallableError("This PromisingFunction is not callable")
@@ -61,17 +67,15 @@ class PromisingFunction(Generic[T_co]):
         return Promise[T_co](
             coro=coro,
             start_soon=self.start_soon,
-            make_parent_wait=self.make_parent_wait,
-            config_inheritable=self.config_inheritable,
+            children_start_soon=self.children_start_soon,
         )
 
 
 def function(
     func_or_class: Callable[..., T_co] | type | None = None,
     *,
-    start_soon: bool | Sentinel = NOT_SET,
-    make_parent_wait: bool | Sentinel = NOT_SET,
-    config_inheritable: bool | Sentinel = NOT_SET,
+    start_soon: bool | Sentinel = INHERIT,
+    children_start_soon: bool | Sentinel = INHERIT,
     # TODO Mention in a comment that the real return type is
     #  `PromisingFunction[T_co]` only (as long as we eventually settle on
     #  it being the case, and not start returning the original function or
@@ -109,8 +113,7 @@ def function(
             return PromisingFunction[T_co](
                 f_or_cls,
                 start_soon=start_soon,
-                make_parent_wait=make_parent_wait,
-                config_inheritable=config_inheritable,
+                children_start_soon=children_start_soon,
             )
 
         return _decorator
@@ -120,6 +123,5 @@ def function(
     return PromisingFunction[T_co](
         func_or_class,
         start_soon=start_soon,
-        make_parent_wait=make_parent_wait,
-        config_inheritable=config_inheritable,
+        children_start_soon=children_start_soon,
     )

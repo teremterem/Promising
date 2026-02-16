@@ -88,7 +88,8 @@ class Promise(Future, Generic[T_co]):
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
     # TODO Would it make sense to implement this get_state() method which would
-    #  return either NOT_STARTED, STARTED, DONE or FAILED sentinels ?
+    #  return either NOT_STARTED, STARTED, DONE or FAILED sentinels ? (Also,
+    #  remember that at the very least, Future already has done() method.)
 
     def __init__(
         self,

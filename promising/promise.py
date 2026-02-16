@@ -67,8 +67,8 @@ class Promise(Future, Generic[T_co]):
             event loop as the parent's loop.
         name: Human-readable name for the Promise. If None, generates a unique
             name ("Promise-N", where N is a number).
-        parent: Parent Promise instance. If NOT_SET, uses the currently active
-            Promise as parent.
+        parent: Parent Promise instance. If INHERIT, uses the currently active
+            Promise as a parent. If None, the Promise has no parent.
         TODO Explain start_soon and start_soon_for_children parameters.
         prefill_result: Pre-set result value. Cannot be combined with coro or
             prefill_exception.
@@ -101,18 +101,21 @@ class Promise(Future, Generic[T_co]):
         start_soon: bool | Sentinel = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         prefill_result: T_co | Sentinel | None = NOT_SET,
+        # TODO Use NOT_SET instead of None below as well, for consistency ?
         prefill_exception: BaseException | None = None,
     ) -> None:
         self._previous_token = None
         self._task = None
 
-        if parent is NOT_SET:
+        if parent is None:
+            self._parent = None
+        elif parent is INHERIT:
             self._parent = self.get_current(raise_if_none=False)
         elif isinstance(parent, Promise):
             self._parent = parent
         else:
             raise ValueError(
-                f"Parent must be either INHERIT or another Promise, but `{type(parent)}` was given instead"
+                f"Parent must be either INHERIT, another Promise or None, but `{type(parent)}` was given instead"
             )
 
         self._setup_start_soon(

@@ -16,16 +16,9 @@ class PromisingFunction(Generic[T_co]):
         func_or_class: Callable[..., T_co] | type | None = None,
         *,
         start_soon: bool | Sentinel = NOT_SET,
-        make_parent_wait: bool | Sentinel = NOT_SET,
-        config_inheritable: bool | Sentinel = NOT_SET,
     ) -> None:
         self.original = func_or_class
-
-        # TODO Is maintaining these attributes here like this directly a good
-        #  idea ?
         self.start_soon = start_soon
-        self.make_parent_wait = make_parent_wait
-        self.config_inheritable = config_inheritable
 
     def __call__(
         self,

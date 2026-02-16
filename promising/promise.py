@@ -8,9 +8,9 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
+from promising import should_start_soon_by_default
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError
-from promising.promising_config import PromisingConfig
-from promising.sentinels import NOT_SET, Sentinel
+from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
 _promise_name_counter = itertools.count(1)
@@ -43,7 +43,7 @@ class Promise(Future, Generic[T_co]):
     Promises extend asyncio Futures to provide:
     - Parent-child relationships between asynchronous operations
     - Configuration inheritance from parent Promises
-    - Automatic child task management and waiting
+    - Automatic child task management
     - Thread-safe concurrent.futures compatibility
 
     Parent-child relationships semantics:
@@ -70,15 +70,7 @@ class Promise(Future, Generic[T_co]):
             name ("Promise-N", where N is a number).
         parent: Parent Promise instance. If NOT_SET, uses the currently active
             Promise as parent.
-        config: Configuration object. Cannot be combined with explicit config
-            parameters.
-        start_soon: Whether to start execution immediately. If NOT_SET, uses
-            [inheritable] parent config setting.
-        make_parent_wait: Whether parent should wait for this Promise. If
-            NOT_SET, uses [inheritable] parent config setting.
-        config_inheritable: Whether this config can be inherited by children.
-            If NOT_SET, defaults to True (unless the default is overridden via
-            PROMISING_DEFAULT_CONFIGS_INHERITABLE environment variable).
+        TODO Explain start_soon and start_soon_for_children parameters.
         prefill_result: Pre-set result value. Cannot be combined with coro or
             prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro or
@@ -97,48 +89,52 @@ class Promise(Future, Generic[T_co]):
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
 
-    def __init__(  # noqa: PLR0912 (too-many-branches)
+    def __init__(
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
-        parent: "Promise[Any] | Sentinel | None" = NOT_SET,
-        config: PromisingConfig | None = None,
-        # TODO Support optional `children_config` too ?
-        start_soon: bool | Sentinel = NOT_SET,
-        make_parent_wait: bool | Sentinel = NOT_SET,
-        config_inheritable: bool | Sentinel = NOT_SET,
+        parent: "Promise[Any] | Sentinel | None" = INHERIT,
+        start_soon: bool | Sentinel = INHERIT,
+        start_soon_for_children: bool | Sentinel = NOT_SET,
         prefill_result: T_co | Sentinel | None = NOT_SET,
         prefill_exception: BaseException | None = None,
     ) -> None:
-        # TODO [ALMOST READY] Fix the following linting error - too many branches
         self._previous_token = None
         self._task = None
 
         if parent is NOT_SET:
             self._parent = self.get_current(raise_if_none=False)
-        else:
+        elif isinstance(parent, Promise):
             self._parent = parent
+        else:
+            raise ValueError(
+                f"Parent must be either INHERIT or another Promise, but `{type(parent)}` was given instead"
+            )
 
-        self._config = self._init_config(
-            config,
-            start_soon=start_soon,
-            make_parent_wait=make_parent_wait,
-            config_inheritable=config_inheritable,
-        )
+        # TODO TODO TODO
 
-        # TODO Is WeakSet below really going to work ? What about those child
-        #  Promises that don't start_soon and the user did not keep a reference
-        #  to them so they could be awaited later (and let's say they were
-        #  marked as make_parent_wait) ? On one hand, they should not block the
-        #  parent, because the parent will end up being blocked forever. On the
-        #  other hand, what are implications of ignoring such promises ? This
-        #  should be reconsidered when the library is used by MiniAgents and
-        #  real life scenarios become clear.
-        # TODO Issue a warning if start_soon is False, but make_parent_wait is
-        #  True ? Prohibit such combinations altogether ? I'd say let's
-        #  prohibit it altogether.
+        if isinstance(start_soon, bool):
+            self._start_soon = start_soon
+        elif start_soon is INHERIT:
+            if self._parent is None:
+                self._start_soon = should_start_soon_by_default()
+            self._start_soon = self._parent.start_soon
+        elif isinstance(start_soon, Sentinel):
+            raise ValueError(
+                f"start_soon must be either a boolean value or INHERIT, but `{type(start_soon)}` was given instead"
+            )
+
+        # TODO TODO TODO
+        if start_soon is INHERIT:
+            start_soon = self._parent.get_config().start_soon
+        elif isinstance(start_soon, Sentinel):
+            raise ValueError("start_soon must be either a boolean value or INHERIT")
+        if start_soon_for_children is INHERIT:
+            start_soon_for_children = self._parent.get_config().start_soon_for_children
+        # TODO TODO TODO
+
         self._children: WeakSet[Promise[Any]] = WeakSet()
 
         if self._parent is not None:
@@ -150,8 +146,6 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             self._parent._children.add(self)
 
-        # TODO Should we have a config setting to disable multithreading
-        #  support ? Is there any speed benefit ?
         self._concurrent_future = _PromiseBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
@@ -161,25 +155,10 @@ class Promise(Future, Generic[T_co]):
         self._name = name
 
         self._coro = coro
-        if self._coro is None:
-            if prefill_result is not NOT_SET and prefill_exception is not None:
-                raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
-
-            if prefill_result is not NOT_SET:
-                self.set_result(prefill_result)
-            elif prefill_exception is not None:
-                self.set_exception(prefill_exception)
-
-            else:
-                raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
-        else:
-            if not coroutines.iscoroutine(coro):
-                raise TypeError(f"Promise must be created with a coroutine. Got {type(coro)}.")
-            if prefill_result is not NOT_SET or prefill_exception is not None:
-                raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
-
-            if self._config.is_start_soon():
-                self._create_task()
+        self._finish_initialization(
+            prefill_result=prefill_result,
+            prefill_exception=prefill_exception,
+        )
 
     def _create_task(self) -> None:
         self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
@@ -268,38 +247,6 @@ class Promise(Future, Generic[T_co]):
         yield from self._task
         return (yield from super().__await__())
 
-    def _init_config(self, config: PromisingConfig | None, **kwargs: Any | Sentinel) -> PromisingConfig:
-        """
-        Initialize the Promise configuration.
-
-        Behavior:
-        - If an explicit config object is provided, return it (as is).
-        - Else, if all individual config kwargs are NOT_SET and a parent
-          Promise exists, return the nearest inheritable parent configuration.
-        - Else, construct and return a new PromisingConfig from the provided
-          kwargs.
-
-        Args:
-            config: Explicit configuration object.
-            **kwargs: Individual configuration parameters.
-
-        Returns:
-            A PromisingConfig instance.
-
-        Raises:
-            ValueError: If both a config object and any explicit config kwargs
-                are provided.
-        """
-        if config is not None:
-            if any(value is not NOT_SET for value in kwargs.values()):
-                raise ValueError("Cannot provide both a 'config' object and explicit config kwargs")
-            return config
-
-        if self._parent is not None and all(value is NOT_SET for value in kwargs.values()):
-            return self._parent.get_config().find_inheritable_config()
-
-        return PromisingConfig(**kwargs)
-
     @classmethod
     def get_current(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
@@ -343,12 +290,11 @@ class Promise(Future, Generic[T_co]):
 
     def is_active(self) -> bool:
         """
-        TODO It is unclear what this method is going to be used for. Is this
-         information going to be useful outside of the Promise class itself ?
-
         Returns:
             True if the Promise is currently active, False otherwise.
         """
+        # TODO It might make more sense to replace this method with get_state()
+        #  and return NOT_STARTED, STARTED, DONE and FAILED sentinels instead.
         return self._previous_token is not None
 
     def get_name(self) -> str:
@@ -356,16 +302,6 @@ class Promise(Future, Generic[T_co]):
         Get the human-readable name of this Promise.
         """
         return self._name
-
-    def get_config(self) -> PromisingConfig:
-        """
-        Get the configuration object that controls the behavior of this
-        Promise.
-
-        Returns:
-            The PromisingConfig instance associated with this Promise.
-        """
-        return self._config
 
     def get_pending_children(self) -> set["Promise[Any]"]:
         """
@@ -411,8 +347,6 @@ class Promise(Future, Generic[T_co]):
         Returns:
             A concurrent.futures.Future that mirrors this Promise's state.
         """
-        # TODO Should we ever copy the context vars to the caller's thread
-        #  (if this even makes sense) ?
         return self._concurrent_future
 
     def _activate(self) -> None:
@@ -440,6 +374,7 @@ class Promise(Future, Generic[T_co]):
         """
         Wait for child Promises that require the parent to wait.
         """
+        # TODO Make it possible to call this method from another thread
         promises_to_await = [
             child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
         ]
@@ -450,6 +385,32 @@ class Promise(Future, Generic[T_co]):
             #  errors to the user as soon as they happen (for all children, not
             #  just the ones that make the parent wait).
             await asyncio.gather(*promises_to_await, return_exceptions=True)
+
+    def _finish_initialization(
+        self,
+        *,
+        prefill_result: T_co | Sentinel | None,
+        prefill_exception: BaseException | None,
+    ) -> None:
+        if self._coro is None:
+            if prefill_result is not NOT_SET and prefill_exception is not None:
+                raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
+
+            if prefill_result is not NOT_SET:
+                self.set_result(prefill_result)
+            elif prefill_exception is not None:
+                self.set_exception(prefill_exception)
+
+            else:
+                raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
+        else:
+            if not coroutines.iscoroutine(self._coro):
+                raise TypeError(f"Promise must be created with a coroutine. Got {type(self._coro)}.")
+            if prefill_result is not NOT_SET or prefill_exception is not None:
+                raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
+
+            if self._start_soon:
+                self._create_task()
 
 
 class _PromiseBackedConcurrentFuture(concurrent.futures.Future):

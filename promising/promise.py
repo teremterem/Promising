@@ -88,6 +88,8 @@ class Promise(Future, Generic[T_co]):
     _task: Task[T_co] | None
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
+    # TODO Would it make sense to implement this get_state() method which would
+    #  return either NOT_STARTED, STARTED, DONE or FAILED sentinels ?
 
     def __init__(
         self,
@@ -97,7 +99,7 @@ class Promise(Future, Generic[T_co]):
         name: str | None = None,
         parent: "Promise[Any] | Sentinel | None" = INHERIT,
         start_soon: bool | Sentinel = INHERIT,
-        start_soon_for_children: bool | Sentinel = NOT_SET,
+        children_start_soon: bool | Sentinel = INHERIT,
         prefill_result: T_co | Sentinel | None = NOT_SET,
         prefill_exception: BaseException | None = None,
     ) -> None:
@@ -113,29 +115,10 @@ class Promise(Future, Generic[T_co]):
                 f"Parent must be either INHERIT or another Promise, but `{type(parent)}` was given instead"
             )
 
-        # TODO TODO TODO
-
-        if isinstance(start_soon, bool):
-            self._start_soon = start_soon
-        elif start_soon is INHERIT:
-            if self._parent is None:
-                self._start_soon = should_start_soon_by_default()
-            self._start_soon = self._parent.start_soon
-        elif isinstance(start_soon, Sentinel):
-            raise ValueError(
-                f"start_soon must be either a boolean value or INHERIT, but `{type(start_soon)}` was given instead"
-            )
-
-        # TODO TODO TODO
-        if start_soon is INHERIT:
-            start_soon = self._parent.get_config().start_soon
-        elif isinstance(start_soon, Sentinel):
-            raise ValueError("start_soon must be either a boolean value or INHERIT")
-        if start_soon_for_children is INHERIT:
-            start_soon_for_children = self._parent.get_config().start_soon_for_children
-        # TODO TODO TODO
-
-        self._children: WeakSet[Promise[Any]] = WeakSet()
+        self._setup_start_soon(
+            start_soon=start_soon,
+            children_start_soon=children_start_soon,
+        )
 
         if self._parent is not None:
             if loop is None:
@@ -143,6 +126,7 @@ class Promise(Future, Generic[T_co]):
             elif loop is not self._parent._loop:
                 raise ValueError("Parent and child Promises must share the same event loop")
 
+        self._children: WeakSet[Promise[Any]] = WeakSet()
         if self._parent is not None:
             self._parent._children.add(self)
 
@@ -288,15 +272,6 @@ class Promise(Future, Generic[T_co]):
             raise NoParentPromiseError("No parent Promise found")
         return self._parent
 
-    def is_active(self) -> bool:
-        """
-        Returns:
-            True if the Promise is currently active, False otherwise.
-        """
-        # TODO It might make more sense to replace this method with get_state()
-        #  and return NOT_STARTED, STARTED, DONE and FAILED sentinels instead.
-        return self._previous_token is not None
-
     def get_name(self) -> str:
         """
         Get the human-readable name of this Promise.
@@ -385,6 +360,34 @@ class Promise(Future, Generic[T_co]):
             #  errors to the user as soon as they happen (for all children, not
             #  just the ones that make the parent wait).
             await asyncio.gather(*promises_to_await, return_exceptions=True)
+
+    def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
+        if isinstance(children_start_soon, bool):
+            self._children_start_soon = children_start_soon
+        elif children_start_soon is INHERIT:
+            if self._parent is None:
+                self._children_start_soon = should_start_soon_by_default()
+            else:
+                self._children_start_soon = self._parent._children_start_soon
+        else:
+            raise ValueError(
+                "children_start_soon must be either INHERIT or a boolean value, "
+                f"but `{type(children_start_soon)}` was given instead"
+            )
+
+        if isinstance(start_soon, bool):
+            self._start_soon = start_soon
+        elif start_soon is INHERIT:
+            if self._parent is None:
+                self._start_soon = should_start_soon_by_default()
+            else:
+                # This is not a typo - we want to get the children_start_soon
+                # value from the parent Promise.
+                self._start_soon = self._parent._parent._children_start_soon
+        else:
+            raise ValueError(
+                f"start_soon must be either INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
+            )
 
     def _finish_initialization(
         self,

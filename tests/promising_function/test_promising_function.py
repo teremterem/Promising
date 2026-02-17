@@ -592,7 +592,7 @@ async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
     execution_order: list[str] = []
     child_promise = None
 
-    @promising.function(start_soon=True, make_parent_wait=make_parent_wait)
+    @promising.function(start_soon=True)
     async def child_func() -> str:
         await asyncio.sleep(0.1)
         execution_order.append("child_done")
@@ -603,10 +603,11 @@ async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
         nonlocal child_promise
         child_promise = child_func()
         execution_order.append("parent_coro_done")
+        if make_parent_wait:
+            await promising.get_current_promise().await_for_children()
         return "parent"
 
-    parent_promise = parent_func()
-    await parent_promise
+    await parent_func()
 
     if make_parent_wait:
         assert execution_order == ["parent_coro_done", "child_done"]

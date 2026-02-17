@@ -337,14 +337,10 @@ class Promise(Future, Generic[T_co]):
 
     async def _afinalize(self) -> None:
         """
-        Finalize the Promise execution by waiting for children and restoring context.
-
-        Waits for all child Promises that have make_parent_wait=True, then
-        deactivates this Promise by removing it from the context (and restoring
-        the previous value for the respective context var).
+        Finalize the Promise execution by restoring context (removing this
+        Promise from the context and restoring the previous value for the
+        respective context var).
         """
-        await self.await_for_children()
-
         self._current.reset(self._previous_token)
         self._previous_token = None
 
@@ -353,16 +349,15 @@ class Promise(Future, Generic[T_co]):
         Wait for child Promises that require the parent to wait.
         """
         # TODO Make it possible to call this method from another thread
-        promises_to_await = [
-            child for child in self.get_pending_children() if child.get_config().is_make_parent_wait()
-        ]
-        if promises_to_await:
-            # TODO Do errors disappear from stdout/stderr when they are
-            #  "gathered" like this ? Do they make it to stdout/stderr only
-            #  when the whole python process exits ? We should somehow show the
-            #  errors to the user as soon as they happen (for all children, not
-            #  just the ones that make the parent wait).
-            await asyncio.gather(*promises_to_await, return_exceptions=True)
+        # TODO Do errors disappear from stdout/stderr when they are
+        #  "gathered" like this ? Do they make it to stdout/stderr only
+        #  when the whole python process exits ? We should somehow show the
+        #  errors to the user as soon as they happen (for all children, not
+        #  just the ones that make the parent wait).
+        # TODO Ideally, a warning should be issued if any of the children are
+        #  configured with start_soon=False, because that would make it quite
+        #  easy to introduce deadlocks.
+        await asyncio.gather(*self.get_pending_children(), return_exceptions=True)
 
     def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

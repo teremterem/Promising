@@ -377,7 +377,7 @@ class Promise(Future, Generic[T_co]):
             else:
                 # This is not a typo - we want to get the children_start_soon
                 # value from the parent Promise.
-                self._start_soon = self._parent._parent._children_start_soon
+                self._start_soon = self._parent._children_start_soon
         else:
             raise ValueError(
                 f"start_soon must be either INHERIT or a boolean value, but `{type(start_soon)}` was given instead"

@@ -26,20 +26,20 @@ class PromisingFunction(Generic[T_co]):
         self,
         *args: Any,
         **kwargs: Any,
-        # TODO Add start_soon and children_start_soon parameters here too.
-        #  They should take precedence over the ones passed to the
-        #  PromisingFunction constructor.
     ) -> Promise[T_co]:
+        # TODO Add start_soon and children_start_soon parameters
+        #  here too. They should take precedence over the ones
+        #  passed to the PromisingFunction constructor.
         return self.call(*args, **kwargs)
 
     def call(
         self,
         *args: Any,
         **kwargs: Any,
-        # TODO Add start_soon and children_start_soon parameters here too.
-        #  They should take precedence over the ones passed to the
-        #  PromisingFunction constructor.
     ) -> Promise[T_co]:
+        # TODO Add start_soon and children_start_soon parameters
+        #  here too. They should take precedence over the ones
+        #  passed to the PromisingFunction constructor.
         if self.original is None:
             raise PromisingFunctionNotCallableError("This PromisingFunction is not callable")
 

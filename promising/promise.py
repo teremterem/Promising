@@ -67,9 +67,17 @@ class Promise(Future, Generic[T_co]):
             event loop as the parent's loop.
         name: Human-readable name for the Promise. If None, generates a unique
             name ("Promise-N", where N is a number).
-        parent: Parent Promise instance. If INHERIT, uses the currently active
-            Promise as a parent. If None, the Promise has no parent.
-        TODO Explain start_soon and start_soon_for_children parameters.
+        parent: Parent Promise instance. If INHERIT, uses the currently
+            active Promise as a parent. If None, the Promise has no
+            parent.
+        start_soon: Whether to start executing the coroutine
+            immediately upon creation. If INHERIT, uses the parent's
+            children_start_soon value (or the global default if no
+            parent).
+        children_start_soon: Default start_soon value for child
+            Promises created during this Promise's execution. If
+            INHERIT, inherits from the parent's children_start_soon
+            (or the global default if no parent).
         prefill_result: Pre-set result value. Cannot be combined with coro or
             prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro or
@@ -343,7 +351,7 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_remaining_children(self, *, raise_exceptions: bool = True) -> None:
+    async def await_remaining_children(self, *, return_exceptions: bool = False) -> None:
         """
         Wait for child Promises to finish.
         """
@@ -351,7 +359,7 @@ class Promise(Future, Generic[T_co]):
         # TODO Ideally, a warning should be issued if any of the children are
         #  configured with start_soon=False, because that would make it quite
         #  easy to introduce deadlocks.
-        await asyncio.gather(*self.get_pending_children(), return_exceptions=raise_exceptions)
+        await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
 
     def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

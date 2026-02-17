@@ -13,7 +13,7 @@ Promising is a hierarchical asynchronous Promise/coroutine management library th
 pytest
 
 # Run a single test file
-pytest tests/promises/test_concurrent_future.py
+pytest tests/promise/test_concurrent_future.py
 
 # Run a single test function
 pytest tests/promising_function/test_promising_function.py::test_decorator_bare
@@ -34,7 +34,7 @@ pre-commit run --all-files
 uv sync --all-extras
 ```
 
-Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests run in parallel by default via pytest-xdist (`-n auto`); use `-n0` to disable parallelism for debugging. Tests are organized into subdirectories by component (e.g., `tests/promises/`, `tests/promising_function/`).
+Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests run in parallel by default via pytest-xdist (`-n auto`); use `-n0` to disable parallelism for debugging. Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_function/`).
 
 ## Architecture
 
@@ -42,19 +42,18 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 **Key components:**
 
-- `Promise[T]` (`promising/promise.py`) - Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_create_task()` (if `start_soon`) → `_afulfill()` (activates context, runs coro, waits for `make_parent_wait` children, sets result) → `_afinalize()` (resets context). Also contains `_PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
+- `Promise[T]` (`promising/promise.py`) - Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_create_task()` (if `start_soon`) → `_afulfill()` (activates context, runs coro, waits for children, sets result) → `_afinalize()` (resets context). Also contains `_PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`. Configuration is handled directly on Promise via `start_soon` and `children_start_soon` parameters, which use `INHERIT` sentinel to inherit from the parent Promise.
 
-- `PromisingConfig` (`promising/promising_config.py`) - Configuration with inheritance. Values use `INHERIT` sentinel to inherit from the nearest inheritable parent config. Key settings:
-  - `start_soon`: Execute immediately vs defer until awaited (default: True)
-  - `make_parent_wait`: Parent waits for completion of "this" Promise (default: False)
-  - `config_inheritable`: Config inheritance from "this" Promise to children (default: True)
+- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions or classes into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`. Accepts `start_soon` and `children_start_soon` config, which are forwarded to the created Promise.
 
-- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions or classes into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
+**Sentinel pattern:** `NOT_SET` and `INHERIT` in `sentinels.py` raise on boolean coercion to prevent misuse. `NOT_SET` means "use default", `INHERIT` means "inherit from parent".
 
-**Sentinel pattern:** `NOT_SET` and `INHERIT` in `sentinels.py` raise on boolean coercion to prevent misuse. `NOT_SET` means "use default", `INHERIT` means "inherit from parent config".
+**Configuration:** `start_soon` determines whether a Promise starts executing immediately upon creation (or, upon the nearest event loop execution window which is not occupied by something else, to be precise) or defers until awaited explicitly. `children_start_soon`, if set, dictates the `start_soon` value for those child Promises which don't have it set explicitly. To put it another way, `INHERIT` in `start_soon` means that the value for `start_soon` should be taken from the parent Promise's `children_start_soon` value. Conversely, when `children_start_soon` itself is set to `INHERIT`, it simply means that the value for `children_start_soon` setting is inherited from the parent Promise's `children_start_soon`. If all of the above are set to `INHERIT`, then the value is taken from the global `START_SOON_BY_DEFAULT`, which is set to `True` but can be overridden by the user by a simple assignment of `promising.START_SOON_BY_DEFAULT = False` or similar.
 
 **Public API** (exported from `promising/__init__.py`):
-- `Promise`, `PromisingConfig`, `PromisingFunction`, `function`, `get_current_promise()`
+- `Promise`, `PromisingFunction`, `function`, `get_current_promise()`
+- `INHERIT`, `NOT_SET`, `Sentinel` - sentinel values
+- `START_SOON_BY_DEFAULT`, `should_start_soon_by_default()` - global default control
 - `function()` is the decorator: use as `@promising.function()` with config args or `@promising.function` bare.
 
 **Example usage** (`examples/keyword_agent.py`): Shows idiomatic `@promising.function` decorator usage — decorate an async function, call it to get a `Promise`, await it for the result. Install example deps with `uv sync --extra examples`.

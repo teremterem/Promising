@@ -8,7 +8,7 @@ import pytest
 
 import promising
 from promising.errors import PromisingFunctionNotCallableError
-from promising.sentinels import NOT_SET, Sentinel
+from promising.sentinels import INHERIT, Sentinel
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
 
@@ -327,25 +327,6 @@ async def test_decorator_with_empty_parens() -> None:
     assert await greet() == "hello"
 
 
-async def test_decorator_with_config() -> None:
-    """
-    @promising.function(start_soon=False,
-    make_parent_wait=True) forwards config to the
-    resulting Promise.
-    """
-
-    @promising.function(start_soon=False, make_parent_wait=True)
-    async def worker() -> str:
-        return "done"
-
-    assert isinstance(worker, promising.PromisingFunction)
-    promise = worker()
-    config = promise.get_config()
-    assert config.is_start_soon() is False
-    assert config.is_make_parent_wait() is True
-    await promise
-
-
 async def test_decorator_with_class() -> None:
     """
     @promising.function applied to a class works
@@ -394,69 +375,35 @@ async def test_preserves_original_func() -> None:
 # ── 5. Config Forwarding (Parametrized) ─────────────────────────────
 
 
-@pytest.mark.parametrize("start_soon", [True, False, NOT_SET])
-@pytest.mark.parametrize("make_parent_wait", [True, False, NOT_SET])
-@pytest.mark.parametrize(
-    "config_inheritable",
-    [True, NOT_SET],
-    ids=["inheritable_true", "inheritable_not_set"],
-)
+@pytest.mark.parametrize("start_soon", [True, False, INHERIT])
+@pytest.mark.parametrize("children_start_soon", [True, False, INHERIT])
 async def test_config_forwarding(
     *,
     start_soon: bool | Sentinel,
-    make_parent_wait: bool | Sentinel,
-    config_inheritable: bool | Sentinel,
+    children_start_soon: bool | Sentinel,
 ) -> None:
     """
-    Parametrized over start_soon, make_parent_wait,
-    and config_inheritable. Asserts resolved config
-    values match expectations. NOT_SET falls back to
-    defaults: start_soon=True, make_parent_wait=False,
-    config_inheritable=True.
-
-    config_inheritable=False is excluded because root
-    configs (Promises created outside a parent context)
-    disallow it. See
-    test_config_inheritable_false_on_root_raises.
+    Parametrized over start_soon and
+    children_start_soon. Asserts resolved config
+    values match expectations. INHERIT falls back to
+    defaults (True via should_start_soon_by_default).
     """
 
+    @promising.function(start_soon=start_soon, children_start_soon=children_start_soon)
     async def noop() -> None:
         pass
 
-    pf = promising.function(
-        noop,
-        start_soon=start_soon,
-        make_parent_wait=make_parent_wait,
-        config_inheritable=config_inheritable,
-    )
-    promise = pf()
-    config = promise.get_config()
+    promise = noop()
 
-    # NOT_SET → defaults: start_soon=True,
-    # make_parent_wait=False, config_inheritable=True
-    expected_start_soon = True if start_soon is NOT_SET else start_soon
-    expected_make_parent_wait = False if make_parent_wait is NOT_SET else make_parent_wait
+    # INHERIT at root level resolves to the global
+    # default (True)
+    expected_start_soon = True if start_soon is INHERIT else start_soon
+    expected_children_start_soon = True if children_start_soon is INHERIT else children_start_soon
 
-    assert config.is_start_soon() is expected_start_soon
-    assert config.is_make_parent_wait() is expected_make_parent_wait
-    # Both True and NOT_SET resolve to True for root configs
-    assert config.is_config_inheritable() is True
+    assert promise._start_soon is expected_start_soon
+    assert promise._children_start_soon is expected_children_start_soon
 
     await promise
-
-
-async def test_config_inheritable_false_on_root_raises() -> None:
-    """
-    Root configs (no parent) cannot have
-    config_inheritable=False.
-    """
-
-    async def noop() -> None:
-        pass
-
-    pf = promising.function(noop, config_inheritable=False)
-    with pytest.raises(ValueError, match="Cannot set config_inheritable to False"):
-        pf()
 
 
 @pytest.mark.parametrize("start_soon", [True, False])
@@ -580,19 +527,19 @@ async def test_promise_has_no_parent_outside_context() -> None:
     await promise
 
 
-@pytest.mark.parametrize("make_parent_wait", [True, False])
-async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
+@pytest.mark.parametrize("await_remaining_children", [True, False])
+async def test_promise_await_remaining_children(*, await_remaining_children: bool) -> None:
     """
-    Parametrized over make_parent_wait={True, False}.
-    With True: the child completes before the parent
-    promise resolves (parent coro body finishes first,
-    then _afinalize waits for the child). With False:
-    the parent resolves without waiting for the child.
+    Parametrized over await_remaining_children={True, False}.
+    With True: the parent coro body explicitly calls
+    await_remaining_children(), so the child completes before
+    the parent resolves. With False: the parent resolves
+    without waiting for the child.
     """
     execution_order: list[str] = []
     child_promise = None
 
-    @promising.function(start_soon=True, make_parent_wait=make_parent_wait)
+    @promising.function(start_soon=True)
     async def child_func() -> str:
         await asyncio.sleep(0.1)
         execution_order.append("child_done")
@@ -603,12 +550,13 @@ async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
         nonlocal child_promise
         child_promise = child_func()
         execution_order.append("parent_coro_done")
+        if await_remaining_children:
+            await promising.get_current_promise().await_remaining_children()
         return "parent"
 
-    parent_promise = parent_func()
-    await parent_promise
+    await parent_func()
 
-    if make_parent_wait:
+    if await_remaining_children:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]

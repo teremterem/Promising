@@ -185,8 +185,7 @@ class Promise(Future, Generic[T_co]):
         This method:
         1. Activates the Promise as the current context
         2. Executes the coroutine
-        3. Waits for child Promises that have make_parent_wait=True
-        4. Sets the result or exception
+        3. Sets the result or exception
 
         Raises:
             RuntimeError: If the Promise is already done or has no coroutine.
@@ -346,7 +345,7 @@ class Promise(Future, Generic[T_co]):
 
     async def await_for_children(self) -> None:
         """
-        Wait for child Promises that require the parent to wait.
+        Wait for child Promises to finish.
         """
         # TODO Make it possible to call this method from another thread
         # TODO Do errors disappear from stdout/stderr when they are

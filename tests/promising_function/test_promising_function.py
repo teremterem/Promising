@@ -327,24 +327,6 @@ async def test_decorator_with_empty_parens() -> None:
     assert await greet() == "hello"
 
 
-async def test_decorator_with_config() -> None:
-    """
-    @promising.function(start_soon=False,
-    children_start_soon=False) forwards config to
-    the resulting Promise.
-    """
-
-    @promising.function(start_soon=False, children_start_soon=False)
-    async def worker() -> str:
-        return "done"
-
-    assert isinstance(worker, promising.PromisingFunction)
-    promise = worker()
-    assert promise._start_soon is False
-    assert promise._children_start_soon is False
-    await promise
-
-
 async def test_decorator_with_class() -> None:
     """
     @promising.function applied to a class works
@@ -407,15 +389,11 @@ async def test_config_forwarding(
     defaults (True via should_start_soon_by_default).
     """
 
+    @promising.function(start_soon=start_soon, children_start_soon=children_start_soon)
     async def noop() -> None:
         pass
 
-    pf = promising.function(
-        noop,
-        start_soon=start_soon,
-        children_start_soon=children_start_soon,
-    )
-    promise = pf()
+    promise = noop()
 
     # INHERIT at root level resolves to the global
     # default (True)

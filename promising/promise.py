@@ -351,7 +351,7 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_remaining_children(self, *, return_exceptions: bool = False) -> None:
+    async def await_remaining_children(self, *, return_exceptions: bool = False) -> list[Any]:
         """
         Wait for child Promises to finish.
         """
@@ -359,7 +359,7 @@ class Promise(Future, Generic[T_co]):
         # TODO Ideally, a warning should be issued if any of the children are
         #  configured with start_soon=False, because that would make it quite
         #  easy to introduce deadlocks.
-        await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
+        return await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
 
     def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

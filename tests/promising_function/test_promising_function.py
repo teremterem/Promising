@@ -580,14 +580,14 @@ async def test_promise_has_no_parent_outside_context() -> None:
     await promise
 
 
-@pytest.mark.parametrize("make_parent_wait", [True, False])
-async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
+@pytest.mark.parametrize("await_children", [True, False])
+async def test_promise_await_children(*, await_children: bool) -> None:
     """
-    Parametrized over make_parent_wait={True, False}.
-    With True: the child completes before the parent
-    promise resolves (parent coro body finishes first,
-    then _afinalize waits for the child). With False:
-    the parent resolves without waiting for the child.
+    Parametrized over await_children={True, False}.
+    With True: the parent coro body explicitly calls
+    await_for_children(), so the child completes before
+    the parent resolves. With False: the parent resolves
+    without waiting for the child.
     """
     execution_order: list[str] = []
     child_promise = None
@@ -603,13 +603,13 @@ async def test_make_parent_wait_integration(*, make_parent_wait: bool) -> None:
         nonlocal child_promise
         child_promise = child_func()
         execution_order.append("parent_coro_done")
-        if make_parent_wait:
+        if await_children:
             await promising.get_current_promise().await_for_children()
         return "parent"
 
     await parent_func()
 
-    if make_parent_wait:
+    if await_children:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]

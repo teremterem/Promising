@@ -343,20 +343,15 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_for_children(self) -> None:
+    async def await_remaining_children(self, *, raise_exceptions: bool = True) -> None:
         """
         Wait for child Promises to finish.
         """
         # TODO Make it possible to call this method from another thread
-        # TODO Do errors disappear from stdout/stderr when they are
-        #  "gathered" like this ? Do they make it to stdout/stderr only
-        #  when the whole python process exits ? We should somehow show the
-        #  errors to the user as soon as they happen (for all children, not
-        #  just the ones that make the parent wait).
         # TODO Ideally, a warning should be issued if any of the children are
         #  configured with start_soon=False, because that would make it quite
         #  easy to introduce deadlocks.
-        await asyncio.gather(*self.get_pending_children(), return_exceptions=True)
+        await asyncio.gather(*self.get_pending_children(), return_exceptions=raise_exceptions)
 
     def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

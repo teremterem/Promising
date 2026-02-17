@@ -580,12 +580,12 @@ async def test_promise_has_no_parent_outside_context() -> None:
     await promise
 
 
-@pytest.mark.parametrize("await_children", [True, False])
-async def test_promise_await_children(*, await_children: bool) -> None:
+@pytest.mark.parametrize("await_remaining_children", [True, False])
+async def test_promise_await_remaining_children(*, await_remaining_children: bool) -> None:
     """
-    Parametrized over await_children={True, False}.
+    Parametrized over await_remaining_children={True, False}.
     With True: the parent coro body explicitly calls
-    await_for_children(), so the child completes before
+    await_remaining_children(), so the child completes before
     the parent resolves. With False: the parent resolves
     without waiting for the child.
     """
@@ -603,13 +603,13 @@ async def test_promise_await_children(*, await_children: bool) -> None:
         nonlocal child_promise
         child_promise = child_func()
         execution_order.append("parent_coro_done")
-        if await_children:
-            await promising.get_current_promise().await_for_children()
+        if await_remaining_children:
+            await promising.get_current_promise().await_remaining_children()
         return "parent"
 
     await parent_func()
 
-    if await_children:
+    if await_remaining_children:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]

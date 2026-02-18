@@ -521,6 +521,43 @@ async def test_everything_starts_soon_by_default_global_default_ignores_parent(
     await child_promise
 
 
+@pytest.mark.parametrize("children_start_soon_by_default", [True, False, NOT_SET])
+@pytest.mark.parametrize("parent_start_soon", [True, False])
+async def test_children_start_soon_by_default_enforced_on_children(
+    *,
+    children_start_soon_by_default: bool | Sentinel,
+    parent_start_soon: bool,
+) -> None:
+    """
+    children_start_soon_by_default on the parent controls
+    the start_soon resolution of child Promises that leave
+    start_soon as NOT_SET. A concrete bool enforces that
+    value; NOT_SET means no enforcement (child falls back
+    to everything_starts_soon_by_default).
+    """
+    child_promise = None
+
+    @promising.function  # start_soon=NOT_SET
+    async def child_func() -> None:
+        pass
+
+    @promising.function(
+        start_soon=parent_start_soon,
+        children_start_soon_by_default=children_start_soon_by_default,
+    )
+    async def parent_func() -> None:
+        nonlocal child_promise
+        child_promise = child_func()
+
+    await parent_func()
+
+    # NOT_SET means no enforcement; child falls back to
+    # everything_starts_soon_by_default (global default: True).
+    expected_start_soon = True if children_start_soon_by_default is NOT_SET else children_start_soon_by_default
+    assert child_promise._start_soon is expected_start_soon
+    await child_promise
+
+
 # ── 6. Edge Cases & Integration ─────────────────────────────────────
 
 

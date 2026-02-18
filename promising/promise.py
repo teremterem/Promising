@@ -71,13 +71,23 @@ class Promise(Future, Generic[T_co]):
             active Promise as a parent. If None, the Promise has no
             parent.
         start_soon: Whether to start executing the coroutine
-            immediately upon creation. If INHERIT, uses the parent's
-            children_start_soon_by_default value (or the global default if no
+            immediately upon creation. NOT_SET (default) defers to
+            the parent's children_start_soon_by_default if that is
+            enforced (i.e. set to a concrete bool), otherwise falls
+            back to everything_starts_soon_by_default. INHERIT copies
+            the parent's start_soon directly (or falls back to
+            everything_starts_soon_by_default if no parent).
+        children_start_soon_by_default: Default start_soon value
+            enforced on child Promises that leave start_soon as
+            NOT_SET. NOT_SET (default) means no enforcement. INHERIT
+            copies the parent's children_start_soon_by_default (or
+            falls back to everything_starts_soon_by_default if no
             parent).
-        children_start_soon_by_default: Default start_soon value for child
-            Promises created during this Promise's execution. If
-            INHERIT, inherits from the parent's children_start_soon_by_default
-            (or the global default if no parent).
+        everything_starts_soon_by_default: Local override for the
+            global EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT
+            (default) propagates from the parent (or reads the global
+            if no parent). GLOBAL_DEFAULT reads the current global setting
+            without inheriting.
         prefill_result: Pre-set result value. Cannot be combined with coro or
             prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro or

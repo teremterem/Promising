@@ -128,9 +128,9 @@ class Promise(Future, Generic[T_co]):
 
         if parent is INHERIT:
             self._parent = self.get_current(raise_if_none=False)
-        elif isinstance(parent, Promise):
+        elif parent is None or isinstance(parent, Promise):
             self._parent = parent
-        elif parent is not None:
+        else:
             raise ValueError(
                 f"`parent` must be either INHERIT, another Promise or None, but `{type(parent)}` was given instead"
             )

@@ -11,6 +11,9 @@ from promising.types import T_co
 class PromisingFunction(Generic[T_co]):
     original: Callable[..., T_co] | type | None = None
 
+    # TODO Explain the idea behind parent-child relationships between Promise
+    #  objects with respect to PromisingFunction calls
+
     def __init__(
         self,
         func_or_class: Callable[..., T_co] | type | None = None,

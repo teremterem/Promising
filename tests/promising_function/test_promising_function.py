@@ -376,20 +376,20 @@ async def test_preserves_original_func() -> None:
 
 
 @pytest.mark.parametrize("start_soon", [True, False, INHERIT])
-@pytest.mark.parametrize("children_start_soon", [True, False, INHERIT])
+@pytest.mark.parametrize("children_start_soon_by_default", [True, False, INHERIT])
 async def test_config_forwarding(
     *,
     start_soon: bool | Sentinel,
-    children_start_soon: bool | Sentinel,
+    children_start_soon_by_default: bool | Sentinel,
 ) -> None:
     """
     Parametrized over start_soon and
-    children_start_soon. Asserts resolved config
+    children_start_soon_by_default. Asserts resolved config
     values match expectations. INHERIT falls back to
-    defaults (True via should_start_soon_by_default).
+    defaults (True via should_everything_start_soon_by_default).
     """
 
-    @promising.function(start_soon=start_soon, children_start_soon=children_start_soon)
+    @promising.function(start_soon=start_soon, children_start_soon_by_default=children_start_soon_by_default)
     async def noop() -> None:
         pass
 
@@ -398,10 +398,12 @@ async def test_config_forwarding(
     # INHERIT at root level resolves to the global
     # default (True)
     expected_start_soon = True if start_soon is INHERIT else start_soon
-    expected_children_start_soon = True if children_start_soon is INHERIT else children_start_soon
+    expected_children_start_soon_by_default = (
+        True if children_start_soon_by_default is INHERIT else children_start_soon_by_default
+    )
 
     assert promise._start_soon is expected_start_soon
-    assert promise._children_start_soon is expected_children_start_soon
+    assert promise._children_start_soon_by_default is expected_children_start_soon_by_default
 
     await promise
 

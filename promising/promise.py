@@ -9,7 +9,7 @@ from typing import Any, Generic
 from weakref import WeakSet
 
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError
-from promising.sentinels import INHERIT, NOT_SET, Sentinel
+from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
 _promise_name_counter = itertools.count(1)
@@ -72,11 +72,11 @@ class Promise(Future, Generic[T_co]):
             parent.
         start_soon: Whether to start executing the coroutine
             immediately upon creation. If INHERIT, uses the parent's
-            children_start_soon value (or the global default if no
+            children_start_soon_by_default value (or the global default if no
             parent).
-        children_start_soon: Default start_soon value for child
+        children_start_soon_by_default: Default start_soon value for child
             Promises created during this Promise's execution. If
-            INHERIT, inherits from the parent's children_start_soon
+            INHERIT, inherits from the parent's children_start_soon_by_default
             (or the global default if no parent).
         prefill_result: Pre-set result value. Cannot be combined with coro or
             prefill_exception.
@@ -106,8 +106,9 @@ class Promise(Future, Generic[T_co]):
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
         parent: "Promise[Any] | Sentinel | None" = INHERIT,
-        start_soon: bool | Sentinel = INHERIT,
-        children_start_soon: bool | Sentinel = INHERIT,
+        start_soon: bool | Sentinel = NOT_SET,
+        children_start_soon_by_default: bool | Sentinel = NOT_SET,
+        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
         prefill_result: T_co | Sentinel | None = NOT_SET,
         # TODO Use NOT_SET instead of None below as well, for consistency ?
         prefill_exception: BaseException | None = None,
@@ -115,26 +116,24 @@ class Promise(Future, Generic[T_co]):
         self._previous_token = None
         self._task = None
 
-        if parent is None:
-            self._parent = None
-        elif parent is INHERIT:
+        if parent is INHERIT:
             self._parent = self.get_current(raise_if_none=False)
         elif isinstance(parent, Promise):
             self._parent = parent
-        else:
+        elif parent is not None:
             raise ValueError(
-                f"Parent must be either INHERIT, another Promise or None, but `{type(parent)}` was given instead"
+                f"`parent` must be either INHERIT, another Promise or None, but `{type(parent)}` was given instead"
             )
 
-        self._setup_start_soon(
-            start_soon=start_soon,
-            children_start_soon=children_start_soon,
-        )
+        self._resolve_everything_starts_soon_by_default(everything_starts_soon_by_default)
+        self._resolve_start_soon(start_soon)
+        self._resolve_children_start_soon_by_default(children_start_soon_by_default)
 
         if self._parent is not None:
             if loop is None:
                 loop = self._parent._loop
             elif loop is not self._parent._loop:
+                # TODO Is this actually critical ?
                 raise ValueError("Parent and child Promises must share the same event loop")
 
         self._children: WeakSet[Promise[Any]] = WeakSet()
@@ -356,39 +355,75 @@ class Promise(Future, Generic[T_co]):
         Wait for child Promises to finish.
         """
         # TODO Make it possible to call this method from another thread
-        # TODO Ideally, a warning should be issued if any of the children are
-        #  configured with start_soon=False, because that would make it quite
-        #  easy to introduce deadlocks.
+        # TODO Ideally, a warning (or an optional exception ?) should be issued
+        #  if any of the children are configured with start_soon=False, because
+        #  that would make it quite easy to introduce deadlocks.
         return await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
 
-    def _setup_start_soon(self, *, start_soon: bool | Sentinel, children_start_soon: bool | Sentinel) -> None:
-        from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
+    def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
+        from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
 
-        if isinstance(children_start_soon, bool):
-            self._children_start_soon = children_start_soon
-        elif children_start_soon is INHERIT:
+        if isinstance(everything_starts_soon_by_default, bool):
+            # Concrete value was provided
+            self._everything_starts_soon_by_default = everything_starts_soon_by_default
+        elif everything_starts_soon_by_default is GLOBAL_DEFAULT:
+            # Use the global default
+            self._everything_starts_soon_by_default = should_everything_start_soon_by_default()
+        elif everything_starts_soon_by_default is INHERIT:
             if self._parent is None:
-                self._children_start_soon = should_start_soon_by_default()
+                # Use the global default
+                self._everything_starts_soon_by_default = should_everything_start_soon_by_default()
             else:
-                self._children_start_soon = self._parent._children_start_soon
+                # Inherit from the parent
+                self._everything_starts_soon_by_default = self._parent._everything_starts_soon_by_default
         else:
             raise ValueError(
-                "children_start_soon must be either INHERIT or a boolean value, "
-                f"but `{type(children_start_soon)}` was given instead"
+                "`everything_starts_soon_by_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
+                f"but `{type(everything_starts_soon_by_default)}` was given instead"
             )
 
+    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> None:
         if isinstance(start_soon, bool):
+            # Concrete value was provided
             self._start_soon = start_soon
+        elif start_soon is NOT_SET:
+            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
+                # The parent is enforcing this setting for its children
+                self._start_soon = self._parent._children_start_soon_by_default
+            else:
+                # Use the default
+                self._start_soon = self._everything_starts_soon_by_default
         elif start_soon is INHERIT:
             if self._parent is None:
-                self._start_soon = should_start_soon_by_default()
+                # Use the default
+                self._start_soon = self._everything_starts_soon_by_default
             else:
-                # This is not a typo - we want to get the children_start_soon
-                # value from the parent Promise.
-                self._start_soon = self._parent._children_start_soon
+                # Inherit from the parent
+                self._start_soon = self._parent._start_soon
         else:
             raise ValueError(
-                f"start_soon must be either INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
+                "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
+                f"but `{type(start_soon)}` was given instead"
+            )
+
+    def _resolve_children_start_soon_by_default(self, children_start_soon_by_default: bool | Sentinel) -> None:
+        if isinstance(children_start_soon_by_default, bool) or children_start_soon_by_default is NOT_SET:
+            # Apart from the concrete value, we also want to allow
+            # `self._children_start_soon_by_default` to stay as NOT_SET, so we
+            # can later tell whether it is being enforced on children or not
+            # (NOT_SET means "no enforcement").
+            self._children_start_soon_by_default = children_start_soon_by_default
+        elif children_start_soon_by_default is INHERIT:
+            if self._parent is None:
+                # Use the default
+                self._children_start_soon_by_default = self._everything_starts_soon_by_default
+            else:
+                # Inherit from the parent
+                self._children_start_soon_by_default = self._parent._children_start_soon_by_default
+        else:
+            raise ValueError(
+                "`children_start_soon_by_default` must be either NOT_SET, INHERIT or a boolean value, "
+                f"but `{type(children_start_soon_by_default)}` was given instead"
             )
 
     def _finish_initialization(

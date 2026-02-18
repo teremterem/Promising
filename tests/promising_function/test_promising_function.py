@@ -8,7 +8,7 @@ import pytest
 
 import promising
 from promising.errors import PromisingFunctionNotCallableError
-from promising.sentinels import INHERIT, Sentinel
+from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
 
@@ -375,35 +375,53 @@ async def test_preserves_original_func() -> None:
 # ── 5. Config Forwarding (Parametrized) ─────────────────────────────
 
 
-@pytest.mark.parametrize("start_soon", [True, False, INHERIT])
-@pytest.mark.parametrize("children_start_soon_by_default", [True, False, INHERIT])
+@pytest.mark.parametrize("everything_starts_soon_by_default", [True, False, INHERIT, GLOBAL_DEFAULT])
+@pytest.mark.parametrize("start_soon", [True, False, INHERIT, NOT_SET])
+@pytest.mark.parametrize("children_start_soon_by_default", [True, False, INHERIT, NOT_SET])
 async def test_config_forwarding(
     *,
     start_soon: bool | Sentinel,
     children_start_soon_by_default: bool | Sentinel,
+    everything_starts_soon_by_default: bool | Sentinel,
 ) -> None:
     """
-    Parametrized over start_soon and
-    children_start_soon_by_default. Asserts resolved config
-    values match expectations. INHERIT falls back to
-    defaults (True via should_everything_start_soon_by_default).
+    Parametrized over all three config parameters. At root
+    level (no parent), INHERIT and GLOBAL_DEFAULT for
+    everything_starts_soon_by_default both resolve to the
+    global default (True). For start_soon, both INHERIT and
+    NOT_SET fall back to everything_starts_soon_by_default.
+    For children_start_soon_by_default, INHERIT resolves to
+    everything_starts_soon_by_default, while NOT_SET stays
+    as NOT_SET (no enforcement on children).
     """
 
-    @promising.function(start_soon=start_soon, children_start_soon_by_default=children_start_soon_by_default)
+    @promising.function(
+        start_soon=start_soon,
+        children_start_soon_by_default=children_start_soon_by_default,
+        everything_starts_soon_by_default=everything_starts_soon_by_default,
+    )
     async def noop() -> None:
         pass
 
     promise = noop()
 
-    # INHERIT at root level resolves to the global
-    # default (True)
-    expected_start_soon = True if start_soon is INHERIT else start_soon
-    expected_children_start_soon_by_default = (
-        True if children_start_soon_by_default is INHERIT else children_start_soon_by_default
+    # At root level, INHERIT and GLOBAL_DEFAULT both read
+    # the global default (True).
+    expected_everything = (
+        everything_starts_soon_by_default if isinstance(everything_starts_soon_by_default, bool) else True
+    )
+    # INHERIT and NOT_SET for start_soon fall back to
+    # everything_starts_soon_by_default at root.
+    expected_start_soon = start_soon if isinstance(start_soon, bool) else expected_everything
+    # INHERIT resolves to everything_starts_soon_by_default;
+    # NOT_SET stays as NOT_SET (no enforcement).
+    expected_children = (
+        expected_everything if children_start_soon_by_default is INHERIT else children_start_soon_by_default
     )
 
+    assert promise._everything_starts_soon_by_default is expected_everything
     assert promise._start_soon is expected_start_soon
-    assert promise._children_start_soon_by_default is expected_children_start_soon_by_default
+    assert promise._children_start_soon_by_default is expected_children
 
     await promise
 
@@ -435,6 +453,54 @@ async def test_start_soon_behavior(*, start_soon: bool) -> None:
 
     await promise
     assert executed is True
+
+
+async def test_everything_starts_soon_by_default_inherits_from_parent() -> None:
+    """
+    INHERIT (the default for everything_starts_soon_by_default)
+    propagates the parent's value to child Promises. A parent
+    with everything_starts_soon_by_default=False causes
+    children (with INHERIT) to also resolve to False,
+    overriding the global default (True).
+    """
+    child_promise = None
+
+    @promising.function  # start_soon=NOT_SET, everything_starts_soon_by_default=INHERIT
+    async def child_func() -> None:
+        pass
+
+    @promising.function(everything_starts_soon_by_default=False, start_soon=True)
+    async def parent_func() -> None:
+        nonlocal child_promise
+        child_promise = child_func()
+
+    await parent_func()
+    assert child_promise._everything_starts_soon_by_default is False
+    # NOT_SET for start_soon falls back to the inherited False.
+    assert child_promise._start_soon is False
+    await child_promise
+
+
+async def test_everything_starts_soon_by_default_global_default_ignores_parent() -> None:
+    """
+    GLOBAL_DEFAULT always reads the live global setting,
+    ignoring the parent's everything_starts_soon_by_default.
+    """
+    child_promise = None
+
+    @promising.function(everything_starts_soon_by_default=GLOBAL_DEFAULT, start_soon=True)
+    async def child_func() -> None:
+        pass
+
+    @promising.function(everything_starts_soon_by_default=False, start_soon=True)
+    async def parent_func() -> None:
+        nonlocal child_promise
+        child_promise = child_func()
+
+    await parent_func()
+    # Parent has False, but GLOBAL_DEFAULT always reads the live global (True).
+    assert child_promise._everything_starts_soon_by_default is promising.EVERYTHING_STARTS_SOON_BY_DEFAULT
+    await child_promise
 
 
 # ── 6. Edge Cases & Integration ─────────────────────────────────────

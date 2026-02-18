@@ -1,3 +1,4 @@
+# TODO Split into multiple files
 """
 Tests for PromisingFunction and the function() decorator.
 """
@@ -455,7 +456,13 @@ async def test_start_soon_behavior(*, start_soon: bool) -> None:
     assert executed is True
 
 
-async def test_everything_starts_soon_by_default_inherits_from_parent() -> None:
+@pytest.mark.parametrize("everything_starts_soon_by_default", [True, False])
+@pytest.mark.parametrize("parent_start_soon", [True, False])
+async def test_everything_starts_soon_by_default_inherits_from_parent(
+    *,
+    everything_starts_soon_by_default: bool,
+    parent_start_soon: bool,
+) -> None:
     """
     INHERIT (the default for everything_starts_soon_by_default)
     propagates the parent's value to child Promises. A parent
@@ -469,37 +476,48 @@ async def test_everything_starts_soon_by_default_inherits_from_parent() -> None:
     async def child_func() -> None:
         pass
 
-    @promising.function(everything_starts_soon_by_default=False, start_soon=True)
+    @promising.function(
+        everything_starts_soon_by_default=everything_starts_soon_by_default,
+        start_soon=parent_start_soon,
+    )
     async def parent_func() -> None:
         nonlocal child_promise
         child_promise = child_func()
 
     await parent_func()
-    assert child_promise._everything_starts_soon_by_default is False
-    # NOT_SET for start_soon falls back to the inherited False.
-    assert child_promise._start_soon is False
+    assert child_promise._everything_starts_soon_by_default is everything_starts_soon_by_default
+    # NOT_SET for start_soon falls back to the inherited value.
+    assert child_promise._start_soon is everything_starts_soon_by_default
     await child_promise
 
 
-async def test_everything_starts_soon_by_default_global_default_ignores_parent() -> None:
+@pytest.mark.parametrize("parent_starts_soon_by_default", [True, False])
+@pytest.mark.parametrize("parent_start_soon", [True, False])
+@pytest.mark.parametrize("child_start_soon", [True, False])
+async def test_everything_starts_soon_by_default_global_default_ignores_parent(
+    *,
+    parent_starts_soon_by_default: bool,
+    parent_start_soon: bool,
+    child_start_soon: bool,
+) -> None:
     """
     GLOBAL_DEFAULT always reads the live global setting,
     ignoring the parent's everything_starts_soon_by_default.
     """
     child_promise = None
 
-    @promising.function(everything_starts_soon_by_default=GLOBAL_DEFAULT, start_soon=True)
+    @promising.function(everything_starts_soon_by_default=GLOBAL_DEFAULT, start_soon=child_start_soon)
     async def child_func() -> None:
         pass
 
-    @promising.function(everything_starts_soon_by_default=False, start_soon=True)
+    @promising.function(everything_starts_soon_by_default=parent_starts_soon_by_default, start_soon=parent_start_soon)
     async def parent_func() -> None:
         nonlocal child_promise
         child_promise = child_func()
 
     await parent_func()
-    # Parent has False, but GLOBAL_DEFAULT always reads the live global (True).
-    assert child_promise._everything_starts_soon_by_default is promising.EVERYTHING_STARTS_SOON_BY_DEFAULT
+    # GLOBAL_DEFAULT always reads the live global (True).
+    assert child_promise._everything_starts_soon_by_default is True
     await child_promise
 
 

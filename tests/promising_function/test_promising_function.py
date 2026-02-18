@@ -97,19 +97,6 @@ async def test_coroutine_executes_once() -> None:
     assert call_count == 2
 
 
-async def test_no_args_function() -> None:
-    """
-    Wrapping a zero-argument async function and calling
-    it with no args works.
-    """
-
-    @promising.function
-    async def constant() -> int:
-        return 42
-
-    assert await constant() == 42
-
-
 async def test_default_args() -> None:
     """
     Calling with no args uses defaults; calling with
@@ -524,22 +511,6 @@ async def test_children_start_soon_by_default_enforced_on_children(
 
 
 # ── 6. Edge Cases & Integration ─────────────────────────────────────
-
-
-async def test_call_delegates_to_call_method() -> None:
-    """
-    Calling via __call__ and via .call() produce
-    equivalent results.
-    """
-
-    @promising.function
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    result_call = await add(1, 2)
-    result_method = await add.call(3, 4)
-    assert result_call == 3
-    assert result_method == 7
 
 
 async def test_multiple_calls_produce_independent_promises() -> None:

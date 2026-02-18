@@ -2,7 +2,6 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.errors import PromisingFunctionNotCallableError
 from promising.promise import Promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
@@ -16,7 +15,7 @@ class PromisingFunction(Generic[T_co]):
 
     def __init__(
         self,
-        func_or_class: Callable[..., T_co] | type | None = None,
+        func_or_class: Callable[..., T_co] | type,
         *,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
@@ -42,12 +41,6 @@ class PromisingFunction(Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # TODO Add start_soon and children_start_soon_by_default parameters
-        #  here too. They should take precedence over the ones
-        #  passed to the PromisingFunction constructor.
-        if self.original is None:
-            raise PromisingFunctionNotCallableError("This PromisingFunction is not callable")
-
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability

@@ -20,11 +20,3 @@ class NoParentPromiseError(PromiseError):
 
 class NoParentConfigError(BasePromisingConfigError):
     pass
-
-
-class PromisingFunctionError(PromiseError):
-    pass
-
-
-class PromisingFunctionNotCallableError(PromisingFunctionError):
-    pass

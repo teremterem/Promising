@@ -8,7 +8,6 @@ import asyncio
 import pytest
 
 import promising
-from promising.errors import PromisingFunctionNotCallableError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
@@ -204,26 +203,6 @@ async def test_callable_class_execution_count() -> None:
 
 
 # ── 3. Error Cases ──────────────────────────────────────────────────
-
-
-async def test_none_raises_on_call() -> None:
-    """
-    PromisingFunction(None) raises
-    PromisingFunctionNotCallableError when called.
-    """
-    pf = promising.PromisingFunction(None)
-    with pytest.raises(PromisingFunctionNotCallableError):
-        pf()
-
-
-async def test_none_raises_on_call_with_args() -> None:
-    """
-    Same error even when passing args to a
-    PromisingFunction wrapping None.
-    """
-    pf = promising.PromisingFunction(None)
-    with pytest.raises(PromisingFunctionNotCallableError):
-        pf(1, 2, key="v")
 
 
 async def test_exception_propagates_through_promise() -> None:

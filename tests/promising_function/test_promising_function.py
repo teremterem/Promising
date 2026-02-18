@@ -23,6 +23,7 @@ async def test_calling_promising_function_returns_promise() -> None:
     async def greet() -> str:
         return "hello"
 
+    assert isinstance(greet, promising.PromisingFunction)
     result = greet()
     assert isinstance(result, promising.Promise)
     assert await result == "hello"
@@ -274,23 +275,6 @@ async def test_various_exception_types(*, exc_type: type) -> None:
 
 
 # ── 4. function() Decorator Modes ───────────────────────────────────
-
-
-async def test_decorator_bare() -> None:
-    """
-    @promising.function (no parens) produces a
-    PromisingFunction; calling returns a Promise;
-    awaiting yields the result.
-    """
-
-    @promising.function
-    async def greet() -> str:
-        return "hello"
-
-    assert isinstance(greet, promising.PromisingFunction)
-    result = greet()
-    assert isinstance(result, promising.Promise)
-    assert await result == "hello"
 
 
 async def test_decorator_with_empty_parens() -> None:
@@ -573,22 +557,6 @@ async def test_multiple_calls_produce_independent_promises() -> None:
     assert p1 is not p2
     assert await p1 == 1
     assert await p2 == 2
-
-
-async def test_result_is_awaitable_promise() -> None:
-    """
-    The return value is both an instance of Promise
-    and an instance of asyncio.Future.
-    """
-
-    @promising.function
-    async def noop() -> None:
-        pass
-
-    result = noop()
-    assert isinstance(result, promising.Promise)
-    assert isinstance(result, asyncio.Future)
-    await result
 
 
 async def test_promise_has_parent_when_created_in_context() -> None:

@@ -56,6 +56,11 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 - `EVERYTHING_STARTS_SOON_BY_DEFAULT`, `should_everything_start_soon_by_default()` - global default control
 - `function()` is the decorator: use as `@promising.function()` with config args or `@promising.function` bare.
 
+**Error classes** (`promising/errors.py`):
+- `BasePromisingError`, `PromiseError` - base classes
+- `NoCurrentPromiseError` - raised when `get_current_promise()` is called outside a Promise context
+- `NoParentPromiseError` - raised when a Promise has no parent
+
 **Example usage** (`examples/keyword_agent.py`): Shows idiomatic `@promising.function` decorator usage — decorate an async function, call it to get a `Promise`, await it for the result. Install example deps with `uv sync --extra examples`.
 
 ## Code Style

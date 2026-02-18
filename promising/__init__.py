@@ -1,3 +1,4 @@
+from promising.errors import BasePromisingError, NoCurrentPromiseError, NoParentPromiseError, PromiseError
 from promising.promise import Promise, get_current_promise
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
@@ -17,11 +18,15 @@ def should_everything_start_soon_by_default() -> bool:
 
 
 __all__ = [
+    "BasePromisingError",
+    "EVERYTHING_STARTS_SOON_BY_DEFAULT",
     "INHERIT",
     "NOT_SET",
+    "NoCurrentPromiseError",
+    "NoParentPromiseError",
     "Promise",
+    "PromiseError",
     "PromisingFunction",
-    "EVERYTHING_STARTS_SOON_BY_DEFAULT",
     "Sentinel",
     "function",
     "get_current_promise",

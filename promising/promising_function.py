@@ -2,32 +2,36 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.errors import PromisingFunctionNotCallableError
 from promising.promise import Promise
-from promising.sentinels import INHERIT, Sentinel
+from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
 
 class PromisingFunction(Generic[T_co]):
     original: Callable[..., T_co] | type | None = None
 
+    # TODO Explain the idea behind parent-child relationships between Promise
+    #  objects with respect to PromisingFunction calls
+
     def __init__(
         self,
-        func_or_class: Callable[..., T_co] | type | None = None,
+        func_or_class: Callable[..., T_co] | type,
         *,
-        start_soon: bool | Sentinel = INHERIT,
-        children_start_soon: bool | Sentinel = INHERIT,
+        start_soon: bool | Sentinel = NOT_SET,
+        children_start_soon_by_default: bool | Sentinel = NOT_SET,
+        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
         self.original = func_or_class
         self.start_soon = start_soon
-        self.children_start_soon = children_start_soon
+        self.children_start_soon_by_default = children_start_soon_by_default
+        self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
     def __call__(
         self,
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # TODO Add start_soon and children_start_soon parameters
+        # TODO Add start_soon and children_start_soon_by_default parameters
         #  here too. They should take precedence over the ones
         #  passed to the PromisingFunction constructor.
         return self.call(*args, **kwargs)
@@ -37,12 +41,6 @@ class PromisingFunction(Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # TODO Add start_soon and children_start_soon parameters
-        #  here too. They should take precedence over the ones
-        #  passed to the PromisingFunction constructor.
-        if self.original is None:
-            raise PromisingFunctionNotCallableError("This PromisingFunction is not callable")
-
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
@@ -53,29 +51,25 @@ class PromisingFunction(Generic[T_co]):
             # Otherwise, assume it is already a function
             actual_func = functools.partial(self.original, *args, **kwargs)
 
-        # TODO TODO TODO Create a PromisingConfig object beforehand, so its
-        #  validations are passed before we create any coroutines and get the
-        #  `Coroutine was not awaited` warning as a result of such validation
-        #  errors.
-
         # Assume the function is asynchronous and get the coroutine out of it
-        # TODO TODO TODO Support synchronous functions too. (How to identify
-        #  them without trying to get the coroutine, thought ?)
+        # TODO Support synchronous functions too. (How to identify them without
+        #  trying to get the coroutine, thought ?)
         coro = actual_func()
 
-        # TODO TODO TODO Introduce "backends"
         return Promise[T_co](
             coro=coro,
             start_soon=self.start_soon,
-            children_start_soon=self.children_start_soon,
+            children_start_soon_by_default=self.children_start_soon_by_default,
+            everything_starts_soon_by_default=self.everything_starts_soon_by_default,
         )
 
 
 def function(
     func_or_class: Callable[..., T_co] | type | None = None,
     *,
-    start_soon: bool | Sentinel = INHERIT,
-    children_start_soon: bool | Sentinel = INHERIT,
+    start_soon: bool | Sentinel = NOT_SET,
+    children_start_soon_by_default: bool | Sentinel = NOT_SET,
+    everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     # TODO Mention in a comment that the real return type is
     #  `PromisingFunction[T_co]` only (as long as we eventually settle on
     #  it being the case, and not start returning the original function or
@@ -113,7 +107,8 @@ def function(
             return PromisingFunction[T_co](
                 f_or_cls,
                 start_soon=start_soon,
-                children_start_soon=children_start_soon,
+                children_start_soon_by_default=children_start_soon_by_default,
+                everything_starts_soon_by_default=everything_starts_soon_by_default,
             )
 
         return _decorator
@@ -123,5 +118,6 @@ def function(
     return PromisingFunction[T_co](
         func_or_class,
         start_soon=start_soon,
-        children_start_soon=children_start_soon,
+        children_start_soon_by_default=children_start_soon_by_default,
+        everything_starts_soon_by_default=everything_starts_soon_by_default,
     )

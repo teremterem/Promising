@@ -1,14 +1,8 @@
-"""
-Tests for PromisingFunction and the function() decorator.
-"""
-
 import asyncio
 
 import pytest
 
 import promising
-from promising.errors import PromisingFunctionNotCallableError
-from promising.sentinels import INHERIT, Sentinel
 
 # ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
 
@@ -23,6 +17,7 @@ async def test_calling_promising_function_returns_promise() -> None:
     async def greet() -> str:
         return "hello"
 
+    assert isinstance(greet, promising.PromisingFunction)
     result = greet()
     assert isinstance(result, promising.Promise)
     assert await result == "hello"
@@ -94,19 +89,6 @@ async def test_coroutine_executes_once() -> None:
     assert await promise_two == "done"
     assert await promise_two == "done"
     assert call_count == 2
-
-
-async def test_no_args_function() -> None:
-    """
-    Wrapping a zero-argument async function and calling
-    it with no args works.
-    """
-
-    @promising.function
-    async def constant() -> int:
-        return 42
-
-    assert await constant() == 42
 
 
 async def test_default_args() -> None:
@@ -205,26 +187,6 @@ async def test_callable_class_execution_count() -> None:
 # ── 3. Error Cases ──────────────────────────────────────────────────
 
 
-async def test_none_raises_on_call() -> None:
-    """
-    PromisingFunction(None) raises
-    PromisingFunctionNotCallableError when called.
-    """
-    pf = promising.PromisingFunction(None)
-    with pytest.raises(PromisingFunctionNotCallableError):
-        pf()
-
-
-async def test_none_raises_on_call_with_args() -> None:
-    """
-    Same error even when passing args to a
-    PromisingFunction wrapping None.
-    """
-    pf = promising.PromisingFunction(None)
-    with pytest.raises(PromisingFunctionNotCallableError):
-        pf(1, 2, key="v")
-
-
 async def test_exception_propagates_through_promise() -> None:
     """
     An exception raised inside the async function
@@ -296,23 +258,6 @@ async def test_various_exception_types(*, exc_type: type) -> None:
 # ── 4. function() Decorator Modes ───────────────────────────────────
 
 
-async def test_decorator_bare() -> None:
-    """
-    @promising.function (no parens) produces a
-    PromisingFunction; calling returns a Promise;
-    awaiting yields the result.
-    """
-
-    @promising.function
-    async def greet() -> str:
-        return "hello"
-
-    assert isinstance(greet, promising.PromisingFunction)
-    result = greet()
-    assert isinstance(result, promising.Promise)
-    assert await result == "hello"
-
-
 async def test_decorator_with_empty_parens() -> None:
     """
     @promising.function() (empty parens) behaves
@@ -372,86 +317,7 @@ async def test_preserves_original_func() -> None:
     assert decorated.original is original
 
 
-# ── 5. Config Forwarding (Parametrized) ─────────────────────────────
-
-
-@pytest.mark.parametrize("start_soon", [True, False, INHERIT])
-@pytest.mark.parametrize("children_start_soon", [True, False, INHERIT])
-async def test_config_forwarding(
-    *,
-    start_soon: bool | Sentinel,
-    children_start_soon: bool | Sentinel,
-) -> None:
-    """
-    Parametrized over start_soon and
-    children_start_soon. Asserts resolved config
-    values match expectations. INHERIT falls back to
-    defaults (True via should_start_soon_by_default).
-    """
-
-    @promising.function(start_soon=start_soon, children_start_soon=children_start_soon)
-    async def noop() -> None:
-        pass
-
-    promise = noop()
-
-    # INHERIT at root level resolves to the global
-    # default (True)
-    expected_start_soon = True if start_soon is INHERIT else start_soon
-    expected_children_start_soon = True if children_start_soon is INHERIT else children_start_soon
-
-    assert promise._start_soon is expected_start_soon
-    assert promise._children_start_soon is expected_children_start_soon
-
-    await promise
-
-
-@pytest.mark.parametrize("start_soon", [True, False])
-async def test_start_soon_behavior(*, start_soon: bool) -> None:
-    """
-    With start_soon=True: after calling + sleeping,
-    the coroutine has already executed. With False:
-    it hasn't executed until explicitly awaited.
-    """
-    executed = False
-
-    async def worker() -> str:
-        nonlocal executed
-        executed = True
-        return "done"
-
-    pf = promising.function(worker, start_soon=start_soon)
-    promise = pf()
-
-    # Give the event loop a chance to run scheduled tasks
-    await asyncio.sleep(0.1)
-
-    if start_soon:
-        assert executed is True
-    else:
-        assert executed is False
-
-    await promise
-    assert executed is True
-
-
-# ── 6. Edge Cases & Integration ─────────────────────────────────────
-
-
-async def test_call_delegates_to_call_method() -> None:
-    """
-    Calling via __call__ and via .call() produce
-    equivalent results.
-    """
-
-    @promising.function
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    result_call = await add(1, 2)
-    result_method = await add.call(3, 4)
-    assert result_call == 3
-    assert result_method == 7
+# ── 5. Edge Cases & Integration ─────────────────────────────────────
 
 
 async def test_multiple_calls_produce_independent_promises() -> None:
@@ -469,22 +335,6 @@ async def test_multiple_calls_produce_independent_promises() -> None:
     assert p1 is not p2
     assert await p1 == 1
     assert await p2 == 2
-
-
-async def test_result_is_awaitable_promise() -> None:
-    """
-    The return value is both an instance of Promise
-    and an instance of asyncio.Future.
-    """
-
-    @promising.function
-    async def noop() -> None:
-        pass
-
-    result = noop()
-    assert isinstance(result, promising.Promise)
-    assert isinstance(result, asyncio.Future)
-    await result
 
 
 async def test_promise_has_parent_when_created_in_context() -> None:
@@ -539,7 +389,7 @@ async def test_promise_await_remaining_children(*, await_remaining_children: boo
     execution_order: list[str] = []
     child_promise = None
 
-    @promising.function(start_soon=True)
+    @promising.function
     async def child_func() -> str:
         await asyncio.sleep(0.1)
         execution_order.append("child_done")

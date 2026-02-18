@@ -489,6 +489,7 @@ async def test_everything_starts_soon_by_default_inherits_from_parent(
     # NOT_SET for start_soon falls back to the inherited value.
     assert child_promise._start_soon is everything_starts_soon_by_default
     await child_promise
+    # TODO Also test it NOT being inherited if it is overridden on the child
 
 
 @pytest.mark.parametrize("parent_starts_soon_by_default", [True, False])
@@ -556,6 +557,7 @@ async def test_children_start_soon_by_default_enforced_on_children(
     expected_start_soon = True if children_start_soon_by_default is NOT_SET else children_start_soon_by_default
     assert child_promise._start_soon is expected_start_soon
     await child_promise
+    # TODO Also test it NOT being enforced if it is overridden on the child
 
 
 # ── 6. Edge Cases & Integration ─────────────────────────────────────

@@ -79,11 +79,11 @@ class PromisingFunction(Generic[T_co]):
         self.children_start_soon_by_default = children_start_soon_by_default
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
-    def __get__(self, obj: Any, objtype: type | None = None) -> "PromisingFunction[T_co]":
+    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
         if obj is not None and isinstance(self.__func__, types.FunctionType):
             # Regular instance method: create a bound method so that `obj` is
             # automatically prepended as the first argument on every call.
-            return types.MethodType(self, obj)  # type: ignore[return-value]
+            return types.MethodType(self, obj)
         return self
 
     def __call__(

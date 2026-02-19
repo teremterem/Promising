@@ -346,7 +346,8 @@ async def test_class_method_exception_propagates() -> None:
 
 async def test_promising_function_on_top_of_staticmethod() -> None:
     """
-    Applying @promising.function on top of @staticmethod still works.
+    Applying @promising.function on top of @staticmethod still works,
+    both when called via the class and via an instance.
     """
 
     class MyClass:
@@ -355,21 +356,21 @@ async def test_promising_function_on_top_of_staticmethod() -> None:
         async def my_method() -> None: ...
 
     assert await MyClass.my_method() is None
-    # TODO Also, test that it works when static method is called via an
-    #  instance
+    assert await MyClass().my_method() is None
 
 
 async def test_promising_function_on_top_of_classmethod() -> None:
     """
-    Applying @promising.function on top of @classmethod still works.
+    Applying @promising.function on top of @classmethod still works,
+    both when called via the class and via an instance, and `cls` is
+    correctly received in both cases.
     """
 
     class MyClass:
         @promising.function
         @classmethod
-        async def my_method(cls) -> None: ...
+        async def my_method(cls) -> type:
+            return cls
 
-    assert await MyClass.my_method() is None
-    # TODO Also, test that it works when class method is called via an instance
-    # TODO In both cases we should ensure that `my_method` still receives the
-    #  class itself as the first argument
+    assert await MyClass.my_method() is MyClass
+    assert await MyClass().my_method() is MyClass

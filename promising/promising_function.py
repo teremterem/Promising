@@ -80,9 +80,13 @@ class PromisingFunction(Generic[T_co]):
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
+        if isinstance(self.__func__, classmethod):
+            # Classmethod: bind the class as the first argument regardless of
+            # whether the lookup is via the class or an instance.
+            cls = objtype if obj is None else type(obj)
+            return types.MethodType(self, cls)
         if obj is not None and isinstance(self.__func__, types.FunctionType):
-            # Regular instance method: create a bound method so that `obj` is
-            # automatically prepended as the first argument on every call.
+            # Regular instance method: bind the instance as the first argument.
             return types.MethodType(self, obj)
         return self
 
@@ -106,7 +110,13 @@ class PromisingFunction(Generic[T_co]):
         #  immutability
         # TODO Support synchronous functions too. (How to identify them without
         #  trying to get the coroutine, thought ?)
-        coro = self.__func__(*args, **kwargs)
+        if isinstance(self.__func__, classmethod):
+            # __func__ is a classmethod object; args[0] is the class, already
+            # prepended by MethodType in __get__. classmethod objects are not
+            # directly callable, so we reach through to the underlying function.
+            coro = self.__func__.__func__(*args, **kwargs)
+        else:
+            coro = self.__func__(*args, **kwargs)
 
         return Promise[T_co](
             coro=coro,

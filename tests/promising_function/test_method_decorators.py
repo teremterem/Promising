@@ -339,3 +339,30 @@ async def test_class_method_exception_propagates() -> None:
 
     with pytest.raises(TypeError, match="class method error"):
         await MyClass().failing()
+
+
+# ── Alternative Decorator Ordering ──────────────────────────────────────
+
+
+async def test_promising_function_on_top_of_staticmethod() -> None:
+    """
+    Applying @promising.function on top of @staticmethod still works.
+    """
+    class MyClass:
+        @promising.function
+        @staticmethod
+        async def my_method() -> None: ...
+
+    assert await MyClass.my_method() is None
+
+
+async def test_promising_function_on_top_of_classmethod() -> None:
+    """
+    Applying @promising.function on top of @classmethod still works.
+    """
+    class MyClass:
+        @promising.function
+        @classmethod
+        async def my_method(cls) -> None: ...
+
+    assert await MyClass.my_method() is None

@@ -80,39 +80,11 @@ class PromisingFunction(Generic[T_co]):
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
     def __get__(self, obj: Any, objtype: type | None = None) -> "PromisingFunction[T_co]":
-        # Descriptor protocol support so PromisingFunction works as a method
-        # decorator inside a class body.
-        if isinstance(self.__func__, staticmethod):
-            # Static methods don't bind to instance or class - return as-is
-            # so that call() can unwrap __func__ itself.
-            return self
-        if obj is None:
-            # Class-level attribute access (e.g. MyClass.my_method).
-            if isinstance(self.__func__, classmethod):
-                # Bind the class so the underlying coroutine receives cls as
-                # its first argument.
-                bound = self.__func__.__get__(None, objtype)
-                return self.__class__(
-                    bound,
-                    start_soon=self.start_soon,
-                    children_start_soon_by_default=self.children_start_soon_by_default,
-                    everything_starts_soon_by_default=self.everything_starts_soon_by_default,
-                )
-            return self
-        # Instance-level attribute access (e.g. obj.my_method).
-        if isinstance(self.__func__, classmethod):
-            # Bind the class (not the instance) - same semantics as the
-            # built-in classmethod descriptor.
-            bound = self.__func__.__get__(obj, objtype if objtype is not None else type(obj))
-            return self.__class__(
-                bound,
-                start_soon=self.start_soon,
-                children_start_soon_by_default=self.children_start_soon_by_default,
-                everything_starts_soon_by_default=self.everything_starts_soon_by_default,
-            )
-        # Regular instance method: create a bound method so that `obj` is
-        # automatically prepended as the first argument on every call.
-        return types.MethodType(self, obj)  # type: ignore[return-value]
+        if obj is not None and isinstance(self.__func__, types.FunctionType):
+            # Regular instance method: create a bound method so that `obj` is
+            # automatically prepended as the first argument on every call.
+            return types.MethodType(self, obj)  # type: ignore[return-value]
+        return self
 
     def __call__(
         self,

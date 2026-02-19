@@ -134,8 +134,8 @@ async def test_static_method_via_class_returns_promise() -> None:
     """
 
     class MathUtils:
-        @promising.function
         @staticmethod
+        @promising.function
         async def double(x: int) -> int:
             return x * 2
 
@@ -152,8 +152,8 @@ async def test_static_method_via_instance_returns_promise() -> None:
     """
 
     class MathUtils:
-        @promising.function
         @staticmethod
+        @promising.function
         async def double(x: int) -> int:
             return x * 2
 
@@ -170,8 +170,8 @@ async def test_static_method_receives_no_implicit_arg() -> None:
     """
 
     class MathUtils:
-        @promising.function
         @staticmethod
+        @promising.function
         async def add(a: int, b: int) -> int:
             return a + b
 
@@ -186,8 +186,8 @@ async def test_static_method_with_empty_parens_decorator() -> None:
     """
 
     class MathUtils:
-        @promising.function()
         @staticmethod
+        @promising.function()
         async def triple(x: int) -> int:
             return x * 3
 
@@ -202,8 +202,8 @@ async def test_static_method_exception_propagates() -> None:
     """
 
     class MyClass:
-        @promising.function
         @staticmethod
+        @promising.function
         async def failing() -> None:
             raise RuntimeError("static method error")
 
@@ -224,8 +224,8 @@ async def test_class_method_via_class_returns_promise() -> None:
     """
 
     class Factory:
-        @promising.function
         @classmethod
+        @promising.function
         async def create_name(cls) -> str:
             return cls.__name__
 
@@ -241,8 +241,8 @@ async def test_class_method_via_instance_returns_promise() -> None:
     """
 
     class Factory:
-        @promising.function
         @classmethod
+        @promising.function
         async def create_name(cls) -> str:
             return cls.__name__
 
@@ -259,8 +259,8 @@ async def test_class_method_receives_cls_via_class() -> None:
     """
 
     class Base:
-        @promising.function
         @classmethod
+        @promising.function
         async def get_class_name(cls) -> str:
             return cls.__name__
 
@@ -278,8 +278,8 @@ async def test_class_method_receives_cls_via_instance() -> None:
     """
 
     class Base:
-        @promising.function
         @classmethod
+        @promising.function
         async def get_class_name(cls) -> str:
             return cls.__name__
 
@@ -297,8 +297,8 @@ async def test_class_method_forwards_args() -> None:
     """
 
     class Formatter:
-        @promising.function
         @classmethod
+        @promising.function
         async def format_value(cls, value: int, *, prefix: str = "") -> str:
             return f"{prefix}{cls.__name__}:{value}"
 
@@ -313,8 +313,8 @@ async def test_class_method_with_empty_parens_decorator() -> None:
     """
 
     class Factory:
-        @promising.function()
         @classmethod
+        @promising.function()
         async def create_name(cls) -> str:
             return cls.__name__
 
@@ -329,8 +329,8 @@ async def test_class_method_exception_propagates() -> None:
     """
 
     class MyClass:
-        @promising.function
         @classmethod
+        @promising.function
         async def failing(cls) -> None:
             raise TypeError("class method error")
 

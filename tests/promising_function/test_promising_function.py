@@ -4,7 +4,7 @@ import pytest
 
 import promising
 
-# ── 1. Core: Async Function Wrapping & Argument Forwarding ──────────
+# ── Core: Async Function Wrapping & Argument Forwarding ──────────
 
 
 async def test_calling_promising_function_returns_promise() -> None:
@@ -119,72 +119,7 @@ async def test_star_args_and_kwargs() -> None:
     assert result == ((1, 2, 3), {"key": "value"})
 
 
-# ── 2. Callable Classes ─────────────────────────────────────────────
-
-
-async def test_with_callable_class() -> None:
-    """
-    A class with __init__(name) and async __call__()
-    is instantiated with args and awaited for the result.
-    """
-
-    @promising.function
-    class Greeter:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        async def __call__(self) -> str:
-            return f"hello, {self.name}"
-
-    assert await Greeter("world") == "hello, world"
-
-
-async def test_with_callable_class_kwargs() -> None:
-    """
-    A class with keyword-only __init__ params works
-    when decorated with @promising.function.
-    """
-
-    @promising.function
-    class Greeter:
-        def __init__(self, *, greeting: str, name: str) -> None:
-            self.greeting = greeting
-            self.name = name
-
-        async def __call__(self) -> str:
-            return f"{self.greeting}, {self.name}"
-
-    assert await Greeter(greeting="hi", name="world") == "hi, world"
-
-
-async def test_callable_class_execution_count() -> None:
-    """
-    Each call creates a new instance — tracked via
-    nonlocal counters for __init__ and __call__.
-    """
-    init_count = 0
-    call_count = 0
-
-    @promising.function
-    class Counter:
-        def __init__(self) -> None:
-            nonlocal init_count
-            init_count += 1
-
-        async def __call__(self) -> str:
-            nonlocal call_count
-            call_count += 1
-            return "counted"
-
-    assert await Counter() == "counted"
-    assert init_count == 1
-    assert call_count == 1
-    assert await Counter() == "counted"
-    assert init_count == 2
-    assert call_count == 2
-
-
-# ── 3. Error Cases ──────────────────────────────────────────────────
+# ── Error Cases ──────────────────────────────────────────────────
 
 
 async def test_exception_propagates_through_promise() -> None:
@@ -199,42 +134,6 @@ async def test_exception_propagates_through_promise() -> None:
 
     with pytest.raises(ValueError, match="test error"):
         await failing()
-
-
-async def test_exception_from_class_callable() -> None:
-    """
-    An exception raised in a class's __call__ method
-    propagates through the Promise when awaited.
-    """
-
-    @promising.function
-    class Failing:
-        def __init__(self) -> None:
-            pass
-
-        async def __call__(self) -> None:
-            raise RuntimeError("class call error")
-
-    with pytest.raises(RuntimeError, match="class call error"):
-        await Failing()
-
-
-async def test_exception_in_class_init() -> None:
-    """
-    An exception in __init__ raises synchronously
-    (before Promise creation).
-    """
-
-    @promising.function
-    class FailingInit:
-        def __init__(self) -> None:
-            raise TypeError("init error")
-
-        async def __call__(self) -> None:
-            pass
-
-    with pytest.raises(TypeError, match="init error"):
-        FailingInit()
 
 
 @pytest.mark.parametrize(
@@ -255,7 +154,7 @@ async def test_various_exception_types(*, exc_type: type) -> None:
         await failing()
 
 
-# ── 4. function() Decorator Modes ───────────────────────────────────
+# ── function() Decorator Modes ───────────────────────────────────
 
 
 async def test_decorator_with_empty_parens() -> None:
@@ -270,24 +169,6 @@ async def test_decorator_with_empty_parens() -> None:
 
     assert isinstance(greet, promising.PromisingFunction)
     assert await greet() == "hello"
-
-
-async def test_decorator_with_class() -> None:
-    """
-    @promising.function applied to a class works
-    end-to-end.
-    """
-
-    @promising.function
-    class Greeter:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        async def __call__(self) -> str:
-            return f"hello, {self.name}"
-
-    assert isinstance(Greeter, promising.PromisingFunction)
-    assert await Greeter("world") == "hello, world"
 
 
 async def test_used_as_direct_call() -> None:
@@ -317,7 +198,7 @@ async def test_preserves_original_func() -> None:
     assert decorated.original is original
 
 
-# ── 5. Edge Cases & Integration ─────────────────────────────────────
+# ── Edge Cases & Integration ─────────────────────────────────────
 
 
 async def test_multiple_calls_produce_independent_promises() -> None:

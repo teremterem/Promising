@@ -50,6 +50,9 @@ def function(
     #    are in reverse order
     #  - What goes through when staticmethod is called on a class
     #  - What goes through when staticmethod is called via an instance
+    #
+    #  Do it via tests ? Allow passing in a custom function class to this
+    #  decorator or just call PromisingFunction directly in those tests ?
 
     # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
     #  resolve postponed type hints correctly, when you implement input params

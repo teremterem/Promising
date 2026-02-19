@@ -348,21 +348,32 @@ async def test_promising_function_on_top_of_staticmethod() -> None:
     """
     Applying @promising.function on top of @staticmethod still works.
     """
+
     class MyClass:
         @promising.function
         @staticmethod
         async def my_method() -> None: ...
 
     assert await MyClass.my_method() is None
+    # TODO Also, test that it works when static method is called via an
+    #  instance
 
 
 async def test_promising_function_on_top_of_classmethod() -> None:
     """
     Applying @promising.function on top of @classmethod still works.
     """
+
     class MyClass:
         @promising.function
         @classmethod
         async def my_method(cls) -> None: ...
 
     assert await MyClass.my_method() is None
+    # TODO Also, test that it works when class method is called via an instance
+    # TODO In both cases we should ensure that `my_method` still receives the
+    #  class itself as the first argument
+    # TODO We also need to look into how exactly the class is passed via
+    #  PromisingFunction.__call__ in all FOUR cases: classmethod called on
+    #  class, called on instance, PLUS both these calling methods but with two
+    #  different decoration orders)

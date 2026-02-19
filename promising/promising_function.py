@@ -28,15 +28,21 @@ def function(
     - All these interactions are stored/storable in graph databases, or any
       other kinds of databases or caches that can handle the data structures.
     """
-    # TODO Stop returning PromisingFunction, return another function instead
-    #  (just "instrument" it with some attribute to access PromisingFunction
-    #  object ?)
-    # TODO Allow this decorator to be used as a method decorator as well.
-    # TODO Or is it impossible ? (Will we want to have some sort of function
-    #  registry to find and call functions dynamically ?)
+    # TODO Will @classmethod decoration ordering matter for the way caching
+    #  works in PromisingFunction ?
+    #
+    #    @classmethod
+    #    @promising.function
+    #
+    #  versus
+    #
+    #    @promising.function
+    #    @classmethod
+
     # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
-    #  resolve postponed type hints correctly as well, when you implement
-    #  input params as Promises.
+    #  resolve postponed type hints correctly, when you implement input params
+    #  as Promises.
+
     if func_or_method is None:
         # The decorator was used with arguments
         # TODO Same thing about a comment for the return type as above

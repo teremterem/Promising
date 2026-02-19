@@ -374,3 +374,50 @@ async def test_promising_function_on_top_of_classmethod() -> None:
 
     assert await MyClass.my_method() is MyClass
     assert await MyClass().my_method() is MyClass
+
+
+async def test_promising_function_on_top_of_classmethod_with_args() -> None:
+    """
+    @promising.function above @classmethod with extra arguments:
+    cls and all user-supplied args are forwarded correctly through
+    the __func__.__func__ unwrapping path in call(), both when called
+    via the class and via an instance.
+    """
+
+    class MyClass:
+        @promising.function
+        @classmethod
+        async def my_method(cls, value: int, *, prefix: str = "") -> str:
+            return f"{prefix}{cls.__name__}:{value}"
+
+    assert await MyClass.my_method(7) == "MyClass:7"
+    assert await MyClass.my_method(7, prefix=">>") == ">>MyClass:7"
+    assert await MyClass().my_method(7) == "MyClass:7"
+    assert await MyClass().my_method(7, prefix=">>") == ">>MyClass:7"
+
+
+async def test_promising_function_called_with_parens_on_static_and_class() -> None:
+    """
+    Smoke test: @promising.function() with empty parens (parameterized /
+    _decorator branch) above @staticmethod and @classmethod.  Calls from
+    the class and from an instance must both produce the correct result.
+    """
+
+    class MyClass:
+        @promising.function()
+        @staticmethod
+        async def static_add(a: int, b: int) -> int:
+            return a + b
+
+        @promising.function()
+        @classmethod
+        async def class_name(cls) -> str:
+            return cls.__name__
+
+    # staticmethod via class and instance
+    assert await MyClass.static_add(3, 4) == 7
+    assert await MyClass().static_add(3, 4) == 7
+
+    # classmethod via class and instance
+    assert await MyClass.class_name() == "MyClass"
+    assert await MyClass().class_name() == "MyClass"

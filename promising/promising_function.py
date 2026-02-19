@@ -109,6 +109,12 @@ class PromisingFunction(Generic[T_co]):
         if obj is not None and isinstance(self.__func__, types.FunctionType):
             # Regular instance method: bind the instance as the first argument.
             return types.MethodType(self, obj)
+        # Intentionally return unbound self for all remaining cases (e.g. when
+        # self.__func__ is a staticmethod object). This is safe because
+        # call() invokes self.__func__(*args, **kwargs) directly, and
+        # staticmethod objects are callable without going through the
+        # descriptor protocol since Python 3.10 (bpo-43682). No binding is
+        # required or desired here.
         return self
 
     def __call__(

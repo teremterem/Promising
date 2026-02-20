@@ -22,7 +22,7 @@ import promising
 # ── helpers ──────────────────────────────────────────────────
 
 
-def _get_promising_function(cls, name):
+def _get_promising_function(cls: type, name: str) -> promising.PromisingFunction:
     """
     Return the ``PromisingFunction`` instance for *name*
     from *cls.__dict__*, unwrapping ``classmethod`` /

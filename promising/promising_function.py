@@ -11,7 +11,7 @@ from promising.types import T_co
 def function(
     # TODO Split into two functions with the same name using @overload ?
     #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
-    func_or_method: Callable[..., T_co] | None = None,
+    func_or_method: Callable[..., T_co] | types.MethodType | classmethod | staticmethod | None = None,
     *,
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon_by_default: bool | Sentinel = NOT_SET,
@@ -92,7 +92,7 @@ class PromisingFunction(Generic[T_co]):
 
     def __init__(
         self,
-        func_or_method: Callable[..., T_co],
+        func_or_method: Callable[..., T_co] | types.MethodType | classmethod | staticmethod,
         *,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,

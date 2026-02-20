@@ -83,7 +83,7 @@ def function(
 
 
 class PromisingFunction(Generic[T_co]):
-    __wrapped__: Callable[..., T_co] | staticmethod[Any, T_co] | classmethod[Any, Any, T_co] | types.MethodType
+    __wrapped__: Callable[..., T_co] | types.MethodType | classmethod | staticmethod
 
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls

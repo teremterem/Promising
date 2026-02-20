@@ -14,7 +14,7 @@ def function(
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon_by_default: bool | Sentinel = NOT_SET,
     everything_starts_soon_by_default: bool | Sentinel = INHERIT,
-) -> "PromisingFunction[T_co] | Callable[..., T_co]":
+) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
     TODO Finalize this docstring by explaining why we need the
      PromisingFunction wrapper at all. List the advantages it provides:
@@ -62,7 +62,7 @@ def function(
     if func_or_method is None:
         # The decorator was used with arguments
         # TODO Same thing about a comment for the return type as above
-        def _decorator(f_or_m: Callable[..., T_co]) -> "PromisingFunction[T_co] | Callable[..., T_co]":
+        def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
                 f_or_m,
                 start_soon=start_soon,

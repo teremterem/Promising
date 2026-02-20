@@ -54,14 +54,14 @@ async def test_instance_method_via_instance():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = obj.method(42)
         spy.assert_called_once_with(obj, 42)
-        assert spy.call_args[0] == (obj, 42)
         assert await result == 42
 
 
-async def test_instance_method_via_instance__no_decoration():
+async def test_instance_method_via_instance__not_decorated():
     """
-    Instance method called on an instance: ``call()``
-    receives ``(instance, <user_arg>)``.
+    Instance method called on an instance (but promising.function
+    is applied to a method that is already bound to the instance):
+    ``call()`` receives ``(<user_arg>,)``.
     """
 
     class MyClass:
@@ -73,10 +73,9 @@ async def test_instance_method_via_instance__no_decoration():
 
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = pf(42)
-        # With this setup the object does not go through the PromisingFunction,
-        # it's already bound with the method
+        # With this setup the obj does not go through the
+        # PromisingFunction, it's already bound with the method
         spy.assert_called_once_with(42)
-        assert spy.call_args[0] == (42,)
         assert await result == 42
 
 
@@ -100,7 +99,6 @@ async def test_classmethod_via_class__classmethod_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass.method(42)
         spy.assert_called_once_with(MyClass, 42)
-        assert spy.call_args[0] == (MyClass, 42)
         assert await result == 42
 
 
@@ -121,7 +119,6 @@ async def test_classmethod_via_class__promising_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass.method(42)
         spy.assert_called_once_with(MyClass, 42)
-        assert spy.call_args[0] == (MyClass, 42)
         assert await result == 42
 
 
@@ -142,7 +139,6 @@ async def test_classmethod_via_instance__classmethod_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass().method(42)
         spy.assert_called_once_with(MyClass, 42)
-        assert spy.call_args[0] == (MyClass, 42)
         assert await result == 42
 
 
@@ -163,7 +159,6 @@ async def test_classmethod_via_instance__promising_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass().method(42)
         spy.assert_called_once_with(MyClass, 42)
-        assert spy.call_args[0] == (MyClass, 42)
         assert await result == 42
 
 
@@ -187,7 +182,6 @@ async def test_staticmethod_via_class__staticmethod_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass.method(42)
         spy.assert_called_once_with(42)
-        assert spy.call_args[0] == (42,)
         assert await result == 42
 
 
@@ -208,7 +202,6 @@ async def test_staticmethod_via_instance__staticmethod_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass().method(42)
         spy.assert_called_once_with(42)
-        assert spy.call_args[0] == (42,)
         assert await result == 42
 
 
@@ -229,7 +222,6 @@ async def test_staticmethod_via_class__promising_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass.method(42)
         spy.assert_called_once_with(42)
-        assert spy.call_args[0] == (42,)
         assert await result == 42
 
 
@@ -250,5 +242,4 @@ async def test_staticmethod_via_instance__promising_on_top():
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass().method(42)
         spy.assert_called_once_with(42)
-        assert spy.call_args[0] == (42,)
         assert await result == 42

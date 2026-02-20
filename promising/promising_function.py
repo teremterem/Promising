@@ -5,13 +5,13 @@ from typing import Any, Generic
 
 from promising.promise import Promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
-from promising.types import T_co
+from promising.types import DecoratableFunctionType, T_co
 
 
 def function(
     # TODO Split into two functions with the same name using @overload ?
     #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
-    func_or_method: Callable[..., T_co] | types.MethodType | classmethod | staticmethod | None = None,
+    func_or_method: DecoratableFunctionType | None = None,
     *,
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon_by_default: bool | Sentinel = NOT_SET,
@@ -85,14 +85,14 @@ def function(
 
 
 class PromisingFunction(Generic[T_co]):
-    __wrapped__: Callable[..., T_co] | types.MethodType | classmethod | staticmethod
+    __wrapped__: DecoratableFunctionType
 
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls
 
     def __init__(
         self,
-        func_or_method: Callable[..., T_co] | types.MethodType | classmethod | staticmethod,
+        func_or_method: DecoratableFunctionType,
         *,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,

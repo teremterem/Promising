@@ -83,7 +83,7 @@ def function(
 
 
 class PromisingFunction(Generic[T_co]):
-    __func__: Callable[..., T_co]
+    __wrapped__: Callable[..., T_co]
 
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls

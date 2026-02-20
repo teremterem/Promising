@@ -9,6 +9,8 @@ from promising.types import T_co
 
 
 def function(
+    # TODO Split into two functions with the same name using @overload ?
+    #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
     func_or_method: Callable[..., T_co] | None = None,
     *,
     start_soon: bool | Sentinel = NOT_SET,

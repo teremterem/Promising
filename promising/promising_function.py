@@ -31,32 +31,6 @@ def function(
     - All these interactions are stored/storable in graph databases, or any
       other kinds of databases or caches that can handle the data structures.
     """
-    # TODO Will @classmethod decoration ordering matter for the way caching
-    #  works in PromisingFunction ?
-    #
-    #    @classmethod
-    #    @promising.function
-    #
-    #  versus
-    #
-    #    @promising.function
-    #    @classmethod
-    #
-    #  Inspect the following things in PromisingFunction.__call__:
-    #
-    #  - How instance is passed through __call__ when regular instance method
-    #    is called (shouldn't be passed through __call__)
-    #  - How class is passed through __call__ to classmethod
-    #  - The same but with decorators in reverse order
-    #  - The same but when classmethod is called via an instance
-    #  - The same but when classmethod is called via an instance AND decorators
-    #    are in reverse order
-    #  - What goes through when staticmethod is called on a class
-    #  - What goes through when staticmethod is called via an instance
-    #
-    #  Do it via tests ? Allow passing in a custom function class to this
-    #  decorator or just call PromisingFunction directly in those tests ?
-
     # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
     #  resolve postponed type hints correctly, when you implement input params
     #  as Promises.

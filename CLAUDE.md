@@ -16,7 +16,7 @@ pytest
 pytest tests/promise/test_concurrent_future.py
 
 # Run a single test function
-pytest tests/promising_function/test_promising_function.py::test_decorator_bare
+pytest tests/promising_function/test_promising_function.py::test_calling_promising_function_returns_promise
 
 # Run tests with coverage
 pytest --cov=promising
@@ -34,7 +34,7 @@ pre-commit run --all-files
 uv sync --all-extras
 ```
 
-Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Tests run in parallel by default via pytest-xdist (`-n auto`); use `-n0` to disable parallelism for debugging. Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_function/`).
+Note: Tests use `pytest-asyncio` in auto mode - all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`); use `-n0` to disable parallelism for debugging. Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_function/`).
 
 ## Architecture
 
@@ -44,11 +44,13 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 - `Promise[T]` (`promising/promise.py`) - Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_create_task()` (if `start_soon`) → `_afulfill()` (activates context, runs coro, waits for children, sets result) → `_afinalize()` (resets context). Also contains `_PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`. Configuration is handled directly on Promise via `start_soon`, `children_start_soon_by_default`, and `everything_starts_soon_by_default` parameters, which are either set to concrete boolean values or use sentinels (`INHERIT`, `NOT_SET`, `GLOBAL_DEFAULT`) to control inheritance from parent Promises.
 
-- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`. Works with instance methods, `@classmethod`, and `@staticmethod` (decorator order doesn't matter — `@promising.function` can go above or below `@classmethod`/`@staticmethod`). Implements the descriptor protocol (`__get__`) to correctly bind `self`/`cls`. Accepts `start_soon`, `children_start_soon_by_default`, and `everything_starts_soon_by_default` config, which are forwarded to the created Promise.
+- `PromisingFunction` (`promising/promising_function.py`) - Decorator/wrapper that turns async functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`. Works with instance methods, `@classmethod`, and `@staticmethod` (decorator order doesn't matter — `@promising.function` can go above or below `@classmethod`/`@staticmethod`). Implements the descriptor protocol (`__get__`) to correctly bind `self`/`cls`. Accepts `start_soon`, `children_start_soon_by_default`, and `everything_starts_soon_by_default` config, which are forwarded to the created Promise. These three config params can also be passed as keyword arguments **at call time** (e.g. `my_func(arg, start_soon=False)`) to override the `PromisingFunction`-level defaults for that specific call; note that even passing `NOT_SET` explicitly at call time overrides the constructor value.
 
 **Sentinel pattern:** `NOT_SET`, `INHERIT`, and `GLOBAL_DEFAULT` in `sentinels.py` raise on boolean coercion to prevent misuse. `NOT_SET` means "unset / no enforcement", `INHERIT` means "inherit from parent", `GLOBAL_DEFAULT` means "read the current global setting directly".
 
 **Configuration:** `start_soon` determines whether a Promise starts executing immediately upon creation (or at the nearest available event loop window) or defers until awaited. `children_start_soon_by_default`, when set, enforces a `start_soon` default for child Promises. `everything_starts_soon_by_default` is a per-Promise local override (normally inherited by children, grandchildren, etc. as well) for the global `EVERYTHING_STARTS_SOON_BY_DEFAULT`. The global `EVERYTHING_STARTS_SOON_BY_DEFAULT` is set to `True`, although it can be changed via `promising.EVERYTHING_STARTS_SOON_BY_DEFAULT = False`. For the detailed inheritance logic of these parameters and their sentinel values, see the `Promise` class docstring.
+
+**Key Promise methods:** `await_remaining_children()` — called inside a parent coroutine to wait for all child Promises before the parent resolves (otherwise children run concurrently and may outlive the parent). `as_concurrent_future()` — returns a thread-safe `concurrent.futures.Future` view of the Promise, allowing it to be used from non-async threads.
 
 **Public API:** Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The decorator is `promising.function` — usable as `@promising.function()` with config args or `@promising.function` bare.
 
@@ -64,4 +66,5 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 - Line length for all the code: 119 characters (Ruff)
 - Line length for docstrings and comments specifically: 80 characters (to make them easily readable even when they are put in markdown blocks for documentation)
 - Python version: 3.10+
-- Pre-commit hooks enforce: trailing whitespace, YAML validation, Ruff formatting and linting
+- Pre-commit hooks enforce: trailing whitespace, end-of-file newline, YAML validation, Ruff linting (with `--fix`) and formatting
+- There is no CI/CD — pre-commit is the main automated gate

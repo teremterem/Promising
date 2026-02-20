@@ -83,7 +83,7 @@ def function(
 
 
 class PromisingFunction(Generic[T_co]):
-    __wrapped__: Callable[..., T_co]
+    __wrapped__: Callable[..., T_co] | staticmethod[Any, T_co] | classmethod[Any, Any, T_co] | types.MethodType
 
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls
@@ -141,9 +141,10 @@ class PromisingFunction(Generic[T_co]):
         # TODO Support synchronous functions too. (How to identify them without
         #  trying to get the coroutine, thought ?)
         if isinstance(self.__wrapped__, classmethod):
-            # __func__ is a classmethod object; args[0] is the class, already
-            # prepended by MethodType in __get__. classmethod objects are not
-            # directly callable, so we reach through to the underlying function.
+            # self.__wrapped__ is a classmethod object; args[0] is the class,
+            # already prepended by MethodType in __get__. classmethod objects
+            # are not directly callable, so we reach through to the underlying
+            # function.
             coro = self.__wrapped__.__func__(*args, **kwargs)
         else:
             coro = self.__wrapped__(*args, **kwargs)

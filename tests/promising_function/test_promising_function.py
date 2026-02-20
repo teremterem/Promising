@@ -187,7 +187,7 @@ async def test_used_as_direct_call() -> None:
 
 async def test_preserves_original_func() -> None:
     """
-    decorated.__func__ is the original function passed
+    decorated.__wrapped__ is the original function passed
     to the decorator.
     """
 
@@ -195,7 +195,7 @@ async def test_preserves_original_func() -> None:
         return "preserved"
 
     decorated = promising.function(original)
-    assert decorated.__func__ is original
+    assert decorated.__wrapped__ is original
 
 
 # ── Edge Cases & Integration ─────────────────────────────────────

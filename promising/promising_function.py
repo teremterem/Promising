@@ -1,3 +1,4 @@
+import functools
 import types
 from collections.abc import Callable
 from typing import Any, Generic
@@ -95,23 +96,25 @@ class PromisingFunction(Generic[T_co]):
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
-        self.__func__ = func_or_method
+        # This will also set `self.__wrapped__` to `func_or_method`
+        functools.update_wrapper(self, func_or_method)
+
         self.start_soon = start_soon
         self.children_start_soon_by_default = children_start_soon_by_default
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        if isinstance(self.__func__, classmethod):
+        if isinstance(self.__wrapped__, classmethod):
             # Classmethod: bind the class as the first argument regardless of
             # whether the lookup is via the class or an instance.
             cls = objtype if obj is None else type(obj)
             return types.MethodType(self, cls)
-        if obj is not None and isinstance(self.__func__, types.FunctionType):
+        if obj is not None and isinstance(self.__wrapped__, types.FunctionType):
             # Regular instance method: bind the instance as the first argument.
             return types.MethodType(self, obj)
         # Intentionally return unbound self for all remaining cases (e.g. when
-        # self.__func__ is a staticmethod object). This is safe because
-        # call() invokes self.__func__(*args, **kwargs) directly, and
+        # self.__wrapped__ is a staticmethod object). This is safe because
+        # call() invokes self.__wrapped__(*args, **kwargs) directly, and
         # staticmethod objects are callable without going through the
         # descriptor protocol since Python 3.10 (bpo-43682). No binding is
         # required or desired here.
@@ -137,13 +140,13 @@ class PromisingFunction(Generic[T_co]):
         #  immutability
         # TODO Support synchronous functions too. (How to identify them without
         #  trying to get the coroutine, thought ?)
-        if isinstance(self.__func__, classmethod):
+        if isinstance(self.__wrapped__, classmethod):
             # __func__ is a classmethod object; args[0] is the class, already
             # prepended by MethodType in __get__. classmethod objects are not
             # directly callable, so we reach through to the underlying function.
-            coro = self.__func__.__func__(*args, **kwargs)
+            coro = self.__wrapped__.__func__(*args, **kwargs)
         else:
-            coro = self.__func__(*args, **kwargs)
+            coro = self.__wrapped__(*args, **kwargs)
 
         return Promise[T_co](
             coro=coro,

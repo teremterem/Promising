@@ -25,7 +25,7 @@ def function(
     - Returned Promises can be awaited any number of times without
       re-executing the function.
     - TODO Should input parameters always be passed as promises as well ?
-       All of them ? Only those, that were typehinted as `Promise` explicitly ?
+       All of them ? Only those, that were typed as `Promise` explicitly ?
     - Both, input parameters and results are strictly serializable and are
       serialized/deserialized in transit
     - All these interactions are stored/storable in graph databases, or any
@@ -101,9 +101,6 @@ class PromisingFunction(Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # TODO Add start_soon and children_start_soon_by_default parameters
-        #  here too. They should take precedence over the ones
-        #  passed to the PromisingFunction constructor.
         return self.call(*args, **kwargs)
 
     def call(
@@ -127,7 +124,21 @@ class PromisingFunction(Generic[T_co]):
 
         return Promise[T_co](
             coro=coro,
-            start_soon=self.start_soon,
-            children_start_soon_by_default=self.children_start_soon_by_default,
-            everything_starts_soon_by_default=self.everything_starts_soon_by_default,
+            # Allow overriding the start_soon, children_start_soon_by_default,
+            # and everything_starts_soon_by_default parameters from the
+            # PromisingFunction constructor by passing them as keyword arguments
+            # to the call() method.
+            # TODO Add info about this to a docstring (class docstring ?)
+            start_soon=kwargs.get(
+                "start_soon",
+                self.start_soon,
+            ),
+            children_start_soon_by_default=kwargs.get(
+                "children_start_soon_by_default",
+                self.children_start_soon_by_default,
+            ),
+            everything_starts_soon_by_default=kwargs.get(
+                "everything_starts_soon_by_default",
+                self.everything_starts_soon_by_default,
+            ),
         )

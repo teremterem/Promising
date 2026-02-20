@@ -185,26 +185,6 @@ async def test_staticmethod_via_class__staticmethod_on_top():
         assert await result == 42
 
 
-async def test_staticmethod_via_instance__staticmethod_on_top():
-    """
-    ``@staticmethod`` on top, called via an instance:
-    ``call()`` receives ``(<user_arg>,)`` only.
-    """
-
-    class MyClass:
-        @staticmethod
-        @promising.function
-        async def method(x: int) -> int:
-            return x
-
-    pf = _get_promising_function(MyClass, "method")
-
-    with patch.object(pf, "call", wraps=pf.call) as spy:
-        result = MyClass().method(42)
-        spy.assert_called_once_with(42)
-        assert await result == 42
-
-
 async def test_staticmethod_via_class__promising_on_top():
     """
     ``@promising.function`` on top, called via the class:
@@ -221,6 +201,26 @@ async def test_staticmethod_via_class__promising_on_top():
 
     with patch.object(pf, "call", wraps=pf.call) as spy:
         result = MyClass.method(42)
+        spy.assert_called_once_with(42)
+        assert await result == 42
+
+
+async def test_staticmethod_via_instance__staticmethod_on_top():
+    """
+    ``@staticmethod`` on top, called via an instance:
+    ``call()`` receives ``(<user_arg>,)`` only.
+    """
+
+    class MyClass:
+        @staticmethod
+        @promising.function
+        async def method(x: int) -> int:
+            return x
+
+    pf = _get_promising_function(MyClass, "method")
+
+    with patch.object(pf, "call", wraps=pf.call) as spy:
+        result = MyClass().method(42)
         spy.assert_called_once_with(42)
         assert await result == 42
 

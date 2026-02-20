@@ -50,11 +50,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 **Configuration:** `start_soon` determines whether a Promise starts executing immediately upon creation (or at the nearest available event loop window) or defers until awaited. `children_start_soon_by_default`, when set, enforces a `start_soon` default for child Promises. `everything_starts_soon_by_default` is a per-Promise local override (normally inherited by children, grandchildren, etc. as well) for the global `EVERYTHING_STARTS_SOON_BY_DEFAULT`. The global `EVERYTHING_STARTS_SOON_BY_DEFAULT` is set to `True`, although it can be changed via `promising.EVERYTHING_STARTS_SOON_BY_DEFAULT = False`. For the detailed inheritance logic of these parameters and their sentinel values, see the `Promise` class docstring.
 
-**Public API** (exported from `promising/__init__.py`):
-- `Promise`, `PromisingFunction`, `function`, `get_current_promise()`
-- `INHERIT`, `NOT_SET`, `Sentinel` - sentinel values
-- `EVERYTHING_STARTS_SOON_BY_DEFAULT`, `should_everything_start_soon_by_default()` - global default control
-- `function()` is the decorator: use as `@promising.function()` with config args or `@promising.function` bare.
+**Public API:** Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The decorator is `promising.function` — usable as `@promising.function()` with config args or `@promising.function` bare.
 
 **Error classes** (`promising/errors.py`):
 - `BasePromisingError`, `PromiseError` - base classes

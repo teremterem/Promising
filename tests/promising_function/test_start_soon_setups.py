@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 import promising
-from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 
 @pytest.mark.parametrize("everything_starts_soon_by_default", [True, False, INHERIT, GLOBAL_DEFAULT])

@@ -480,6 +480,13 @@ async def test_parallel_await(*, start_soon: bool | None) -> None:
     tasks = [asyncio.create_task(await_promise_task()) for _ in range(5)]
     results = await asyncio.gather(*tasks)
 
+    assert promise.result() == "Hello from Promise!"
+
+    # A couple of additional, consecutive awaits of the same promise
+    assert await promise == "Hello from Promise!"
+    assert await promise == "Hello from Promise!"
+
+    # Check the results of the concurrent tasks
     assert all(r == "Hello from Promise!" for r in results)
 
     if start_soon is None:

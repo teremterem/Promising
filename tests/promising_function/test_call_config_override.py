@@ -166,7 +166,13 @@ async def test_config_kwargs_do_not_leak_into_function() -> None:
     async def add(a: int, b: int) -> int:
         return a + b
 
-    result = await add(3, 4, start_soon=True)
+    result = await add(
+        3,
+        4,
+        start_soon=True,
+        children_start_soon_by_default=True,
+        everything_starts_soon_by_default=True,
+    )
     assert result == 7
 
 

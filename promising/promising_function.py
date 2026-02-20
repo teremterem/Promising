@@ -74,6 +74,11 @@ class PromisingFunction(Generic[T_co]):
     ) -> None:
         # This will also set `self.__wrapped__` to `func_or_method`
         functools.update_wrapper(self, func_or_method)
+        # TODO Safeguard against the wrapped function accepting keyword
+        #  arguments that are reserved to configure the Promise
+        #  (`start_soon`, `children_start_soon_by_default`,
+        #  `everything_starts_soon_by_default`)
+        #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
 
         self.start_soon = start_soon
         self.children_start_soon_by_default = children_start_soon_by_default

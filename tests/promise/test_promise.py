@@ -422,6 +422,72 @@ async def test_from_concurrent_tasks(
         assert coro_call_count == 1
 
 
+@pytest.mark.parametrize("start_soon", [True, False, None])
+async def test_parallel_await(*, start_soon: bool | None) -> None:
+    """
+    Test that multiple concurrent tasks awaiting the same Promise
+    all receive the correct result while the underlying coroutine
+    executes exactly once.
+
+    Test Parameters:
+        start_soon: Controls Promise execution timing:
+            - True: Promise starts execution immediately upon
+              creation
+            - False: Promise delays execution until explicitly
+              awaited
+            - None: Creates a prefilled Promise (no coroutine
+              execution)
+
+    Test Flow:
+        1. Create a Promise based on start_soon parameter:
+           - If None: Create a prefilled Promise with
+             "Hello from Promise!"
+           - Otherwise: Create a Promise with a coroutine that
+             sleeps for 0.1s and returns "Hello from Promise!"
+
+        2. Launch 5 concurrent tasks, each directly awaiting the
+           same Promise
+
+        3. Gather all task results
+
+        4. Verify:
+           - All 5 tasks received the correct result
+           - The coroutine was called exactly once (or 0 times
+             if prefilled)
+
+    Key Scenario Tested:
+        - Multiple concurrent awaits of the same Promise do not
+          cause the coroutine to execute more than once
+    """
+
+    coro_call_count = 0
+
+    if start_soon is None:
+        promise = Promise(prefill_result="Hello from Promise!")
+    else:
+
+        async def sample_coro() -> str:
+            nonlocal coro_call_count
+            coro_call_count += 1
+            await asyncio.sleep(0.1)
+            return "Hello from Promise!"
+
+        promise = Promise(sample_coro(), start_soon=start_soon)
+
+    async def await_promise_task() -> str:
+        return await promise
+
+    tasks = [asyncio.create_task(await_promise_task()) for _ in range(5)]
+    results = await asyncio.gather(*tasks)
+
+    assert all(r == "Hello from Promise!" for r in results)
+
+    if start_soon is None:
+        assert coro_call_count == 0
+    else:
+        assert coro_call_count == 1
+
+
 def _promise_expected_incomplete(*, start_soon: bool | None, await_promise: bool | None) -> bool:
     """
     Return True when the promise is NOT expected to be done:

@@ -108,6 +108,29 @@ class PromisingFunction(Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
+        # Allow overriding the start_soon, children_start_soon_by_default,
+        # and everything_starts_soon_by_default parameters from the
+        # PromisingFunction constructor by passing them as keyword arguments
+        # to the call() method.
+        # TODO Add info about this to a docstring.
+        #  (Class docstring ? This method's docstring ?)
+        # TODO Mention that the only way NOT to override the parameters is NOT
+        #  to pass them into the call() method at all (passing NOT_SET will
+        #  still override the parameters from the PromisingFunction
+        #  constructor).
+        start_soon = kwargs.pop(
+            "start_soon",
+            self.start_soon,
+        )
+        children_start_soon_by_default = kwargs.pop(
+            "children_start_soon_by_default",
+            self.children_start_soon_by_default,
+        )
+        everything_starts_soon_by_default = kwargs.pop(
+            "everything_starts_soon_by_default",
+            self.everything_starts_soon_by_default,
+        )
+
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
@@ -124,21 +147,7 @@ class PromisingFunction(Generic[T_co]):
 
         return Promise[T_co](
             coro=coro,
-            # Allow overriding the start_soon, children_start_soon_by_default,
-            # and everything_starts_soon_by_default parameters from the
-            # PromisingFunction constructor by passing them as keyword arguments
-            # to the call() method.
-            # TODO Add info about this to a docstring (class docstring ?)
-            start_soon=kwargs.get(
-                "start_soon",
-                self.start_soon,
-            ),
-            children_start_soon_by_default=kwargs.get(
-                "children_start_soon_by_default",
-                self.children_start_soon_by_default,
-            ),
-            everything_starts_soon_by_default=kwargs.get(
-                "everything_starts_soon_by_default",
-                self.everything_starts_soon_by_default,
-            ),
+            start_soon=start_soon,
+            children_start_soon_by_default=children_start_soon_by_default,
+            everything_starts_soon_by_default=everything_starts_soon_by_default,
         )

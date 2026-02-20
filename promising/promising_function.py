@@ -31,13 +31,8 @@ def function(
     - All these interactions are stored/storable in graph databases, or any
       other kinds of databases or caches that can handle the data structures.
     """
-    # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
-    #  resolve postponed type hints correctly, when you implement input params
-    #  as Promises.
-
     if func_or_method is None:
         # The decorator was used with arguments
-        # TODO Same thing about a comment for the return type as above
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
                 f_or_m,
@@ -74,6 +69,9 @@ class PromisingFunction(Generic[T_co]):
     ) -> None:
         # This will also set `self.__wrapped__` to `func_or_method`
         functools.update_wrapper(self, func_or_method)
+        # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
+        #  resolve postponed type hints correctly, when you implement input params
+        #  as Promises.
         # TODO Safeguard against the wrapped function accepting keyword
         #  arguments that are reserved to configure the Promise
         #  (`start_soon`, `children_start_soon_by_default`,

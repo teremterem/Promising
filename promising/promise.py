@@ -194,9 +194,71 @@ class Promise(Future, Generic[T_co]):
                 "Use 'await promise' instead."
             )
 
+        # TODO TODO TODO I don't think this is thread-safe
         if self._task is None and not self.done():
             self._loop.call_soon_threadsafe(self._create_task)
         return self.as_concurrent_future().result()
+
+    def sync_remaining_children(self, *, return_exceptions: bool = False) -> list[Any]:
+        """
+        Synchronously wait for all pending child Promises
+        to finish, blocking the calling thread.
+
+        This is the synchronous counterpart of
+        ``await_remaining_children()`` — intended for use
+        inside sync promising functions that run in a thread
+        pool executor.
+
+        Args:
+            return_exceptions: If True, exceptions from
+                children are returned in the results list
+                instead of being raised.
+
+        Returns:
+            A list of results (and optionally exceptions)
+            from all pending child Promises.
+
+        Raises:
+            PromiseError: If called from the same thread as
+                the event loop, which would deadlock.
+        """
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop is self._loop:
+            raise PromiseError(
+                "promise.sync_remaining_children() cannot be "
+                "called from the event loop thread because it "
+                "would deadlock. Use "
+                "'await promise.await_remaining_children()' "
+                "instead."
+            )
+
+        children = list(self.get_pending_children())
+        for child in children:
+            # TODO TODO TODO I don't think this is thread-safe
+            if child._task is None and not child.done():
+                self._loop.call_soon_threadsafe(child._create_task)
+
+        results: list[Any] = []
+        for child in children:
+            try:
+                # TODO TODO TODO This way of mimicking
+                #  `await_remaining_children()` might be quite poor - I suspect
+                #  `gather()` will exit upon the FIRST occurred error, while
+                #  the code below will wait for each child consecutively, even
+                #  if some of them have already failed.
+                results.append(child.as_concurrent_future().result())
+            except BaseException as exc:
+                if return_exceptions:
+                    results.append(exc)
+                else:
+                    raise
+        # TODO TODO TODO Returning these results might not be effective if the
+        #  caller code does not know which specific promises were awaited
+        return results
 
     def _create_task(self) -> None:
         self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
@@ -402,6 +464,8 @@ class Promise(Future, Generic[T_co]):
         # TODO Ideally, a warning (or an optional exception ?) should be issued
         #  if any of the children are configured with start_soon=False, because
         #  that would make it quite easy to introduce deadlocks.
+        # TODO TODO TODO Returning these results might not be effective if the
+        #  caller code does not know which specific promises were awaited
         return await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
 
     def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:

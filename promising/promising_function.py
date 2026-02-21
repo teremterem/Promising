@@ -10,6 +10,7 @@ from promising.promise import Promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
+# TODO Allow overriding this executor in local promise configurations
 _sync_function_executor = ThreadPoolExecutor()
 
 

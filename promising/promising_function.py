@@ -12,6 +12,9 @@ from promising.types import DecoratableFunctionType, T_co
 
 # TODO Allow overriding this executor in local promise configurations
 _sync_function_executor = ThreadPoolExecutor()
+# TODO Do `loop.set_default_executor(...)` ?
+# TODO Don't maintain `_sync_function_executor` as a global variable at all ?
+#  Use the loop's default executor instead ?
 
 
 def function(

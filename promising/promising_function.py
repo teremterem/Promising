@@ -1,3 +1,4 @@
+import contextvars
 import functools
 import inspect
 import types
@@ -169,21 +170,25 @@ class PromisingFunction(Generic[T_co]):
                 # Get the event loop from the promise that is running this
                 # async function
                 loop = get_current_promise().get_loop()
+                # Copy the current context so that ContextVars
+                # (in particular Promise._current) are accessible
+                # inside the executor thread. This is needed because
+                # loop.run_in_executor() does not propagate context
+                # in Python < 3.12.
+                ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
-                    # TODO Put executor behind a backend that can be configured
-                    #  per promise tree
-                    # TODO What to do about potential deadlocks if recursive
-                    #  sync promises use up the executor's thread pool (when
-                    #  each such promise waits for its children to complete) ?
+                    # TODO Put executor behind a backend that can be
+                    #  configured per promise tree
+                    # TODO What to do about potential deadlocks if
+                    #  recursive sync promises use up the executor's
+                    #  thread pool (when each such promise waits for
+                    #  its children to complete) ?
                     _sync_function_executor,
-                    functools.partial(func, *args, **kwargs),
+                    functools.partial(ctx.run, func, *args, **kwargs),
                 )
 
             coro = _run_sync()
 
-        # TODO Make sure the parent promise is still accessible via the
-        #  respective ContextVar even when the promise is created in a sync
-        #  context
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,

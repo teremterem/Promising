@@ -172,9 +172,7 @@ class PromisingFunction(Generic[T_co]):
                 loop = get_current_promise().get_loop()
                 # Copy the current context so that ContextVars
                 # (in particular Promise._current) are accessible
-                # inside the executor thread. This is needed because
-                # loop.run_in_executor() does not propagate context
-                # in Python < 3.12.
+                # inside the executor thread
                 ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
                     # TODO Put executor behind a backend that can be

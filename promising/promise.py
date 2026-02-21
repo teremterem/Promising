@@ -1,7 +1,6 @@
 import asyncio
 import concurrent.futures
 import contextvars
-import functools
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
@@ -9,7 +8,7 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising.errors import NoCurrentPromiseError, NoParentPromiseError
+from promising.errors import NoCurrentPromiseError, NoParentPromiseError, PromiseError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
@@ -166,12 +165,37 @@ class Promise(Future, Generic[T_co]):
 
     def sync(self) -> T_co:
         """
-        TODO docstring
+        Synchronously wait for and return the Promise result,
+        blocking the calling thread.
+
+        This is the synchronous counterpart of
+        ``await promise`` — intended for use inside sync
+        promising functions that run in a thread pool
+        executor. It schedules the Promise's execution on
+        the event loop via ``call_soon_threadsafe`` and
+        blocks until the result (or exception) is available.
+
+        Returns:
+            The resolved value of the Promise.
+
+        Raises:
+            PromiseError: If called from the same thread as
+                the event loop, which would deadlock.
         """
-        # TODO Check if we are not in the same thread as the event loop,
-        #  and raise an error if we are
-        create_task = functools.partial(self._loop.create_task, name=self._name + "-Sync")
-        self._loop.call_soon_threadsafe(create_task, self)
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop is self._loop:
+            raise PromiseError(
+                "promise.sync() cannot be called from the "
+                "event loop thread because it would deadlock. "
+                "Use 'await promise' instead."
+            )
+
+        if self._task is None and not self.done():
+            self._loop.call_soon_threadsafe(self._create_task)
         return self.as_concurrent_future().result()
 
     def _create_task(self) -> None:

@@ -1,4 +1,3 @@
-import asyncio
 import functools
 import inspect
 import types
@@ -6,7 +5,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic
 
-from promising.promise import Promise
+from promising.promise import Promise, get_current_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
@@ -167,14 +166,24 @@ class PromisingFunction(Generic[T_co]):
                 func = self.__wrapped__
 
             async def _run_sync() -> T_co:
-                loop = asyncio.get_running_loop()
+                # Get the event loop from the promise that is running this
+                # async function
+                loop = get_current_promise().get_loop()
                 return await loop.run_in_executor(
+                    # TODO Put executor behind a backend that can be configured
+                    #  per promise tree
+                    # TODO What to do about potential deadlocks if recursive
+                    #  sync promises use up the executor's thread pool (when
+                    #  each such promise waits for its children to complete) ?
                     _sync_function_executor,
                     functools.partial(func, *args, **kwargs),
                 )
 
             coro = _run_sync()
 
+        # TODO Make sure the parent promise is still accessible via the
+        #  respective ContextVar even when the promise is created in a sync
+        #  context
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,

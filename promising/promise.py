@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import contextvars
+import functools
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
@@ -143,7 +144,6 @@ class Promise(Future, Generic[T_co]):
             if loop is None:
                 loop = self._parent._loop
             elif loop is not self._parent._loop:
-                # TODO Is this actually critical ?
                 raise ValueError("Parent and child Promises must share the same event loop")
 
         self._children: WeakSet[Promise[Any]] = WeakSet()
@@ -163,6 +163,16 @@ class Promise(Future, Generic[T_co]):
             prefill_result=prefill_result,
             prefill_exception=prefill_exception,
         )
+
+    def sync(self) -> T_co:
+        """
+        TODO docstring
+        """
+        # TODO Check if we are not in the same thread as the event loop,
+        #  and raise an error if we are
+        create_task = functools.partial(self._loop.create_task, name=self._name + "-Sync")
+        self._loop.call_soon_threadsafe(create_task, self)
+        return self.as_concurrent_future().result()
 
     def _create_task(self) -> None:
         self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")

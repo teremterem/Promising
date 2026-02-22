@@ -296,3 +296,51 @@ async def test_promise_await_remaining_children(*, await_remaining_children: boo
     # asyncio warnings about the child promise being not awaited (or being
     # cancelled).
     await child_promise
+
+
+@pytest.mark.parametrize("recursively", [True, False])
+async def test_promise_await_remaining_children_recursively(*, recursively: bool) -> None:
+    """
+    Parametrized over recursively={True, False}.
+    Three levels of nesting: root → child → grandchild → great-grandchild.
+    With True: await_remaining_children(recursively=True) is called on the
+    root, so every level completes before the root resolves.
+    With False: await_remaining_children(recursively=False) only waits for
+    direct children (child), so grandchild and great-grandchild may still
+    be running when the root resolves.
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def great_grandchild_func() -> str:
+        await asyncio.sleep(0.3)
+        execution_order.append("great_grandchild_done")
+        return "great_grandchild"
+
+    @promising.function
+    async def grandchild_func() -> str:
+        await asyncio.sleep(0.2)
+        great_grandchild_func()
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
+    async def child_func() -> str:
+        grandchild_func()
+        execution_order.append("child_done")
+        return "child"
+
+    @promising.function
+    async def root_func() -> str:
+        child_func()
+        await asyncio.sleep(0.1)
+        execution_order.append("root_coro_done")
+        await promising.get_current_promise().await_remaining_children(recursively=recursively)
+        return "root"
+
+    await root_func()
+
+    if recursively:
+        assert execution_order == ["child_done", "root_coro_done", "grandchild_done", "great_grandchild_done"]
+    else:
+        assert execution_order == ["child_done", "root_coro_done"]

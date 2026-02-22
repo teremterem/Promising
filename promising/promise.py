@@ -15,6 +15,8 @@ from promising.types import T_co
 _promise_name_counter = itertools.count(1)
 
 
+# TODO Come up with a better name for this function ? `get_this_promise()` ?
+#  `get_ongoing_promise()` ? `get_outer_promise()` ?
 def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     """
     Get the currently active Promise from context.
@@ -456,13 +458,26 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_remaining_children(self) -> None:
+    async def await_remaining_children(self, *, recursively: bool = False) -> None:
         """
         Wait for child Promises to finish.
+
+        Args:
+            recursively: If True, wait for all children of all children, and so
+                on, recursively.
         """
         # `return_exceptions` is set to True to make sure we wait for ALL the
         # remaining children, regardless of whether any of them fail or not.
-        await asyncio.gather(*self.get_pending_children(), return_exceptions=True)
+        p = self.get_pending_children()
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(p)
+        await asyncio.gather(*p, return_exceptions=True)
+        if recursively:
+            p = self.get_pending_children()
+            print(p)
+            for child in p:
+                await child.await_remaining_children(recursively=True)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # TODO Ideally, a warning (or an optional exception ?) should be issued
         #  if any of the remaining children are configured with start_soon=False,
         #  because that would make it quite easy to introduce deadlocks.
@@ -560,6 +575,8 @@ class Promise(Future, Generic[T_co]):
                 self._create_task()
 
 
+# TODO Make this class general purpose (a bridge between an asyncio Future and
+#  a concurrent Future)
 class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
     """
     A thread-safe concurrent.futures.Future backed by a Promise.

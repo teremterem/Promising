@@ -11,6 +11,7 @@ from weakref import WeakSet
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
+from promising.utils import AsyncioBackedConcurrentFuture
 
 _promise_name_counter = itertools.count(1)
 
@@ -160,7 +161,7 @@ class Promise(Future, Generic[T_co]):
         if self._parent is not None:
             self._parent._children.add(self)
 
-        self._concurrent_future = _PromiseBackedConcurrentFuture(self)
+        self._concurrent_future = AsyncioBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
 

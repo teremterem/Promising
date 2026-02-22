@@ -1,94 +1,103 @@
-class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
-    """
-    A thread-safe concurrent.futures.Future backed by a Promise.
+import asyncio
+import concurrent.futures
+from typing import Any
 
-    This class provides a bridge between asyncio-based Promises and the
-    concurrent.futures interface, allowing Promises to be used in
+
+class AsyncioBackedConcurrentFuture(concurrent.futures.Future):
+    """
+    A thread-safe concurrent.futures.Future backed by an asyncio Future.
+
+    This class provides a bridge between asyncio-based Futures and the
+    concurrent.futures interface, allowing asyncio Futures to be used in
     multi-threaded contexts while maintaining proper result/exception
     synchronization.
 
     Args:
-        promise: The Promise instance that backs this concurrent future.
+        asyncio_future: The asyncio Future instance that backs this concurrent
+            Future.
     """
 
-    def __init__(self, promise: "Promise[Any]") -> None:
+    def __init__(self, asyncio_future: asyncio.Future[Any]) -> None:
         super().__init__()
-        self._promise = promise
+        self._asyncio_future = asyncio_future
 
     def result(self, timeout: float | None = None) -> Any:
         """
-        Get the result of the Promise.
+        Get the result of the asyncio Future.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's result is properly consumed (asyncio will not issue
-        a warning about the Promise not having been awaited for).
+        This method blocks until the underlying asyncio Future is done and ensures
+        that the asyncio Future's result is properly consumed (asyncio will not issue
+        a warning about the asyncio Future not having been awaited for).
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The result value from the Promise.
+            The result value from the asyncio Future.
 
         Raises:
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
-            Exception: Any exception that occurred during Promise execution.
+            Exception: Any exception that occurred during asyncio Future execution.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set the
-            # result/exception on this concurrent Future)
+            # Let's block until the underlying asyncio Future is done (it will
+            # set the result/exception on this concurrent Future)
             result = super().result(timeout=timeout)
         finally:
-            # Let's also read the result from the Promise directly, so it knows
-            # that its result has been consumed and there is no need to issue a
-            # warning about the Promise not having been awaited for (which, by
-            # this point, would be done already)
+            # Let's also read the result from the asyncio Future directly, so
+            # it knows that its result has been consumed and there is no need
+            # to issue a warning about the asyncio Future not having been
+            # awaited for (which, by this point, would be done already)
             try:
-                self._promise.result()
+                self._asyncio_future.result()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here
                 pass
         # For consistency, let's return the result from this concurrent Future,
-        # even though it's going to be the same as the result from the Promise
+        # even though it's going to be the same as the result from the asyncio
+        # Future
         return result
 
     def exception(self, timeout: float | None = None) -> BaseException | None:
         """
-        Get the exception that occurred during Promise execution, if any.
+        Get the exception that occurred during asyncio Future execution, if
+        any.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's exception is properly consumed (asyncio will not
-        issue a warning about the exception not having been retrieved from the
-        Promise).
+        This method blocks until the underlying asyncio Future is done and
+        ensures that the asyncio Future's exception is properly consumed
+        (asyncio will not issue a warning about the exception not having
+        been retrieved from the asyncio Future).
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
 
         Returns:
-            The exception that occurred, or None if the Promise completed
-            successfully.
+            The exception that occurred, or None if the asyncio Future
+            completed successfully.
 
         Raises:
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set
-            # the result/exception on this concurrent Future)
+            # Let's block until the underlying asyncio Future is done (it will
+            # set the result/exception on this concurrent Future)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also read the exception from the Promise directly, so it
-            # knows that its exception has been consumed and there is no need
-            # to issue a warning about the exception never being retrieved from
-            # the Promise (which, by this point, would be done already)
+            # Let's also read the exception from the asyncio Future directly,
+            # so it knows that its exception has been consumed and there is no
+            # need to issue a warning about the exception never being retrieved
+            # from the asyncio Future (which, by this point, would be done
+            # already)
             try:
-                self._promise.exception()
+                self._asyncio_future.exception()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
                 pass
         # For consistency, let's return the exception from this concurrent
         # Future, even though it's going to be the same as the exception from
-        # the Promise
+        # the asyncio Future
         return exception

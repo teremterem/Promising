@@ -11,10 +11,14 @@ from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
 # TODO Allow overriding this executor in local promise configurations
-_sync_function_executor = ThreadPoolExecutor()
+# TODO What to do about potential deadlocks if recursive sync promises use up
+#  the executor's thread pool (when each such promise waits for its children to
+#  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
+#  and we need our own mechanism ? Or is it enough to issue a warning / throw
+#  an error when the number of nested sync function calls approaches this
+#  number ?
+_sync_function_executor = ThreadPoolExecutor(max_workers=128)
 # TODO Do `loop.set_default_executor(...)` ?
-# TODO Don't maintain `_sync_function_executor` as a global variable at all ?
-#  Use the loop's default executor instead ?
 
 
 def function(
@@ -175,12 +179,6 @@ class PromisingFunction(Generic[T_co]):
                 # inside the executor thread
                 ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
-                    # TODO Put executor behind a backend that can be
-                    #  configured per promise tree
-                    # TODO What to do about potential deadlocks if
-                    #  recursive sync promises use up the executor's
-                    #  thread pool (when each such promise waits for
-                    #  its children to complete) ?
                     _sync_function_executor,
                     functools.partial(ctx.run, func, *args, **kwargs),
                 )

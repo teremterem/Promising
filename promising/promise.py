@@ -456,17 +456,16 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_remaining_children(self, *, return_exceptions: bool = False) -> list[Any]:
+    async def await_remaining_children(self) -> None:
         """
         Wait for child Promises to finish.
         """
-        # TODO Make it possible to call this method from another thread
+        # `return_exceptions` is set to True to make sure we wait for ALL the
+        # remaining children, regardless of whether any of them fail or not.
+        await asyncio.gather(*self.get_pending_children(), return_exceptions=True)
         # TODO Ideally, a warning (or an optional exception ?) should be issued
-        #  if any of the children are configured with start_soon=False, because
-        #  that would make it quite easy to introduce deadlocks.
-        # TODO TODO TODO Returning these results might not be effective if the
-        #  caller code does not know which specific promises were awaited
-        return await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
+        #  if any of the remaining children are configured with start_soon=False,
+        #  because that would make it quite easy to introduce deadlocks.
 
     def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
         from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

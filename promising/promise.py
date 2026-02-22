@@ -15,8 +15,6 @@ from promising.types import T_co
 _promise_name_counter = itertools.count(1)
 
 
-# TODO Come up with a better name for this function ? `get_this_promise()` ?
-#  `get_ongoing_promise()` ? `get_outer_promise()` ?
 def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     """
     Get the currently active Promise from context.
@@ -34,6 +32,17 @@ def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
             is True.
     """
     return Promise.get_current(raise_if_none=raise_if_none)
+
+
+async def await_children(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
+    """
+    return await Promise.get_current(raise_if_none=True).await_children(recursively=recursively)
 
 
 class Promise(Future, Generic[T_co]):
@@ -147,7 +156,7 @@ class Promise(Future, Generic[T_co]):
             elif loop is not self._parent._loop:
                 raise ValueError("Parent and child Promises must share the same event loop")
 
-        self._children: WeakSet[Promise[Any]] = WeakSet()
+        self._children: WeakSet[Promise[Any]] = WeakSet[Promise[Any]]()
         if self._parent is not None:
             self._parent._children.add(self)
 
@@ -207,7 +216,7 @@ class Promise(Future, Generic[T_co]):
         to finish, blocking the calling thread.
 
         This is the synchronous counterpart of
-        ``await_remaining_children()`` — intended for use
+        ``await_children()`` — intended for use
         inside sync promising functions that run in a thread
         pool executor.
 
@@ -233,12 +242,11 @@ class Promise(Future, Generic[T_co]):
             raise SyncPromiseUsageError(
                 "promise.sync_remaining_children() cannot be "
                 "called from the event loop thread because it "
-                "would deadlock. Use "
-                "'await promise.await_remaining_children()' "
-                "instead."
+                "would deadlock. Use 'await promise.await_children()' "
+                "or 'await promising.await_children()' instead."
             )
 
-        children = list(self.get_pending_children())
+        children = list[Promise[Any]](self.get_still_existing_children())
         for child in children:
             # TODO TODO TODO I don't think this is thread-safe
             if child._task is None and not child.done():
@@ -248,7 +256,7 @@ class Promise(Future, Generic[T_co]):
         for child in children:
             try:
                 # TODO TODO TODO This way of mimicking
-                #  `await_remaining_children()` might be quite poor - I suspect
+                #  `await_children()` might be quite poor - I suspect
                 #  `gather()` will exit upon the FIRST occurred error, while
                 #  the code below will wait for each child consecutively, even
                 #  if some of them have already failed.
@@ -264,6 +272,7 @@ class Promise(Future, Generic[T_co]):
 
     def _create_task(self) -> None:
         self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+        self._task.__promise_backref = self
 
     def set_result(self, result: T_co) -> None:
         """
@@ -395,20 +404,25 @@ class Promise(Future, Generic[T_co]):
         """
         return self._name
 
-    def get_pending_children(self) -> set["Promise[Any]"]:
+    def get_still_existing_children(
+        self,
+        *,
+        recursively: bool = False,
+        exclude_done: bool = True,
+    ) -> set["Promise[Any]"]:
         """
-        Get child Promises that haven't completed yet (provided they are still
-        reachable and weren't garbage collected yet).
+        Get child Promises that weren't garbage collected and are still
+        reachable. Those would be the ones that are either still in progress
+        themselves, or have children of their own that are still in progress.
 
-        Handles potential race conditions when iterating over the WeakSet of
-        children by retrying if the set changes during iteration.
+        Args:
+            recursively: If True, return children of children, and so on
+                (in the same set).
+            exclude_done: If True, exclude child Promises that are done
+                (i.e. have a result or exception set).
 
         Returns:
-            Set of child Promises that are not done.
-
-        Raises:
-            RuntimeError: If unable to get a stable view of children after 1000
-                attempts.
+            Set of child Promises that are still existing.
         """
         # # COPIED FROM asyncio.tasks::all_tasks():
         # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
@@ -421,13 +435,27 @@ class Promise(Future, Generic[T_co]):
             try:
                 # In `asyncio.tasks` it was `_all_tasks` instead of
                 # `self._children`
-                children = list(self._children)
+                children = list[Promise[Any]](self._children)
             except RuntimeError:
                 i += 1
                 if i > 1000:  # noqa: PLR2004 (magic-value-comparison)
                     raise
+
             else:
-                return {child for child in children if not child.done()}
+                if exclude_done:
+                    result = {child for child in children if not child.done()}
+                else:
+                    result = set[Promise[Any]](children)
+
+                if recursively:
+                    # We are iterating over all the children, regardless of
+                    # the exclude_done setting, because some children that are
+                    # done might have children of their own that are still in
+                    # progress.
+                    for child in children:
+                        result.update(child.get_still_existing_children(recursively=True, exclude_done=exclude_done))
+
+                return result
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
@@ -458,7 +486,7 @@ class Promise(Future, Generic[T_co]):
         self._current.reset(self._previous_token)
         self._previous_token = None
 
-    async def await_remaining_children(self, *, recursively: bool = False) -> None:
+    async def await_children(self, *, recursively: bool = False) -> None:
         """
         Wait for child Promises to finish.
 
@@ -466,18 +494,20 @@ class Promise(Future, Generic[T_co]):
             recursively: If True, wait for all children of all children, and so
                 on, recursively.
         """
-        # `return_exceptions` is set to True to make sure we wait for ALL the
-        # remaining children, regardless of whether any of them fail or not.
-        p = self.get_pending_children()
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print(p)
-        await asyncio.gather(*p, return_exceptions=True)
-        if recursively:
-            p = self.get_pending_children()
-            print(p)
-            for child in p:
-                await child.await_remaining_children(recursively=True)
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        while children := self.get_still_existing_children(
+            recursively=recursively,
+            exclude_done=True,
+        ):
+            # The loop is needed because, in case of recursive awaiting, new
+            # children may be spawned by existing ones while the existing ones
+            # are being awaited
+            await asyncio.gather(
+                *children,
+                # `return_exceptions` is set to True to make sure we wait for ALL
+                # the children that are still in progress, regardless of whether
+                # any of them fail (we don't just wait until the first one fails)
+                return_exceptions=True,
+            )
         # TODO Ideally, a warning (or an optional exception ?) should be issued
         #  if any of the remaining children are configured with start_soon=False,
         #  because that would make it quite easy to introduce deadlocks.

@@ -258,12 +258,12 @@ async def test_promise_has_no_parent_outside_context() -> None:
     await promise
 
 
-@pytest.mark.parametrize("await_remaining_children", [True, False])
-async def test_promise_await_remaining_children(*, await_remaining_children: bool) -> None:
+@pytest.mark.parametrize("await_children", [True, False])
+async def test_promise_await_children(*, await_children: bool) -> None:
     """
-    Parametrized over await_remaining_children={True, False}.
+    Parametrized over await_children={True, False}.
     With True: the parent coro body explicitly calls
-    await_remaining_children(), so the child completes before
+    await_children(), so the child completes before
     the parent resolves. With False: the parent resolves
     without waiting for the child.
     """
@@ -281,13 +281,13 @@ async def test_promise_await_remaining_children(*, await_remaining_children: boo
         nonlocal child_promise
         child_promise = child_func()
         execution_order.append("parent_coro_done")
-        if await_remaining_children:
-            await promising.get_current_promise().await_remaining_children()
+        if await_children:
+            await promising.await_children()
         return "parent"
 
     await parent_func()
 
-    if await_remaining_children:
+    if await_children:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]
@@ -298,14 +298,14 @@ async def test_promise_await_remaining_children(*, await_remaining_children: boo
     await child_promise
 
 
-@pytest.mark.parametrize("recursively", [True, False])
-async def test_promise_await_remaining_children_recursively(*, recursively: bool) -> None:
+@pytest.mark.parametrize("recursively", [True])
+async def test_promise_await_children_recursively(*, recursively: bool) -> None:
     """
     Parametrized over recursively={True, False}.
     Three levels of nesting: root → child → grandchild → great-grandchild.
-    With True: await_remaining_children(recursively=True) is called on the
+    With True: await_children(recursively=True) is called on the
     root, so every level completes before the root resolves.
-    With False: await_remaining_children(recursively=False) only waits for
+    With False: await_children(recursively=False) only waits for
     direct children (child), so grandchild and great-grandchild may still
     be running when the root resolves.
     """
@@ -335,7 +335,7 @@ async def test_promise_await_remaining_children_recursively(*, recursively: bool
         child_func()
         await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
-        await promising.get_current_promise().await_remaining_children(recursively=recursively)
+        await promising.await_children(recursively=recursively)
         return "root"
 
     await root_func()

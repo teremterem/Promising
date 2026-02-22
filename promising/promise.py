@@ -46,6 +46,13 @@ async def await_children(*, recursively: bool = False) -> None:
     return await Promise.get_current(raise_if_none=True).await_children(recursively=recursively)
 
 
+async def await_children_sync(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish, blocking the calling thread.
+    """
+    return await Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
+
+
 class Promise(Future, Generic[T_co]):
     """
     A Promise combines asyncio Future functionality with hierarchical context
@@ -209,29 +216,7 @@ class Promise(Future, Generic[T_co]):
         self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 
-    def await_children_sync(self, *, return_exceptions: bool = False) -> list[Any]:
-        """
-        Synchronously wait for all pending child Promises
-        to finish, blocking the calling thread.
-
-        This is the synchronous counterpart of
-        ``await_children()`` — intended for use
-        inside sync promising functions that run in a thread
-        pool executor.
-
-        Args:
-            return_exceptions: If True, exceptions from
-                children are returned in the results list
-                instead of being raised.
-
-        Returns:
-            A list of results (and optionally exceptions)
-            from all pending child Promises.
-
-        Raises:
-            SyncPromiseUsageError: If called from the same thread as
-                the event loop, which would deadlock.
-        """
+    def await_children_sync(self, *, recursively: bool = False) -> None:
         try:
             running_loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -245,27 +230,21 @@ class Promise(Future, Generic[T_co]):
                 "or 'await promising.await_children()' instead."
             )
 
-        children = list[Promise[Any]](self.get_still_existing_children())
-        for child in children:
-            self._loop.call_soon_threadsafe(child._ensure_task_scheduled)
+        concurrent_future = concurrent.futures.Future[None]()
 
-        results: list[Any] = []
-        for child in children:
+        async def await_children_and_notify():
             try:
-                # TODO TODO TODO This way of mimicking
-                #  `await_children()` might be quite poor - I suspect
-                #  `gather()` will exit upon the FIRST occurred error, while
-                #  the code below will wait for each child consecutively, even
-                #  if some of them have already failed.
-                results.append(child.as_concurrent_future().result())
-            except BaseException as exc:
-                if return_exceptions:
-                    results.append(exc)
-                else:
-                    raise
-        # TODO TODO TODO Returning these results might not be effective if the
-        #  caller code does not know which specific promises were awaited
-        return results
+                await self.await_children(recursively=recursively)
+            except BaseException as exc:  # noqa: BLE001 (blind-except)
+                concurrent_future.set_exception(exc)
+            else:
+                concurrent_future.set_result(None)
+
+        def schedule_await_children():
+            self._loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
+
+        self._loop.call_soon_threadsafe(schedule_await_children)
+        return concurrent_future.result()
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():

@@ -271,7 +271,7 @@ class Promise(Future, Generic[T_co]):
         return results
 
     def _create_task(self) -> None:
-        self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+        self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
 
     def set_result(self, result: T_co) -> None:
         """
@@ -301,7 +301,7 @@ class Promise(Future, Generic[T_co]):
         super().set_exception(exception)
         self._concurrent_future.set_exception(exception)
 
-    async def _afulfill(self) -> None:
+    async def _fulfill(self) -> None:
         """
         Execute the Promise's coroutine and manage its lifecycle.
 
@@ -330,7 +330,7 @@ class Promise(Future, Generic[T_co]):
             exception = exc
         finally:
             try:
-                await self._afinalize()
+                await self._finalize()
             finally:
                 if exception is not NOT_SET:
                     self.set_exception(exception)
@@ -340,7 +340,7 @@ class Promise(Future, Generic[T_co]):
     def __await__(self) -> Generator[Any, None, T_co]:
         """
         If the Promise hasn't started yet, start execution of the coro via
-        _afulfill() and run it to completion. If already started via
+        _fulfill() and run it to completion. If already started via
         start_soon, wait for the existing task to complete.
 
         Returns:
@@ -476,7 +476,7 @@ class Promise(Future, Generic[T_co]):
         """
         self._previous_token = self._current.set(self)
 
-    async def _afinalize(self) -> None:
+    async def _finalize(self) -> None:
         """
         Finalize the Promise execution by restoring context (removing this
         Promise from the context and restoring the previous value for the

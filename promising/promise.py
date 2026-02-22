@@ -210,7 +210,7 @@ class Promise(Future, Generic[T_co]):
             self._loop.call_soon_threadsafe(self._create_task)
         return self.as_concurrent_future().result()
 
-    def sync_remaining_children(self, *, return_exceptions: bool = False) -> list[Any]:
+    def await_children_sync(self, *, return_exceptions: bool = False) -> list[Any]:
         """
         Synchronously wait for all pending child Promises
         to finish, blocking the calling thread.
@@ -240,7 +240,7 @@ class Promise(Future, Generic[T_co]):
 
         if running_loop is self._loop:
             raise SyncPromiseUsageError(
-                "promise.sync_remaining_children() cannot be "
+                "promise.await_children_sync() cannot be "
                 "called from the event loop thread because it "
                 "would deadlock. Use 'await promise.await_children()' "
                 "or 'await promising.await_children()' instead."

@@ -50,7 +50,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 
 **Configuration:** `start_soon` determines whether a Promise starts executing immediately upon creation (or at the nearest available event loop window) or defers until awaited. `children_start_soon_by_default`, when set, enforces a `start_soon` default for child Promises. `everything_starts_soon_by_default` is a per-Promise local override (normally inherited by children, grandchildren, etc. as well) for the global `EVERYTHING_STARTS_SOON_BY_DEFAULT`. The global `EVERYTHING_STARTS_SOON_BY_DEFAULT` is set to `True`, although it can be changed via `promising.EVERYTHING_STARTS_SOON_BY_DEFAULT = False`. For the detailed inheritance logic of these parameters and their sentinel values, see the `Promise` class docstring.
 
-**Key Promise methods:** `await_children()` — can be called inside a parent coroutine to wait for all child Promises before the parent resolves (otherwise children run concurrently and may outlive the parent). `as_concurrent_future()` — returns a thread-safe `concurrent.futures.Future` view of the Promise, allowing it to be used from non-async threads. `sync()` — the synchronous counterpart of `await promise`, blocks the calling thread until the Promise resolves; intended for use inside sync promising functions running in a thread pool. `sync_remaining_children()` — the synchronous counterpart of `await_children()`. Both `sync()` and `sync_remaining_children()` guard against being called from the event loop thread (raises `SyncPromiseUsageError` to prevent deadlock).
+**Key Promise methods:** `await_children()` — can be called inside a parent coroutine to wait for all child Promises before the parent resolves (otherwise children run concurrently and may outlive the parent). `as_concurrent_future()` — returns a thread-safe `concurrent.futures.Future` view of the Promise, allowing it to be used from non-async threads. `sync()` — the synchronous counterpart of `await promise`, blocks the calling thread until the Promise resolves; intended for use inside sync promising functions running in a thread pool. `await_children_sync()` — the synchronous counterpart of `await_children()`. Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (raises `SyncPromiseUsageError` to prevent deadlock).
 
 **Public API:** Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The decorator is `promising.function` — usable as `@promising.function()` with config args or `@promising.function` bare.
 
@@ -58,7 +58,7 @@ Note: Tests use `pytest-asyncio` in auto mode - all async test functions are aut
 - `BasePromisingError` - base class
 - `NoCurrentPromiseError` - raised when `get_current_promise()` is called outside a Promise context
 - `NoParentPromiseError` - raised when a Promise has no parent
-- `SyncPromiseUsageError` - raised when `sync()` or `sync_remaining_children()` are called from the event loop thread
+- `SyncPromiseUsageError` - raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 **Example usage** (`examples/keyword_agent.py`): Shows idiomatic `@promising.function` decorator usage — decorate an async function, call it to get a `Promise`, await it for the result. Install example deps with `uv sync --extra examples`.
 

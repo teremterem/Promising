@@ -1,4 +1,4 @@
-"""Tests for Promise.sync_remaining_children()."""
+"""Tests for Promise.await_children_sync()."""
 
 import asyncio
 from typing import NoReturn
@@ -12,9 +12,9 @@ from promising.promise import Promise
 # ── Basic functionality ─────────────────────────────────────────
 
 
-async def test_sync_remaining_children_waits_for_all() -> None:
+async def test_await_children_sync_waits_for_all() -> None:
     """
-    sync_remaining_children() blocks until every pending
+    await_children_sync() blocks until every pending
     child Promise has resolved and returns their results.
     """
     execution_order: list[str] = []
@@ -31,14 +31,14 @@ async def test_sync_remaining_children_waits_for_all() -> None:
         # Yield to let children register
         await asyncio.sleep(0)  # TODO TODO TODO Why do we need this ?
         # Now switch to sync to wait for them
-        await asyncio.get_running_loop().run_in_executor(None, current.sync_remaining_children)
+        await asyncio.get_running_loop().run_in_executor(None, current.await_children_sync)
 
     parent = Promise(parent_coro(), start_soon=True)
     await parent
     assert sorted(execution_order) == ["a", "b"]
 
 
-async def test_sync_remaining_children_no_pending() -> None:
+async def test_await_children_sync_no_pending() -> None:
     """
     When there are no pending children, returns an empty
     list immediately.
@@ -46,17 +46,17 @@ async def test_sync_remaining_children_no_pending() -> None:
 
     async def parent_coro() -> list:
         current = promising.get_current_promise()
-        return await asyncio.get_running_loop().run_in_executor(None, current.sync_remaining_children)
+        return await asyncio.get_running_loop().run_in_executor(None, current.await_children_sync)
 
     parent = Promise(parent_coro(), start_soon=True)
     result = await parent
     assert result == []
 
 
-async def test_sync_remaining_children_starts_lazy_children() -> None:
+async def test_await_children_sync_starts_lazy_children() -> None:
     """
     Children created with start_soon=False are started by
-    sync_remaining_children() and waited for.
+    await_children_sync() and waited for.
     """
 
     async def child_coro() -> str:
@@ -65,7 +65,7 @@ async def test_sync_remaining_children_starts_lazy_children() -> None:
     async def parent_coro() -> list:
         current = promising.get_current_promise()
         Promise(child_coro(), start_soon=False)
-        return await asyncio.get_running_loop().run_in_executor(None, current.sync_remaining_children)
+        return await asyncio.get_running_loop().run_in_executor(None, current.await_children_sync)
 
     parent = Promise(parent_coro(), start_soon=True)
     results = await parent
@@ -75,7 +75,7 @@ async def test_sync_remaining_children_starts_lazy_children() -> None:
 # ── Exception handling ──────────────────────────────────────────
 
 
-async def test_sync_remaining_children_raises_child_exception() -> None:
+async def test_await_children_sync_raises_child_exception() -> None:
     """
     With return_exceptions=False (default), an exception
     from a child is raised.
@@ -88,14 +88,14 @@ async def test_sync_remaining_children_raises_child_exception() -> None:
     async def parent_coro() -> None:
         current = promising.get_current_promise()
         Promise(failing(), start_soon=True)
-        await asyncio.get_running_loop().run_in_executor(None, current.sync_remaining_children)
+        await asyncio.get_running_loop().run_in_executor(None, current.await_children_sync)
 
     parent = Promise(parent_coro(), start_soon=True)
     with pytest.raises(ValueError, match="child boom"):
         await parent
 
 
-async def test_sync_remaining_children_return_exceptions() -> None:
+async def test_await_children_sync_return_exceptions() -> None:
     """
     With return_exceptions=True, child exceptions appear
     in the results list instead of being raised.
@@ -115,7 +115,7 @@ async def test_sync_remaining_children_return_exceptions() -> None:
         Promise(failing(), start_soon=True)
         return await asyncio.get_running_loop().run_in_executor(
             None,
-            lambda: current.sync_remaining_children(return_exceptions=True),
+            lambda: current.await_children_sync(return_exceptions=True),
         )
 
     parent = Promise(parent_coro(), start_soon=True)
@@ -132,9 +132,9 @@ async def test_sync_remaining_children_return_exceptions() -> None:
 # ── Event loop thread guard ─────────────────────────────────────
 
 
-async def test_sync_remaining_children_raises_on_event_loop_thread() -> None:
+async def test_await_children_sync_raises_on_event_loop_thread() -> None:
     """
-    sync_remaining_children() raises SyncPromiseUsageError when
+    await_children_sync() raises SyncPromiseUsageError when
     called from the event loop thread.
     """
 
@@ -144,7 +144,7 @@ async def test_sync_remaining_children_raises_on_event_loop_thread() -> None:
     parent = Promise(coro(), start_soon=False)
 
     with pytest.raises(SyncPromiseUsageError, match="deadlock"):
-        parent.sync_remaining_children()
+        parent.await_children_sync()
 
     await parent
 
@@ -152,11 +152,11 @@ async def test_sync_remaining_children_raises_on_event_loop_thread() -> None:
 # ── Integration with sync promising functions ────────────────────
 
 
-async def test_sync_remaining_children_in_sync_promising_func() -> None:
+async def test_await_children_sync_in_sync_promising_func() -> None:
     """
     Primary use case: a sync promising function spawns
     async children and waits for them via
-    sync_remaining_children().
+    await_children_sync().
     """
 
     @promising.function
@@ -170,16 +170,16 @@ async def test_sync_remaining_children_in_sync_promising_func() -> None:
         async_child(1, start_soon=False)
         async_child(2, start_soon=False)
         async_child(3, start_soon=False)
-        return current.sync_remaining_children()
+        return current.await_children_sync()
 
     results = await sync_parent()
     assert sorted(results) == [10, 20, 30]
 
 
-async def test_sync_remaining_children_exception_in_sync_promising_func() -> None:
+async def test_await_children_sync_exception_in_sync_promising_func() -> None:
     """
     Exception from a child propagates through
-    sync_remaining_children() inside a sync promising
+    await_children_sync() inside a sync promising
     function.
     """
 
@@ -191,7 +191,7 @@ async def test_sync_remaining_children_exception_in_sync_promising_func() -> Non
     def sync_parent() -> list:
         current = promising.get_current_promise()
         failing_child(start_soon=False)
-        return current.sync_remaining_children()
+        return current.await_children_sync()
 
     with pytest.raises(RuntimeError, match="child error"):
         await sync_parent()

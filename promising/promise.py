@@ -206,9 +206,7 @@ class Promise(Future, Generic[T_co]):
                 "Use 'await promise' instead."
             )
 
-        # TODO TODO TODO I don't think this is thread-safe
-        if self._task is None and not self.done():
-            self._loop.call_soon_threadsafe(self._create_task)
+        self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 
     def await_children_sync(self, *, return_exceptions: bool = False) -> list[Any]:
@@ -249,9 +247,7 @@ class Promise(Future, Generic[T_co]):
 
         children = list[Promise[Any]](self.get_still_existing_children())
         for child in children:
-            # TODO TODO TODO I don't think this is thread-safe
-            if child._task is None and not child.done():
-                self._loop.call_soon_threadsafe(child._create_task)
+            self._loop.call_soon_threadsafe(child._ensure_task_scheduled)
 
         results: list[Any] = []
         for child in children:
@@ -271,8 +267,9 @@ class Promise(Future, Generic[T_co]):
         #  caller code does not know which specific promises were awaited
         return results
 
-    def _create_task(self) -> None:
-        self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
+    def _ensure_task_scheduled(self) -> None:
+        if self._task is None and not self.done():
+            self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
 
     def set_result(self, result: T_co) -> None:
         """
@@ -348,11 +345,12 @@ class Promise(Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
+        # TODO Ensure we are in the same thread as the Promise's event loop is
+        #  running
         if self.done():
             return self.result()
 
-        if self._task is None:
-            self._create_task()
+        self._ensure_task_scheduled()
 
         yield from self._task
         return (yield from super().__await__())
@@ -602,4 +600,7 @@ class Promise(Future, Generic[T_co]):
                 raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
 
             if self._start_soon:
-                self._create_task()
+                # We don't know which thread the Promise is created in, so we
+                # use `self._loop.call_soon_threadsafe` to "stay on the safe
+                # side"
+                self._loop.call_soon_threadsafe(self._ensure_task_scheduled)

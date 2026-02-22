@@ -272,7 +272,6 @@ class Promise(Future, Generic[T_co]):
 
     def _create_task(self) -> None:
         self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
-        self._task.__promise_backref = self
 
     def set_result(self, result: T_co) -> None:
         """

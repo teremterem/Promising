@@ -6,7 +6,7 @@ from typing import NoReturn
 import pytest
 
 import promising
-from promising.errors import PromiseError
+from promising.errors import SyncPromiseUsageError
 from promising.promise import Promise
 
 # ── Basic functionality ─────────────────────────────────────────
@@ -134,7 +134,7 @@ async def test_sync_remaining_children_return_exceptions() -> None:
 
 async def test_sync_remaining_children_raises_on_event_loop_thread() -> None:
     """
-    sync_remaining_children() raises PromiseError when
+    sync_remaining_children() raises SyncPromiseUsageError when
     called from the event loop thread.
     """
 
@@ -143,7 +143,7 @@ async def test_sync_remaining_children_raises_on_event_loop_thread() -> None:
 
     parent = Promise(coro(), start_soon=False)
 
-    with pytest.raises(PromiseError, match="deadlock"):
+    with pytest.raises(SyncPromiseUsageError, match="deadlock"):
         parent.sync_remaining_children()
 
     await parent

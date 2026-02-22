@@ -1,4 +1,4 @@
-from promising.errors import BasePromisingError, NoCurrentPromiseError, NoParentPromiseError, PromiseError
+from promising.errors import BasePromisingError, NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
 from promising.promise import Promise, get_current_promise
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
@@ -26,9 +26,9 @@ __all__ = [
     "NoCurrentPromiseError",
     "NoParentPromiseError",
     "Promise",
-    "PromiseError",
     "PromisingFunction",
     "Sentinel",
+    "SyncPromiseUsageError",
     "function",
     "get_current_promise",
     "should_everything_start_soon_by_default",

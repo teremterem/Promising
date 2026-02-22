@@ -8,7 +8,7 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising.errors import NoCurrentPromiseError, NoParentPromiseError, PromiseError
+from promising.errors import NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
@@ -179,7 +179,7 @@ class Promise(Future, Generic[T_co]):
             The resolved value of the Promise.
 
         Raises:
-            PromiseError: If called from the same thread as
+            SyncPromiseUsageError: If called from the same thread as
                 the event loop, which would deadlock.
         """
         try:
@@ -188,7 +188,7 @@ class Promise(Future, Generic[T_co]):
             running_loop = None
 
         if running_loop is self._loop:
-            raise PromiseError(
+            raise SyncPromiseUsageError(
                 "promise.sync() cannot be called from the "
                 "event loop thread because it would deadlock. "
                 "Use 'await promise' instead."
@@ -219,7 +219,7 @@ class Promise(Future, Generic[T_co]):
             from all pending child Promises.
 
         Raises:
-            PromiseError: If called from the same thread as
+            SyncPromiseUsageError: If called from the same thread as
                 the event loop, which would deadlock.
         """
         try:
@@ -228,7 +228,7 @@ class Promise(Future, Generic[T_co]):
             running_loop = None
 
         if running_loop is self._loop:
-            raise PromiseError(
+            raise SyncPromiseUsageError(
                 "promise.sync_remaining_children() cannot be "
                 "called from the event loop thread because it "
                 "would deadlock. Use "

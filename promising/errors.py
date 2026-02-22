@@ -2,13 +2,13 @@ class BasePromisingError(Exception):
     pass
 
 
-class PromiseError(BasePromisingError):
+class NoCurrentPromiseError(BasePromisingError):
     pass
 
 
-class NoCurrentPromiseError(PromiseError):
+class NoParentPromiseError(BasePromisingError):
     pass
 
 
-class NoParentPromiseError(PromiseError):
+class SyncPromiseUsageError(BasePromisingError):
     pass

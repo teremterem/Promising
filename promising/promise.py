@@ -302,12 +302,13 @@ class Promise(Future, Generic[T_co]):
         result = NOT_SET
         exception = NOT_SET
 
-        # Activate this Promise by setting it as the current context and store
-        # the previous context token for later restoration
-        self._previous_token = self._current.set(self)
-
         try:
+            # Activate this Promise by setting it as the current context and
+            # store the previous context token for later restoration
+            self._previous_token = self._current.set(self)
+
             result = await self._coro
+
         except BaseException as exc:  # noqa: BLE001 (blind-except)
             exception = exc
         finally:

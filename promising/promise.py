@@ -165,7 +165,7 @@ class Promise(Future, Generic[T_co]):
             elif loop is not self._parent._loop:
                 raise ValueError("Parent and child Promises must share the same event loop")
 
-        self._children: WeakSet[Promise[Any]] = WeakSet[Promise[Any]]()
+        self._children = WeakSet[Promise[Any]]()
         if self._parent is not None:
             self._parent._children.add(self)
 

@@ -46,11 +46,11 @@ async def await_children(*, recursively: bool = False) -> None:
     return await Promise.get_current(raise_if_none=True).await_children(recursively=recursively)
 
 
-async def await_children_sync(*, recursively: bool = False) -> None:
+def await_children_sync(*, recursively: bool = False) -> None:
     """
     Wait for all child Promises to finish, blocking the calling thread.
     """
-    return await Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
+    return Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
 
 
 class Promise(Future, Generic[T_co]):

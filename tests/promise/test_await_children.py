@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import pytest
 
@@ -6,7 +7,7 @@ import promising
 
 
 @pytest.mark.parametrize("await_children", [True, False])
-async def test_promise_await_children(*, await_children: bool) -> None:
+async def test_await_children(*, await_children: bool) -> None:
     """
     Parametrized over await_children={True, False}.
     With True: the parent coro body explicitly calls
@@ -46,7 +47,7 @@ async def test_promise_await_children(*, await_children: bool) -> None:
 
 
 @pytest.mark.parametrize("recursively", [True])
-async def test_promise_await_children_recursively(*, recursively: bool) -> None:
+async def test_await_children_recursively(*, recursively: bool) -> None:
     """
     Parametrized over recursively={True, False}.
     Three levels of nesting: root → child → grandchild → great-grandchild.
@@ -91,3 +92,58 @@ async def test_promise_await_children_recursively(*, recursively: bool) -> None:
         assert execution_order == ["child_done", "root_coro_done", "grandchild_done", "great_grandchild_done"]
     else:
         assert execution_order == ["child_done", "root_coro_done"]
+
+
+@pytest.mark.parametrize("recursively", [True])
+async def test_await_children_recursively_sync_children(
+    *,
+    recursively: bool,
+) -> None:
+    """
+    Same as test_await_children_recursively but only the
+    root is async — child, grandchild, and great-grandchild
+    are all sync promising functions running in thread pools.
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    def great_grandchild_func() -> str:
+        time.sleep(0.3)
+        execution_order.append("great_grandchild_done")
+        return "great_grandchild"
+
+    @promising.function
+    def grandchild_func() -> str:
+        time.sleep(0.2)
+        great_grandchild_func()
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
+    def child_func() -> str:
+        grandchild_func()
+        execution_order.append("child_done")
+        return "child"
+
+    @promising.function
+    async def root_func() -> str:
+        child_func()
+        await asyncio.sleep(0.1)
+        execution_order.append("root_coro_done")
+        await promising.await_children(recursively=recursively)
+        return "root"
+
+    await root_func()
+
+    if recursively:
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+            "grandchild_done",
+            "great_grandchild_done",
+        ]
+    else:
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+        ]

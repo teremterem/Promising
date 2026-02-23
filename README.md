@@ -87,6 +87,25 @@ Use `recursively=True` to wait for the entire subtree (children, grandchildren, 
 await promising.await_children(recursively=True)
 ```
 
+> **Note:** `await_children()` and `await_children_sync()` are purely for
+> timing/synchronization — they do **not** propagate child exceptions.
+> Internally they use `return_exceptions=True` so that all children are
+> awaited even when some fail, but the exceptions are discarded. To handle
+> errors from children, capture their `Promise` references and await them
+> directly:
+>
+> ```python
+> @promising.function
+> async def parent_task() -> str:
+>     a = child_task("a")
+>     b = child_task("b")
+>
+>     # Await each child to propagate its exceptions
+>     await a
+>     await b
+>     return "all done"
+> ```
+
 ## Sync Function Support
 
 `@promising.function` works on regular (non-async) functions too. They run in a thread pool while still participating in the Promise hierarchy:
@@ -244,10 +263,10 @@ promise = Promise(prefill_exception=ValueError("oops"))
 
 # Explicit parent (overrides automatic context-based detection)
 parent = Promise(prefill_result="parent")
-child = Promise(some_coro(), parent=parent)
+child = Promise(my_coro(), parent=parent)
 
 # No parent (opt out of automatic parent detection)
-orphan = Promise(some_coro(), parent=None)
+orphan = Promise(my_coro(), parent=None)
 ```
 
 ## Examples

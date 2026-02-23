@@ -8,7 +8,7 @@ from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
-from promising.errors import NoCurrentPromiseError, NoParentPromiseError
+from promising.errors import NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
@@ -32,6 +32,28 @@ def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
             is True.
     """
     return Promise.get_current(raise_if_none=raise_if_none)
+
+
+async def await_children(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
+    """
+    return await Promise.get_current(raise_if_none=True).await_children(recursively=recursively)
+
+
+def await_children_sync(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish, blocking the calling thread.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
+    """
+    return Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
 
 
 class Promise(Future, Generic[T_co]):
@@ -108,6 +130,8 @@ class Promise(Future, Generic[T_co]):
     # TODO Would it make sense to implement this get_state() method which would
     #  return either NOT_STARTED, STARTED, DONE or FAILED sentinels ? (Also,
     #  remember that at the very least, Future already has done() method.)
+    # TODO Order the methods in this class in a more useful manner
+    #  (do this after we spin off PromisingContext out of this class)
 
     def __init__(
         self,
@@ -143,19 +167,20 @@ class Promise(Future, Generic[T_co]):
             if loop is None:
                 loop = self._parent._loop
             elif loop is not self._parent._loop:
-                # TODO Is this actually critical ?
                 raise ValueError("Parent and child Promises must share the same event loop")
 
-        self._children: WeakSet[Promise[Any]] = WeakSet()
+        self._children = WeakSet[Promise[Any]]()
         if self._parent is not None:
             self._parent._children.add(self)
 
-        self._concurrent_future = _PromiseBackedConcurrentFuture(self)
+        self._concurrent_future = _AsyncioBackedConcurrentFuture(self)
 
         super().__init__(loop=loop)
 
         if name is None:
             name = f"Promise-{next(_promise_name_counter)}"
+        # TODO Implement custom __str__ and __repr__ methods and use this name
+        #  in them ?
         self._name = name
 
         self._coro = coro
@@ -164,8 +189,72 @@ class Promise(Future, Generic[T_co]):
             prefill_exception=prefill_exception,
         )
 
-    def _create_task(self) -> None:
-        self._task = self._loop.create_task(self._afulfill(), name=self._name + "-Task")
+    def sync(self) -> T_co:
+        """
+        Synchronously wait for and return the Promise result,
+        blocking the calling thread.
+
+        This is the synchronous counterpart of
+        ``await promise`` — intended for use inside sync
+        promising functions that run in a thread pool
+        executor. It schedules the Promise's execution on
+        the event loop via ``call_soon_threadsafe`` and
+        blocks until the result (or exception) is available.
+
+        Returns:
+            The resolved value of the Promise.
+
+        Raises:
+            SyncPromiseUsageError: If called from the same thread as
+                the event loop, which would deadlock.
+        """
+        self._assert_no_sync_usage_deadlock(
+            "`promise.sync()` cannot be called from the "
+            "event loop thread because it would deadlock. "
+            "Use `await promise` instead."
+        )
+
+        self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
+        return self.as_concurrent_future().result()
+
+    def await_children_sync(self, *, recursively: bool = False) -> None:
+        self._assert_no_sync_usage_deadlock(
+            "`await_children_sync()` cannot be called from the "
+            "event loop thread because it would deadlock. Use "
+            "`await promise.await_children()` or "
+            "`await promising.await_children()` instead."
+        )
+
+        concurrent_future = concurrent.futures.Future[None]()
+
+        async def await_children_and_notify() -> None:
+            try:
+                await self.await_children(recursively=recursively)
+            except BaseException as exc:  # noqa: BLE001 (blind-except)
+                concurrent_future.set_exception(exc)
+            else:
+                concurrent_future.set_result(None)
+
+        def schedule_await_children() -> None:
+            self._loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
+
+        self._loop.call_soon_threadsafe(schedule_await_children)
+        # Should any error happen in the underlying async `await_children`,
+        # the call below will re-raise it
+        concurrent_future.result()
+
+    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop is self._loop:
+            raise SyncPromiseUsageError(message)
+
+    def _ensure_task_scheduled(self) -> None:
+        if self._task is None and not self.done():
+            self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
 
     def set_result(self, result: T_co) -> None:
         """
@@ -195,7 +284,7 @@ class Promise(Future, Generic[T_co]):
         super().set_exception(exception)
         self._concurrent_future.set_exception(exception)
 
-    async def _afulfill(self) -> None:
+    async def _fulfill(self) -> None:
         """
         Execute the Promise's coroutine and manage its lifecycle.
 
@@ -217,14 +306,24 @@ class Promise(Future, Generic[T_co]):
         result = NOT_SET
         exception = NOT_SET
 
-        self._activate()
         try:
+            # Activate this Promise by setting it as the current context and
+            # store the previous context token for later restoration
+            self._previous_token = self._current.set(self)
+
             result = await self._coro
+
         except BaseException as exc:  # noqa: BLE001 (blind-except)
             exception = exc
         finally:
             try:
-                await self._afinalize()
+                # Finalize the Promise execution by restoring context
+                # (removing this Promise from the context and restoring the
+                # previous value for the respective context var)
+                if self._previous_token is not None:
+                    self._current.reset(self._previous_token)
+                    self._previous_token = None
+
             finally:
                 if exception is not NOT_SET:
                     self.set_exception(exception)
@@ -234,18 +333,19 @@ class Promise(Future, Generic[T_co]):
     def __await__(self) -> Generator[Any, None, T_co]:
         """
         If the Promise hasn't started yet, start execution of the coro via
-        _afulfill() and run it to completion. If already started via
+        _fulfill() and run it to completion. If already started via
         start_soon, wait for the existing task to complete.
 
         Returns:
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
+        # TODO Ensure we are in the same thread as the Promise's event loop is
+        #  running
         if self.done():
             return self.result()
 
-        if self._task is None:
-            self._create_task()
+        self._ensure_task_scheduled()
 
         yield from self._task
         return (yield from super().__await__())
@@ -297,20 +397,25 @@ class Promise(Future, Generic[T_co]):
         """
         return self._name
 
-    def get_pending_children(self) -> set["Promise[Any]"]:
+    def get_still_existing_children(
+        self,
+        *,
+        recursively: bool = False,
+        exclude_done: bool = True,
+    ) -> set["Promise[Any]"]:
         """
-        Get child Promises that haven't completed yet (provided they are still
-        reachable and weren't garbage collected yet).
+        Get child Promises that weren't garbage collected and are still
+        reachable. Those would be the ones that are either still in progress
+        themselves, or have children of their own that are still in progress.
 
-        Handles potential race conditions when iterating over the WeakSet of
-        children by retrying if the set changes during iteration.
+        Args:
+            recursively: If True, return children of children, and so on
+                (in the same set).
+            exclude_done: If True, exclude child Promises that are done
+                (i.e. have a result or exception set).
 
         Returns:
-            Set of child Promises that are not done.
-
-        Raises:
-            RuntimeError: If unable to get a stable view of children after 1000
-                attempts.
+            Set of child Promises that are still existing.
         """
         # # COPIED FROM asyncio.tasks::all_tasks():
         # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
@@ -323,13 +428,27 @@ class Promise(Future, Generic[T_co]):
             try:
                 # In `asyncio.tasks` it was `_all_tasks` instead of
                 # `self._children`
-                children = list(self._children)
+                children = list[Promise[Any]](self._children)
             except RuntimeError:
                 i += 1
                 if i > 1000:  # noqa: PLR2004 (magic-value-comparison)
                     raise
+
             else:
-                return {child for child in children if not child.done()}
+                if exclude_done:
+                    result = {child for child in children if not child.done()}
+                else:
+                    result = set[Promise[Any]](children)
+
+                if recursively:
+                    # We are iterating over all the children, regardless of
+                    # the exclude_done setting, because some children that are
+                    # done might have children of their own that are still in
+                    # progress.
+                    for child in children:
+                        result.update(child.get_still_existing_children(recursively=True, exclude_done=exclude_done))
+
+                return result
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
@@ -343,32 +462,33 @@ class Promise(Future, Generic[T_co]):
         """
         return self._concurrent_future
 
-    def _activate(self) -> None:
-        """
-        Activate this Promise by setting it as the current context.
-
-        Stores the previous context token for later restoration.
-        """
-        self._previous_token = self._current.set(self)
-
-    async def _afinalize(self) -> None:
-        """
-        Finalize the Promise execution by restoring context (removing this
-        Promise from the context and restoring the previous value for the
-        respective context var).
-        """
-        self._current.reset(self._previous_token)
-        self._previous_token = None
-
-    async def await_remaining_children(self, *, return_exceptions: bool = False) -> list[Any]:
+    async def await_children(self, *, recursively: bool = False) -> None:
         """
         Wait for child Promises to finish.
+
+        Args:
+            recursively: If True, wait for all children of all children, and so
+                on, recursively.
         """
-        # TODO Make it possible to call this method from another thread
+        while children := self.get_still_existing_children(
+            recursively=recursively,
+            exclude_done=True,
+        ):
+            # The loop is needed because, in case of recursive awaiting, new
+            # children may be spawned by existing ones while the existing ones
+            # are being awaited
+            await asyncio.gather(
+                *children,
+                # `return_exceptions` is set to True to make sure we wait for
+                # ALL the children that are still in progress, regardless of
+                # whether any of them fail (we don't just wait until the first
+                # one fails)
+                return_exceptions=True,
+            )
         # TODO Ideally, a warning (or an optional exception ?) should be issued
-        #  if any of the children are configured with start_soon=False, because
-        #  that would make it quite easy to introduce deadlocks.
-        return await asyncio.gather(*self.get_pending_children(), return_exceptions=return_exceptions)
+        #  if any of the remaining children are configured with
+        #  `start_soon=False`, because that would make it quite easy to
+        #  introduce deadlocks.
 
     def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
         from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
@@ -397,6 +517,9 @@ class Promise(Future, Generic[T_co]):
             # Concrete value was provided
             self._start_soon = start_soon
         elif start_soon is NOT_SET:
+            # TODO Should there be any reason or scenario when
+            #  `everything_starts_soon_by_default` takes precedence over the
+            #  parent's `children_start_soon_by_default` ?
             if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
                 # The parent is enforcing this setting for its children
                 self._start_soon = self._parent._children_start_soon_by_default
@@ -460,100 +583,107 @@ class Promise(Future, Generic[T_co]):
                 raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
 
             if self._start_soon:
-                self._create_task()
+                # We don't know which thread the Promise is created in, so we
+                # use `self._loop.call_soon_threadsafe` to "stay on the safe
+                # side"
+                self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
 
 
-class _PromiseBackedConcurrentFuture(concurrent.futures.Future):
+class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
     """
-    A thread-safe concurrent.futures.Future backed by a Promise.
+    A thread-safe concurrent.futures.Future backed by an asyncio Future.
 
-    This class provides a bridge between asyncio-based Promises and the
-    concurrent.futures interface, allowing Promises to be used in
+    This class provides a bridge between asyncio-based Futures and the
+    concurrent.futures interface, allowing asyncio Futures to be used in
     multi-threaded contexts while maintaining proper result/exception
     synchronization.
 
     Args:
-        promise: The Promise instance that backs this concurrent future.
+        asyncio_future: The asyncio Future instance that backs this concurrent
+            Future.
     """
 
-    def __init__(self, promise: "Promise[Any]") -> None:
+    def __init__(self, asyncio_future: asyncio.Future[Any]) -> None:
         super().__init__()
-        self._promise = promise
+        self._asyncio_future = asyncio_future
 
     def result(self, timeout: float | None = None) -> Any:
         """
-        Get the result of the Promise.
+        Get the result of the asyncio Future.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's result is properly consumed (asyncio will not issue
-        a warning about the Promise not having been awaited for).
+        This method blocks until the underlying asyncio Future is done and ensures
+        that the asyncio Future's result is properly consumed (asyncio will not issue
+        a warning about the asyncio Future not having been awaited for).
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The result value from the Promise.
+            The result value from the asyncio Future.
 
         Raises:
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
-            Exception: Any exception that occurred during Promise execution.
+            Exception: Any exception that occurred during asyncio Future execution.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set the
-            # result/exception on this concurrent Future)
+            # Let's block until the underlying asyncio Future is done (it will
+            # set the result/exception on this concurrent Future)
             result = super().result(timeout=timeout)
         finally:
-            # Let's also read the result from the Promise directly, so it knows
-            # that its result has been consumed and there is no need to issue a
-            # warning about the Promise not having been awaited for (which, by
-            # this point, would be done already)
+            # Let's also read the result from the asyncio Future directly, so
+            # it knows that its result has been consumed and there is no need
+            # to issue a warning about the asyncio Future not having been
+            # awaited for (which, by this point, would be done already)
             try:
-                self._promise.result()
+                self._asyncio_future.result()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here
                 pass
         # For consistency, let's return the result from this concurrent Future,
-        # even though it's going to be the same as the result from the Promise
+        # even though it's going to be the same as the result from the asyncio
+        # Future
         return result
 
     def exception(self, timeout: float | None = None) -> BaseException | None:
         """
-        Get the exception that occurred during Promise execution, if any.
+        Get the exception that occurred during asyncio Future execution, if
+        any.
 
-        This method blocks until the underlying Promise is done and ensures
-        that the Promise's exception is properly consumed (asyncio will not
-        issue a warning about the exception not having been retrieved from the
-        Promise).
+        This method blocks until the underlying asyncio Future is done and
+        ensures that the asyncio Future's exception is properly consumed
+        (asyncio will not issue a warning about the exception not having
+        been retrieved from the asyncio Future).
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
 
         Returns:
-            The exception that occurred, or None if the Promise completed
-            successfully.
+            The exception that occurred, or None if the asyncio Future
+            completed successfully.
 
         Raises:
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
         """
         try:
-            # Let's block until the underlying Promise is done (it will set
-            # the result/exception on this concurrent Future)
+            # Let's block until the underlying asyncio Future is done (it will
+            # set the result/exception on this concurrent Future)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also read the exception from the Promise directly, so it
-            # knows that its exception has been consumed and there is no need
-            # to issue a warning about the exception never being retrieved from
-            # the Promise (which, by this point, would be done already)
+            # Let's also read the exception from the asyncio Future directly,
+            # so it knows that its exception has been consumed and there is no
+            # need to issue a warning about the exception never being retrieved
+            # from the asyncio Future (which, by this point, would be done
+            # already)
             try:
-                self._promise.exception()
+                self._asyncio_future.exception()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
                 pass
         # For consistency, let's return the exception from this concurrent
         # Future, even though it's going to be the same as the exception from
-        # the Promise
+        # the asyncio Future
         return exception

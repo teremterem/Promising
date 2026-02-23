@@ -1,11 +1,24 @@
+import contextvars
 import functools
+import inspect
 import types
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic
 
-from promising.promise import Promise
+from promising.promise import Promise, get_current_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
+
+# TODO Allow overriding this executor in local promise configurations
+# TODO What to do about potential deadlocks if recursive sync promises use up
+#  the executor's thread pool (when each such promise waits for its children to
+#  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
+#  and we need our own mechanism ? Or is it enough to issue a warning / throw
+#  an error when the number of nested sync function calls approaches this
+#  number ?
+_sync_function_executor = ThreadPoolExecutor(max_workers=128)
+# TODO Do `loop.set_default_executor(...)` ?
 
 
 def function(
@@ -63,6 +76,9 @@ class PromisingFunction(Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
+        # TODO Accept name as a parameter ?
+        # TODO Implement a custom __str__ and __repr__ methods and use this
+        #  name in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
@@ -81,6 +97,11 @@ class PromisingFunction(Generic[T_co]):
         self.start_soon = start_soon
         self.children_start_soon_by_default = children_start_soon_by_default
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
+
+    def _is_coroutine_function(self) -> bool:
+        if isinstance(self.__wrapped__, (classmethod, staticmethod)):
+            return inspect.iscoroutinefunction(self.__wrapped__.__func__)
+        return inspect.iscoroutinefunction(self.__wrapped__)
 
     def __get__(self, obj: Any, objtype: type | None = None) -> "PromisingFunction[T_co] | types.MethodType":
         if isinstance(self.__wrapped__, classmethod):
@@ -137,17 +158,38 @@ class PromisingFunction(Generic[T_co]):
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
-        # TODO Support synchronous functions too. (How to identify them without
-        #  trying to get the coroutine, thought ?)
-        if isinstance(self.__wrapped__, classmethod):
-            # self.__wrapped__ is a classmethod object; args[0] is the class,
-            # already prepended by MethodType in __get__. classmethod objects
-            # are not directly callable, so we reach through to the underlying
-            # function.
-            coro = self.__wrapped__.__func__(*args, **kwargs)
+        if self._is_coroutine_function():
+            if isinstance(self.__wrapped__, classmethod):
+                # self.__wrapped__ is a classmethod object; args[0] is the
+                # class, already prepended by MethodType in __get__.
+                # classmethod objects are not directly callable, so we reach
+                # through to the underlying function.
+                coro = self.__wrapped__.__func__(*args, **kwargs)
+            else:
+                coro = self.__wrapped__(*args, **kwargs)
         else:
-            coro = self.__wrapped__(*args, **kwargs)
+            if isinstance(self.__wrapped__, classmethod):
+                func = self.__wrapped__.__func__
+            else:
+                func = self.__wrapped__
 
+            async def _run_sync() -> T_co:
+                # Get the event loop from the promise that is running this
+                # async function
+                loop = get_current_promise().get_loop()
+                # Copy the current context so that ContextVars
+                # (in particular Promise._current) are accessible
+                # inside the executor thread
+                ctx = contextvars.copy_context()
+                return await loop.run_in_executor(
+                    _sync_function_executor,
+                    functools.partial(ctx.run, func, *args, **kwargs),
+                )
+
+            coro = _run_sync()
+
+        # TODO Pass a name to the Promise constructor that would include the
+        #  name of the function that was decorated
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,

@@ -202,34 +202,22 @@ class Promise(Future, Generic[T_co]):
             SyncPromiseUsageError: If called from the same thread as
                 the event loop, which would deadlock.
         """
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is self._loop:
-            raise SyncPromiseUsageError(
-                "promise.sync() cannot be called from the "
-                "event loop thread because it would deadlock. "
-                "Use 'await promise' instead."
-            )
+        self._assert_no_sync_usage_deadlock(
+            "`promise.sync()` cannot be called from the "
+            "event loop thread because it would deadlock. "
+            "Use `await promise` instead."
+        )
 
         self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 
     def await_children_sync(self, *, recursively: bool = False) -> None:
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is self._loop:
-            raise SyncPromiseUsageError(
-                "promise.await_children_sync() cannot be "
-                "called from the event loop thread because it "
-                "would deadlock. Use 'await promise.await_children()' "
-                "or 'await promising.await_children()' instead."
-            )
+        self._assert_no_sync_usage_deadlock(
+            "`await_children_sync()` cannot be called from the "
+            "event loop thread because it would deadlock. Use "
+            "`await promise.await_children()` or "
+            "`await promising.await_children()` instead."
+        )
 
         concurrent_future = concurrent.futures.Future[None]()
 
@@ -246,6 +234,15 @@ class Promise(Future, Generic[T_co]):
 
         self._loop.call_soon_threadsafe(schedule_await_children)
         return concurrent_future.result()
+
+    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop is self._loop:
+            raise SyncPromiseUsageError(message)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():

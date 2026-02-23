@@ -46,7 +46,7 @@ async def test_await_children(*, await_children: bool) -> None:
     await child_promise
 
 
-@pytest.mark.parametrize("recursively", [True])
+@pytest.mark.parametrize("recursively", [True, False])
 async def test_await_children_recursively(*, recursively: bool) -> None:
     """
     Parametrized over recursively={True, False}.
@@ -94,7 +94,7 @@ async def test_await_children_recursively(*, recursively: bool) -> None:
         assert execution_order == ["child_done", "root_coro_done"]
 
 
-@pytest.mark.parametrize("recursively", [True])
+@pytest.mark.parametrize("recursively", [True, False])
 async def test_await_children_recursively_sync_children(
     *,
     recursively: bool,

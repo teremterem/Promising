@@ -51,7 +51,7 @@ async def test_await_children_sync(*, await_children: bool) -> None:
     await child_promise
 
 
-@pytest.mark.parametrize("recursively", [True])
+@pytest.mark.parametrize("recursively", [True, False])
 async def test_await_children_sync_recursively(
     *,
     recursively: bool,
@@ -108,7 +108,7 @@ async def test_await_children_sync_recursively(
         ]
 
 
-@pytest.mark.parametrize("recursively", [True])
+@pytest.mark.parametrize("recursively", [True, False])
 async def test_await_children_sync_recursively_all_sync(
     *,
     recursively: bool,

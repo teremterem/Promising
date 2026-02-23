@@ -316,8 +316,9 @@ class Promise(Future, Generic[T_co]):
                 # Finalize the Promise execution by restoring context
                 # (removing this Promise from the context and restoring the
                 # previous value for the respective context var)
-                self._current.reset(self._previous_token)
-                self._previous_token = None
+                if self._previous_token is not None:
+                    self._current.reset(self._previous_token)
+                    self._previous_token = None
 
             finally:
                 if exception is not NOT_SET:

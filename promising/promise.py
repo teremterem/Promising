@@ -48,6 +48,10 @@ async def await_children(*, recursively: bool = False) -> None:
 def await_children_sync(*, recursively: bool = False) -> None:
     """
     Wait for all child Promises to finish, blocking the calling thread.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
     """
     return Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
 
@@ -475,14 +479,16 @@ class Promise(Future, Generic[T_co]):
             # are being awaited
             await asyncio.gather(
                 *children,
-                # `return_exceptions` is set to True to make sure we wait for ALL
-                # the children that are still in progress, regardless of whether
-                # any of them fail (we don't just wait until the first one fails)
+                # `return_exceptions` is set to True to make sure we wait for
+                # ALL the children that are still in progress, regardless of
+                # whether any of them fail (we don't just wait until the first
+                # one fails)
                 return_exceptions=True,
             )
         # TODO Ideally, a warning (or an optional exception ?) should be issued
-        #  if any of the remaining children are configured with start_soon=False,
-        #  because that would make it quite easy to introduce deadlocks.
+        #  if any of the remaining children are configured with
+        #  `start_soon=False`, because that would make it quite easy to
+        #  introduce deadlocks.
 
     def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
         from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)

@@ -76,6 +76,9 @@ class PromisingFunction(Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
+        # TODO Accept name as a parameter ?
+        # TODO Implement a custom __str__ and __repr__ methods and use this
+        #  name in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
@@ -185,6 +188,8 @@ class PromisingFunction(Generic[T_co]):
 
             coro = _run_sync()
 
+        # TODO Pass a name to the Promise constructor that would include the
+        #  name of the function that was decorated
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,

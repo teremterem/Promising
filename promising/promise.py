@@ -175,6 +175,8 @@ class Promise(Future, Generic[T_co]):
 
         if name is None:
             name = f"Promise-{next(_promise_name_counter)}"
+        # TODO Implement custom __str__ and __repr__ methods and use this name
+        #  in them ?
         self._name = name
 
         self._coro = coro

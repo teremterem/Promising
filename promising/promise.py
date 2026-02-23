@@ -233,7 +233,9 @@ class Promise(Future, Generic[T_co]):
             self._loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
 
         self._loop.call_soon_threadsafe(schedule_await_children)
-        return concurrent_future.result()
+        # Should any error happen in the underlying async `await_children`,
+        # the call below will re-raise it
+        concurrent_future.result()
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:
         try:
@@ -514,6 +516,9 @@ class Promise(Future, Generic[T_co]):
             # Concrete value was provided
             self._start_soon = start_soon
         elif start_soon is NOT_SET:
+            # TODO Should there be any reason or scenario when
+            #  `everything_starts_soon_by_default` takes precedence over the
+            #  parent's `children_start_soon_by_default` ?
             if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
                 # The parent is enforcing this setting for its children
                 self._start_soon = self._parent._children_start_soon_by_default

@@ -223,7 +223,7 @@ class Promise(Future, Generic[T_co]):
 
         concurrent_future = concurrent.futures.Future[None]()
 
-        async def await_children_and_notify():
+        async def await_children_and_notify() -> None:
             try:
                 await self.await_children(recursively=recursively)
             except BaseException as exc:  # noqa: BLE001 (blind-except)
@@ -231,7 +231,7 @@ class Promise(Future, Generic[T_co]):
             else:
                 concurrent_future.set_result(None)
 
-        def schedule_await_children():
+        def schedule_await_children() -> None:
             self._loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
 
         self._loop.call_soon_threadsafe(schedule_await_children)

@@ -302,14 +302,22 @@ class Promise(Future, Generic[T_co]):
         result = NOT_SET
         exception = NOT_SET
 
-        self._activate()
+        # Activate this Promise by setting it as the current context and store
+        # the previous context token for later restoration
+        self._previous_token = self._current.set(self)
+
         try:
             result = await self._coro
         except BaseException as exc:  # noqa: BLE001 (blind-except)
             exception = exc
         finally:
             try:
-                await self._finalize()
+                # Finalize the Promise execution by restoring context
+                # (removing this Promise from the context and restoring the
+                # previous value for the respective context var)
+                self._current.reset(self._previous_token)
+                self._previous_token = None
+
             finally:
                 if exception is not NOT_SET:
                     self.set_exception(exception)
@@ -447,23 +455,6 @@ class Promise(Future, Generic[T_co]):
             A concurrent.futures.Future that mirrors this Promise's state.
         """
         return self._concurrent_future
-
-    def _activate(self) -> None:
-        """
-        Activate this Promise by setting it as the current context.
-
-        Stores the previous context token for later restoration.
-        """
-        self._previous_token = self._current.set(self)
-
-    async def _finalize(self) -> None:
-        """
-        Finalize the Promise execution by restoring context (removing this
-        Promise from the context and restoring the previous value for the
-        respective context var).
-        """
-        self._current.reset(self._previous_token)
-        self._previous_token = None
 
     async def await_children(self, *, recursively: bool = False) -> None:
         """

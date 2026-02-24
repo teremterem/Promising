@@ -1,17 +1,59 @@
 import asyncio
 import concurrent.futures
+import contextvars
 import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
+from contextvars import ContextVar
 from typing import Any, Generic
 from weakref import WeakSet
 
 from promising.errors import NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
-from promising.promising_context import PromisingContext
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
 _promise_name_counter = itertools.count(1)
+
+
+def get_current_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
+    """
+    Get the currently active Promise from context.
+
+    Args:
+        raise_if_none: If True, raises NoCurrentPromiseError when no active
+            Promise is found.
+
+    Returns:
+        The currently active Promise instance, or None if no Promise is active
+        and raise_if_none is False.
+
+    Raises:
+        NoCurrentPromiseError: If no active Promise is found and raise_if_none
+            is True.
+    """
+    return Promise.get_current(raise_if_none=raise_if_none)
+
+
+async def await_children(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
+    """
+    return await Promise.get_current(raise_if_none=True).await_children(recursively=recursively)
+
+
+def await_children_sync(*, recursively: bool = False) -> None:
+    """
+    Wait for all child Promises to finish, blocking the calling thread.
+
+    Args:
+        recursively: If True, wait for all children of all children, and so
+            on, recursively.
+    """
+    return Promise.get_current(raise_if_none=True).await_children_sync(recursively=recursively)
 
 
 class Promise(Future, Generic[T_co]):
@@ -79,6 +121,9 @@ class Promise(Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
+    _current: ContextVar["Promise[Any] | None"] = ContextVar("Promise._current", default=None)
+
+    _previous_token: contextvars.Token | None
     _task: Task[T_co] | None
 
     # TODO [ALMOST READY] Support cancellation of the whole Promise tree
@@ -94,6 +139,7 @@ class Promise(Future, Generic[T_co]):
         *,
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
+        parent: "Promise[Any] | Sentinel | None" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
@@ -104,12 +150,18 @@ class Promise(Future, Generic[T_co]):
         self._previous_token = None
         self._task = None
 
-        self._context = PromisingContext(
-            associated_promise=self,
-            start_soon=start_soon,
-            children_start_soon_by_default=children_start_soon_by_default,
-            everything_starts_soon_by_default=everything_starts_soon_by_default,
-        )
+        if parent is INHERIT:
+            self._parent = self.get_current(raise_if_none=False)
+        elif parent is None or isinstance(parent, Promise):
+            self._parent = parent
+        else:
+            raise ValueError(
+                f"`parent` must be either INHERIT, another Promise or None, but `{type(parent)}` was given instead"
+            )
+
+        self._resolve_everything_starts_soon_by_default(everything_starts_soon_by_default)
+        self._resolve_start_soon(start_soon)
+        self._resolve_children_start_soon_by_default(children_start_soon_by_default)
 
         if self._parent is not None:
             if loop is None:

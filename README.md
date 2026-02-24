@@ -145,7 +145,7 @@ def sync_parent() -> str:
     return "done"
 ```
 
-Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `SyncPromiseUsageError`.
+Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `PromisingSyncUsageError`.
 
 ## Method Decorators
 
@@ -327,7 +327,7 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 |---|---|
 | `promising.NoCurrentPromiseError` | `get_current_promise()` is called outside a Promise context. |
 | `promising.NoParentPromiseError` | `get_parent()` is called on a Promise with no parent. |
-| `promising.SyncPromiseUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread. |
+| `promising.PromisingSyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread. |
 
 All inherit from `promising.BasePromisingError`.
 

@@ -6,7 +6,7 @@ from typing import NoReturn
 import pytest
 
 import promising
-from promising.errors import SyncPromiseUsageError
+from promising.errors import PromisingSyncUsageError
 from promising.promise import Promise
 
 # ── Basic functionality ─────────────────────────────────────────
@@ -87,7 +87,7 @@ async def test_sync_propagates_prefilled_exception() -> None:
 
 async def test_sync_raises_on_event_loop_thread() -> None:
     """
-    sync() raises SyncPromiseUsageError when called from the event
+    sync() raises PromisingSyncUsageError when called from the event
     loop thread, because it would deadlock.
     """
 
@@ -96,7 +96,7 @@ async def test_sync_raises_on_event_loop_thread() -> None:
 
     promise = Promise(coro(), start_soon=False)
 
-    with pytest.raises(SyncPromiseUsageError, match="deadlock"):
+    with pytest.raises(PromisingSyncUsageError, match="deadlock"):
         promise.sync()
 
     # Clean up — await the promise so asyncio doesn't warn
@@ -110,7 +110,7 @@ async def test_sync_raises_on_event_loop_thread_prefilled() -> None:
     """
     promise = Promise(prefill_result="already done")
 
-    with pytest.raises(SyncPromiseUsageError, match="deadlock"):
+    with pytest.raises(PromisingSyncUsageError, match="deadlock"):
         promise.sync()
 
 

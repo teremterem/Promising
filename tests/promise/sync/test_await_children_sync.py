@@ -170,7 +170,7 @@ async def test_await_children_sync_recursively_all_sync(
 
 async def test_await_children_sync_raises_on_event_loop_thread() -> None:
     """
-    await_children_sync() raises SyncPromiseUsageError
+    await_children_sync() raises PromisingSyncUsageError
     when called from the event loop thread, because it
     would deadlock.
     """
@@ -178,7 +178,7 @@ async def test_await_children_sync_raises_on_event_loop_thread() -> None:
     @promising.function
     async def some_async_func() -> None:
         with pytest.raises(
-            promising.SyncPromiseUsageError,
+            promising.PromisingSyncUsageError,
             match="deadlock",
         ):
             promising.await_children_sync()

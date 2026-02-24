@@ -70,7 +70,7 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 - `BasePromisingError` — base class
 - `NoCurrentPromiseError` — raised when `get_current_promise()` is called outside a Promise context
 - `NoParentPromiseError` — raised when a Promise has no parent
-- `SyncPromiseUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
+- `PromisingSyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 ### Public API
 

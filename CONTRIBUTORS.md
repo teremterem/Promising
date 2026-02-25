@@ -68,9 +68,9 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 ### Error Classes (`promising/errors.py`)
 
 - `BasePromisingError` — base class
-- `NoCurrentPromiseError` — raised when `get_current_promise()` is called outside a Promise context
-- `NoParentPromiseError` — raised when a Promise has no parent
-- `PromisingSyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
+- `ContextNotFoundError` — TODO Explain
+- `PromiseNotFoundError` — TODO Explain
+- `SyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 ### Public API
 

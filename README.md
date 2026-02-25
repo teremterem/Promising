@@ -145,7 +145,7 @@ def sync_parent() -> str:
     return "done"
 ```
 
-Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `PromisingSyncUsageError`.
+Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `SyncUsageError`.
 
 ## Method Decorators
 
@@ -309,7 +309,7 @@ uv sync --extra examples
 
 | Function | Description |
 |---|---|
-| `promising.get_current_promise(raise_if_none=True)` | Get the currently active Promise from context. |
+| `promising.get_active_promise(raise_if_none=True)` | Get the currently active Promise from context. |
 | `promising.await_children(recursively=False)` | Wait for all children of the current Promise. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
 
@@ -327,9 +327,9 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 
 | Error | Raised When |
 |---|---|
-| `promising.NoCurrentPromiseError` | `get_current_promise()` is called outside a Promise context. |
-| `promising.NoParentPromiseError` | `get_parent()` is called on a Promise with no parent. |
-| `promising.PromisingSyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread. |
+| `promising.ContextNotFoundError` | TODO Explain |
+| `promising.PromiseNotFoundError` | TODO Explain |
+| `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread. |
 
 All inherit from `promising.BasePromisingError`.
 

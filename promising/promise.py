@@ -30,7 +30,7 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
         NoCurrentPromiseError: If no active Promise is found and raise_if_none
             is True.
     """
-    return Promise.get_current(raise_if_none=raise_if_none)
+    return Promise.get_active_promise(raise_if_none=raise_if_none)
 
 
 class Promise(PromisingContext, Future, Generic[T_co]):
@@ -233,7 +233,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         try:
             # Activate this Promise by setting it as the current context and
             # store the previous context token for later restoration
-            self._previous_token = self._current.set(self)
+            self._previous_token = self._active_context.set(self)
 
             result = await self._coro
 
@@ -245,7 +245,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # (removing this Promise from the context and restoring the
                 # previous value for the respective context var)
                 if self._previous_token is not None:
-                    self._current.reset(self._previous_token)
+                    self._active_context.reset(self._previous_token)
                     self._previous_token = None
 
             finally:
@@ -291,10 +291,12 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             NoCurrentPromiseError: If no active Promise exists and
                 raise_if_none is True.
         """
-        current = cls.get_active_context(raise_if_none=raise_if_none)
-        current = cls._current.get()
+        current = cls.get_active_context(raise_if_none=False)
+        while current is not None and not isinstance(current, Promise):
+            current = current.get_parent(raise_if_none=False)
+
         if raise_if_none and current is None:
-            raise PromiseNotFoundError("No active Promise found")
+            raise PromiseNotFoundError("No active Promise is found")
         return current
 
     def get_parent(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":

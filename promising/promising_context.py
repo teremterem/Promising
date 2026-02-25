@@ -27,7 +27,7 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
         ContextNotFoundError: If no active PromisingContext is found and raise_if_none
             is True.
     """
-    return PromisingContext.get_current(raise_if_none=raise_if_none)
+    return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
 async def await_children(*, recursively: bool = False) -> None:
@@ -54,7 +54,6 @@ def await_children_sync(*, recursively: bool = False) -> None:
 
 class PromisingContext:
     _active_context = ContextVar["PromisingContext | None"]("PromisingContext._active_context", default=None)
-
     _previous_token: contextvars.Token | None
 
     # TODO Support cancellation of the whole PromisingContext tree
@@ -71,7 +70,7 @@ class PromisingContext:
         self._previous_token = None
 
         if parent is INHERIT:
-            self._parent = self.get_current(raise_if_none=False)
+            self._parent = self.get_active_context(raise_if_none=False)
         elif parent is None or isinstance(parent, PromisingContext):
             self._parent = parent
         else:
@@ -120,7 +119,7 @@ class PromisingContext:
             raise ContextNotFoundError("No active PromisingContext is found")
         return active
 
-    def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
+    def get_parent(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
         Get the parent PromisingContext of this PromisingContext.
 

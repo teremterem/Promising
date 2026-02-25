@@ -1,6 +1,6 @@
 import asyncio
 
-from promising import PromisingSyncUsageError
+from promising import SyncUsageError
 
 
 def assert_no_sync_usage_deadlock(*, loop: asyncio.AbstractEventLoop, message: str) -> None:
@@ -10,4 +10,4 @@ def assert_no_sync_usage_deadlock(*, loop: asyncio.AbstractEventLoop, message: s
         running_loop = None
 
     if running_loop is loop:
-        raise PromisingSyncUsageError(message)
+        raise SyncUsageError(message)

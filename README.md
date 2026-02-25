@@ -169,6 +169,8 @@ class MyService:
         return x * 2
 ```
 
+TODO Mention that ordering will matter for `@classmethod` when function result persistance is implemented - the `promising` internals will or will not have `cls` passed throught them depending on the order of the decorators, even though for the decorated method itself it will all look the same.
+
 ## Execution Timing: `start_soon`
 
 By default, Promises start executing immediately upon creation (at the nearest event loop opportunity). This is controlled by the `start_soon` parameter:

@@ -1,7 +1,9 @@
+# TODO Update docstrings throughout the file
 import asyncio
 import concurrent.futures
 import contextvars
-from asyncio import AbstractEventLoop
+import inspect
+from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
 from weakref import WeakSet
 
@@ -56,8 +58,6 @@ class PromisingContext:
     _previous_token: contextvars.Token | None
 
     # TODO Support cancellation of the whole PromisingContext tree
-    # TODO Order the methods in this class in a more useful manner
-    #  (do this after we spin off PromisingContext out of this class)
 
     def __init__(
         self,
@@ -84,51 +84,19 @@ class PromisingContext:
         self._resolve_start_soon(start_soon)
         self._resolve_children_start_soon_by_default(children_start_soon_by_default)
 
-        if self._parent is not None:
-            if loop is None:
-                loop = self._parent.loop
-            elif loop is not self._parent.loop:
+        if loop is None:
+            if self._parent is None:
+                self._ctx_loop = asyncio.get_event_loop()
+            else:
+                self._ctx_loop = self._parent._ctx_loop
+        else:
+            if self._parent is not None and loop is not self._parent._ctx_loop:
                 raise ValueError("Parent and child PromisingContexts must share the same event loop")
-        # TODO TODO TODO Get the current loop if none was resolved
+            self._ctx_loop = loop
 
         self._children = WeakSet[PromisingContext]()
         if self._parent is not None:
             self._parent._children.add(self)
-
-    def await_children_sync(self, *, recursively: bool = False) -> None:
-        self._assert_no_sync_usage_deadlock(
-            "`await_children_sync()` cannot be called from the "
-            "event loop thread because it would deadlock. Use "
-            "`await promise.await_children()` or "
-            "`await promising.await_children()` instead."
-        )
-
-        concurrent_future = concurrent.futures.Future[None]()
-
-        async def await_children_and_notify() -> None:
-            try:
-                await self.await_children(recursively=recursively)
-            except BaseException as exc:  # noqa: BLE001 (blind-except)
-                concurrent_future.set_exception(exc)
-            else:
-                concurrent_future.set_result(None)
-
-        def schedule_await_children() -> None:
-            self._loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
-
-        self._loop.call_soon_threadsafe(schedule_await_children)
-        # Should any error happen in the underlying async `await_children`,
-        # the call below will re-raise it
-        concurrent_future.result()
-
-    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is self._loop:
-            raise SyncPromiseUsageError(message)
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -171,15 +139,67 @@ class PromisingContext:
             raise ContextNotFoundError("No parent PromisingContext is found")
         return self._parent
 
-    # TODO TODO TODO
+    async def await_children(self, *, recursively: bool = False) -> None:
+        """
+        Wait for child Promises to finish.
 
-    def get_still_existing_children(
+        Args:
+            recursively: If True, wait for all children of all children, and so
+                on, recursively.
+        """
+        while children := self.collect_remaining_children(
+            recursively=recursively,
+            exclude_non_awaitable=True,
+            exclude_done=True,
+        ):
+            # The loop is needed because, in case of recursive awaiting, new
+            # children may be spawned by existing ones while the existing ones
+            # are being awaited
+            await asyncio.gather(
+                *children,
+                # `return_exceptions` is set to True to make sure we wait for
+                # ALL the children that are still in progress, regardless of
+                # whether any of them fail (we don't just wait until the first
+                # one fails)
+                return_exceptions=True,
+            )
+
+    def await_children_sync(self, *, recursively: bool = False) -> None:
+        self._assert_no_sync_usage_deadlock(
+            "`await_children_sync()` cannot be called from the "
+            "event loop thread because it would deadlock. Use "
+            "`await promise.await_children()` or "
+            "`await promising.await_children()` instead."
+        )
+
+        concurrent_future = concurrent.futures.Future[None]()
+
+        async def await_children_and_notify() -> None:
+            try:
+                await self.await_children(recursively=recursively)
+            except BaseException as exc:  # noqa: BLE001 (blind-except)
+                concurrent_future.set_exception(exc)
+            else:
+                concurrent_future.set_result(None)
+
+        def schedule_await_children() -> None:
+            self._ctx_loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
+
+        self._ctx_loop.call_soon_threadsafe(schedule_await_children)
+        # Should any error happen in the underlying async `await_children`,
+        # the call below will re-raise it
+        concurrent_future.result()
+
+    def collect_remaining_children(
         self,
         *,
         recursively: bool = False,
+        exclude_non_awaitable: bool = True,
         exclude_done: bool = True,
     ) -> set["PromisingContext"]:
         """
+        # TODO Explain the treatment of PromisingContexts versus Futures (or
+        #  awaitables in general, for that matter)
         Get child PromisingContexts that weren't garbage collected and are still
         reachable. Those would be the ones that are either still in progress
         themselves, or have children of their own that are still in progress.
@@ -202,7 +222,7 @@ class PromisingContext:
         i = 0
         while True:
             try:
-                # In `asyncio.tasks` it was `_all_tasks` instead of
+                # In `asyncio.tasks::all_tasks()` it was `_all_tasks` instead of
                 # `self._children`
                 children = list[PromisingContext](self._children)
             except RuntimeError:
@@ -211,48 +231,33 @@ class PromisingContext:
                     raise
 
             else:
-                if exclude_done:
-                    result = {child for child in children if not child.done()}
-                else:
-                    result = set[PromisingContext](children)
+                result = {
+                    child
+                    for child in children
+                    if (not exclude_non_awaitable or inspect.isawaitable(child))
+                    and (not exclude_done or not isinstance(child, Future) or not child.done())
+                }
 
                 if recursively:
                     # We are iterating over all the children, regardless of
-                    # the exclude_done setting, because some children that are
-                    # done might have children of their own that are still in
-                    # progress.
+                    # the exclude_done and exclude_non_awaitable settings,
+                    # because some children that are done or non-awaitable
+                    # might have children of their own which are awaitable and
+                    # are still in progress and so on. (This works because
+                    # those children of children prevent their parents from
+                    # being garbage collected, since they, while themselves
+                    # being active, still hold a strong reference to their
+                    # parents.)
                     for child in children:
-                        result.update(child.get_still_existing_children(recursively=True, exclude_done=exclude_done))
+                        result.update(
+                            child.collect_remaining_children(
+                                recursively=True,
+                                exclude_non_awaitable=exclude_non_awaitable,
+                                exclude_done=exclude_done,
+                            )
+                        )
 
                 return result
-
-    async def await_children(self, *, recursively: bool = False) -> None:
-        """
-        Wait for child Promises to finish.
-
-        Args:
-            recursively: If True, wait for all children of all children, and so
-                on, recursively.
-        """
-        while children := self.get_still_existing_children(
-            recursively=recursively,
-            exclude_done=True,
-        ):
-            # The loop is needed because, in case of recursive awaiting, new
-            # children may be spawned by existing ones while the existing ones
-            # are being awaited
-            await asyncio.gather(
-                *children,
-                # `return_exceptions` is set to True to make sure we wait for
-                # ALL the children that are still in progress, regardless of
-                # whether any of them fail (we don't just wait until the first
-                # one fails)
-                return_exceptions=True,
-            )
-        # TODO Ideally, a warning (or an optional exception ?) should be issued
-        #  if any of the remaining children are configured with
-        #  `start_soon=False`, because that would make it quite easy to
-        #  introduce deadlocks.
 
     def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
         from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
@@ -322,3 +327,12 @@ class PromisingContext:
                 "`children_start_soon_by_default` must be either NOT_SET, INHERIT or a boolean value, "
                 f"but `{type(children_start_soon_by_default)}` was given instead"
             )
+
+    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop is self._ctx_loop:
+            raise SyncPromiseUsageError(message)

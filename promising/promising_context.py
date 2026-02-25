@@ -1,4 +1,4 @@
-# TODO Update docstrings throughout the file
+# TODO TODO TODO Update docstrings throughout this file
 import asyncio
 import concurrent.futures
 import contextvars
@@ -7,7 +7,7 @@ from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
 from weakref import WeakSet
 
-from promising.errors import ContextNotFoundError, SyncPromiseUsageError
+from promising.errors import ContextNotFoundError, SyncUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 
@@ -335,4 +335,4 @@ class PromisingContext:
             running_loop = None
 
         if running_loop is self._ctx_loop:
-            raise SyncPromiseUsageError(message)
+            raise SyncUsageError(message)

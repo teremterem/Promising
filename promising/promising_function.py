@@ -6,7 +6,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic
 
-from promising.promise import Promise, get_current_promise
+from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
@@ -174,9 +174,9 @@ class PromisingFunction(Generic[T_co]):
                 func = self.__wrapped__
 
             async def _run_sync() -> T_co:
-                # Get the event loop from the promise that is running this
-                # async function
-                loop = get_current_promise().get_loop()
+                # Get the event loop from the active promise that is running
+                # this async function
+                loop = get_active_promise().get_loop()
                 # Copy the current context so that ContextVars
                 # (in particular Promise._current) are accessible
                 # inside the executor thread

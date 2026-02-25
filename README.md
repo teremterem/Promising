@@ -169,8 +169,6 @@ class MyService:
         return x * 2
 ```
 
-TODO Mention that ordering will matter for `@classmethod` when function result persistance is implemented - the `promising` internals will or will not have `cls` passed throught them depending on the order of the decorators, even though for the decorated method itself it will all look the same.
-
 ## Execution Timing: `start_soon`
 
 By default, Promises start executing immediately upon creation (at the nearest event loop opportunity). This is controlled by the `start_soon` parameter:
@@ -280,6 +278,7 @@ uv sync --extra examples
 ```
 
 - `examples/keyword_agent.py` — an LLM-powered keyword extraction agent using `@promising.function` with `litellm` and `pydantic`.
+- `examples/htmx_ui/` — a web UI example using `python-fasthtml` and HTMX.
 
 ## API Reference
 
@@ -292,25 +291,35 @@ uv sync --extra examples
 
 ### Promise
 
+`Promise` extends both `PromisingContext` and `asyncio.Future`. It inherits all hierarchy and configuration methods from `PromisingContext` (see below) and adds coroutine execution and thread-safe access.
+
 | Method / Property | Description |
 |---|---|
 | `await promise` | Wait for and return the result. Can be awaited multiple times. |
 | `promise.sync()` | Synchronous counterpart of `await` — blocks the calling thread. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
-| `promise.await_children(recursively=False)` | Async — wait for child Promises to finish. |
-| `promise.await_children_sync(recursively=False)` | Sync — block until child Promises finish. |
-| `promise.get_parent(raise_if_none=True)` | Get the parent Promise. |
 | `promise.get_name()` | Get the human-readable name (auto-generated as `"Promise-N"`). |
-| `promise.get_still_existing_children(recursively=False, exclude_done=True)` | Get the set of child Promises that are still reachable. |
 | `promise.as_concurrent_future()` | Get a thread-safe `concurrent.futures.Future` view. |
+
+### PromisingContext
+
+`PromisingContext` is the base class that manages the parent-child hierarchy, configuration inheritance, and context variable tracking. `Promise` inherits from it. It can also be used standalone as a lightweight context node that participates in the hierarchy without being an `asyncio.Future`.
+
+| Method / Property | Description |
+|---|---|
+| `ctx.get_parent(raise_if_none=True)` | Get the parent context. |
+| `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
+| `ctx.await_children_sync(recursively=False)` | Sync — block until child contexts finish. |
+| `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
 
 ### Top-Level Convenience Functions
 
 | Function | Description |
 |---|---|
-| `promising.get_active_promise(raise_if_none=True)` | Get the currently active Promise from context. |
-| `promising.await_children(recursively=False)` | Wait for all children of the current Promise. |
+| `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` from context. |
+| `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` from context (walks up the parent chain past non-Promise contexts). |
+| `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
 
 ### Sentinels
@@ -318,7 +327,7 @@ uv sync --extra examples
 | Sentinel | Meaning |
 |---|---|
 | `promising.NOT_SET` | No value provided / no enforcement. |
-| `promising.INHERIT` | Copy from the parent Promise; fall back to the global default when there is no parent. |
+| `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 
 All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
@@ -327,9 +336,9 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 
 | Error | Raised When |
 |---|---|
-| `promising.ContextNotFoundError` | TODO Explain |
-| `promising.PromiseNotFoundError` | TODO Explain |
-| `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread. |
+| `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside of a promising function). |
+| `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
+| `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 
 All inherit from `promising.BasePromisingError`.
 

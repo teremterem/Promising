@@ -250,5 +250,6 @@ async def test_sync_parent_child_relationship() -> None:
     await parent_promise
 
     assert child_promise is not None
-    assert child_promise.get_parent(raise_if_none=False) is parent_promise
+    assert child_promise.get_parent_context(raise_if_none=False) is parent_promise
+    assert child_promise.get_parent_promise(raise_if_none=False) is parent_promise
     await child_promise

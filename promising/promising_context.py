@@ -116,10 +116,10 @@ class PromisingContext:
         """
         active = cls._active_context.get()
         if raise_if_none and active is None:
-            raise ContextNotFoundError("No active PromisingContext is found")
+            raise ContextNotFoundError("No active PromisingContext found")
         return active
 
-    def get_parent(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
+    def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
         Get the parent PromisingContext of this PromisingContext.
 
@@ -135,7 +135,7 @@ class PromisingContext:
                 raise_if_none is True.
         """
         if raise_if_none and self._parent is None:
-            raise ContextNotFoundError("No parent PromisingContext is found")
+            raise ContextNotFoundError("No parent PromisingContext found")
         return self._parent
 
     async def await_children(self, *, recursively: bool = False) -> None:

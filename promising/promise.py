@@ -10,12 +10,15 @@ from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
 
+# TODO This is not thread-safe anymore - promises and contexts can be created
+#  in other threads now
 _promise_name_counter = itertools.count(1)
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     """
-    Get the currently active Promise from context.
+    Get the currently active Promise from context (skipping over any
+    PromisingContexts that aren't Promises).
 
     Args:
         raise_if_none: If True, raises PromiseNotFoundError when no active
@@ -79,6 +82,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             or prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro
             or prefill_result.
+        # TODO Better to explain `start_soon` related parameters here, and not
+        #  refer the reader to the PromisingContext docstring
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
@@ -139,15 +144,14 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def sync(self) -> T_co:
         """
-        Synchronously wait for and return the Promise result,
-        blocking the calling thread.
+        Synchronously wait for and return the Promise result, blocking the
+        calling thread.
 
-        This is the synchronous counterpart of
-        ``await promise`` — intended for use inside sync
-        promising functions that run in a thread pool
-        executor. It schedules the Promise's execution on
-        the event loop via ``call_soon_threadsafe`` and
-        blocks until the result (or exception) is available.
+        This is the synchronous counterpart of `await promise` — intended for
+        use inside sync promising functions that run in a thread pool executor.
+        It schedules the Promise's execution on the event loop via
+        `call_soon_threadsafe` and blocks until the result (or exception) is
+        available.
         # TODO The reader does not need to be bothered by the implementation
         #  details of this method.
 
@@ -155,8 +159,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             The resolved value of the Promise.
 
         Raises:
-            SyncPromiseUsageError: If called from the same thread as
-                the event loop, which would deadlock.
+            SyncPromiseUsageError: If called from the same thread as the event
+                loop, which would deadlock.
         """
         self._assert_no_sync_usage_deadlock(
             "`promise.sync()` cannot be called from the "
@@ -177,7 +181,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         directly by users; it is managed by the Promise's lifecycle.
 
         Also sets the result on the concurrent.futures.Future for thread
-        compatibility (see as_concurrent_future() method).
+        compatibility (see `as_concurrent_future()` method).
 
         Args:
             result: The result value to set.
@@ -191,7 +195,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         called directly by users; it is managed by the Promise's lifecycle.
 
         Also sets the exception on the concurrent.futures.Future for thread
-        compatibility (see as_concurrent_future() method).
+        compatibility (see `as_concurrent_future()` method).
 
         Args:
             exception: The exception to set.
@@ -272,7 +276,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
-        Get the currently active Promise from context variables.
+        Get the currently active Promise from context variables (skipping over
+        any PromisingContexts that aren't Promises).
 
         Args:
             raise_if_none: If True, raises an exception when no active Promise
@@ -301,7 +306,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
-        Get the parent Promise of this Promise.
+        Get the parent Promise of this Promise (skipping over any
+        PromisingContexts that aren't Promises).
 
         Args:
             raise_if_none: If True, raises an exception when no parent exists.
@@ -335,13 +341,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
-        Get a thread-safe concurrent.futures.Future view of this Promise.
+        Get a thread-safe `concurrent.futures.Future` view of this Promise.
 
         This allows the Promise to be used in multi-threaded contexts where
-        concurrent.futures.Future objects are expected.
+        `concurrent.futures.Future` objects are expected.
 
         Returns:
-            A concurrent.futures.Future that mirrors this Promise's state.
+            A `concurrent.futures.Future` that mirrors this Promise's state.
         """
         return self._concurrent_future
 
@@ -377,16 +383,16 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
 class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
     """
-    A thread-safe concurrent.futures.Future backed by an asyncio Future.
+    A thread-safe `concurrent.futures.Future` backed by an `asyncio.Future`.
 
     This class provides a bridge between asyncio-based Futures and the
-    concurrent.futures interface, allowing asyncio Futures to be used in
-    multi-threaded contexts while maintaining proper result/exception
-    synchronization.
+    `concurrent.futures.Future` interface, allowing `asyncio.Future` instances
+    to be used in multi-threaded contexts while maintaining proper
+    result/exception synchronization.
 
     Args:
-        asyncio_future: The asyncio Future instance that backs this concurrent
-            Future.
+        asyncio_future: The `asyncio.Future` instance that backs this
+            `concurrent.futures.Future`.
     """
 
     def __init__(self, asyncio_future: asyncio.Future[Any]) -> None:
@@ -395,31 +401,32 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
 
     def result(self, timeout: float | None = None) -> Any:
         """
-        Get the result of the asyncio Future.
+        Get the result of the `asyncio.Future`.
 
-        This method blocks until the underlying asyncio Future is done and ensures
-        that the asyncio Future's result is properly consumed (asyncio will not issue
-        a warning about the asyncio Future not having been awaited for).
+        This method blocks until the underlying `asyncio.Future` is done and ensures
+        that the `asyncio.Future`'s result is properly consumed (`asyncio` will not issue
+        a warning about the `asyncio.Future` not having been awaited for).
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The result value from the asyncio Future.
+            The result value from the `asyncio.Future`.
 
         Raises:
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
-            Exception: Any exception that occurred during asyncio Future execution.
+            Exception: Any exception that occurred during `asyncio.Future`
+                execution.
         """
         try:
-            # Let's block until the underlying asyncio Future is done (it will
-            # set the result/exception on this concurrent Future)
+            # Let's block until the underlying `asyncio.Future` is done (it will
+            # set the result/exception on this `concurrent.futures.Future`)
             result = super().result(timeout=timeout)
         finally:
             # Let's also read the result from the asyncio Future directly, so
             # it knows that its result has been consumed and there is no need
-            # to issue a warning about the asyncio Future not having been
+            # to issue a warning about the `asyncio.Future` not having been
             # awaited for (which, by this point, would be done already)
             try:
                 self._asyncio_future.result()
@@ -437,16 +444,16 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
         Get the exception that occurred during asyncio Future execution, if
         any.
 
-        This method blocks until the underlying asyncio Future is done and
-        ensures that the asyncio Future's exception is properly consumed
+        This method blocks until the underlying `asyncio.Future` is done and
+        ensures that the `asyncio.Future`'s exception is properly consumed
         (asyncio will not issue a warning about the exception not having
-        been retrieved from the asyncio Future).
+        been retrieved from the `asyncio.Future`).
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
 
         Returns:
-            The exception that occurred, or None if the asyncio Future
+            The exception that occurred, or None if the `asyncio.Future`
             completed successfully.
 
         Raises:
@@ -454,14 +461,15 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
                 completion.
         """
         try:
-            # Let's block until the underlying asyncio Future is done (it will
-            # set the result/exception on this concurrent Future)
+            # Let's block until the underlying `asyncio.Future` is done
+            # (it will set the result/exception on this
+            # `concurrent.futures.Future`)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also read the exception from the asyncio Future directly,
+            # Let's also read the exception from the `asyncio.Future` directly,
             # so it knows that its exception has been consumed and there is no
             # need to issue a warning about the exception never being retrieved
-            # from the asyncio Future (which, by this point, would be done
+            # from the `asyncio.Future` (which, by this point, would be done
             # already)
             try:
                 self._asyncio_future.exception()
@@ -469,7 +477,7 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
                 pass
-        # For consistency, let's return the exception from this concurrent
-        # Future, even though it's going to be the same as the exception from
-        # the asyncio Future
+        # For consistency, let's return the exception from this
+        # `concurrent.futures.Future`, even though it's going to be the same as
+        # the exception from the `asyncio.Future`
         return exception

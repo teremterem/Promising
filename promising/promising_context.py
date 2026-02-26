@@ -1,4 +1,3 @@
-# TODO TODO TODO Update docstrings throughout this file
 import asyncio
 import concurrent.futures
 import contextvars
@@ -32,27 +31,69 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
 
 async def await_children(*, recursively: bool = False) -> None:
     """
-    Wait for all child Promises to finish.
+    Wait for all awaitable children of the active context to finish.
 
     Args:
-        recursively: If True, wait for all children of all children, and so
-            on, recursively.
+        recursively: If True, wait for all descendants, not just direct
+            children.
     """
+    # TODO We need unit tests that ensure this function works correctly even
+    #  when called on a bare PromisingContext, and not on a Promise.
     return await get_active_context().await_children(recursively=recursively)
 
 
 def await_children_sync(*, recursively: bool = False) -> None:
     """
-    Wait for all child Promises to finish, blocking the calling thread.
+    Wait for all awaitable children of the active context to finish,
+    blocking the calling thread.
+    # TODO Elaborate more on why this method exists.
+    #  See promising/promise.py::Promise.sync() for more details.
 
     Args:
-        recursively: If True, wait for all children of all children, and so
-            on, recursively.
+        recursively: If True, wait for all descendants, not just direct
+            children.
     """
+    # TODO We need unit tests that ensure this function works correctly even
+    #  when called on a bare PromisingContext, and not on a Promise.
     return get_active_context().await_children_sync(recursively=recursively)
 
 
 class PromisingContext:
+    """
+    Create a new PromisingContext.
+
+    A PromisingContext provides hierarchical context management for
+    asynchronous operations. It tracks parent-child relationships,
+    manages configuration inheritance (e.g. start_soon behavior), and
+    maintains a weak set of child contexts for awaiting.
+
+    Args:
+        loop: The event loop to use. If not provided, inherits from the
+            parent context. If no parent exists, uses the current event
+            loop. If provided explicitly and a parent exists, must be the
+            same event loop as the parent's.
+        parent: Parent PromisingContext. If INHERIT (default), uses the
+            currently active context as parent. If None, the context has
+            no parent.
+        start_soon: Whether associated work should start immediately.
+            NOT_SET (default) defers to the parent's
+            children_start_soon_by_default if enforced, otherwise falls
+            back to everything_starts_soon_by_default. INHERIT copies the
+            parent's start_soon directly.
+        children_start_soon_by_default: Default start_soon value enforced
+            on child contexts that leave start_soon as NOT_SET. NOT_SET
+            (default) means no enforcement. INHERIT copies the parent's
+            setting.
+        everything_starts_soon_by_default: Local override for the global
+            EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT (default)
+            propagates from the parent. GLOBAL_DEFAULT reads the current
+            global setting without inheriting.
+
+    Raises:
+        ValueError: If invalid parameter values or combinations are
+            provided.
+    """
+
     _active_context = ContextVar["PromisingContext | None"]("PromisingContext._active_context", default=None)
     _previous_token: contextvars.Token | None
 
@@ -121,10 +162,11 @@ class PromisingContext:
 
     def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
-        Get the parent PromisingContext of this PromisingContext.
+        Get the immediate parent PromisingContext of this PromisingContext.
 
         Args:
-            raise_if_none: If True, raises an exception when no parent PromisingContext exists.
+            raise_if_none: If True, raises an exception when no parent
+                PromisingContext exists.
 
         Returns:
             The parent PromisingContext, or None if none exists and
@@ -140,11 +182,14 @@ class PromisingContext:
 
     async def await_children(self, *, recursively: bool = False) -> None:
         """
-        Wait for child Promises to finish.
+        Wait for all awaitable children to finish.
+
+        Repeatedly gathers awaitable children until none remain, since
+        children may spawn new children while being awaited.
 
         Args:
-            recursively: If True, wait for all children of all children, and so
-                on, recursively.
+            recursively: If True, wait for all descendants, not just direct
+                children.
         """
         while children := self.collect_remaining_children(
             recursively=recursively,
@@ -158,19 +203,35 @@ class PromisingContext:
                 *children,
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
-                # whether any of them fail (we don't just wait until the first
-                # one fails)
+                # whether any of them fail (we don't want to wait only until
+                # the first one, if any, fails)
                 return_exceptions=True,
             )
 
     def await_children_sync(self, *, recursively: bool = False) -> None:
+        """
+        Wait for all awaitable children to finish, blocking the calling
+        thread.
+
+        This is the synchronous counterpart of await_children() — intended
+        for use from threads that are not running the event loop.
+        # TODO Elaborate more on why this method exists.
+        #  See promising/promise.py::Promise.sync() for more details.
+
+        Args:
+            recursively: If True, wait for all descendants, not just direct
+                children.
+
+        Raises:
+            SyncUsageError: If called from the event loop thread, because this
+                would cause a deadlock.
+        """
         self._assert_no_sync_usage_deadlock(
             "`await_children_sync()` cannot be called from the "
             "event loop thread because it would deadlock. Use "
             "`await promise.await_children()` or "
             "`await promising.await_children()` instead."
         )
-
         concurrent_future = concurrent.futures.Future[None]()
 
         async def await_children_and_notify() -> None:
@@ -197,20 +258,29 @@ class PromisingContext:
         exclude_done: bool = True,
     ) -> set["PromisingContext"]:
         """
-        # TODO Explain the treatment of PromisingContexts versus Futures (or
-        #  awaitables in general, for that matter)
-        Get child PromisingContexts that weren't garbage collected and are still
-        reachable. Those would be the ones that are either still in progress
-        themselves, or have children of their own that are still in progress.
+        Collect child contexts that haven't been garbage collected.
+
+        Children are held via a WeakSet, so only children that are still
+        strongly referenced elsewhere will be returned. Filtering options
+        allow narrowing the set to awaitable and/or in-progress children.
+
+        A child is considered "awaitable" if ``inspect.isawaitable()``
+        returns True for it (e.g. Promises, which are Futures). A child is
+        considered "done" if it is an asyncio Future whose ``done()`` method
+        returns True.
 
         Args:
-            recursively: If True, return children of children, and so on
-                (in the same set).
-            exclude_done: If True, exclude child PromisingContexts that are done
-                (i.e. have a result or exception set).
+            recursively: If True, include descendants at all levels, not
+                just direct children.
+            exclude_non_awaitable: If True (default), exclude children that
+                are not awaitable (i.e. plain PromisingContexts that are not
+                Futures).
+            exclude_done: If True (default), exclude children that weren't
+                garbage collected yet, but are done nonetheless (i.e. Futures
+                with a result or exception already set).
 
         Returns:
-            Set of child PromisingContexts that are still existing.
+            Set of child PromisingContexts matching the filter criteria.
         """
         # # COPIED FROM asyncio.tasks::all_tasks():
         # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another

@@ -1,4 +1,3 @@
-# TODO TODO TODO Update docstrings throughout this file
 import asyncio
 import concurrent.futures
 import itertools
@@ -19,7 +18,7 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     Get the currently active Promise from context.
 
     Args:
-        raise_if_none: If True, raises NoCurrentPromiseError when no active
+        raise_if_none: If True, raises PromiseNotFoundError when no active
             Promise is found.
 
     Returns:
@@ -27,7 +26,7 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
         and raise_if_none is False.
 
     Raises:
-        NoCurrentPromiseError: If no active Promise is found and raise_if_none
+        PromiseNotFoundError: If no active Promise is found and raise_if_none
             is True.
     """
     return Promise.get_active_promise(raise_if_none=raise_if_none)
@@ -35,22 +34,23 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
 
 class Promise(PromisingContext, Future, Generic[T_co]):
     """
-    A Promise combines asyncio Future functionality with hierarchical context
-    management.
+    A Promise combines PromisingContext's hierarchical context management
+    with asyncio Future functionality.
 
-    Promises extend asyncio Futures to provide:
-    - Parent-child relationships between asynchronous operations
-    - Configuration inheritance from parent Promises
-    - Automatic child task management
-    - Thread-safe concurrent.futures compatibility
+    Promise extends both PromisingContext and asyncio Future to provide:
+    - Asynchronous computation backed by a coroutine
+    - Result/exception propagation via the Future interface
+    - Thread-safe synchronous access via concurrent.futures compatibility
+    - Hierarchical parent-child relationships (inherited from
+      PromisingContext)
 
-    Parent-child relationships semantics:
-    - If the coroutine of a Promise creates other Promise instances during its
-      execution, those Promises are attached as children of that Promise.
-    - The exact time when a child's execution starts, finishes, or when its
-      resolution is triggered does not matter (it may occur outside of the
-      parent's execution window); it is still registered as a child of the
-      Promise whose coroutine created it.
+    Parent-child relationships (inherited from PromisingContext):
+    - If a Promise's coroutine creates other Promises or
+      PromisingContexts during execution, they are attached as children
+      of that context.
+    - The exact time when a child's execution starts, finishes, or when
+      its resolution is triggered does not matter; it is still registered
+      as a child of the context whose coroutine created it.
     - If a parent is explicitly specified at creation time, that explicit
       parent takes precedence.
 
@@ -58,49 +58,36 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         T_co: The covariant type of the Promise's result.
 
     Args:
-        coro: The coroutine to execute. If None, the Promise must be prefilled
-            with a result or exception.
-        loop: The event loop to use. If not provided, inherits from the parent
-            Promise. If no parent Promise, uses the current running loop. If
-            provided explicitly and a parent Promise exists, must be the same
-            event loop as the parent's loop.
-        name: Human-readable name for the Promise. If None, generates a unique
-            name ("Promise-N", where N is a number).
-        parent: Parent Promise instance. If INHERIT, uses the currently
-            active Promise as a parent. If None, the Promise has no
-            parent.
-        start_soon: Whether to start executing the coroutine
-            immediately upon creation. NOT_SET (default) defers to
-            the parent's children_start_soon_by_default if that is
-            enforced (i.e. set to a concrete bool), otherwise falls
-            back to everything_starts_soon_by_default. INHERIT copies
-            the parent's start_soon directly (or falls back to
-            everything_starts_soon_by_default if no parent).
-        children_start_soon_by_default: Default start_soon value
-            enforced on child Promises that leave start_soon as
-            NOT_SET. NOT_SET (default) means no enforcement. INHERIT
-            copies the parent's children_start_soon_by_default (or
-            falls back to everything_starts_soon_by_default if no
-            parent).
-        everything_starts_soon_by_default: Local override for the
-            global EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT
-            (default) propagates from the parent (or reads the global
-            if no parent). GLOBAL_DEFAULT reads the current global setting
-            without inheriting.
-        prefill_result: Pre-set result value. Cannot be combined with coro or
-            prefill_exception.
-        prefill_exception: Pre-set exception. Cannot be combined with coro or
-            prefill_result.
+        coro: The coroutine to execute. If None, the Promise must be
+            prefilled with a result or exception.
+        loop: The event loop to use. Passed to PromisingContext; see
+            PromisingContext.__init__ for inheritance behavior.
+        name: Human-readable name for the Promise. If None, generates a
+            unique name ("Promise-N", where N is a number).
+        parent: Parent context. Passed to PromisingContext; see
+            PromisingContext.__init__ for inheritance behavior.
+        start_soon: Whether to start executing the coroutine immediately
+            upon creation. Passed to PromisingContext; see
+            PromisingContext.__init__ for inheritance behavior.
+        children_start_soon_by_default: Default start_soon value enforced
+            on child contexts. Passed to PromisingContext; see
+            PromisingContext.__init__ for inheritance behavior.
+        everything_starts_soon_by_default: Local override for the global
+            EVERYTHING_STARTS_SOON_BY_DEFAULT. Passed to PromisingContext;
+            see PromisingContext.__init__ for inheritance behavior.
+        prefill_result: Pre-set result value. Cannot be combined with coro
+            or prefill_exception.
+        prefill_exception: Pre-set exception. Cannot be combined with coro
+            or prefill_result.
 
     Raises:
-        ValueError: If invalid parameter combinations are provided. See
-            parameter descriptions above.
+        ValueError: If invalid parameter combinations are provided.
         TypeError: If coro is not a coroutine when provided.
     """
 
     _task: Task[T_co] | None
 
-    # TODO Order the methods in this class in a more useful manner
+    # TODO TODO TODO Order the methods in this class in a more useful manner
 
     def __init__(
         self,
@@ -136,6 +123,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._task = None
         self._concurrent_future = _AsyncioBackedConcurrentFuture(self)
 
+        # TODO TODO TODO Move the support of `name` to the level of
+        #  PromisingContext
         if name is None:
             name = f"Promise-{next(_promise_name_counter)}"
         # TODO Implement custom __str__ and __repr__ methods and use this name
@@ -159,6 +148,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         executor. It schedules the Promise's execution on
         the event loop via ``call_soon_threadsafe`` and
         blocks until the result (or exception) is available.
+        # TODO The reader does not need to be bothered by the implementation
+        #  details of this method.
 
         Returns:
             The resolved value of the Promise.
@@ -233,6 +224,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         try:
             # Activate this Promise by setting it as the current context and
             # store the previous context token for later restoration
+            # TODO TODO TODO Move to the level of PromisingContext
+            #  (as a context manager)
             self._previous_token = self._active_context.set(self)
 
             result = await self._coro
@@ -244,6 +237,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # Finalize the Promise execution by restoring context
                 # (removing this Promise from the context and restoring the
                 # previous value for the respective context var)
+                # TODO TODO TODO Move to the level of PromisingContext
+                #  (as a context manager)
                 if self._previous_token is not None:
                     self._active_context.reset(self._previous_token)
                     self._previous_token = None

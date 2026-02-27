@@ -92,8 +92,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
-    # TODO TODO TODO Order the methods in this class in a more useful manner
-
     def __init__(
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
@@ -141,137 +139,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             prefill_result=prefill_result,
             prefill_exception=prefill_exception,
         )
-
-    def sync(self) -> T_co:
-        """
-        Synchronously wait for and return the Promise result, blocking the
-        calling thread.
-
-        This is the synchronous counterpart of `await promise` — intended for
-        use inside sync promising functions that run in a thread pool executor.
-        It schedules the Promise's execution on the event loop via
-        `call_soon_threadsafe` and blocks until the result (or exception) is
-        available.
-        # TODO The reader does not need to be bothered by the implementation
-        #  details of this method.
-
-        Returns:
-            The resolved value of the Promise.
-
-        Raises:
-            SyncPromiseUsageError: If called from the same thread as the event
-                loop, which would deadlock.
-        """
-        self._assert_no_sync_usage_deadlock(
-            "`promise.sync()` cannot be called from the "
-            "event loop thread because it would deadlock. "
-            "Use `await promise` instead."
-        )
-
-        self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
-        return self.as_concurrent_future().result()
-
-    def _ensure_task_scheduled(self) -> None:
-        if self._task is None and not self.done():
-            self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
-
-    def set_result(self, result: T_co) -> None:
-        """
-        Set the result of the Promise. This method is not intended to be called
-        directly by users; it is managed by the Promise's lifecycle.
-
-        Also sets the result on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            result: The result value to set.
-        """
-        super().set_result(result)
-        self._concurrent_future.set_result(result)
-
-    def set_exception(self, exception: BaseException) -> None:
-        """
-        Set an exception on the Promise. This method is not intended to be
-        called directly by users; it is managed by the Promise's lifecycle.
-
-        Also sets the exception on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            exception: The exception to set.
-        """
-        super().set_exception(exception)
-        self._concurrent_future.set_exception(exception)
-
-    async def _fulfill(self) -> None:
-        """
-        Execute the Promise's coroutine and manage its lifecycle.
-
-        This method:
-        1. Activates the Promise as the current context
-        2. Executes the coroutine
-        3. Sets the result or exception
-
-        Raises:
-            RuntimeError: If the Promise is already done or has no coroutine.
-        """
-        if self.done():
-            # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
-        if self._coro is None:
-            # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self.get_name()}")
-
-        result = NOT_SET
-        exception = NOT_SET
-
-        try:
-            # Activate this Promise by setting it as the current context and
-            # store the previous context token for later restoration
-            # TODO TODO TODO Move to the level of PromisingContext
-            #  (as a context manager)
-            self._previous_token = self._active_context.set(self)
-
-            result = await self._coro
-
-        except BaseException as exc:  # noqa: BLE001 (blind-except)
-            exception = exc
-        finally:
-            try:
-                # Finalize the Promise execution by restoring context
-                # (removing this Promise from the context and restoring the
-                # previous value for the respective context var)
-                # TODO TODO TODO Move to the level of PromisingContext
-                #  (as a context manager)
-                if self._previous_token is not None:
-                    self._active_context.reset(self._previous_token)
-                    self._previous_token = None
-
-            finally:
-                if exception is not NOT_SET:
-                    self.set_exception(exception)
-                else:
-                    self.set_result(result)
-
-    def __await__(self) -> Generator[Any, None, T_co]:
-        """
-        If the Promise hasn't started yet, start execution of the coro via
-        _fulfill() and run it to completion. If already started via
-        start_soon, wait for the existing task to complete.
-
-        Returns:
-            A generator for the await protocol that eventually returns the
-            result of the Promise.
-        """
-        # TODO Ensure we are in the same thread as the Promise's event loop is
-        #  running
-        if self.done():
-            return self.result()
-
-        self._ensure_task_scheduled()
-
-        yield from self._task
-        return (yield from super().__await__())
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -339,6 +206,55 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return self._name
 
+    def __await__(self) -> Generator[Any, None, T_co]:
+        """
+        If the Promise hasn't started yet, start execution of the coro via
+        _fulfill() and run it to completion. If already started via
+        start_soon, wait for the existing task to complete.
+
+        Returns:
+            A generator for the await protocol that eventually returns the
+            result of the Promise.
+        """
+        # TODO Ensure we are in the same thread as the Promise's event loop is
+        #  running
+        if self.done():
+            return self.result()
+
+        self._ensure_task_scheduled()
+
+        yield from self._task
+        return (yield from super().__await__())
+
+    def sync(self) -> T_co:
+        """
+        Synchronously wait for and return the Promise result, blocking the
+        calling thread.
+
+        This is the synchronous counterpart of `await promise` — intended for
+        use inside sync promising functions that run in a thread pool executor.
+        It schedules the Promise's execution on the event loop via
+        `call_soon_threadsafe` and blocks until the result (or exception) is
+        available.
+        # TODO The reader does not need to be bothered by the implementation
+        #  details of this method.
+
+        Returns:
+            The resolved value of the Promise.
+
+        Raises:
+            SyncPromiseUsageError: If called from the same thread as the event
+                loop, which would deadlock.
+        """
+        self._assert_no_sync_usage_deadlock(
+            "`promise.sync()` cannot be called from the "
+            "event loop thread because it would deadlock. "
+            "Use `await promise` instead."
+        )
+
+        self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
+        return self.as_concurrent_future().result()
+
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
         Get a thread-safe `concurrent.futures.Future` view of this Promise.
@@ -350,6 +266,89 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A `concurrent.futures.Future` that mirrors this Promise's state.
         """
         return self._concurrent_future
+
+    async def _fulfill(self) -> None:
+        """
+        Execute the Promise's coroutine and manage its lifecycle.
+
+        This method:
+        1. Activates the Promise as the current context
+        2. Executes the coroutine
+        3. Sets the result or exception
+
+        Raises:
+            RuntimeError: If the Promise is already done or has no coroutine.
+        """
+        if self.done():
+            # Should not happen
+            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
+        if self._coro is None:
+            # Should not happen
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self.get_name()}")
+
+        result = NOT_SET
+        exception = NOT_SET
+
+        try:
+            # Activate this Promise by setting it as the current context and
+            # store the previous context token for later restoration
+            # TODO TODO TODO Move to the level of PromisingContext
+            #  (as a context manager)
+            self._previous_token = self._active_context.set(self)
+
+            result = await self._coro
+
+        except BaseException as exc:  # noqa: BLE001 (blind-except)
+            exception = exc
+        finally:
+            try:
+                # Finalize the Promise execution by restoring context
+                # (removing this Promise from the context and restoring the
+                # previous value for the respective context var)
+                # TODO TODO TODO Move to the level of PromisingContext
+                #  (as a context manager)
+                if self._previous_token is not None:
+                    self._active_context.reset(self._previous_token)
+                    self._previous_token = None
+
+            finally:
+                if exception is not NOT_SET:
+                    self.set_exception(exception)
+                else:
+                    self.set_result(result)
+
+    def _ensure_task_scheduled(self) -> None:
+        if self._task is None and not self.done():
+            self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
+
+    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
+        if isinstance(start_soon, bool):
+            # Concrete value was provided
+            return start_soon
+
+        if start_soon is NOT_SET:
+            # TODO Should there be any reason or scenario when
+            #  `everything_starts_soon_by_default` takes precedence over the
+            #  parent's `children_start_soon_by_default` ?
+            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
+                # The parent is enforcing this setting for its children
+                return self._parent._children_start_soon_by_default
+
+            # Use the default
+            return self._everything_starts_soon_by_default
+
+        if start_soon is INHERIT:
+            if self._parent is None:
+                # Use the default
+                return self._everything_starts_soon_by_default
+
+            # Inherit from the parent
+            return self._parent._start_soon
+
+        raise ValueError(
+            "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
+            f"but `{type(start_soon)}` was given instead"
+        )
 
     def _finish_initialization(
         self,
@@ -380,34 +379,33 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # side"
                 self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
 
-    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
-        if isinstance(start_soon, bool):
-            # Concrete value was provided
-            return start_soon
+    def set_result(self, result: T_co) -> None:
+        """
+        Set the result of the Promise. This method is not intended to be called
+        directly by users; it is managed by the Promise's lifecycle.
 
-        if start_soon is NOT_SET:
-            # TODO Should there be any reason or scenario when
-            #  `everything_starts_soon_by_default` takes precedence over the
-            #  parent's `children_start_soon_by_default` ?
-            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
-                # The parent is enforcing this setting for its children
-                return self._parent._children_start_soon_by_default
+        Also sets the result on the concurrent.futures.Future for thread
+        compatibility (see `as_concurrent_future()` method).
 
-            # Use the default
-            return self._everything_starts_soon_by_default
+        Args:
+            result: The result value to set.
+        """
+        super().set_result(result)
+        self._concurrent_future.set_result(result)
 
-        if start_soon is INHERIT:
-            if self._parent is None:
-                # Use the default
-                return self._everything_starts_soon_by_default
+    def set_exception(self, exception: BaseException) -> None:
+        """
+        Set an exception on the Promise. This method is not intended to be
+        called directly by users; it is managed by the Promise's lifecycle.
 
-            # Inherit from the parent
-            return self._parent._start_soon
+        Also sets the exception on the concurrent.futures.Future for thread
+        compatibility (see `as_concurrent_future()` method).
 
-        raise ValueError(
-            "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
-            f"but `{type(start_soon)}` was given instead"
-        )
+        Args:
+            exception: The exception to set.
+        """
+        super().set_exception(exception)
+        self._concurrent_future.set_exception(exception)
 
 
 class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):

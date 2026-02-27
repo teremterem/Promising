@@ -90,7 +90,6 @@ class PromisingContext:
     """
 
     _active_context = ContextVar["PromisingContext | None"]("PromisingContext._active_context", default=None)
-    _previous_token: contextvars.Token | None
 
     # TODO Support cancellation of the whole PromisingContext tree
 
@@ -102,7 +101,7 @@ class PromisingContext:
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
-        self._previous_token = None
+        self._previous_token: contextvars.Token | None = None
 
         if parent is INHERIT:
             self._parent = self.get_active_context(raise_if_none=False)
@@ -114,8 +113,12 @@ class PromisingContext:
                 f"or None, but `{type(parent)}` was given instead"
             )
 
-        self._resolve_everything_starts_soon_by_default(everything_starts_soon_by_default)
-        self._resolve_children_start_soon_by_default(children_start_soon_by_default)
+        self._everything_starts_soon_by_default = self._resolve_everything_starts_soon_by_default(
+            everything_starts_soon_by_default
+        )
+        self._children_start_soon_by_default = self._resolve_children_start_soon_by_default(
+            children_start_soon_by_default
+        )
 
         if loop is None:
             if self._parent is None:
@@ -321,47 +324,56 @@ class PromisingContext:
 
                 return result
 
-    def _resolve_everything_starts_soon_by_default(self, everything_starts_soon_by_default: bool | Sentinel) -> None:
+    def _resolve_everything_starts_soon_by_default(
+        self,
+        everything_starts_soon_by_default: bool | Sentinel,
+    ) -> bool:
         from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
 
         if isinstance(everything_starts_soon_by_default, bool):
             # Concrete value was provided
-            self._everything_starts_soon_by_default = everything_starts_soon_by_default
-        elif everything_starts_soon_by_default is GLOBAL_DEFAULT:
+            return everything_starts_soon_by_default
+
+        if everything_starts_soon_by_default is GLOBAL_DEFAULT:
             # Use the global default
-            self._everything_starts_soon_by_default = should_everything_start_soon_by_default()
-        elif everything_starts_soon_by_default is INHERIT:
+            return should_everything_start_soon_by_default()
+
+        if everything_starts_soon_by_default is INHERIT:
             if self._parent is None:
                 # Use the global default
-                self._everything_starts_soon_by_default = should_everything_start_soon_by_default()
-            else:
-                # Inherit from the parent
-                self._everything_starts_soon_by_default = self._parent._everything_starts_soon_by_default
-        else:
-            raise ValueError(
-                "`everything_starts_soon_by_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
-                f"but `{type(everything_starts_soon_by_default)}` was given instead"
-            )
+                return should_everything_start_soon_by_default()
 
-    def _resolve_children_start_soon_by_default(self, children_start_soon_by_default: bool | Sentinel) -> None:
+            # Inherit from the parent
+            return self._parent._everything_starts_soon_by_default
+
+        raise ValueError(
+            "`everything_starts_soon_by_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(everything_starts_soon_by_default)}` was given instead"
+        )
+
+    def _resolve_children_start_soon_by_default(
+        self,
+        children_start_soon_by_default: bool | Sentinel,
+    ) -> bool | Sentinel:
         if isinstance(children_start_soon_by_default, bool) or children_start_soon_by_default is NOT_SET:
             # Apart from the concrete value, we also want to allow
             # `self._children_start_soon_by_default` to stay as NOT_SET, so we
             # can later tell whether it is being enforced on children or not
             # (NOT_SET means "no enforcement").
-            self._children_start_soon_by_default = children_start_soon_by_default
-        elif children_start_soon_by_default is INHERIT:
+            return children_start_soon_by_default
+
+        if children_start_soon_by_default is INHERIT:
             if self._parent is None:
                 # Use the default
-                self._children_start_soon_by_default = self._everything_starts_soon_by_default
-            else:
-                # Inherit from the parent
-                self._children_start_soon_by_default = self._parent._children_start_soon_by_default
-        else:
-            raise ValueError(
-                "`children_start_soon_by_default` must be either NOT_SET, INHERIT or a boolean value, "
-                f"but `{type(children_start_soon_by_default)}` was given instead"
-            )
+                return self._everything_starts_soon_by_default
+
+            # Inherit from the parent
+            return self._parent._children_start_soon_by_default
+
+        raise ValueError(
+            "`children_start_soon_by_default` must be either NOT_SET, INHERIT or a boolean value, "
+            f"but `{type(children_start_soon_by_default)}` was given instead"
+        )
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:
         try:

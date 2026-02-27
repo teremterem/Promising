@@ -337,7 +337,7 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 
 | Error | Raised When |
 |---|---|
-| `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside of a promising function). |
+| `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 

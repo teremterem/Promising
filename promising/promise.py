@@ -69,28 +69,28 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             unique name ("Promise-N", where N is a number).
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
-        start_soon: Whether to start executing the coroutine immediately
-            upon creation. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
+        start_soon: Whether associated work should start immediately.
+            NOT_SET (default) defers to the parent's
+            children_start_soon_by_default if enforced, otherwise falls
+            back to everything_starts_soon_by_default. INHERIT copies the
+            parent's start_soon directly.
         children_start_soon_by_default: Default start_soon value enforced
-            on child contexts. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
+            on child contexts that leave start_soon as NOT_SET. NOT_SET
+            (default) means no enforcement. INHERIT copies the parent's
+            setting.
         everything_starts_soon_by_default: Local override for the global
-            EVERYTHING_STARTS_SOON_BY_DEFAULT. Passed to PromisingContext;
-            see PromisingContext.__init__ for inheritance behavior.
+            EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT (default)
+            propagates from the parent. GLOBAL_DEFAULT reads the current
+            global setting without inheriting.
         prefill_result: Pre-set result value. Cannot be combined with coro
             or prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro
             or prefill_result.
-        # TODO Better to explain `start_soon` related parameters here, and not
-        #  refer the reader to the PromisingContext docstring
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
         TypeError: If coro is not a coroutine when provided.
     """
-
-    _task: Task[T_co] | None
 
     # TODO TODO TODO Order the methods in this class in a more useful manner
 
@@ -112,7 +112,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             self,
             loop=loop,
             parent=parent,
-            start_soon=start_soon,
             children_start_soon_by_default=children_start_soon_by_default,
             everything_starts_soon_by_default=everything_starts_soon_by_default,
         )
@@ -124,9 +123,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # None)
             loop=self._ctx_loop,
         )
-
-        self._task = None
+        self._task: Task[T_co] | None = None
         self._concurrent_future = _AsyncioBackedConcurrentFuture(self)
+
+        self._start_soon = self._resolve_start_soon(start_soon)
 
         # TODO TODO TODO Move the support of `name` to the level of
         #  PromisingContext
@@ -379,6 +379,35 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # use `self._loop.call_soon_threadsafe` to "stay on the safe
                 # side"
                 self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
+
+    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
+        if isinstance(start_soon, bool):
+            # Concrete value was provided
+            return start_soon
+
+        if start_soon is NOT_SET:
+            # TODO Should there be any reason or scenario when
+            #  `everything_starts_soon_by_default` takes precedence over the
+            #  parent's `children_start_soon_by_default` ?
+            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
+                # The parent is enforcing this setting for its children
+                return self._parent._children_start_soon_by_default
+
+            # Use the default
+            return self._everything_starts_soon_by_default
+
+        if start_soon is INHERIT:
+            if self._parent is None:
+                # Use the default
+                return self._everything_starts_soon_by_default
+
+            # Inherit from the parent
+            return self._parent._start_soon
+
+        raise ValueError(
+            "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
+            f"but `{type(start_soon)}` was given instead"
+        )
 
 
 class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):

@@ -75,11 +75,6 @@ class PromisingContext:
         parent: Parent PromisingContext. If INHERIT (default), uses the
             currently active context as parent. If None, the context has
             no parent.
-        start_soon: Whether associated work should start immediately.
-            NOT_SET (default) defers to the parent's
-            children_start_soon_by_default if enforced, otherwise falls
-            back to everything_starts_soon_by_default. INHERIT copies the
-            parent's start_soon directly.
         children_start_soon_by_default: Default start_soon value enforced
             on child contexts that leave start_soon as NOT_SET. NOT_SET
             (default) means no enforcement. INHERIT copies the parent's
@@ -104,7 +99,6 @@ class PromisingContext:
         *,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
-        start_soon: bool | Sentinel = NOT_SET,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -121,7 +115,6 @@ class PromisingContext:
             )
 
         self._resolve_everything_starts_soon_by_default(everything_starts_soon_by_default)
-        self._resolve_start_soon(start_soon)
         self._resolve_children_start_soon_by_default(children_start_soon_by_default)
 
         if loop is None:
@@ -348,33 +341,6 @@ class PromisingContext:
             raise ValueError(
                 "`everything_starts_soon_by_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
                 f"but `{type(everything_starts_soon_by_default)}` was given instead"
-            )
-
-    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> None:
-        if isinstance(start_soon, bool):
-            # Concrete value was provided
-            self._start_soon = start_soon
-        elif start_soon is NOT_SET:
-            # TODO Should there be any reason or scenario when
-            #  `everything_starts_soon_by_default` takes precedence over the
-            #  parent's `children_start_soon_by_default` ?
-            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
-                # The parent is enforcing this setting for its children
-                self._start_soon = self._parent._children_start_soon_by_default
-            else:
-                # Use the default
-                self._start_soon = self._everything_starts_soon_by_default
-        elif start_soon is INHERIT:
-            if self._parent is None:
-                # Use the default
-                self._start_soon = self._everything_starts_soon_by_default
-            else:
-                # Inherit from the parent
-                self._start_soon = self._parent._start_soon
-        else:
-            raise ValueError(
-                "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
-                f"but `{type(start_soon)}` was given instead"
             )
 
     def _resolve_children_start_soon_by_default(self, children_start_soon_by_default: bool | Sentinel) -> None:

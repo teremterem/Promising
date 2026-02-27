@@ -301,6 +301,7 @@ uv sync --extra examples
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
 | `promise.get_name()` | Get the human-readable name (auto-generated as `"Promise-N"`). |
 | `promise.as_concurrent_future()` | Get a thread-safe `concurrent.futures.Future` view. |
+| `promise.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 
 ### PromisingContext
 
@@ -308,7 +309,7 @@ uv sync --extra examples
 
 | Method / Property | Description |
 |---|---|
-| `ctx.get_parent(raise_if_none=True)` | Get the parent context. |
+| `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
 | `ctx.await_children_sync(recursively=False)` | Sync — block until child contexts finish. |
 | `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
@@ -317,8 +318,8 @@ uv sync --extra examples
 
 | Function | Description |
 |---|---|
-| `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` from context. |
-| `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` from context (walks up the parent chain past non-Promise contexts). |
+| `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
+| `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
 

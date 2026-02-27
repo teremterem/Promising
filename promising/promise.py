@@ -243,8 +243,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             The resolved value of the Promise.
 
         Raises:
-            SyncPromiseUsageError: If called from the same thread as the event
-                loop, which would deadlock.
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
         """
         self._assert_no_sync_usage_deadlock(
             "`promise.sync()` cannot be called from the "

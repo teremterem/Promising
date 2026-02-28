@@ -7,7 +7,13 @@ from promising.errors import (
     SyncUsageError,
 )
 from promising.promise import Promise, get_active_promise
-from promising.promising_context import PromisingContext, await_children, await_children_sync, get_active_context
+from promising.promising_context import (
+    PromisingContext,
+    await_children,
+    await_children_sync,
+    context,
+    get_active_context,
+)
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
@@ -34,6 +40,7 @@ __all__ = [
     "ContextAlreadyActiveError",
     "ContextNotActiveError",
     "ContextNotFoundError",
+    "context",
     "PromiseNotFoundError",
     "Promise",
     "PromisingContext",

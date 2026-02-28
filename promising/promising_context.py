@@ -392,7 +392,12 @@ class PromisingContext:
             @wraps(func_or_method)
             async def _decorator(*args: Any, **kwargs: Any) -> Any:
                 with self:
-                    return await func_or_method(*args, **kwargs)
+                    if isinstance(func_or_method, classmethod):
+                        func = func_or_method.__func__
+                    else:
+                        func = func_or_method
+
+                    return await func(*args, **kwargs)
 
             return _decorator
 
@@ -400,7 +405,12 @@ class PromisingContext:
         @wraps(func_or_method)
         def _decorator_sync(*args: Any, **kwargs: Any) -> Any:
             with self:
-                return func_or_method(*args, **kwargs)
+                if isinstance(func_or_method, classmethod):
+                    func = func_or_method.__func__
+                else:
+                    func = func_or_method
+
+                return func(*args, **kwargs)
 
         return _decorator_sync
 

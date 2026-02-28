@@ -1,6 +1,5 @@
 import contextvars
 import functools
-import inspect
 import types
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -9,6 +8,7 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
+from promising.utils import is_func_or_method_coro
 
 # TODO Allow overriding this executor in local promise configurations
 # TODO What to do about potential deadlocks if recursive sync promises use up
@@ -98,11 +98,6 @@ class PromisingFunction(Generic[T_co]):
         self.children_start_soon_by_default = children_start_soon_by_default
         self.everything_starts_soon_by_default = everything_starts_soon_by_default
 
-    def _is_coroutine_function(self) -> bool:
-        if isinstance(self.__wrapped__, (classmethod, staticmethod)):
-            return inspect.iscoroutinefunction(self.__wrapped__.__func__)
-        return inspect.iscoroutinefunction(self.__wrapped__)
-
     def __get__(self, obj: Any, objtype: type | None = None) -> "PromisingFunction[T_co] | types.MethodType":
         if isinstance(self.__wrapped__, classmethod):
             # Classmethod: bind the class as the first argument regardless of
@@ -158,7 +153,7 @@ class PromisingFunction(Generic[T_co]):
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
-        if self._is_coroutine_function():
+        if is_func_or_method_coro(self.__wrapped__):
             if isinstance(self.__wrapped__, classmethod):
                 # self.__wrapped__ is a classmethod object; args[0] is the
                 # class, already prepended by MethodType in __get__.

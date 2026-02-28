@@ -4,11 +4,44 @@ import contextvars
 import inspect
 from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
+from functools import wraps
 from types import TracebackType
+from typing import Any
 from weakref import WeakSet
 
 from promising.errors import ContextAlreadyActiveError, ContextNotActiveError, ContextNotFoundError, SyncUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising.types import DecoratableFunctionType
+from promising.utils import is_func_or_method_coro
+
+
+def context(
+    # TODO Split into two functions with the same name using @overload ?
+    #  Similar case:
+    #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
+    func_or_method: DecoratableFunctionType | None = None,
+    *,
+    loop: AbstractEventLoop | None = None,
+    parent: "PromisingContext | Sentinel | None" = INHERIT,
+    children_start_soon_by_default: bool | Sentinel = NOT_SET,
+    everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+) -> "PromisingContext | DecoratableFunctionType":
+    if func_or_method is None:
+        # Context manager mode (or decorator mode without arguments)
+        return PromisingContext(
+            loop=loop,
+            parent=parent,
+            children_start_soon_by_default=children_start_soon_by_default,
+            everything_starts_soon_by_default=everything_starts_soon_by_default,
+        )
+
+    # Decorator mode (with arguments)
+    return PromisingContext(
+        loop=loop,
+        parent=parent,
+        children_start_soon_by_default=children_start_soon_by_default,
+        everything_starts_soon_by_default=everything_starts_soon_by_default,
+    )(func_or_method)
 
 
 def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -352,6 +385,24 @@ class PromisingContext:
                 raise exc from exc_value
 
         return False  # Let's not suppress any exceptions
+
+    def __call__(self, func_or_method: DecoratableFunctionType) -> DecoratableFunctionType:
+        if is_func_or_method_coro(func_or_method):
+            # Async function or method
+            @wraps(func_or_method)
+            async def _decorator(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    return await func_or_method(*args, **kwargs)
+
+            return _decorator
+
+        # Sync function or method
+        @wraps(func_or_method)
+        def _decorator_sync(*args: Any, **kwargs: Any) -> Any:
+            with self:
+                return func_or_method(*args, **kwargs)
+
+        return _decorator_sync
 
     def _resolve_everything_starts_soon_by_default(
         self,

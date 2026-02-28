@@ -26,6 +26,8 @@ def context(
     children_start_soon_by_default: bool | Sentinel = NOT_SET,
     everything_starts_soon_by_default: bool | Sentinel = INHERIT,
 ) -> "PromisingContext | DecoratableFunctionType":
+    # TODO TODO TODO This isn't going to work - PromisingContext objects
+    #  SHOULD NOT be created "on the spot"
     if func_or_method is None:
         # Context manager mode (or decorator mode without arguments)
         return PromisingContext(

@@ -4,9 +4,10 @@ import contextvars
 import inspect
 from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
+from types import TracebackType
 from weakref import WeakSet
 
-from promising.errors import ContextNotFoundError, SyncUsageError
+from promising.errors import ContextAlreadyActiveError, ContextNotActiveError, ContextNotFoundError, SyncUsageError
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 
@@ -323,6 +324,34 @@ class PromisingContext:
                         )
 
                 return result
+
+    def __enter__(self) -> "PromisingContext":
+        if self._previous_token is not None:
+            raise ContextAlreadyActiveError("This PromisingContext is already active")
+
+        self._previous_token = self._active_context.set(self)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        try:
+            if self._previous_token is None:
+                raise ContextNotActiveError("This PromisingContext is not active")
+
+            self._active_context.reset(self._previous_token)
+            self._previous_token = None
+
+        except BaseException as exc:  # noqa: BLE001 (blind-except)
+            if exc_value is None:
+                raise exc
+            else:
+                raise exc from exc_value
+
+        return False  # Let's not suppress any exceptions
 
     def _resolve_everything_starts_soon_by_default(
         self,

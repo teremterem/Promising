@@ -286,42 +286,26 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         exception = NOT_SET
 
         try:
-            # Activate this Promise by setting it as the current context and
-            # store the previous context token for later restoration
-            # TODO TODO TODO Move to the level of PromisingContext
-            #  (as a context manager)
-            self._previous_token = self._active_context.set(self)
-
-            result = await self._coro
+            with self:
+                result = await self._coro
 
         except BaseException as exc:
             exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
-                if not hasattr(exception, "__promising_trace"):
+                if not hasattr(exception, "__promising_trace__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
-                    exception.__promising_trace = self
+                    exception.__promising_trace__ = self
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
                 pass
         finally:
-            try:
-                # Finalize the Promise execution by restoring context
-                # (removing this Promise from the context and restoring the
-                # previous value for the respective context var)
-                # TODO TODO TODO Move to the level of PromisingContext
-                #  (as a context manager)
-                if self._previous_token is not None:
-                    self._active_context.reset(self._previous_token)
-                    self._previous_token = None
-
-            finally:
-                if exception is not NOT_SET:
-                    self.set_exception(exception)
-                else:
-                    self.set_result(result)
+            if exception is not NOT_SET:
+                self.set_exception(exception)
+            else:
+                self.set_result(result)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():

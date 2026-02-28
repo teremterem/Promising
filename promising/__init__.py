@@ -1,5 +1,7 @@
 from promising.errors import (
     BasePromisingError,
+    ContextAlreadyActiveError,
+    ContextNotActiveError,
     ContextNotFoundError,
     PromiseNotFoundError,
     SyncUsageError,
@@ -29,6 +31,8 @@ __all__ = [
     "GLOBAL_DEFAULT",
     "INHERIT",
     "NOT_SET",
+    "ContextAlreadyActiveError",
+    "ContextNotActiveError",
     "ContextNotFoundError",
     "PromiseNotFoundError",
     "Promise",

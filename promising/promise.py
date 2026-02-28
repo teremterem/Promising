@@ -1,6 +1,5 @@
 import asyncio
 import concurrent.futures
-import itertools
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
 from typing import Any, Generic
@@ -9,10 +8,6 @@ from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
-
-# TODO This is not thread-safe anymore - promises and contexts can be created
-#  in other threads now
-_promise_name_counter = itertools.count(1)
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -129,7 +124,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         # TODO TODO TODO Move the support of `name` to the level of
         #  PromisingContext
         if name is None:
-            name = f"Promise-{next(_promise_name_counter)}"
+            name = f"Promise-{id(self)}"
         # TODO Implement custom __str__ and __repr__ methods and use this name
         #  in them ?
         self._name = name
@@ -279,6 +274,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done or has no coroutine.
         """
+        # ruff: BLE001 (blind-except)
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
@@ -298,8 +294,18 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
             result = await self._coro
 
-        except BaseException as exc:  # noqa: BLE001 (blind-except)
+        except BaseException as exc:
             exception = exc
+            try:
+                # TODO Make it possible to disable setting this trace ?
+                if not hasattr(exception, "__promising_trace"):
+                    # We only let it be set at the deepest level of the promise
+                    # hierarchy
+                    exception.__promising_trace = self
+            except BaseException:  # noqa: BLE001 (blind-except)
+                # Suppress the error if any - failure to store the trace should
+                # not affect the exception handling
+                pass
         finally:
             try:
                 # Finalize the Promise execution by restoring context

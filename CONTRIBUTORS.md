@@ -33,7 +33,7 @@ ruff check
 pre-commit run --all-files
 ```
 
-Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_function/`).
+Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_context/`, `tests/promising_function/`), each with a `sync/` subdirectory for sync-related tests.
 
 ## Code Style
 
@@ -49,7 +49,9 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 ### PromisingContext (`promising/promising_context.py`)
 
-The base class for hierarchical context management. Manages parent-child relationships, configuration inheritance (`children_start_soon_by_default`, `everything_starts_soon_by_default`), and child-waiting (`await_children` / `await_children_sync`). Uses a `ContextVar` (`PromisingContext._active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+The base class for hierarchical context management. Manages parent-child relationships, naming (`name` parameter, `get_name()`), configuration inheritance (`children_start_soon_by_default`, `everything_starts_soon_by_default`), and child-waiting (`await_children` / `await_children_sync`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext._active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+
+This file also contains the `context` class — a context manager / decorator that creates a `PromisingContext` without producing a `Promise`. It implements the descriptor protocol (via `DecoratorSupport`) for use as a method decorator.
 
 ### Promise (`promising/promise.py`)
 
@@ -70,10 +72,14 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 ### Error Classes (`promising/errors.py`)
 
 - `BasePromisingError` — base class
+- `ContextAlreadyActiveError` — attempting to enter a `PromisingContext` that is already active
+- `ContextNotActiveError` — attempting to exit a `PromisingContext` that is not active
 - `ContextNotFoundError` — no active `PromisingContext` found
+- `ContextUsageError` — misuse of `promising.context` (e.g. using the same instance as both context manager and decorator)
+- `DecorationError` — invalid decorator usage
 - `PromiseNotFoundError` — no active `Promise` found (the active context is not a `Promise`)
 - `SyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 ### Public API
 
-Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The decorator is `promising.function` — usable as `@promising.function()` with config args or `@promising.function` bare.
+Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The main entry points are `promising.function` (decorator that produces Promises) and `promising.context` (context manager / decorator that creates a bare `PromisingContext`). Both are usable bare or with configuration arguments.

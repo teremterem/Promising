@@ -288,6 +288,7 @@ uv sync --extra examples
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `parent`, `children_start_soon_by_default`, and `everything_starts_soon_by_default`. |
 
 ### Promise
 
@@ -299,9 +300,7 @@ uv sync --extra examples
 | `promise.sync()` | Synchronous counterpart of `await` — blocks the calling thread. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
-| `promise.get_name()` | Get the human-readable name (auto-generated as `"Promise-N"`). |
 | `promise.as_concurrent_future()` | Get a thread-safe `concurrent.futures.Future` view. |
-| `promise.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 
 ### PromisingContext
 
@@ -309,7 +308,9 @@ uv sync --extra examples
 
 | Method / Property | Description |
 |---|---|
+| `ctx.get_name()` | Get the human-readable name. Auto-generated as `"{ClassName}-{id}"` if not provided via the `name` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
+| `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 | `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
 | `ctx.await_children_sync(recursively=False)` | Sync — block until child contexts finish. |
 | `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
@@ -322,6 +323,7 @@ uv sync --extra examples
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
+| `promising.should_everything_start_soon_by_default()` | Returns the current value of `EVERYTHING_STARTS_SOON_BY_DEFAULT`. Useful for reading the global default without importing the mutable variable directly. |
 
 ### Sentinels
 
@@ -330,6 +332,7 @@ uv sync --extra examples
 | `promising.NOT_SET` | No value provided / no enforcement. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
+| `promising.Sentinel` | The sentinel class. All three sentinels above are instances of it. |
 
 All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 
@@ -338,6 +341,8 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 | Error | Raised When |
 |---|---|
 | `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). |
+| `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). |
+| `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 

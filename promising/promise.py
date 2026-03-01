@@ -104,6 +104,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         PromisingContext.__init__(
             self,
             loop=loop,
+            name=name,
             parent=parent,
             children_start_soon_by_default=children_start_soon_by_default,
             everything_starts_soon_by_default=everything_starts_soon_by_default,
@@ -120,14 +121,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._concurrent_future = _AsyncioBackedConcurrentFuture(self)
 
         self._start_soon = self._resolve_start_soon(start_soon)
-
-        # TODO TODO TODO Move the support of `name` to the level of
-        #  PromisingContext
-        if name is None:
-            name = f"Promise-{id(self)}"
-        # TODO Implement custom __str__ and __repr__ methods and use this name
-        #  in them ?
-        self._name = name
 
         self._coro = coro
         self._finish_initialization(
@@ -165,12 +158,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if raise_if_none and current is None:
             raise PromiseNotFoundError("No active Promise found")
         return current
-
-    def get_name(self) -> str:
-        """
-        Get the human-readable name of this Promise.
-        """
-        return self._name
 
     def __await__(self) -> Generator[Any, None, T_co]:
         """
@@ -280,7 +267,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
-            self._task = self._loop.create_task(self._fulfill(), name=self._name + "-Task")
+            self._task = self._loop.create_task(self._fulfill(), name=self.get_name() + "-Task")
 
     def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
         if isinstance(start_soon, bool):

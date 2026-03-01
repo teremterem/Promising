@@ -204,11 +204,18 @@ class PromisingContext:
         self,
         *,
         loop: AbstractEventLoop | None = None,
+        name: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
         self._previous_token: contextvars.Token | None = None
+
+        if name is None:
+            name = f"{self.__class__.__name__}-{id(self)}"
+        # TODO Implement custom __str__ and __repr__ methods and use this name
+        #  in them ?
+        self._name = name
 
         if parent is INHERIT:
             self._parent = self.get_active_context(raise_if_none=False)
@@ -240,6 +247,12 @@ class PromisingContext:
         self._children = WeakSet[PromisingContext]()
         if self._parent is not None:
             self._parent._children.add(self)
+
+    def get_name(self) -> str:
+        """
+        Get the human-readable name of this PromisingContext.
+        """
+        return self._name
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -372,7 +385,7 @@ class PromisingContext:
                 concurrent_future.set_result(None)
 
         def schedule_await_children() -> None:
-            self._ctx_loop.create_task(await_children_and_notify(), name=self._name + "-AwaitChildrenSync")
+            self._ctx_loop.create_task(await_children_and_notify(), name=self.get_name() + "-AwaitChildrenSync")
 
         self._ctx_loop.call_soon_threadsafe(schedule_await_children)
         # Should any error happen in the underlying async `await_children`,

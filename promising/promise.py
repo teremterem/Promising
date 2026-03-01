@@ -205,7 +205,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             "Use `await promise` instead."
         )
 
-        self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
+        self._call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
@@ -329,7 +329,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # We don't know which thread the Promise is created in, so we
                 # use `self._loop.call_soon_threadsafe` to "stay on the safe
                 # side"
-                self._loop.call_soon_threadsafe(self._ensure_task_scheduled)
+                self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def set_result(self, result: T_co) -> None:
         """

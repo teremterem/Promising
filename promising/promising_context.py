@@ -3,6 +3,7 @@ import concurrent.futures
 import contextvars
 import inspect
 from asyncio import AbstractEventLoop, Future
+from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
@@ -387,7 +388,7 @@ class PromisingContext:
         def schedule_await_children() -> None:
             self._ctx_loop.create_task(await_children_and_notify(), name=self.get_name() + "-AwaitChildrenSync")
 
-        self._ctx_loop.call_soon_threadsafe(schedule_await_children)
+        self._call_soon_threadsafe(schedule_await_children)
         # Should any error happen in the underlying async `await_children`,
         # the call below will re-raise it
         concurrent_future.result()
@@ -557,3 +558,12 @@ class PromisingContext:
 
         if running_loop is self._ctx_loop:
             raise SyncUsageError(message)
+
+    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
+        if not self._loop.is_running():
+            raise SyncUsageError(
+                "The event loop that would monitor a synchronous operation "
+                f"in this {self.__class__.__name__} is not running"
+            )
+
+        self._loop.call_soon_threadsafe(callback)

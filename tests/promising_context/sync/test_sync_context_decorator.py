@@ -126,8 +126,15 @@ async def test_sync_instance_method_receives_self() -> None:
         def get_value(self) -> int:
             return self.value
 
-    obj = Counter(42)
-    assert obj.get_value() == 42
+    obj1 = Counter(42)
+    obj2 = Counter(100)
+    obj3 = Counter(200)
+    assert obj1.get_value() == 42
+    assert obj2.get_value() == 100
+    assert obj3.get_value() == 200
+    assert obj3.get_value() == 200
+    assert obj1.get_value() == 42
+    assert obj2.get_value() == 100
 
 
 async def test_sync_instance_method_forwards_args() -> None:
@@ -141,11 +148,11 @@ async def test_sync_instance_method_forwards_args() -> None:
             self.base = base
 
         @promising.context()
-        def add(self, x: int, *, multiplier: int = 1) -> int:
+        def add(self, x: int, *, multiplier: int = 2) -> int:
             return (self.base + x) * multiplier
 
     obj = Adder(10)
-    assert obj.add(5) == 15
+    assert obj.add(5) == 30
     assert obj.add(5, multiplier=3) == 45
 
 
@@ -217,6 +224,10 @@ async def test_sync_class_method_receives_cls_via_inheritance() -> None:
         pass
 
     assert Base.get_class_name() == "Base"
+    assert Child.get_class_name() == "Child"
+    assert Child().get_class_name() == "Child"
+    assert Base().get_class_name() == "Base"
+    assert Child().get_class_name() == "Child"
     assert Child.get_class_name() == "Child"
 
 

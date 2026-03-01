@@ -21,6 +21,12 @@ from promising.utils import DecoratorSupport
 
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
+    """
+    # TODO When it comes to using it as a decorator, why does it exist
+    #  separately from @promising.function ? What's the difference between the
+    #  two ?
+    """
+
     def __init__(
         self,
         func_or_method: DecoratableFunctionType | None = None,
@@ -71,14 +77,14 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
         if self.__wrapped__ is None:
             # We are still in the process of decorating a function or method
-            # because it is a decorator with parameters) - let's finish the
-            # decoration process
+            # (because this decorator was used with parameters) - let's finish
+            # the decoration process
             if len(args) != 1 or kwargs:
                 raise ContextUsageError(
                     "The decorator must be called with exactly one positional "
                     "argument after its parameters were already provided, and "
-                    "it should be a strictly positional argument: a "
-                    "function or method to decorate."
+                    "it should be a strictly positional argument: a function "
+                    "or method to decorate."
                 )
             self._update_wrapper(args[0])
             return self

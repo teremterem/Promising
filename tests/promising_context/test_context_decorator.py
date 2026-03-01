@@ -143,8 +143,15 @@ async def test_instance_method_receives_self() -> None:
         async def get_value(self) -> int:
             return self.value
 
-    obj = Counter(42)
-    assert await obj.get_value() == 42
+    obj1 = Counter(42)
+    obj2 = Counter(100)
+    obj3 = Counter(200)
+    assert await obj1.get_value() == 42
+    assert await obj2.get_value() == 100
+    assert await obj3.get_value() == 200
+    assert await obj3.get_value() == 200
+    assert await obj1.get_value() == 42
+    assert await obj2.get_value() == 100
 
 
 async def test_instance_method_forwards_args() -> None:
@@ -158,11 +165,11 @@ async def test_instance_method_forwards_args() -> None:
             self.base = base
 
         @promising.context()
-        async def add(self, x: int, *, multiplier: int = 1) -> int:
+        async def add(self, x: int, *, multiplier: int = 2) -> int:
             return (self.base + x) * multiplier
 
     obj = Adder(10)
-    assert await obj.add(5) == 15
+    assert await obj.add(5) == 30
     assert await obj.add(5, multiplier=3) == 45
 
 
@@ -270,6 +277,10 @@ async def test_class_method_receives_cls_via_inheritance() -> None:
 
     assert await Base.get_class_name() == "Base"
     assert await Child.get_class_name() == "Child"
+    assert await Child().get_class_name() == "Child"
+    assert await Base().get_class_name() == "Base"
+    assert await Child().get_class_name() == "Child"
+    assert await Child.get_class_name() == "Child"
 
 
 async def test_class_method_forwards_args() -> None:
@@ -319,10 +330,11 @@ async def test_context_on_top_of_staticmethod() -> None:
     class MyClass:
         @promising.context()
         @staticmethod
-        async def my_method() -> None: ...
+        async def my_method() -> str:
+            return "ok"
 
-    assert await MyClass.my_method() is None
-    assert await MyClass().my_method() is None
+    assert await MyClass.my_method() == "ok"
+    assert await MyClass().my_method() == "ok"
 
 
 async def test_context_on_top_of_classmethod() -> None:
@@ -397,6 +409,8 @@ async def test_decorator_with_parent_none() -> None:
     @promising.context(parent=None) creates a root context even
     when called inside another context.
     """
+
+    # TODO TODO TODO Parametrize to test with and without a parent
 
     @promising.context(parent=None)
     async def work() -> bool:

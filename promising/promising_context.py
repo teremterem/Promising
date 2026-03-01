@@ -60,6 +60,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
                 "The same instance of `promising.context` cannot serve both "
                 "as a context manager and as a decorator simultaneously"
             )
+
         if self._promising_context is None:
             self._promising_context = PromisingContext(
                 loop=self._loop,
@@ -77,7 +78,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     ) -> bool:
         if self._promising_context is None:
             raise ContextNotActiveError("No PromisingContext was associated with this context manager instance")
-        return self._promising_context.__exit__(exc_type, exc_value, traceback)
+
+        result = self._promising_context.__exit__(exc_type, exc_value, traceback)
+        self._promising_context = None
+        return result
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
         if self.__wrapped__ is None:

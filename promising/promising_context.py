@@ -42,7 +42,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
-        self._loop = loop
+        self._ctx_loop = loop
         self._parent = parent
         self._children_start_soon_by_default = children_start_soon_by_default
         self._everything_starts_soon_by_default = everything_starts_soon_by_default
@@ -63,7 +63,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
-                loop=self._loop,
+                loop=self._ctx_loop,
                 parent=self._parent,
                 children_start_soon_by_default=self._children_start_soon_by_default,
                 everything_starts_soon_by_default=self._everything_starts_soon_by_default,
@@ -102,7 +102,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
-            loop=self._loop,
+            loop=self._ctx_loop,
             parent=self._parent,
             children_start_soon_by_default=self._children_start_soon_by_default,
             everything_starts_soon_by_default=self._everything_starts_soon_by_default,
@@ -564,10 +564,10 @@ class PromisingContext:
             raise SyncUsageError(message)
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
-        if not self._loop.is_running():
+        if not self._ctx_loop.is_running():
             raise SyncUsageError(
                 "The event loop that would monitor a synchronous operation "
                 f"in this {self.__class__.__name__} is not running"
             )
 
-        self._loop.call_soon_threadsafe(callback)
+        self._ctx_loop.call_soon_threadsafe(callback)

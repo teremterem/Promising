@@ -267,7 +267,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
-            self._task = self._loop.create_task(self._fulfill(), name=self.get_name() + "-Task")
+            self._task = self._ctx_loop.create_task(self._fulfill(), name=self.get_name() + "-Task")
 
     def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
         if isinstance(start_soon, bool):
@@ -327,8 +327,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
             if self._start_soon:
                 # We don't know which thread the Promise is created in, so we
-                # use `self._loop.call_soon_threadsafe` to "stay on the safe
-                # side"
+                # use the event loop's `call_soon_threadsafe` to "stay on the
+                # safe side"
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def set_result(self, result: T_co) -> None:

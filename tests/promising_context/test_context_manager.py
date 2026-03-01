@@ -2,8 +2,6 @@ import pytest
 
 import promising
 
-# ── Context Manager: Basic Usage ─────────────────────────────────
-
 
 async def test_context_manager_activates_context() -> None:
     """

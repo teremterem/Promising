@@ -5,7 +5,7 @@ import promising
 # ── Sync Function Decorator ──────────────────────────────────────
 
 
-async def test_sync_function_decorator_activates_context() -> None:
+def test_sync_function_decorator_activates_context() -> None:
     """
     @promising.context() on a sync function: the context is
     active inside the function body.
@@ -23,7 +23,7 @@ async def test_sync_function_decorator_activates_context() -> None:
     assert isinstance(captured_ctx, promising.PromisingContext)
 
 
-async def test_sync_function_decorator_deactivates_after() -> None:
+def test_sync_function_decorator_deactivates_after() -> None:
     """
     After the decorated sync function returns, the context is
     no longer active.
@@ -38,7 +38,7 @@ async def test_sync_function_decorator_deactivates_after() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-async def test_sync_function_decorator_forwards_args() -> None:
+def test_sync_function_decorator_forwards_args() -> None:
     """
     Positional and keyword arguments are forwarded to the
     decorated sync function.
@@ -52,7 +52,7 @@ async def test_sync_function_decorator_forwards_args() -> None:
     assert add(3, 4, multiplier=2) == 14
 
 
-async def test_sync_function_decorator_exception_propagates() -> None:
+def test_sync_function_decorator_exception_propagates() -> None:
     """
     An exception raised inside the decorated sync function
     propagates to the caller.
@@ -66,7 +66,7 @@ async def test_sync_function_decorator_exception_propagates() -> None:
         failing()
 
 
-async def test_sync_function_decorator_deactivates_on_exception() -> None:
+def test_sync_function_decorator_deactivates_on_exception() -> None:
     """
     The context is deactivated even if the decorated sync function
     raises.
@@ -82,7 +82,7 @@ async def test_sync_function_decorator_deactivates_on_exception() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-async def test_sync_function_decorator_without_parens() -> None:
+def test_sync_function_decorator_without_parens() -> None:
     """
     @promising.context (bare, no parens) also works as a decorator
     for sync functions.
@@ -98,7 +98,7 @@ async def test_sync_function_decorator_without_parens() -> None:
 # ── Sync Instance Methods ────────────────────────────────────────
 
 
-async def test_sync_instance_method_activates_context() -> None:
+def test_sync_instance_method_activates_context() -> None:
     """
     @promising.context() on a sync instance method: the context
     is active inside the method body and `self` is received.
@@ -113,7 +113,7 @@ async def test_sync_instance_method_activates_context() -> None:
     assert Greeter().greet() == "hello-sync"
 
 
-async def test_sync_instance_method_receives_self() -> None:
+def test_sync_instance_method_receives_self() -> None:
     """
     The sync method receives the correct `self` instance.
     """
@@ -137,7 +137,7 @@ async def test_sync_instance_method_receives_self() -> None:
     assert obj2.get_value() == 100
 
 
-async def test_sync_instance_method_forwards_args() -> None:
+def test_sync_instance_method_forwards_args() -> None:
     """
     Positional and keyword arguments are forwarded to
     the sync instance method correctly.
@@ -156,7 +156,7 @@ async def test_sync_instance_method_forwards_args() -> None:
     assert obj.add(5, multiplier=3) == 45
 
 
-async def test_sync_instance_method_exception_propagates() -> None:
+def test_sync_instance_method_exception_propagates() -> None:
     """
     An exception raised inside a sync instance method
     propagates to the caller.
@@ -174,7 +174,7 @@ async def test_sync_instance_method_exception_propagates() -> None:
 # ── Static Methods ───────────────────────────────────────────────
 
 
-async def test_sync_static_method_decorator() -> None:
+def test_sync_static_method_decorator() -> None:
     """
     @promising.context() below @staticmethod for sync functions.
     """
@@ -193,7 +193,7 @@ async def test_sync_static_method_decorator() -> None:
 # ── Class Methods ────────────────────────────────────────────────
 
 
-async def test_sync_class_method_decorator() -> None:
+def test_sync_class_method_decorator() -> None:
     """
     @promising.context() below @classmethod for sync methods.
     """
@@ -209,7 +209,7 @@ async def test_sync_class_method_decorator() -> None:
     assert Factory().create_name() == "Factory"
 
 
-async def test_sync_class_method_receives_cls_via_inheritance() -> None:
+def test_sync_class_method_receives_cls_via_inheritance() -> None:
     """
     Sync classmethod receives the correct class through inheritance.
     """
@@ -234,7 +234,7 @@ async def test_sync_class_method_receives_cls_via_inheritance() -> None:
 # ── Alternative Decorator Ordering ───────────────────────────────
 
 
-async def test_sync_context_on_top_of_staticmethod() -> None:
+def test_sync_context_on_top_of_staticmethod() -> None:
     """
     @promising.context() on top of @staticmethod for sync functions.
     """
@@ -249,7 +249,7 @@ async def test_sync_context_on_top_of_staticmethod() -> None:
     assert MyClass().my_method() == "ok"
 
 
-async def test_sync_context_on_top_of_classmethod() -> None:
+def test_sync_context_on_top_of_classmethod() -> None:
     """
     @promising.context() on top of @classmethod for sync functions.
     """

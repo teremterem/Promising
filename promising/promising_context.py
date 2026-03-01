@@ -96,30 +96,24 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # The function or method was already decorated and the decorator is now
         # being called with arguments - let's pass this call through to the
         # underlying function or method
+        ctx = PromisingContext(
+            loop=self._loop,
+            parent=self._parent,
+            children_start_soon_by_default=self._children_start_soon_by_default,
+            everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+        )
 
         if self._is_wrapped_async:
             # Wrapped function or method is async
 
-            # TODO TODO TODO
-
             async def _async_wrapper() -> Any:
-                with PromisingContext(
-                    loop=self._loop,
-                    parent=self._parent,
-                    children_start_soon_by_default=self._children_start_soon_by_default,
-                    everything_starts_soon_by_default=self._everything_starts_soon_by_default,
-                ):
+                with ctx:
                     return await self._wrapped_as_callable(*args, **kwargs)
 
             return _async_wrapper()
 
         # Wrapped function or method is sync
-        with PromisingContext(
-            loop=self._loop,
-            parent=self._parent,
-            children_start_soon_by_default=self._children_start_soon_by_default,
-            everything_starts_soon_by_default=self._everything_starts_soon_by_default,
-        ):
+        with ctx:
             return self._wrapped_as_callable(*args, **kwargs)
 
 

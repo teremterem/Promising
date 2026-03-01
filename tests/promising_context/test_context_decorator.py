@@ -404,18 +404,21 @@ async def test_context_bare_on_top_of_classmethod() -> None:
 # ── Decorator With Configuration ─────────────────────────────────
 
 
-async def test_decorator_with_parent_none() -> None:
+@pytest.mark.parametrize("parent", [None, promising.INHERIT])
+async def test_decorator_with_explicit_parent(parent) -> None:
     """
     @promising.context(parent=None) creates a root context even
     when called inside another context.
     """
 
-    # TODO TODO TODO Parametrize to test with and without a parent
-
-    @promising.context(parent=None)
+    @promising.context(parent=parent)
     async def work() -> bool:
         ctx = promising.get_active_context()
-        return ctx.get_parent_context(raise_if_none=False) is None
+        return ctx.get_parent_context(raise_if_none=False)
 
-    with promising.context():
-        assert await work() is True
+    with promising.context() as parent_ctx:
+        returned_parent_ctx = await work()
+        if parent is None:
+            assert returned_parent_ctx is None
+        else:
+            assert returned_parent_ctx is parent_ctx

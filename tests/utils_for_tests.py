@@ -1,3 +1,5 @@
+from typing import Any
+
 import promising
 
 
@@ -9,7 +11,7 @@ def collect_parent_contexts(ctx: promising.PromisingContext) -> list[promising.P
     return result
 
 
-def collect_parent_promises(ctx: promising.PromisingContext) -> list[promising.PromisingContext]:
+def collect_parent_promises(ctx: promising.PromisingContext) -> list[promising.Promise[Any]]:
     result = []
     while (parent := ctx.get_parent_promise(raise_if_none=False)) is not None:
         result.append(parent)

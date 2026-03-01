@@ -13,7 +13,7 @@ but with @promising.context instead of @promising.function.
 """
 
 import promising
-from tests.test_utils import collect_parent_contexts, collect_parent_promises
+from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
 async def test_contexted_function_inside_outer_context() -> None:

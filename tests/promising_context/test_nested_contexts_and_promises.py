@@ -15,7 +15,7 @@ across three scenarios:
 """
 
 import promising
-from tests.test_utils import collect_parent_contexts, collect_parent_promises
+from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
 async def test_promise_inside_outer_context() -> None:

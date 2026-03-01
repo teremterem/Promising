@@ -8,7 +8,7 @@ the chain while plain contexts do not count as promises.
 """
 
 import promising
-from tests.test_utils import collect_parent_contexts, collect_parent_promises
+from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
 async def test_sync_promise_inside_outer_context() -> None:

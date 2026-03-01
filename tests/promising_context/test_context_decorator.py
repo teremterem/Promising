@@ -412,7 +412,7 @@ async def test_decorator_with_explicit_parent(parent) -> None:
     """
 
     @promising.context(parent=parent)
-    async def work() -> bool:
+    async def work() -> promising.PromisingContext | None:
         ctx = promising.get_active_context()
         return ctx.get_parent_context(raise_if_none=False)
 

@@ -275,23 +275,27 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             return start_soon
 
         if start_soon is NOT_SET:
+            parent_context = self.get_parent_context(raise_if_none=False)
+
             # TODO Should there be any reason or scenario when
             #  `everything_starts_soon_by_default` takes precedence over the
             #  parent's `children_start_soon_by_default` ?
-            if self._parent is not None and self._parent._children_start_soon_by_default is not NOT_SET:
+            if parent_context is not None and parent_context._children_start_soon_by_default is not NOT_SET:
                 # The parent is enforcing this setting for its children
-                return self._parent._children_start_soon_by_default
+                return parent_context._children_start_soon_by_default
 
             # Use the default
             return self._everything_starts_soon_by_default
 
         if start_soon is INHERIT:
-            if self._parent is None:
+            parent_promise = self.get_parent_promise(raise_if_none=False)
+
+            if parent_promise is None:
                 # Use the default
                 return self._everything_starts_soon_by_default
 
             # Inherit from the parent
-            return self._parent._start_soon
+            return parent_promise._start_soon
 
         raise ValueError(
             "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "

@@ -1,4 +1,6 @@
-"""Tests for parent-chain resolution when promises (@promising.function) contain nested contexts.
+"""
+Tests for parent-chain resolution when promises (@promising.function) contain
+nested contexts.
 
 A promise acts as both a context and a boundary: inner contexts see the promise
 in their parent chain, and the promise itself links to whichever context was
@@ -6,8 +8,10 @@ active at *call-site* (not at await-site). These tests verify that relationship
 across three scenarios:
 
 - Promise created and awaited inside an outer context.
-- Promise created outside, awaited inside an outer context (outer is NOT a parent).
-- Promise created inside, awaited outside an outer context (outer IS still a parent).
+- Promise created outside, awaited inside an outer context (outer is NOT a
+  parent).
+- Promise created inside, awaited outside an outer context (outer IS still a
+  parent).
 """
 
 import promising

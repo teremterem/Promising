@@ -1,9 +1,12 @@
-"""Tests for parent-chain resolution when @promising.context-decorated functions contain nested contexts.
+"""
+Tests for parent-chain resolution when @promising.context-decorated functions
+contain nested contexts.
 
-Unlike @promising.function (which creates a promise), @promising.context used as a
-decorator creates a plain context — so there are no promises in the parent chain.
-The decorator's context (func_ctx) becomes the immediate parent of inner contexts,
-and func_ctx itself links to whichever context was active at *call-site*.
+Unlike @promising.function (which creates a promise), @promising.context used
+as a decorator creates a plain context — so there are no promises in the parent
+chain. The decorator's context (func_ctx) becomes the immediate parent of inner
+contexts, and func_ctx itself links to whichever context was active at
+*call-site*.
 
 These tests mirror the three scenarios in test_nested_contexts_and_promises.py,
 but with @promising.context instead of @promising.function.

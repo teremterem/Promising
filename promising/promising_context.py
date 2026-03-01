@@ -4,46 +4,110 @@ import contextvars
 import inspect
 from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
-from functools import wraps
 from types import TracebackType
 from typing import Any
 from weakref import WeakSet
 
-from promising.errors import ContextAlreadyActiveError, ContextNotActiveError, ContextNotFoundError, SyncUsageError
+from promising.errors import (
+    ContextAlreadyActiveError,
+    ContextNotActiveError,
+    ContextNotFoundError,
+    ContextUsageError,
+    SyncUsageError,
+)
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import is_func_or_method_coro
+from promising.utils import DecoratorSupport
 
 
-def context(
-    # TODO Split into two functions with the same name using @overload ?
-    #  Similar case:
-    #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
-    func_or_method: DecoratableFunctionType | None = None,
-    *,
-    loop: AbstractEventLoop | None = None,
-    parent: "PromisingContext | Sentinel | None" = INHERIT,
-    children_start_soon_by_default: bool | Sentinel = NOT_SET,
-    everything_starts_soon_by_default: bool | Sentinel = INHERIT,
-) -> "PromisingContext | DecoratableFunctionType":
-    # TODO TODO TODO This isn't going to work - PromisingContext objects
-    #  SHOULD NOT be created "on the spot"
-    if func_or_method is None:
-        # Context manager mode (or decorator mode without arguments)
-        return PromisingContext(
-            loop=loop,
-            parent=parent,
-            children_start_soon_by_default=children_start_soon_by_default,
-            everything_starts_soon_by_default=everything_starts_soon_by_default,
-        )
+class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
+    def __init__(
+        self,
+        func_or_method: DecoratableFunctionType | None = None,
+        *,
+        loop: AbstractEventLoop | None = None,
+        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        children_start_soon_by_default: bool | Sentinel = NOT_SET,
+        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+    ) -> None:
+        super().__init__(func_or_method)
+        self._loop = loop
+        self._parent = parent
+        self._children_start_soon_by_default = children_start_soon_by_default
+        self._everything_starts_soon_by_default = everything_starts_soon_by_default
 
-    # Decorator mode (with arguments)
-    return PromisingContext(
-        loop=loop,
-        parent=parent,
-        children_start_soon_by_default=children_start_soon_by_default,
-        everything_starts_soon_by_default=everything_starts_soon_by_default,
-    )(func_or_method)
+        self._promising_context = None
+
+    def __enter__(self) -> "PromisingContext":
+        """
+        If this method was called, then it means that this `promising.context`
+        instance is being used as a context manager. We need to create a new
+        PromisingContext instance and activate it.
+        """
+        if self.__wrapped__ is not None:
+            raise ContextUsageError(
+                "The same instance of `promising.context` cannot serve both "
+                "as a context manager and as a decorator simultaneously"
+            )
+        if self._promising_context is None:
+            self._promising_context = PromisingContext(
+                loop=self._loop,
+                parent=self._parent,
+                children_start_soon_by_default=self._children_start_soon_by_default,
+                everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+            )
+        return self._promising_context.__enter__()
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        if self._promising_context is None:
+            raise ContextNotActiveError("No PromisingContext was associated with this context manager instance")
+        return self._promising_context.__exit__(exc_type, exc_value, traceback)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> DecoratableFunctionType:
+        if self.__wrapped__ is None:
+            # We are still in the process of decorating a function or method
+            # because it is a decorator with parameters) - let's finish the
+            # decoration process
+            if len(args) != 1 or kwargs:
+                raise ContextUsageError(
+                    "The decorator must be called with exactly one positional "
+                    "argument after its parameters were already provided, and "
+                    "it should be a strictly positional argument: a "
+                    "function or method to decorate."
+                )
+            self._update_wrapper(args[0])
+
+        # The function or method was already decorated and the decorator is now
+        # being called with arguments - let's pass this call through to the
+        # underlying function or method
+
+        if self._is_wrapped_async:
+            # Wrapped function or method is async
+
+            async def _async_wrapper() -> Any:
+                with PromisingContext(
+                    loop=self._loop,
+                    parent=self._parent,
+                    children_start_soon_by_default=self._children_start_soon_by_default,
+                    everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+                ):
+                    return await self._wrapped_as_callable(*args, **kwargs)
+
+            return _async_wrapper()
+
+        # Wrapped function or method is sync
+        with PromisingContext(
+            loop=self._loop,
+            parent=self._parent,
+            children_start_soon_by_default=self._children_start_soon_by_default,
+            everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+        ):
+            return self._wrapped_as_callable(*args, **kwargs)
 
 
 def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -387,34 +451,6 @@ class PromisingContext:
                 raise exc from exc_value
 
         return False  # Let's not suppress any exceptions
-
-    def __call__(self, func_or_method: DecoratableFunctionType) -> DecoratableFunctionType:
-        if is_func_or_method_coro(func_or_method):
-            # Async function or method
-            @wraps(func_or_method)
-            async def _decorator(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    if isinstance(func_or_method, classmethod):
-                        func = func_or_method.__func__
-                    else:
-                        func = func_or_method
-
-                    return await func(*args, **kwargs)
-
-            return _decorator
-
-        # Sync function or method
-        @wraps(func_or_method)
-        def _decorator_sync(*args: Any, **kwargs: Any) -> Any:
-            with self:
-                if isinstance(func_or_method, classmethod):
-                    func = func_or_method.__func__
-                else:
-                    func = func_or_method
-
-                return func(*args, **kwargs)
-
-        return _decorator_sync
 
     def _resolve_everything_starts_soon_by_default(
         self,

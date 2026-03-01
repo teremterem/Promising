@@ -1,6 +1,5 @@
 import contextvars
 import functools
-import types
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic
@@ -8,7 +7,7 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import is_func_or_method_coro
+from promising.utils import DecoratorSupport
 
 # TODO Allow overriding this executor in local promise configurations
 # TODO What to do about potential deadlocks if recursive sync promises use up
@@ -66,9 +65,7 @@ def function(
     )
 
 
-class PromisingFunction(Generic[T_co]):
-    __wrapped__: DecoratableFunctionType
-
+class PromisingFunction(DecoratorSupport, Generic[T_co]):
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls
 
@@ -83,8 +80,11 @@ class PromisingFunction(Generic[T_co]):
         children_start_soon_by_default: bool | Sentinel = NOT_SET,
         everything_starts_soon_by_default: bool | Sentinel = INHERIT,
     ) -> None:
-        # This will also set `self.__wrapped__` to `func_or_method`
-        functools.update_wrapper(self, func_or_method)
+        super().__init__(func_or_method)
+        self.start_soon = start_soon
+        self.children_start_soon_by_default = children_start_soon_by_default
+        self.everything_starts_soon_by_default = everything_starts_soon_by_default
+
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
         #  resolve postponed type hints correctly, when you implement input params
         #  as Promises.
@@ -93,27 +93,6 @@ class PromisingFunction(Generic[T_co]):
         #  (`start_soon`, `children_start_soon_by_default`,
         #  `everything_starts_soon_by_default`)
         #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
-
-        self.start_soon = start_soon
-        self.children_start_soon_by_default = children_start_soon_by_default
-        self.everything_starts_soon_by_default = everything_starts_soon_by_default
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> "PromisingFunction[T_co] | types.MethodType":
-        if isinstance(self.__wrapped__, classmethod):
-            # Classmethod: bind the class as the first argument regardless of
-            # whether the lookup is via the class or an instance.
-            cls = objtype if obj is None else type(obj)
-            return types.MethodType(self, cls)
-        if obj is not None and isinstance(self.__wrapped__, types.FunctionType):
-            # Regular instance method: bind the instance as the first argument.
-            return types.MethodType(self, obj)
-        # Intentionally return unbound self for all remaining cases (e.g. when
-        # self.__wrapped__ is a staticmethod object). This is safe because
-        # call() invokes self.__wrapped__(*args, **kwargs) directly, and
-        # staticmethod objects are callable without going through the
-        # descriptor protocol since Python 3.10 (bpo-43682). No binding is
-        # required or desired here.
-        return self
 
     def __call__(
         self,
@@ -153,22 +132,12 @@ class PromisingFunction(Generic[T_co]):
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
         #  immutability
-        if is_func_or_method_coro(self.__wrapped__):
-            if isinstance(self.__wrapped__, classmethod):
-                # self.__wrapped__ is a classmethod object; args[0] is the
-                # class, already prepended by MethodType in __get__.
-                # classmethod objects are not directly callable, so we reach
-                # through to the underlying function.
-                coro = self.__wrapped__.__func__(*args, **kwargs)
-            else:
-                coro = self.__wrapped__(*args, **kwargs)
-        else:
-            if isinstance(self.__wrapped__, classmethod):
-                func = self.__wrapped__.__func__
-            else:
-                func = self.__wrapped__
 
-            async def _run_sync() -> T_co:
+        if self._is_wrapped_async:
+            coro = self._wrapped_as_callable(*args, **kwargs)
+        else:
+
+            async def _sync_to_async() -> T_co:
                 # Get the event loop from the active promise that is running
                 # this async function
                 loop = get_active_promise().get_loop()
@@ -178,10 +147,10 @@ class PromisingFunction(Generic[T_co]):
                 ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
                     _sync_function_executor,
-                    functools.partial(ctx.run, func, *args, **kwargs),
+                    functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )
 
-            coro = _run_sync()
+            coro = _sync_to_async()
 
         # TODO Pass a name to the Promise constructor that would include the
         #  name of the function that was decorated

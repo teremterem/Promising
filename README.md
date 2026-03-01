@@ -169,6 +169,65 @@ class MyService:
         return x * 2
 ```
 
+## Lightweight Contexts: `promising.context`
+
+`promising.context` creates a `PromisingContext` — a lightweight node in the hierarchy that is not an `asyncio.Future`. Its main use is scoping `start_soon`-related configuration locally, so that Promises created within it inherit specific defaults. It also lets you group child Promises under a shared context for awaiting or inspection.
+
+### As a Context Manager
+
+```python
+import promising
+
+@promising.function
+async def child_task(name: str) -> str:
+    return f"done: {name}"
+
+async def main():
+    # All children created inside default to start_soon=False
+    with promising.context(children_start_soon_by_default=False) as ctx:
+        a = child_task("a")  # deferred — won't start until awaited
+        b = child_task("b")  # same
+
+    result_a = await a
+    result_b = await b
+```
+
+Nesting works as expected — inner contexts become children of outer ones:
+
+```python
+with promising.context() as outer:
+    with promising.context() as inner:
+        assert promising.get_active_context() is inner
+        assert inner.get_parent_context() is outer
+    assert promising.get_active_context() is outer
+```
+
+### As a Decorator
+
+`@promising.context` wraps a function so that each call runs inside a fresh `PromisingContext`. This works on both async and sync functions:
+
+```python
+@promising.context(children_start_soon_by_default=False)
+async def do_work() -> str:
+    # Children created here inherit start_soon=False
+    a = child_task("x")
+    b = child_task("y")
+    return "done"
+
+await do_work()
+
+# Await all children in all contexts before finishing
+await promising.await_children(recursively=True)
+# TODO Awaiting children will fail here because there is no active context -
+#  fix it by describing how to set up the application properly
+```
+
+Like `@promising.function`, it works with `@classmethod`, `@staticmethod`, and instance methods in either decorator order.
+
+### `promising.context` vs `promising.function`
+
+The key difference: `@promising.function` creates a `Promise` (an `asyncio.Future` that can be awaited and appears in the parent promise chain), while `@promising.context` creates a bare `PromisingContext` that only participates in the context hierarchy. Use `@promising.context` when you want to scope configuration or group children without the function itself becoming a Promise.
+
 ## Execution Timing: `start_soon`
 
 By default, Promises start executing immediately upon creation (at the nearest event loop opportunity). This is controlled by the `start_soon` parameter:

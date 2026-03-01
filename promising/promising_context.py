@@ -68,7 +68,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             raise ContextNotActiveError("No PromisingContext was associated with this context manager instance")
         return self._promising_context.__exit__(exc_type, exc_value, traceback)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> DecoratableFunctionType:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
         if self.__wrapped__ is None:
             # We are still in the process of decorating a function or method
             # because it is a decorator with parameters) - let's finish the
@@ -81,6 +81,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
                     "function or method to decorate."
                 )
             self._update_wrapper(args[0])
+            return self
 
         # The function or method was already decorated and the decorator is now
         # being called with arguments - let's pass this call through to the

@@ -1,5 +1,19 @@
-from promising.errors import BasePromisingError, NoCurrentPromiseError, NoParentPromiseError, SyncPromiseUsageError
-from promising.promise import Promise, await_children, await_children_sync, get_current_promise
+from promising.errors import (
+    BasePromisingError,
+    ContextAlreadyActiveError,
+    ContextNotActiveError,
+    ContextNotFoundError,
+    PromiseNotFoundError,
+    SyncUsageError,
+)
+from promising.promise import Promise, get_active_promise
+from promising.promising_context import (
+    PromisingContext,
+    await_children,
+    await_children_sync,
+    context,
+    get_active_context,
+)
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
@@ -23,15 +37,20 @@ __all__ = [
     "GLOBAL_DEFAULT",
     "INHERIT",
     "NOT_SET",
-    "NoCurrentPromiseError",
-    "NoParentPromiseError",
+    "ContextAlreadyActiveError",
+    "ContextNotActiveError",
+    "ContextNotFoundError",
+    "context",
+    "PromiseNotFoundError",
     "Promise",
+    "PromisingContext",
     "PromisingFunction",
+    "SyncUsageError",
     "Sentinel",
-    "SyncPromiseUsageError",
     "await_children",
     "await_children_sync",
     "function",
-    "get_current_promise",
+    "get_active_context",
+    "get_active_promise",
     "should_everything_start_soon_by_default",
 ]

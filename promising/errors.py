@@ -2,13 +2,29 @@ class BasePromisingError(Exception):
     pass
 
 
-class NoCurrentPromiseError(BasePromisingError):
+class ContextAlreadyActiveError(BasePromisingError):
     pass
 
 
-class NoParentPromiseError(BasePromisingError):
+class ContextNotActiveError(BasePromisingError):
     pass
 
 
-class SyncPromiseUsageError(BasePromisingError):
+class ContextNotFoundError(BasePromisingError):
+    pass
+
+
+class ContextUsageError(BasePromisingError):
+    pass
+
+
+class DecorationError(BasePromisingError):
+    pass
+
+
+class PromiseNotFoundError(BasePromisingError):
+    pass
+
+
+class SyncUsageError(BasePromisingError):
     pass

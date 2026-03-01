@@ -3,7 +3,7 @@ import threading
 import pytest
 
 import promising
-from promising import get_current_promise
+from promising import get_active_promise
 
 # ── Core: Sync Function Wrapping & Argument Forwarding ──────────
 
@@ -215,15 +215,15 @@ async def test_preserves_original_func() -> None:
 # ── Context Propagation ─────────────────────────────────────────
 
 
-async def test_current_promise_accessible_inside_sync_function() -> None:
+async def test_active_promise_accessible_inside_sync_function() -> None:
     """
-    get_current_promise() inside a sync promising function
+    get_active_promise() inside a sync promising function
     (running in a thread pool) returns the wrapping Promise.
     """
 
     @promising.function
     def sync_func() -> promising.Promise:
-        return get_current_promise(raise_if_none=False)
+        return get_active_promise(raise_if_none=False)
 
     promise = sync_func()
     current_from_inside = await promise
@@ -250,5 +250,6 @@ async def test_sync_parent_child_relationship() -> None:
     await parent_promise
 
     assert child_promise is not None
-    assert child_promise.get_parent(raise_if_none=False) is parent_promise
+    assert child_promise.get_parent_context(raise_if_none=False) is parent_promise
+    assert child_promise.get_parent_promise(raise_if_none=False) is parent_promise
     await child_promise

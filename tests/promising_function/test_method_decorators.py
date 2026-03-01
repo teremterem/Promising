@@ -353,10 +353,11 @@ async def test_promising_function_on_top_of_staticmethod() -> None:
     class MyClass:
         @promising.function
         @staticmethod
-        async def my_method() -> None: ...
+        async def my_method() -> str:
+            return "success"
 
-    assert await MyClass.my_method() is None
-    assert await MyClass().my_method() is None
+    assert await MyClass.my_method() == "success"
+    assert await MyClass().my_method() == "success"
 
 
 async def test_promising_function_on_top_of_classmethod() -> None:

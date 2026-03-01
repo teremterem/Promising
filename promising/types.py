@@ -1,7 +1,8 @@
-import types
 from collections.abc import Callable
-from typing import TypeVar
+from types import MethodType
+from typing import Any, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
-DecoratableFunctionType = Callable[..., T_co] | types.MethodType | classmethod | staticmethod
+CallableType = Callable[..., Any] | MethodType | staticmethod
+DecoratableFunctionType = CallableType | classmethod

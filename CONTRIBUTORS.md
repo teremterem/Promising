@@ -33,7 +33,7 @@ ruff check
 pre-commit run --all-files
 ```
 
-Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_function/`).
+Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_context/`, `tests/promising_function/`), each with a `sync/` subdirectory for sync-related tests.
 
 ## Code Style
 
@@ -47,18 +47,22 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 **Core hierarchy flow:** `PromisingFunction` wraps an async or sync function → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises created during that execution become its children via `WeakSet`.
 
+### PromisingContext (`promising/promising_context.py`)
+
+The base class for hierarchical context management. Manages parent-child relationships, naming (`name` parameter, `get_name()`), configuration inheritance (`children_start_soon_by_default`, `everything_starts_soon_by_default`), and child-waiting (`await_children` / `await_children_sync`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext._active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+
+This file also contains the `context` class — a context manager / decorator that creates a `PromisingContext` without producing a `Promise`. It implements the descriptor protocol (via `DecoratorSupport`) for use as a method decorator.
+
 ### Promise (`promising/promise.py`)
 
-Extends `asyncio.Future` with hierarchical context management. Uses `ContextVar` (`Promise._current`) to track the currently active Promise. Key lifecycle: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `_AsyncioBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
-
-Configuration is handled directly on Promise via `start_soon`, `children_start_soon_by_default`, and `everything_starts_soon_by_default` parameters, which are either set to concrete boolean values or use sentinels (`INHERIT`, `NOT_SET`, `GLOBAL_DEFAULT`) to control inheritance from parent Promises.
+Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `_AsyncioBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
 ### PromisingFunction (`promising/promising_function.py`)
 
 Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
 
 - **Async functions** produce coroutines directly.
-- **Sync functions** are detected via `inspect.iscoroutinefunction()` and run in a module-level `ThreadPoolExecutor` (`_sync_function_executor`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate `Promise._current` to the executor thread.
+- **Sync functions** are detected via `inspect.iscoroutinefunction()` and run in a module-level `ThreadPoolExecutor` (`_sync_function_executor`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread.
 - Implements the descriptor protocol (`__get__`) to correctly bind `self`/`cls` for instance methods, `@classmethod`, and `@staticmethod`.
 
 ### Sentinel Pattern (`promising/sentinels.py`)
@@ -68,10 +72,14 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 ### Error Classes (`promising/errors.py`)
 
 - `BasePromisingError` — base class
-- `NoCurrentPromiseError` — raised when `get_current_promise()` is called outside a Promise context
-- `NoParentPromiseError` — raised when a Promise has no parent
-- `SyncPromiseUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
+- `ContextAlreadyActiveError` — attempting to enter a `PromisingContext` that is already active
+- `ContextNotActiveError` — attempting to exit a `PromisingContext` that is not active
+- `ContextNotFoundError` — no active `PromisingContext` found
+- `ContextUsageError` — misuse of `promising.context` (e.g. using the same instance as both context manager and decorator)
+- `DecorationError` — invalid decorator usage
+- `PromiseNotFoundError` — no active `Promise` found (the active context is not a `Promise`)
+- `SyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 ### Public API
 
-Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The decorator is `promising.function` — usable as `@promising.function()` with config args or `@promising.function` bare.
+Almost all of the library's public symbols — classes, functions, sentinels, errors — are exported from `promising/__init__.py`. The main entry points are `promising.function` (decorator that produces Promises) and `promising.context` (context manager / decorator that creates a bare `PromisingContext`). Both are usable bare or with configuration arguments.

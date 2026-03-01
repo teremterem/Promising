@@ -17,7 +17,8 @@ from tests.test_utils import collect_parent_contexts, collect_parent_promises
 
 
 async def test_contexted_function_inside_outer_context() -> None:
-    """Contexted function called and awaited inside an outer context.
+    """
+    Contexted function called and awaited inside an outer context.
 
     func_ctx captures `outer` as its parent at call-site.
 
@@ -47,7 +48,8 @@ async def test_contexted_function_inside_outer_context() -> None:
 
 
 async def test_contexted_function_outside_outer_context() -> None:
-    """Contexted function called outside any context, awaited inside one.
+    """
+    Contexted function called outside any context, awaited inside one.
 
     Because the coroutine is *created* with no active context, func_ctx has no
     parent — the outer context active at await-time is irrelevant.
@@ -79,7 +81,8 @@ async def test_contexted_function_outside_outer_context() -> None:
 
 
 async def test_contexted_function_await_outside_outer_context() -> None:
-    """Contexted function called inside an outer context, awaited outside it.
+    """
+    Contexted function called inside an outer context, awaited outside it.
 
     The parent is determined at call-site, so func_ctx captures `outer` even
     though the await happens after `outer` has exited.

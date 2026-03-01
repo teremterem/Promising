@@ -19,7 +19,8 @@ from tests.test_utils import collect_parent_contexts, collect_parent_promises
 
 
 async def test_promise_inside_outer_context() -> None:
-    """Promise created and awaited inside an outer context.
+    """
+    Promise created and awaited inside an outer context.
 
     The promise captures `outer` as its parent at call-site.
 
@@ -46,7 +47,8 @@ async def test_promise_inside_outer_context() -> None:
 
 
 async def test_promise_outside_outer_context() -> None:
-    """Promise created outside any context, then awaited inside one.
+    """
+    Promise created outside any context, then awaited inside one.
 
     Because the promise is *called* with no active context, it has no parent
     context — the outer context active at await-time is irrelevant.
@@ -74,7 +76,8 @@ async def test_promise_outside_outer_context() -> None:
 
 
 async def test_promise_await_outside_outer_context() -> None:
-    """Promise created inside an outer context, then awaited outside it.
+    """
+    Promise created inside an outer context, then awaited outside it.
 
     The parent is determined at call-site, so `outer` is captured even though
     the await happens after `outer` has exited.

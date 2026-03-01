@@ -12,7 +12,8 @@ from tests.test_utils import collect_parent_contexts, collect_parent_promises
 
 
 async def test_sync_promise_inside_outer_context() -> None:
-    """Sync promising function called and awaited inside an outer context.
+    """
+    Sync promising function called and awaited inside an outer context.
 
     The decorated function is synchronous, but calling it still produces a
     promise that must be awaited. The promise captures `outer` at call-site.
@@ -40,7 +41,8 @@ async def test_sync_promise_inside_outer_context() -> None:
 
 
 async def test_sync_promise_outside_outer_context() -> None:
-    """Sync promising function called outside any context, awaited inside one.
+    """
+    Sync promising function called outside any context, awaited inside one.
 
     The decorated function is synchronous, but calling it still produces a
     promise. Because the promise is *called* with no active context, it has no
@@ -69,7 +71,8 @@ async def test_sync_promise_outside_outer_context() -> None:
 
 
 async def test_sync_promise_await_outside_outer_context() -> None:
-    """Sync promising function called inside an outer context, awaited outside.
+    """
+    Sync promising function called inside an outer context, awaited outside.
 
     The decorated function is synchronous, but calling it still produces a
     promise. The parent is determined at call-site, so `outer` is captured even
@@ -98,7 +101,8 @@ async def test_sync_promise_await_outside_outer_context() -> None:
 
 
 async def test_sync_contexted_function_inside_outer_context() -> None:
-    """Sync contexted function called inside an outer context.
+    """
+    Sync contexted function called inside an outer context.
 
     func_ctx captures `outer` as its parent at call-site. The sync function
     returns directly (no await).

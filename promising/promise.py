@@ -343,6 +343,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result: The result value to set.
         """
         super().set_result(result)
+        # TODO Account for the fact that the concurrent future itself might be
+        #  cancelled by the user:
+        #  https://github.com/teremterem/Promising/pull/57#discussion_r2864024491
         self._concurrent_future.set_result(result)
 
     def set_exception(self, exception: BaseException) -> None:
@@ -357,6 +360,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             exception: The exception to set.
         """
         super().set_exception(exception)
+        # TODO Account for the fact that the concurrent future itself might be
+        #  cancelled by the user:
+        #  https://github.com/teremterem/Promising/pull/57#discussion_r2864024491
         self._concurrent_future.set_exception(exception)
 
 

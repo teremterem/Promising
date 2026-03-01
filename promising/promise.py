@@ -166,35 +166,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             raise PromiseNotFoundError("No active Promise found")
         return current
 
-    def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
-        """
-        Get the parent Promise of this Promise (skipping over any
-        PromisingContexts that aren't Promises).
-
-        Args:
-            raise_if_none: If True, raises an exception when no parent exists.
-
-        Returns:
-            The parent Promise, or None if no parent exists and raise_if_none
-            is False.
-
-        Raises:
-            PromiseNotFoundError: If no parent exists and raise_if_none is
-                True.
-        """
-        # TODO Unit tests are needed for this method: specifically for the
-        #  cases when parent context and parent promise are at different levels
-        #  (with and without other contexts separating them). Also, we need to
-        #  verify correct behavior when there are more than two promises in the
-        #  hierarchy.
-        parent = self.get_parent_context(raise_if_none=False)
-        while parent is not None and not isinstance(parent, Promise):
-            parent = parent.get_parent_context(raise_if_none=False)
-
-        if raise_if_none and parent is None:
-            raise PromiseNotFoundError("No parent Promise found")
-        return parent
-
     def get_name(self) -> str:
         """
         Get the human-readable name of this Promise.

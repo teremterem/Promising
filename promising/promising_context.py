@@ -5,7 +5,7 @@ import inspect
 from asyncio import AbstractEventLoop, Future
 from contextvars import ContextVar
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from weakref import WeakSet
 
 from promising.errors import (
@@ -13,11 +13,15 @@ from promising.errors import (
     ContextNotActiveError,
     ContextNotFoundError,
     ContextUsageError,
+    PromiseNotFoundError,
     SyncUsageError,
 )
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import DecoratorSupport
+
+if TYPE_CHECKING:
+    from promising.promise import Promise
 
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
@@ -95,6 +99,8 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._is_wrapped_async:
             # Wrapped function or method is async
+
+            # TODO TODO TODO
 
             async def _async_wrapper() -> Any:
                 with PromisingContext(
@@ -282,6 +288,32 @@ class PromisingContext:
         if raise_if_none and self._parent is None:
             raise ContextNotFoundError("No parent PromisingContext found")
         return self._parent
+
+    def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
+        """
+        Get the parent Promise of this Promise (skipping over any
+        PromisingContexts that aren't Promises).
+
+        Args:
+            raise_if_none: If True, raises an exception when no parent exists.
+
+        Returns:
+            The parent Promise, or None if no parent exists and raise_if_none
+            is False.
+
+        Raises:
+            PromiseNotFoundError: If no parent exists and raise_if_none is
+                True.
+        """
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
+        parent = self.get_parent_context(raise_if_none=False)
+        while parent is not None and not isinstance(parent, Promise):
+            parent = parent.get_parent_context(raise_if_none=False)
+
+        if raise_if_none and parent is None:
+            raise PromiseNotFoundError("No parent Promise found")
+        return parent
 
     async def await_children(self, *, recursively: bool = False) -> None:
         """

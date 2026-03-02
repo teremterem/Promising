@@ -199,6 +199,8 @@ class PromisingContext:
         ValueError: If invalid parameter values or combinations are provided.
     """
 
+    ctx_namespace: str | None = None
+
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
     # TODO Support cancellation of the whole PromisingContext tree
@@ -212,11 +214,8 @@ class PromisingContext:
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
+        self.ctx_namespace = name
         self._previous_token: contextvars.Token | None = None
-
-        if name is None:
-            name = f"{self.__class__.__name__}-{id(self)}"
-        self._name = name
 
         if parent is INHERIT:
             self._parent = self.get_active_context(raise_if_none=False)
@@ -245,17 +244,10 @@ class PromisingContext:
         if self._parent is not None:
             self._parent._children.add(self)
 
-    def get_name(self) -> str:
-        """
-        Get the human-readable name of this PromisingContext.
-        """
-        return self._name
-
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self._name!r})"
-
-    def __str__(self) -> str:
-        return self._name
+        if self.ctx_namespace:
+            return f"{self.ctx_namespace}-{self.__class__.__name__}-{id(self)}"
+        return f"{self.__class__.__name__}-{id(self)}"
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -388,7 +380,7 @@ class PromisingContext:
                 concurrent_future.set_result(None)
 
         def schedule_await_children() -> None:
-            self._ctx_loop.create_task(await_children_and_notify(), name=self.get_name() + "-AwaitChildrenSync")
+            self._ctx_loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
 
         self._call_soon_threadsafe(schedule_await_children)
         # Should any error happen in the underlying async `await_children`,

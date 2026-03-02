@@ -235,10 +235,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         # ruff: BLE001 (blind-except)
         if self.done():
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
         if self._coro is None:
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self.get_name()}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self}")
 
         result = NOT_SET
         exception = NOT_SET
@@ -251,6 +251,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
+                # TODO Find a way to borrow from MiniAgents the mechanism that
+                #  logs this "promising breadcrumb" together with the error
+                #  tracebacks
                 if not hasattr(exception, "__promising_trace__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
@@ -267,7 +270,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
-            self._task = self._ctx_loop.create_task(self._fulfill(), name=self.get_name() + "-Task")
+            self._task = self._ctx_loop.create_task(self._fulfill(), name=str(self) + "-Task")
 
     def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
         if isinstance(start_soon, bool):

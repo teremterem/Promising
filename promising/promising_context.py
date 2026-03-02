@@ -210,7 +210,7 @@ class PromisingContext:
         ValueError: If invalid parameter values or combinations are provided.
     """
 
-    namespace: str | None = None
+    namespace: str | None
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 

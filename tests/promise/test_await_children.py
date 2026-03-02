@@ -39,11 +39,10 @@ async def test_await_children(*, await_children: bool) -> None:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]
-
-    # Let's await for the child promise to complete, so that we don't get any
-    # asyncio warnings about the child promise being not awaited (or being
-    # cancelled).
-    await child_promise
+        # Let's await for the child promise to complete, so that we don't get any
+        # asyncio warnings about the child promise being not awaited (or being
+        # cancelled).
+        await child_promise
 
 
 @pytest.mark.parametrize("recursively", [True, False])

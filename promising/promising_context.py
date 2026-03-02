@@ -495,6 +495,9 @@ class PromisingContext:
 
         return False  # Let's not suppress any exceptions
 
+    # TODO Implement `get_promising_trace(only_with_namespaces: bool = True)`
+    #  method
+
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
 

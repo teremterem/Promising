@@ -1,7 +1,3 @@
-"""
-Simple test script to verify the as_concurrent_future() method works.
-"""
-
 import asyncio
 import concurrent.futures
 import threading

@@ -17,23 +17,23 @@ from promising.promising_context import (
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
-EVERYTHING_STARTS_SOON_BY_DEFAULT = True
+START_SOON_DEFAULT = True
 
 
-def should_everything_start_soon_by_default() -> bool:
+def should_start_soon_by_default() -> bool:
     """
-    We don't want to import `EVERYTHING_STARTS_SOON_BY_DEFAULT` from this
+    We don't want to import `START_SOON_DEFAULT` from this
     module directly, because we want to allow users to override the default
-    value if they want. Importing `EVERYTHING_STARTS_SOON_BY_DEFAULT` directly
+    value if they want. Importing `START_SOON_DEFAULT` directly
     would copy the concrete value into the other modules' namespaces at the
     time of import.
     """
-    return EVERYTHING_STARTS_SOON_BY_DEFAULT
+    return START_SOON_DEFAULT
 
 
 __all__ = [
     "BasePromisingError",
-    "EVERYTHING_STARTS_SOON_BY_DEFAULT",
+    "START_SOON_DEFAULT",
     "GLOBAL_DEFAULT",
     "INHERIT",
     "NOT_SET",
@@ -52,5 +52,5 @@ __all__ = [
     "function",
     "get_active_context",
     "get_active_promise",
-    "should_everything_start_soon_by_default",
+    "should_start_soon_by_default",
 ]

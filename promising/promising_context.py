@@ -38,14 +38,14 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         *,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
-        children_start_soon_by_default: bool | Sentinel = NOT_SET,
-        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+        children_start_soon: bool | Sentinel = INHERIT,
+        start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
         self._ctx_loop = loop
         self._parent = parent
-        self._children_start_soon_by_default = children_start_soon_by_default
-        self._everything_starts_soon_by_default = everything_starts_soon_by_default
+        self._children_start_soon = children_start_soon
+        self._start_soon_default = start_soon_default
 
         self._promising_context = None
 
@@ -65,8 +65,8 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             self._promising_context = PromisingContext(
                 loop=self._ctx_loop,
                 parent=self._parent,
-                children_start_soon_by_default=self._children_start_soon_by_default,
-                everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+                children_start_soon=self._children_start_soon,
+                start_soon_default=self._start_soon_default,
             )
         return self._promising_context.__enter__()
 
@@ -104,8 +104,8 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         ctx = PromisingContext(
             loop=self._ctx_loop,
             parent=self._parent,
-            children_start_soon_by_default=self._children_start_soon_by_default,
-            everything_starts_soon_by_default=self._everything_starts_soon_by_default,
+            children_start_soon=self._children_start_soon,
+            start_soon_default=self._start_soon_default,
         )
 
         if self._is_wrapped_async:
@@ -187,23 +187,21 @@ class PromisingContext:
         parent: Parent PromisingContext. If INHERIT (default), uses the
             currently active context as parent. If None, the context has
             no parent.
-        children_start_soon_by_default: Default start_soon value enforced
-            on child contexts that leave start_soon as NOT_SET. NOT_SET
-            (default) means no enforcement. INHERIT copies the parent's
-            setting.
-        everything_starts_soon_by_default: Local override for the global
-            EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT (default)
-            propagates from the parent. GLOBAL_DEFAULT reads the current
-            global setting without inheriting.
+        children_start_soon: Default start_soon value enforced on child
+            contexts that leave start_soon as NOT_SET. NOT_SET means no
+            enforcement. INHERIT (default) copies the parent's setting of
+            the same name.
+        start_soon_default: Local override for the global START_SOON_DEFAULT.
+            INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
+            the current global setting without inheriting.
 
     Raises:
-        ValueError: If invalid parameter values or combinations are
-            provided.
+        ValueError: If invalid parameter values or combinations are provided.
     """
 
-    _active_context = ContextVar["PromisingContext | None"]("PromisingContext._active_context", default=None)
+    __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO Support cancellation of the whole PromisingContext tree
+    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,
@@ -211,15 +209,15 @@ class PromisingContext:
         loop: AbstractEventLoop | None = None,
         name: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
-        children_start_soon_by_default: bool | Sentinel = NOT_SET,
-        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+        children_start_soon: bool | Sentinel = INHERIT,
+        start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         self._previous_token: contextvars.Token | None = None
 
         if name is None:
             name = f"{self.__class__.__name__}-{id(self)}"
-        # TODO Implement custom __str__ and __repr__ methods and use this name
-        #  in them ?
+        # TODO TODO TODO Implement custom __str__ and __repr__ methods and use
+        #  this name in them ?
         self._name = name
 
         if parent is INHERIT:
@@ -232,12 +230,8 @@ class PromisingContext:
                 f"or None, but `{type(parent)}` was given instead"
             )
 
-        self._everything_starts_soon_by_default = self._resolve_everything_starts_soon_by_default(
-            everything_starts_soon_by_default
-        )
-        self._children_start_soon_by_default = self._resolve_children_start_soon_by_default(
-            children_start_soon_by_default
-        )
+        self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
+        self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
 
         if loop is None:
             if self._parent is None:
@@ -276,7 +270,7 @@ class PromisingContext:
             ContextNotFoundError: If no active PromisingContext exists and
                 raise_if_none is True.
         """
-        active = cls._active_context.get()
+        active = cls.__active_context.get()
         if raise_if_none and active is None:
             raise ContextNotFoundError("No active PromisingContext found")
         return active
@@ -479,7 +473,7 @@ class PromisingContext:
         if self._previous_token is not None:
             raise ContextAlreadyActiveError("This PromisingContext is already active")
 
-        self._previous_token = self._active_context.set(self)
+        self._previous_token = self.__active_context.set(self)
         return self
 
     def __exit__(
@@ -492,7 +486,7 @@ class PromisingContext:
             if self._previous_token is None:
                 raise ContextNotActiveError("This PromisingContext is not active")
 
-            self._active_context.reset(self._previous_token)
+            self.__active_context.reset(self._previous_token)
             self._previous_token = None
 
         except BaseException as exc:  # noqa: BLE001 (blind-except)
@@ -503,55 +497,49 @@ class PromisingContext:
 
         return False  # Let's not suppress any exceptions
 
-    def _resolve_everything_starts_soon_by_default(
-        self,
-        everything_starts_soon_by_default: bool | Sentinel,
-    ) -> bool:
-        from promising import should_everything_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
+    def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
+        from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
 
-        if isinstance(everything_starts_soon_by_default, bool):
+        if isinstance(start_soon_default, bool):
             # Concrete value was provided
-            return everything_starts_soon_by_default
+            return start_soon_default
 
-        if everything_starts_soon_by_default is GLOBAL_DEFAULT:
+        if start_soon_default is GLOBAL_DEFAULT:
             # Use the global default
-            return should_everything_start_soon_by_default()
+            return should_start_soon_by_default()
 
-        if everything_starts_soon_by_default is INHERIT:
+        if start_soon_default is INHERIT:
             if self._parent is None:
                 # Use the global default
-                return should_everything_start_soon_by_default()
+                return should_start_soon_by_default()
 
             # Inherit from the parent
-            return self._parent._everything_starts_soon_by_default
+            return self._parent._start_soon_default
 
         raise ValueError(
-            "`everything_starts_soon_by_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
-            f"but `{type(everything_starts_soon_by_default)}` was given instead"
+            "`start_soon_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(start_soon_default)}` was given instead"
         )
 
-    def _resolve_children_start_soon_by_default(
-        self,
-        children_start_soon_by_default: bool | Sentinel,
-    ) -> bool | Sentinel:
-        if isinstance(children_start_soon_by_default, bool) or children_start_soon_by_default is NOT_SET:
+    def _resolve_children_start_soon(self, children_start_soon: bool | Sentinel) -> bool | Sentinel:
+        if isinstance(children_start_soon, bool) or children_start_soon is NOT_SET:
             # Apart from the concrete value, we also want to allow
-            # `self._children_start_soon_by_default` to stay as NOT_SET, so we
+            # `self._children_start_soon` to stay as NOT_SET, so we
             # can later tell whether it is being enforced on children or not
             # (NOT_SET means "no enforcement").
-            return children_start_soon_by_default
+            return children_start_soon
 
-        if children_start_soon_by_default is INHERIT:
+        if children_start_soon is INHERIT:
             if self._parent is None:
                 # Use the default
-                return self._everything_starts_soon_by_default
+                return self._start_soon_default
 
             # Inherit from the parent
-            return self._parent._children_start_soon_by_default
+            return self._parent._children_start_soon
 
         raise ValueError(
-            "`children_start_soon_by_default` must be either NOT_SET, INHERIT or a boolean value, "
-            f"but `{type(children_start_soon_by_default)}` was given instead"
+            "`children_start_soon` must be either NOT_SET, INHERIT or a boolean value, "
+            f"but `{type(children_start_soon)}` was given instead"
         )
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:

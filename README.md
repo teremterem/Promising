@@ -184,7 +184,7 @@ async def child_task(name: str) -> str:
 
 async def main():
     # All children created inside default to start_soon=False
-    with promising.context(children_start_soon_by_default=False) as ctx:
+    with promising.context(children_start_soon=False) as ctx:
         a = child_task("a")  # deferred — won't start until awaited
         b = child_task("b")  # same
 
@@ -207,7 +207,7 @@ with promising.context() as outer:
 `@promising.context` wraps a function so that each call runs inside a fresh `PromisingContext`. This works on both async and sync functions:
 
 ```python
-@promising.context(children_start_soon_by_default=False)
+@promising.context(children_start_soon=False)
 async def do_work() -> str:
     # Children created here inherit start_soon=False
     a = child_task("x")
@@ -249,14 +249,14 @@ result = await promise                        # Now it starts
 
 Promises inherit configuration from their parents through three parameters:
 
-- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `NOT_SET` (the default), it defers to its parent's `children_start_soon_by_default`, or falls back to `everything_starts_soon_by_default`.
-- **`children_start_soon_by_default`** — enforces a `start_soon` default for child Promises. `NOT_SET` means no enforcement.
-- **`everything_starts_soon_by_default`** — a per-Promise local override for the global default. Inherited from the parent by default.
+- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `NOT_SET` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`.
+- **`children_start_soon`** — enforces a `start_soon` default for child Promises. `NOT_SET` means no enforcement.
+- **`start_soon_default`** — a per-Promise local override for the global default. Inherited from the parent by default.
 
 These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `NOT_SET` explicitly at call time overrides the decorator value:
 
 ```python
-@promising.function(children_start_soon_by_default=False)
+@promising.function(children_start_soon=False)
 async def parent() -> str:
     # All children created here will default to start_soon=False
     a = child_task("a")                        # Deferred (inherits from parent)
@@ -270,10 +270,10 @@ The global default can be changed:
 import promising
 
 # All Promises start immediately by default (this is the initial value)
-promising.EVERYTHING_STARTS_SOON_BY_DEFAULT = True
+promising.START_SOON_DEFAULT = True
 
 # Change to lazy execution globally
-promising.EVERYTHING_STARTS_SOON_BY_DEFAULT = False
+promising.START_SOON_DEFAULT = False
 ```
 
 ## Thread-Safe Access
@@ -347,7 +347,7 @@ uv sync --extra examples
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `parent`, `children_start_soon_by_default`, and `everything_starts_soon_by_default`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `parent`, `children_start_soon`, and `start_soon_default`. |
 
 ### Promise
 
@@ -382,7 +382,7 @@ uv sync --extra examples
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
-| `promising.should_everything_start_soon_by_default()` | Returns the current value of `EVERYTHING_STARTS_SOON_BY_DEFAULT`. Useful for reading the global default without importing the mutable variable directly. |
+| `promising.should_start_soon_by_default()` | Returns the current value of `START_SOON_DEFAULT`. Useful for reading the global default without importing the mutable variable directly. |
 
 ### Sentinels
 

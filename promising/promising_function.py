@@ -17,7 +17,6 @@ from promising.utils import DecoratorSupport
 #  an error when the number of nested sync function calls approaches this
 #  number ?
 _sync_function_executor = ThreadPoolExecutor(max_workers=128)
-# TODO Do `loop.set_default_executor(...)` ?
 
 
 def function(
@@ -26,8 +25,8 @@ def function(
     func_or_method: DecoratableFunctionType | None = None,
     *,
     start_soon: bool | Sentinel = NOT_SET,
-    children_start_soon_by_default: bool | Sentinel = NOT_SET,
-    everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+    children_start_soon: bool | Sentinel = NOT_SET,
+    start_soon_default: bool | Sentinel = INHERIT,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
     TODO Finalize this docstring by explaining why we need the
@@ -49,8 +48,8 @@ def function(
             return PromisingFunction[T_co](
                 f_or_m,
                 start_soon=start_soon,
-                children_start_soon_by_default=children_start_soon_by_default,
-                everything_starts_soon_by_default=everything_starts_soon_by_default,
+                children_start_soon=children_start_soon,
+                start_soon_default=start_soon_default,
             )
 
         return _decorator
@@ -60,8 +59,8 @@ def function(
     return PromisingFunction[T_co](
         func_or_method,
         start_soon=start_soon,
-        children_start_soon_by_default=children_start_soon_by_default,
-        everything_starts_soon_by_default=everything_starts_soon_by_default,
+        children_start_soon=children_start_soon,
+        start_soon_default=start_soon_default,
     )
 
 
@@ -77,21 +76,20 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         # TODO Implement a custom __str__ and __repr__ methods and use this
         #  name in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon_by_default: bool | Sentinel = NOT_SET,
-        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+        children_start_soon: bool | Sentinel = NOT_SET,
+        start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
         self.start_soon = start_soon
-        self.children_start_soon_by_default = children_start_soon_by_default
-        self.everything_starts_soon_by_default = everything_starts_soon_by_default
+        self.children_start_soon = children_start_soon
+        self.start_soon_default = start_soon_default
 
-        # TODO Make sure to use `get_type_hints()` instead of `__annotations__` to
-        #  resolve postponed type hints correctly, when you implement input params
-        #  as Promises.
+        # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
+        #  to resolve postponed type hints correctly, when you implement input
+        #  params as Promises.
         # TODO Safeguard against the wrapped function accepting keyword
-        #  arguments that are reserved to configure the Promise
-        #  (`start_soon`, `children_start_soon_by_default`,
-        #  `everything_starts_soon_by_default`)
+        #  arguments that are reserved to configure the Promise (`start_soon`,
+        #  `children_start_soon`, `start_soon_default`):
         #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
 
     def __call__(
@@ -106,12 +104,11 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # Allow overriding the start_soon, children_start_soon_by_default,
-        # and everything_starts_soon_by_default parameters from the
-        # PromisingFunction constructor by passing them as keyword arguments
-        # to the call() method.
-        # TODO Add info about this to a docstring.
-        #  (Class docstring ? This method's docstring ?)
+        # NOTE: Allows overriding the start_soon, children_start_soon, and
+        # start_soon_default parameters from the PromisingFunction constructor
+        # by passing them as keyword arguments to the call() method.
+        # TODO Add the above info to a docstring. (Class docstring ? This
+        #  method's docstring ?)
         # TODO Mention that the only way NOT to override the parameters is NOT
         #  to pass them into the call() method at all (passing NOT_SET will
         #  still override the parameters from the PromisingFunction
@@ -120,13 +117,13 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             "start_soon",
             self.start_soon,
         )
-        children_start_soon_by_default = kwargs.pop(
-            "children_start_soon_by_default",
-            self.children_start_soon_by_default,
+        children_start_soon = kwargs.pop(
+            "children_start_soon",
+            self.children_start_soon,
         )
-        everything_starts_soon_by_default = kwargs.pop(
-            "everything_starts_soon_by_default",
-            self.everything_starts_soon_by_default,
+        start_soon_default = kwargs.pop(
+            "start_soon_default",
+            self.start_soon_default,
         )
 
         # TODO Develop a convenient and idiomatic (whatever that would mean)
@@ -157,6 +154,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,
-            children_start_soon_by_default=children_start_soon_by_default,
-            everything_starts_soon_by_default=everything_starts_soon_by_default,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
         )

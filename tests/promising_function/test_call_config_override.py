@@ -1,6 +1,6 @@
 """
-Tests for overriding start_soon, children_start_soon_by_default, and
-everything_starts_soon_by_default at call time (via keyword arguments
+Tests for overriding start_soon, children_start_soon, and
+start_soon_default at call time (via keyword arguments
 to __call__ / call()).
 """
 
@@ -44,7 +44,7 @@ async def test_call_start_soon_not_set_overrides_constructor() -> None:
     """
     Explicitly passing NOT_SET at call time overrides the
     constructor's concrete bool value (falling back to
-    everything_starts_soon_by_default at root level, which
+    start_soon_default at root level, which
     defaults to True globally).
     """
 
@@ -54,74 +54,74 @@ async def test_call_start_soon_not_set_overrides_constructor() -> None:
 
     # Passing NOT_SET explicitly still overrides the constructor's False
     promise = noop(start_soon=NOT_SET)
-    # At root, NOT_SET falls back to everything_starts_soon_by_default (True)
+    # At root, NOT_SET falls back to start_soon_default (True)
     assert promise._start_soon is True
     await promise
 
 
-# ── children_start_soon_by_default ────────────────────────────────────────────
+# ── children_start_soon ────────────────────────────────────────────
 
 
-async def test_call_overrides_children_start_soon_by_default() -> None:
+async def test_call_overrides_children_start_soon() -> None:
     """
-    children_start_soon_by_default set on PromisingFunction is
+    children_start_soon set on PromisingFunction is
     overridden when a different value is passed at call time.
     """
 
-    @promising.function(children_start_soon_by_default=False)
+    @promising.function(children_start_soon=False)
     async def noop() -> None:
         pass
 
-    promise = noop(children_start_soon_by_default=True)
-    assert promise._children_start_soon_by_default is True
+    promise = noop(children_start_soon=True)
+    assert promise._children_start_soon is True
     await promise
 
 
-async def test_call_without_children_start_soon_by_default_uses_constructor_value() -> None:
+async def test_call_without_children_start_soon_uses_constructor_value() -> None:
     """
-    When children_start_soon_by_default is not passed at call
+    When children_start_soon is not passed at call
     time, the PromisingFunction constructor's value is used.
     """
 
-    @promising.function(children_start_soon_by_default=True)
+    @promising.function(children_start_soon=True)
     async def noop() -> None:
         pass
 
     promise = noop()
-    assert promise._children_start_soon_by_default is True
+    assert promise._children_start_soon is True
     await promise
 
 
-# ── everything_starts_soon_by_default ─────────────────────────────────────────
+# ── start_soon_default ─────────────────────────────────────────
 
 
-async def test_call_overrides_everything_starts_soon_by_default() -> None:
+async def test_call_overrides_start_soon_default() -> None:
     """
-    everything_starts_soon_by_default set on PromisingFunction is
+    start_soon_default set on PromisingFunction is
     overridden when a different value is passed at call time.
     """
 
-    @promising.function(everything_starts_soon_by_default=True)
+    @promising.function(start_soon_default=True)
     async def noop() -> None:
         pass
 
-    promise = noop(everything_starts_soon_by_default=False)
-    assert promise._everything_starts_soon_by_default is False
+    promise = noop(start_soon_default=False)
+    assert promise._start_soon_default is False
     await promise
 
 
-async def test_call_without_everything_starts_soon_by_default_uses_constructor_value() -> None:
+async def test_call_without_start_soon_default_uses_constructor_value() -> None:
     """
-    When everything_starts_soon_by_default is not passed at call
+    When start_soon_default is not passed at call
     time, the PromisingFunction constructor's value is used.
     """
 
-    @promising.function(everything_starts_soon_by_default=False)
+    @promising.function(start_soon_default=False)
     async def noop() -> None:
         pass
 
     promise = noop()
-    assert promise._everything_starts_soon_by_default is False
+    assert promise._start_soon_default is False
     await promise
 
 
@@ -136,20 +136,20 @@ async def test_call_overrides_all_three() -> None:
 
     @promising.function(
         start_soon=False,
-        children_start_soon_by_default=False,
-        everything_starts_soon_by_default=False,
+        children_start_soon=False,
+        start_soon_default=False,
     )
     async def noop() -> None:
         pass
 
     promise = noop(
         start_soon=True,
-        children_start_soon_by_default=True,
-        everything_starts_soon_by_default=True,
+        children_start_soon=True,
+        start_soon_default=True,
     )
     assert promise._start_soon is True
-    assert promise._children_start_soon_by_default is True
-    assert promise._everything_starts_soon_by_default is True
+    assert promise._children_start_soon is True
+    assert promise._start_soon_default is True
     await promise
 
 
@@ -170,8 +170,8 @@ async def test_config_kwargs_do_not_leak_into_function() -> None:
         3,
         4,
         start_soon=True,
-        children_start_soon_by_default=True,
-        everything_starts_soon_by_default=True,
+        children_start_soon=True,
+        start_soon_default=True,
     )
     assert result == 7
 
@@ -186,9 +186,9 @@ async def test_config_kwargs_alongside_function_kwargs() -> None:
     async def greet(*, name: str) -> str:
         return f"hello, {name}"
 
-    promise = greet(name="world", start_soon=True, children_start_soon_by_default=False)
+    promise = greet(name="world", start_soon=True, children_start_soon=False)
     assert promise._start_soon is True
-    assert promise._children_start_soon_by_default is False
+    assert promise._children_start_soon is False
     assert await promise == "hello, world"
 
 
@@ -197,32 +197,32 @@ async def test_config_kwargs_alongside_function_kwargs() -> None:
 
 async def test_call_override_with_inherit() -> None:
     """
-    Passing INHERIT at call time for everything_starts_soon_by_default
+    Passing INHERIT at call time for start_soon_default
     overrides a concrete bool from the constructor; at root level
     INHERIT resolves to the global default (True).
     """
 
-    @promising.function(everything_starts_soon_by_default=False)
+    @promising.function(start_soon_default=False)
     async def noop() -> None:
         pass
 
-    promise = noop(everything_starts_soon_by_default=INHERIT)
+    promise = noop(start_soon_default=INHERIT)
     # At root, INHERIT reads the global default (True)
-    assert promise._everything_starts_soon_by_default is True
+    assert promise._start_soon_default is True
     await promise
 
 
 async def test_call_override_with_global_default() -> None:
     """
     Passing GLOBAL_DEFAULT at call time for
-    everything_starts_soon_by_default overrides a concrete bool from
+    start_soon_default overrides a concrete bool from
     the constructor; at root level it also resolves to True.
     """
 
-    @promising.function(everything_starts_soon_by_default=False)
+    @promising.function(start_soon_default=False)
     async def noop() -> None:
         pass
 
-    promise = noop(everything_starts_soon_by_default=GLOBAL_DEFAULT)
-    assert promise._everything_starts_soon_by_default is True
+    promise = noop(start_soon_default=GLOBAL_DEFAULT)
+    assert promise._start_soon_default is True
     await promise

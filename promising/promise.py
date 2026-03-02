@@ -65,18 +65,18 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately.
-            NOT_SET (default) defers to the parent's
-            children_start_soon_by_default if enforced, otherwise falls
-            back to everything_starts_soon_by_default. INHERIT copies the
-            parent's start_soon directly.
-        children_start_soon_by_default: Default start_soon value enforced
-            on child contexts that leave start_soon as NOT_SET. NOT_SET
-            (default) means no enforcement. INHERIT copies the parent's
-            setting.
-        everything_starts_soon_by_default: Local override for the global
-            EVERYTHING_STARTS_SOON_BY_DEFAULT. INHERIT (default)
-            propagates from the parent. GLOBAL_DEFAULT reads the current
-            global setting without inheriting.
+            NOT_SET (default) defers to the parent's children_start_soon if
+            enforced, otherwise falls back to start_soon_default. INHERIT
+            copies the parent's start_soon directly.
+        children_start_soon: Default start_soon value enforced on child
+            contexts that leave start_soon as NOT_SET. NOT_SET (default)
+            means no enforcement. INHERIT copies the parent's setting of
+            the same name.
+            # TODO Explain why the default is NOT_SET, and not INHERIT, like it
+            #  is for bare PromisingContext ?
+        start_soon_default: Local override for the global START_SOON_DEFAULT.
+            INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
+            the current global setting without inheriting.
         prefill_result: Pre-set result value. Cannot be combined with coro
             or prefill_exception.
         prefill_exception: Pre-set exception. Cannot be combined with coro
@@ -95,8 +95,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         name: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon_by_default: bool | Sentinel = NOT_SET,
-        everything_starts_soon_by_default: bool | Sentinel = INHERIT,
+        children_start_soon: bool | Sentinel = NOT_SET,
+        start_soon_default: bool | Sentinel = INHERIT,
         prefill_result: T_co | Sentinel | None = NOT_SET,
         # TODO Use NOT_SET instead of None below as well, for consistency ?
         prefill_exception: BaseException | None = None,
@@ -106,8 +106,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             loop=loop,
             name=name,
             parent=parent,
-            children_start_soon_by_default=children_start_soon_by_default,
-            everything_starts_soon_by_default=everything_starts_soon_by_default,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
         )
         Future.__init__(
             self,
@@ -169,7 +169,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
-        # TODO Ensure we are in the same thread as the Promise's event loop is
+        # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self.done():
             return self.result()
@@ -277,22 +277,19 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if start_soon is NOT_SET:
             parent_context = self.get_parent_context(raise_if_none=False)
 
-            # TODO Should there be any reason or scenario when
-            #  `everything_starts_soon_by_default` takes precedence over the
-            #  parent's `children_start_soon_by_default` ?
-            if parent_context is not None and parent_context._children_start_soon_by_default is not NOT_SET:
+            if parent_context is not None and parent_context._children_start_soon is not NOT_SET:
                 # The parent is enforcing this setting for its children
-                return parent_context._children_start_soon_by_default
+                return parent_context._children_start_soon
 
             # Use the default
-            return self._everything_starts_soon_by_default
+            return self._start_soon_default
 
         if start_soon is INHERIT:
             parent_promise = self.get_parent_promise(raise_if_none=False)
 
             if parent_promise is None:
                 # Use the default
-                return self._everything_starts_soon_by_default
+                return self._start_soon_default
 
             # Inherit from the parent
             return parent_promise._start_soon

@@ -60,8 +60,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
-        name: Human-readable name for the Promise. If None, generates a
-            unique name ("Promise-N", where N is a number).
+        # TODO Explain namespace parameter
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately.
@@ -92,7 +91,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
         loop: AbstractEventLoop | None = None,
-        name: str | None = None,
+        namespace: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
@@ -104,7 +103,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         PromisingContext.__init__(
             self,
             loop=loop,
-            name=name,
+            namespace=namespace,
             parent=parent,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,

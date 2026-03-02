@@ -36,12 +36,14 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self,
         func_or_method: DecoratableFunctionType | None = None,
         *,
+        namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
+        self._ctx_namespace = namespace
         self._ctx_loop = loop
         self._parent = parent
         self._children_start_soon = children_start_soon
@@ -209,12 +211,12 @@ class PromisingContext:
         self,
         *,
         loop: AbstractEventLoop | None = None,
-        name: str | None = None,
+        namespace: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
-        self.ctx_namespace = name
+        self.ctx_namespace = namespace
         self._previous_token: contextvars.Token | None = None
 
         if parent is INHERIT:

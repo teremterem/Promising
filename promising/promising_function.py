@@ -72,9 +72,9 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        # TODO Accept name as a parameter ?
+        # TODO Accept namespace as a parameter ?
         # TODO Implement a custom __str__ and __repr__ methods and use this
-        #  name in them ? (Same as for Promise)
+        #  namespace in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -149,8 +149,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
             coro = _sync_to_async()
 
-        # TODO Pass a name to the Promise constructor that would include the
-        #  name of the function that was decorated
+        # TODO Pass a namespace to the Promise constructor that would include the
+        #  namespace of the function that was decorated
         return Promise[T_co](
             coro=coro,
             start_soon=start_soon,

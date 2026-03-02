@@ -76,8 +76,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         func_or_method: DecoratableFunctionType,
         *,
         namespace: str | None = None,
-        # TODO Implement a custom __str__ and __repr__ methods and use this
-        #  namespace in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -154,8 +152,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
             coro = _sync_to_async()
 
-        # TODO Pass a namespace to the Promise constructor that would include the
-        #  namespace of the function that was decorated
         return Promise[T_co](
             namespace=resolve_namespace(
                 provided_explicitly=self.namespace,

@@ -8,6 +8,7 @@ from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
+from promising.utils import resolve_namespace
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -60,8 +61,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
-        name: Human-readable name for the Promise. If None, generates a
-            unique name ("Promise-N", where N is a number).
+        namespace: Optional human-readable namespace string. Used in
+            ``__repr__`` output. Passed to PromisingContext.
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately.
@@ -91,8 +92,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
+        namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        name: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
@@ -103,8 +104,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     ) -> None:
         PromisingContext.__init__(
             self,
+            namespace=namespace,
             loop=loop,
-            name=name,
             parent=parent,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
@@ -235,10 +236,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         # ruff: BLE001 (blind-except)
         if self.done():
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self.get_name()}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
         if self._coro is None:
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self.get_name()}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self}")
 
         result = NOT_SET
         exception = NOT_SET
@@ -251,6 +252,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
+                # TODO Find a way to borrow from MiniAgents the mechanism that
+                #  logs this "promising breadcrumb" together with the error
+                #  tracebacks
                 if not hasattr(exception, "__promising_trace__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
@@ -267,7 +271,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
-            self._task = self._ctx_loop.create_task(self._fulfill(), name=self.get_name() + "-Task")
+            self._task = self._ctx_loop.create_task(self._fulfill(), name=str(self) + "-Task")
 
     def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
         if isinstance(start_soon, bool):
@@ -327,6 +331,14 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # use the event loop's `call_soon_threadsafe` to "stay on the
                 # safe side"
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
+
+    def __repr__(self) -> str:
+        return self._repr_context(
+            resolve_namespace(
+                provided_explicitly=self.namespace,
+                named_object_fallback=self._coro,
+            ),
+        )
 
     def set_result(self, result: T_co) -> None:
         """

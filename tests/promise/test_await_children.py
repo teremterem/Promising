@@ -39,11 +39,10 @@ async def test_await_children(*, await_children: bool) -> None:
         assert execution_order == ["parent_coro_done", "child_done"]
     else:
         assert execution_order == ["parent_coro_done"]
-
-    # Let's await for the child promise to complete, so that we don't get any
-    # asyncio warnings about the child promise being not awaited (or being
-    # cancelled).
-    await child_promise
+        # Let's await for the child promise to complete, so that we don't get any
+        # asyncio warnings about the child promise being not awaited (or being
+        # cancelled).
+        await child_promise
 
 
 @pytest.mark.parametrize("recursively", [True, False])
@@ -86,12 +85,24 @@ async def test_await_children_recursively(*, recursively: bool) -> None:
         await promising.await_children(recursively=recursively)
         return "root"
 
-    await root_func()
+    promise = root_func()
+    await promise
 
     if recursively:
-        assert execution_order == ["child_done", "root_coro_done", "grandchild_done", "great_grandchild_done"]
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+            "grandchild_done",
+            "great_grandchild_done",
+        ]
     else:
-        assert execution_order == ["child_done", "root_coro_done"]
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+        ]
+        # Let's await for all the children to complete anyway, so that we don't
+        # get any asyncio warnings about coroutines never being awaited
+        await promise.await_children(recursively=True)
 
 
 @pytest.mark.parametrize("recursively", [True, False])
@@ -133,7 +144,8 @@ async def test_await_children_recursively_sync_children(
         await promising.await_children(recursively=recursively)
         return "root"
 
-    await root_func()
+    promise = root_func()
+    await promise
 
     if recursively:
         assert execution_order == [
@@ -147,3 +159,6 @@ async def test_await_children_recursively_sync_children(
             "child_done",
             "root_coro_done",
         ]
+        # Let's await for all the children to complete anyway, so that we don't
+        # get any asyncio warnings about coroutines never being awaited
+        await promise.await_children(recursively=True)

@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import contextvars
+import functools
 import inspect
 from asyncio import AbstractEventLoop, Future
 from collections.abc import Callable
@@ -19,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport
+from promising.utils import DecoratorSupport, resolve_namespace
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -36,12 +37,14 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self,
         func_or_method: DecoratableFunctionType | None = None,
         *,
+        namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
+        self._namespace = namespace
         self._ctx_loop = loop
         self._parent = parent
         self._children_start_soon = children_start_soon
@@ -63,6 +66,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
+                namespace=self._namespace,
                 loop=self._ctx_loop,
                 parent=self._parent,
                 children_start_soon=self._children_start_soon,
@@ -102,6 +106,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
+            namespace=resolve_namespace(
+                provided_explicitly=self._namespace,
+                named_object_fallback=self.__wrapped__,
+            ),
             loop=self._ctx_loop,
             parent=self._parent,
             children_start_soon=self._children_start_soon,
@@ -111,6 +119,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         if self._is_wrapped_async:
             # Wrapped function or method is async
 
+            @functools.wraps(self.__wrapped__)
             async def _async_wrapper() -> Any:
                 with ctx:
                     return await self._wrapped_as_callable(*args, **kwargs)
@@ -180,6 +189,8 @@ class PromisingContext:
     maintains a weak set of child contexts for awaiting.
 
     Args:
+        namespace: Optional human-readable namespace string for this
+            context. Used in ``__repr__`` output.
         loop: The event loop to use. If not provided, inherits from the
             parent context. If no parent exists, uses the current event
             loop. If provided explicitly and a parent exists, must be the
@@ -199,26 +210,23 @@ class PromisingContext:
         ValueError: If invalid parameter values or combinations are provided.
     """
 
+    namespace: str | None
+
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
+    # TODO Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,
         *,
+        namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        name: str | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
+        self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
-
-        if name is None:
-            name = f"{self.__class__.__name__}-{id(self)}"
-        # TODO TODO TODO Implement custom __str__ and __repr__ methods and use
-        #  this name in them ?
-        self._name = name
 
         if parent is INHERIT:
             self._parent = self.get_active_context(raise_if_none=False)
@@ -246,12 +254,6 @@ class PromisingContext:
         self._children = WeakSet[PromisingContext]()
         if self._parent is not None:
             self._parent._children.add(self)
-
-    def get_name(self) -> str:
-        """
-        Get the human-readable name of this PromisingContext.
-        """
-        return self._name
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -384,7 +386,7 @@ class PromisingContext:
                 concurrent_future.set_result(None)
 
         def schedule_await_children() -> None:
-            self._ctx_loop.create_task(await_children_and_notify(), name=self.get_name() + "-AwaitChildrenSync")
+            self._ctx_loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
 
         self._call_soon_threadsafe(schedule_await_children)
         # Should any error happen in the underlying async `await_children`,
@@ -497,6 +499,9 @@ class PromisingContext:
 
         return False  # Let's not suppress any exceptions
 
+    # TODO Implement `get_promising_trace(only_with_namespaces: bool = True)`
+    #  method
+
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
 
@@ -541,6 +546,14 @@ class PromisingContext:
             "`children_start_soon` must be either NOT_SET, INHERIT or a boolean value, "
             f"but `{type(children_start_soon)}` was given instead"
         )
+
+    def _repr_context(self, namespace: str | None = None) -> str:
+        if namespace is not None:
+            namespace = f"{namespace!r} "
+        return f"<{namespace or ''}{self.__class__.__name__} id={id(self)}>"
+
+    def __repr__(self) -> str:
+        return self._repr_context(self.namespace)
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:
         try:

@@ -347,7 +347,7 @@ uv sync --extra examples
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `parent`, `children_start_soon`, and `start_soon_default`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `children_start_soon`, and `start_soon_default`. |
 
 ### Promise
 
@@ -367,7 +367,7 @@ uv sync --extra examples
 
 | Method / Property | Description |
 |---|---|
-| `ctx.get_name()` | Get the human-readable name. Auto-generated as `"{ClassName}-{id}"` if not provided via the `name` constructor parameter. |
+| `ctx.namespace` | Optional human-readable namespace string. Used in `__repr__` output. Set via the `namespace` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 | `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |

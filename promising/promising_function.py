@@ -138,6 +138,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             coro = self._wrapped_as_callable(*args, **kwargs)
         else:
 
+            @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
                 # Get the event loop from the active promise that is running
                 # this async function

@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import contextvars
+import functools
 import inspect
 from asyncio import AbstractEventLoop, Future
 from collections.abc import Callable
@@ -118,6 +119,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         if self._is_wrapped_async:
             # Wrapped function or method is async
 
+            @functools.wraps(self.__wrapped__)
             async def _async_wrapper() -> Any:
                 with ctx:
                     return await self._wrapped_as_callable(*args, **kwargs)

@@ -334,7 +334,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def __repr__(self) -> str:
         return self._repr_context(
             resolve_namespace(
-                provided_explicitly=self.ctx_namespace,
+                provided_explicitly=self.namespace,
                 named_object_fallback=self._coro,
             ),
         )

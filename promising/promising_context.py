@@ -44,7 +44,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
-        self._ctx_namespace = namespace
+        self._namespace = namespace
         self._ctx_loop = loop
         self._parent = parent
         self._children_start_soon = children_start_soon
@@ -66,7 +66,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
-                namespace=self._ctx_namespace,
+                namespace=self._namespace,
                 loop=self._ctx_loop,
                 parent=self._parent,
                 children_start_soon=self._children_start_soon,
@@ -107,7 +107,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # underlying function or method
         ctx = PromisingContext(
             namespace=resolve_namespace(
-                provided_explicitly=self._ctx_namespace,
+                provided_explicitly=self._namespace,
                 named_object_fallback=self.__wrapped__,
             ),
             loop=self._ctx_loop,
@@ -208,7 +208,7 @@ class PromisingContext:
         ValueError: If invalid parameter values or combinations are provided.
     """
 
-    ctx_namespace: str | None = None
+    namespace: str | None = None
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
@@ -223,7 +223,7 @@ class PromisingContext:
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
-        self.ctx_namespace = namespace
+        self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
 
         if parent is INHERIT:
@@ -552,7 +552,7 @@ class PromisingContext:
         return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
 
     def __repr__(self) -> str:
-        return self._repr_context(self.ctx_namespace)
+        return self._repr_context(self.namespace)
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:
         try:

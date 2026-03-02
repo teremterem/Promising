@@ -189,6 +189,8 @@ class PromisingContext:
     maintains a weak set of child contexts for awaiting.
 
     Args:
+        namespace: Optional human-readable namespace string for this
+            context. Used in ``__repr__`` output.
         loop: The event loop to use. If not provided, inherits from the
             parent context. If no parent exists, uses the current event
             loop. If provided explicitly and a parent exists, must be the

@@ -7,6 +7,14 @@ from promising.errors import DecorationError
 from promising.types import CallableType, DecoratableFunctionType
 
 
+def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str:
+    if provided_explicitly:
+        return provided_explicitly
+    if named_object_fallback is not None and hasattr(named_object_fallback, "__name__"):
+        return named_object_fallback.__name__
+    return None
+
+
 class DecoratorSupport:
     __wrapped__: DecoratableFunctionType
 

@@ -7,7 +7,7 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport
+from promising.utils import DecoratorSupport, resolve_namespace
 
 # TODO Allow overriding this executor in local promise configurations
 # TODO What to do about potential deadlocks if recursive sync promises use up
@@ -24,6 +24,7 @@ def function(
     #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
     func_or_method: DecoratableFunctionType | None = None,
     *,
+    namespace: str | None = None,
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon: bool | Sentinel = NOT_SET,
     start_soon_default: bool | Sentinel = INHERIT,
@@ -47,6 +48,7 @@ def function(
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
                 f_or_m,
+                namespace=namespace,
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
@@ -58,6 +60,7 @@ def function(
     # call
     return PromisingFunction[T_co](
         func_or_method,
+        namespace=namespace,
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
@@ -72,7 +75,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        # TODO Accept namespace as a parameter ?
+        namespace: str | None = None,
         # TODO Implement a custom __str__ and __repr__ methods and use this
         #  namespace in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
@@ -80,6 +83,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
+        self.namespace = namespace
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
@@ -152,6 +156,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         # TODO Pass a namespace to the Promise constructor that would include the
         #  namespace of the function that was decorated
         return Promise[T_co](
+            namespace=resolve_namespace(
+                provided_explicitly=self.namespace,
+                named_object_fallback=self.__wrapped__,
+            ),
             coro=coro,
             start_soon=start_soon,
             children_start_soon=children_start_soon,

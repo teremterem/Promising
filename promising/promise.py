@@ -8,6 +8,7 @@ from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
+from promising.utils import resolve_namespace
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -331,13 +332,12 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def __repr__(self) -> str:
-        if self.ctx_namespace:
-            return self._repr_context(namespace=self.ctx_namespace)
-
-        if self._coro and hasattr(self._coro, "__name__"):
-            return self._repr_context(namespace=self._coro.__name__)
-
-        return self._repr_context()
+        return self._repr_context(
+            resolve_namespace(
+                provided_explicitly=self.ctx_namespace,
+                named_object_fallback=self._coro,
+            ),
+        )
 
     def set_result(self, result: T_co) -> None:
         """

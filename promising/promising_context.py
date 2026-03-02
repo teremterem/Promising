@@ -19,7 +19,7 @@ from promising.errors import (
 )
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport
+from promising.utils import DecoratorSupport, resolve_namespace
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -65,6 +65,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
+                namespace=self._ctx_namespace,
                 loop=self._ctx_loop,
                 parent=self._parent,
                 children_start_soon=self._children_start_soon,
@@ -104,6 +105,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
+            namespace=resolve_namespace(
+                provided_explicitly=self._ctx_namespace,
+                named_object_fallback=self.__wrapped__,
+            ),
             loop=self._ctx_loop,
             parent=self._parent,
             children_start_soon=self._children_start_soon,
@@ -210,8 +215,8 @@ class PromisingContext:
     def __init__(
         self,
         *,
-        loop: AbstractEventLoop | None = None,
         namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | Sentinel | None" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,

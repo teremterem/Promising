@@ -251,6 +251,12 @@ class PromisingContext:
         """
         return self._name
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self._name!r})"
+
+    def __str__(self) -> str:
+        return self._name
+
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """

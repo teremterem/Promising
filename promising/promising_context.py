@@ -246,11 +246,6 @@ class PromisingContext:
         if self._parent is not None:
             self._parent._children.add(self)
 
-    def __repr__(self) -> str:
-        if self.ctx_namespace:
-            return f"{self.ctx_namespace}-{self.__class__.__name__}-{id(self)}"
-        return f"{self.__class__.__name__}-{id(self)}"
-
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
@@ -539,6 +534,14 @@ class PromisingContext:
             "`children_start_soon` must be either NOT_SET, INHERIT or a boolean value, "
             f"but `{type(children_start_soon)}` was given instead"
         )
+
+    def _repr_context(self, namespace: str | None) -> str:
+        if namespace:
+            return f"{namespace}-{self.__class__.__name__}-{id(self)}"
+        return f"{self.__class__.__name__}-{id(self)}"
+
+    def __repr__(self) -> str:
+        return self._repr_context(self.ctx_namespace)
 
     def _assert_no_sync_usage_deadlock(self, message: str) -> None:
         try:

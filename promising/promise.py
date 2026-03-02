@@ -255,10 +255,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # TODO Find a way to borrow from MiniAgents the mechanism that
                 #  logs this "promising breadcrumb" together with the error
                 #  tracebacks
-                if not hasattr(exception, "__promising_trace__"):
+                if not hasattr(exception, "__promising_context__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
-                    exception.__promising_trace__ = self
+                    exception.__promising_context__ = self
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling

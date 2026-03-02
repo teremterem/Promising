@@ -331,11 +331,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def __repr__(self) -> str:
-        namespace = self.ctx_namespace
-        if not namespace and self._coro and hasattr(self._coro, "__name__"):
-            namespace = self._coro.__name__
+        if self.ctx_namespace:
+            return self._repr_context(namespace=self.ctx_namespace)
 
-        return self._repr_context(namespace)
+        if self._coro and hasattr(self._coro, "__name__"):
+            return self._repr_context(namespace=self._coro.__name__)
+
+        return self._repr_context()
 
     def set_result(self, result: T_co) -> None:
         """

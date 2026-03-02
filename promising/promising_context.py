@@ -535,7 +535,7 @@ class PromisingContext:
             f"but `{type(children_start_soon)}` was given instead"
         )
 
-    def _repr_context(self, namespace: str | None) -> str:
+    def _repr_context(self, namespace: str | None = None) -> str:
         if namespace:
             return f"{namespace}-{self.__class__.__name__}-{id(self)}"
         return f"{self.__class__.__name__}-{id(self)}"

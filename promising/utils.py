@@ -7,8 +7,8 @@ from promising.errors import DecorationError
 from promising.types import CallableType, DecoratableFunctionType
 
 
-def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str:
-    if provided_explicitly:
+def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str | None:
+    if provided_explicitly is not None:
         return provided_explicitly
 
     if named_object_fallback is None:

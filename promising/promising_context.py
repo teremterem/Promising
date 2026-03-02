@@ -548,8 +548,7 @@ class PromisingContext:
         )
 
     def _repr_context(self, namespace: str | None = None) -> str:
-        namespace = (namespace or "").strip()
-        if namespace:
+        if namespace is not None:
             namespace = f"{namespace!r} "
         return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
 

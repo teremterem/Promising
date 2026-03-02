@@ -201,7 +201,7 @@ class PromisingContext:
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
+    # TODO Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,
@@ -216,8 +216,6 @@ class PromisingContext:
 
         if name is None:
             name = f"{self.__class__.__name__}-{id(self)}"
-        # TODO TODO TODO Implement custom __str__ and __repr__ methods and use
-        #  this name in them ?
         self._name = name
 
         if parent is INHERIT:

@@ -28,26 +28,31 @@ def function(
     start_soon_default: bool | Sentinel = INHERIT,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
-    Decorator that wraps a function so calling it returns a ``Promise`` instead of a plain result.
+    Decorator that wraps a function so calling it returns a ``Promise`` instead
+    of a plain result.
 
     Advantages of decorated functions:
 
-    - Calling a decorated function creates and returns a ``Promise`` object instead of
-      executing the function directly.
-    - A ``Promise`` can be awaited multiple times without re-executing the underlying function.
-    - Promises automatically form parent-child hierarchies — a ``Promise`` created during
-      another ``Promise``'s execution becomes its child.
-    - Works with both async and sync functions (sync functions are transparently run in a
-      thread pool).
-    - Works as a method decorator (instance methods, ``@classmethod``, ``@staticmethod``).
+    - Calling a decorated function creates and returns a ``Promise`` object
+      instead of executing the function directly.
+    - A ``Promise`` can be awaited multiple times without re-executing the
+      underlying function.
+    - Promises automatically form parent-child hierarchies — a ``Promise``
+      created during another ``Promise``'s execution becomes its child.
+    - Works with both async and sync functions (sync functions are
+      transparently run in a thread pool).
+    - Works as a method decorator (instance methods, ``@classmethod``,
+      ``@staticmethod``).
 
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
-        start_soon: Whether the ``Promise`` should start executing immediately upon creation.
-        children_start_soon: Whether child promises created during this ``Promise``'s execution
-            should start executing immediately.
-        start_soon_default: Default ``start_soon`` value propagated to child promises. Defaults
-            to ``INHERIT``, meaning the value is inherited from the parent ``Promise``.
+        start_soon: Whether the ``Promise`` should start executing immediately
+            upon creation.
+        children_start_soon: Whether child promises created during this
+            ``Promise``'s execution should start executing immediately.
+        start_soon_default: Default ``start_soon`` value propagated to child
+            promises. Defaults to ``INHERIT``, meaning the value is inherited
+            from the parent ``Promise``.
     """
     if func_or_method is None:
         # The decorator was used with arguments

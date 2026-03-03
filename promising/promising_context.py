@@ -156,7 +156,7 @@ async def await_children(*, recursively: bool = False) -> None:
     #  when called on a bare PromisingContext, and not on a Promise.
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
-    #  PromisingContext ?
+    #  PromisingContext ? What other functions or methods might we need it in ?
     return await get_active_context().await_children(recursively=recursively)
 
 

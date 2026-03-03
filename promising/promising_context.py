@@ -27,59 +27,6 @@ if TYPE_CHECKING:
 
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
-    """
-    # TODO Fix inaccuracies in this docstring
-    Create a PromisingContext as a context manager or decorator.
-
-    Can be used in two ways:
-
-    1. **Context manager** — wraps a block of code in a PromisingContext::
-
-           with promising.context() as ctx:
-               ...
-           ...
-           await ctx.await_children(recursively=True)
-
-    2. **Decorator** — wraps a function so that each call runs inside a fresh
-       PromisingContext::
-
-           @promising.context(children_start_soon=False)
-           async def process(items):
-               ...
-
-    Decorator difference from ``@promising.function``:
-
-    - ``@promising.function`` creates a ``Promise`` (a PromisingContext +
-      asyncio.Future). The decorated call returns a ``Promise`` that can be
-      awaited and appears in the parent promise chain.
-    - ``@promising.context`` creates a bare ``PromisingContext``. The
-      decorated call returns the function's **raw return value** — no Future
-      is created, and the context does not appear in the parent promise chain.
-
-    Because of this, ``children_start_soon`` defaults to ``INHERIT`` here
-    (transparent pass-through), whereas ``Promise`` defaults to ``NOT_SET``
-    (explicit choice). This makes ``@promising.context`` a lightweight,
-    transparent grouping layer that simply passes the parent's policy through.
-
-    Args:
-        func_or_method: When used as ``@promising.context`` (without
-            parentheses), this receives the decorated function directly.
-            When used with arguments (``@promising.context(...)`` or as a
-            context manager), this is None.
-        namespace: Optional human-readable namespace string. Passed to
-            PromisingContext; used in ``__repr__`` output.
-        loop: The event loop to use. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
-        parent: Parent context. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
-        children_start_soon: Default start_soon value enforced on child
-            contexts that leave start_soon as NOT_SET. INHERIT (default)
-            copies the parent's setting.
-        start_soon_default: Local override for the global START_SOON_DEFAULT.
-            INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
-            the current global setting without inheriting.
-    """
-
     def __init__(
         self,
         func_or_method: DecoratableFunctionType | None = None,

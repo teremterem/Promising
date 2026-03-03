@@ -35,7 +35,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     1. **Context manager** — wraps a block of code in a PromisingContext::
 
-           async with promising.context() as ctx:
+           with promising.context() as ctx:
                ...
            ...
            await ctx.await_children(recursively=True)

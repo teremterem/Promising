@@ -72,9 +72,15 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         children_start_soon: Default start_soon value enforced on child
             contexts that leave start_soon as NOT_SET. NOT_SET (default)
             means no enforcement. INHERIT copies the parent's setting of
-            the same name.
-            # TODO Explain why the default is NOT_SET, and not INHERIT, like it
-            #  is for bare PromisingContext ?
+            the same name. The default is NOT_SET (unlike bare
+            PromisingContext, which defaults to INHERIT) because a Promise
+            is a work unit focused on its own coroutine — propagating
+            enforcement to children should be an explicit choice.
+            PromisingContext defaults to INHERIT because it's a transparent
+            grouping layer that passes the parent's policy through.
+            Children with start_soon=NOT_SET still fall back to
+            start_soon_default, so they get reasonable behavior without
+            being forced by the parent Promise.
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
             the current global setting without inheriting.

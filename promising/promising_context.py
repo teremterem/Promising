@@ -27,6 +27,12 @@ if TYPE_CHECKING:
 
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
+    """
+    # TODO Explain in docstring, when it comes to using it as a decorator, why
+    #  does it exist separately from @promising.function ? What's the
+    #  difference between the two ?
+    """
+
     def __init__(
         self,
         func_or_method: DecoratableFunctionType | None = None,

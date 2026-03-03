@@ -154,6 +154,9 @@ async def await_children(*, recursively: bool = False) -> None:
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
+    # TODO Do we need a check that ensures that this function was called in a
+    #  thread that contains the event loop of this particular
+    #  PromisingContext ?
     return await get_active_context().await_children(recursively=recursively)
 
 
@@ -161,8 +164,10 @@ def await_children_sync(*, recursively: bool = False) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
-    # TODO Elaborate more on why this method exists.
-    #  See promising/promise.py::Promise.sync() for more details.
+
+    This is the synchronous counterpart of ``await_children()`` — intended
+    for use inside sync promising functions that run in a thread pool
+    executor, where ``await`` is not available.
 
     Args:
         recursively: If True, wait for all descendants, not just direct
@@ -350,10 +355,9 @@ class PromisingContext:
         Wait for all awaitable children to finish, blocking the calling
         thread.
 
-        This is the synchronous counterpart of await_children() — intended
-        for use from threads that are not running the event loop.
-        # TODO Elaborate more on why this method exists.
-        #  See promising/promise.py::Promise.sync() for more details.
+        This is the synchronous counterpart of ``await_children()`` — intended
+        for use inside sync promising functions that run in a thread pool
+        executor, where ``await`` is not available.
 
         Args:
             recursively: If True, wait for all descendants, not just direct

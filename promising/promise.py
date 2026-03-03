@@ -102,12 +102,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefill_result: T_co | Sentinel | None = NOT_SET,
-        # TODO Use NOT_SET instead of None below as well, for consistency ?
+        prefill_result: T_co | None | Sentinel = NOT_SET,
         prefill_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(
@@ -314,7 +313,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def _finish_initialization(
         self,
         *,
-        prefill_result: T_co | Sentinel | None,
+        prefill_result: T_co | None | Sentinel,
         prefill_exception: BaseException | None,
     ) -> None:
         if self._coro is None:

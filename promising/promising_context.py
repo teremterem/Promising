@@ -39,7 +39,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -221,7 +221,7 @@ class PromisingContext:
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:

@@ -177,6 +177,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
+        # TODO If the underlying coroutine upon awaiting also returns a Promise,
+        #  we need to seamlessly await it as well !!!
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self.done():

@@ -20,8 +20,6 @@ _sync_function_executor = ThreadPoolExecutor(max_workers=128)
 
 
 def function(
-    # TODO Split into two functions with the same name using @overload ?
-    #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
     func_or_method: DecoratableFunctionType | None = None,
     *,
     namespace: str | None = None,

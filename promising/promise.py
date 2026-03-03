@@ -177,7 +177,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
-        # TODO If the underlying coroutine upon awaiting also returns a Promise,
+        # TODO TODO TODO If the underlying coroutine upon awaiting also returns a Promise,
         #  we need to seamlessly await it as well !!!
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
@@ -194,13 +194,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Synchronously wait for and return the Promise result, blocking the
         calling thread.
 
-        This is the synchronous counterpart of `await promise` — intended for
+        This is the synchronous counterpart of ``await promise`` — intended for
         use inside sync promising functions that run in a thread pool executor.
-        It schedules the Promise's execution on the event loop via
-        `call_soon_threadsafe` and blocks until the result (or exception) is
-        available.
-        # TODO The reader does not need to be bothered by the implementation
-        #  details of this method.
 
         Returns:
             The resolved value of the Promise.
@@ -215,6 +210,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             "Use `await promise` instead."
         )
 
+        # Schedule the task on the event loop from this (non-loop) thread,
+        # then block until the result (or exception) is available.
         self._call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 

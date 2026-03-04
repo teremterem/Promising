@@ -96,6 +96,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
+    # TODO TODO TODO Figure out how to support async generator interface as
+    #  well (together with its "sync" counterpart)
+
     def __init__(
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,

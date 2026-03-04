@@ -70,12 +70,15 @@ class DecoratorSupport:
 
     @property
     def _wrapped_as_callable(self) -> CallableType:
+        """
+        Return the wrapped object in a directly callable form.
+
+        For classmethod objects, returns the underlying ``__func__`` because
+        classmethod descriptors are not directly callable (the class argument
+        is already prepended by :class:`~types.MethodType` in ``__get__``).
+        For all other wrapped objects, returns ``__wrapped__`` as-is.
+        """
         if isinstance(self.__wrapped__, classmethod):
-            # self.__wrapped__ is a classmethod object; args[0] is the
-            # class, already prepended by MethodType in __get__.
-            # classmethod objects are not directly callable, so we reach
-            # through to the underlying function.
-            # TODO Turn the comment above into a docstring
             return self.__wrapped__.__func__
         return self.__wrapped__
 

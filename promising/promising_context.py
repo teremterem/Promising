@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
+    # TODO TODO TODO Review previously generated version of this docstring and
+    #  maybe borrow code examples from it.
     # TODO TODO TODO Fix inaccuracies in this docstring
     Decorator and context manager that establishes a lightweight
     ``PromisingContext`` node in the promise hierarchy without creating
@@ -235,7 +237,7 @@ class PromisingContext:
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO Support cancellation of the whole PromisingContext tree
+    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,

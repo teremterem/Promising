@@ -28,31 +28,36 @@ def function(
     start_soon_default: bool | Sentinel = INHERIT,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
-    Decorator that wraps a function so calling it returns a ``Promise`` instead
-    of a plain result.
+    A decorator that turns a function into one that returns a ``Promise``
+    instead of a plain result.
 
-    Advantages of decorated functions:
+    When called, a decorated function creates and returns a ``Promise``
+    that encapsulates the function's execution. The ``Promise`` can be
+    awaited multiple times without re-executing the underlying function.
 
-    - Calling a decorated function creates and returns a ``Promise`` object
-      instead of executing the function directly.
-    - A ``Promise`` can be awaited multiple times without re-executing the
-      underlying function.
-    - Promises automatically form parent-child hierarchies — a ``Promise``
-      created during another ``Promise``'s execution becomes its child.
-    - Works with both async and sync functions (sync functions are
-      transparently run in a thread pool).
-    - Works as a method decorator (instance methods, ``@classmethod``,
-      ``@staticmethod``).
+    Promises automatically form parent-child hierarchies: if a decorated
+    function is called during another ``Promise``'s execution, the newly
+    created ``Promise`` becomes a child of the active one.
+
+    Both sync and async functions are supported. Sync functions are
+    transparently executed in a thread pool so they can participate in
+    the async promise machinery.
+
+    Works as a method decorator for instance methods, ``@classmethod``,
+    and ``@staticmethod``.
 
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
-        start_soon: Whether the ``Promise`` should start executing immediately
-            upon creation.
+            Defaults to the wrapped function's ``__qualname__``.
+        start_soon: Whether the ``Promise`` should start executing
+            immediately upon creation. Defaults to ``NOT_SET``, which
+            defers to the parent ``Promise``'s configuration.
         children_start_soon: Whether child promises created during this
             ``Promise``'s execution should start executing immediately.
-        start_soon_default: Default ``start_soon`` value propagated to child
-            promises. Defaults to ``INHERIT``, meaning the value is inherited
-            from the parent ``Promise``.
+            Defaults to ``NOT_SET``.
+        start_soon_default: Default ``start_soon`` value propagated to
+            child promises. Defaults to ``INHERIT``, meaning the value
+            is inherited from the parent ``Promise``.
     """
     if func_or_method is None:
         # The decorator was used with arguments
@@ -79,42 +84,8 @@ def function(
 
 
 class PromisingFunction(DecoratorSupport, Generic[T_co]):
-    """
-    A callable wrapper that turns a function into one that returns a
-    ``Promise`` instead of a plain result.
-
-    When called, a ``PromisingFunction`` creates and returns a ``Promise``
-    that encapsulates the wrapped function's execution. Promises
-    automatically form parent-child hierarchies: if a ``PromisingFunction``
-    is called during another ``Promise``'s execution, the newly created
-    ``Promise`` becomes a child of the active one.
-
-    Both sync and async functions are supported. Sync functions are
-    transparently executed in a thread pool so they can participate in
-    the async promise machinery.
-
-    Works as a method decorator for instance methods, ``@classmethod``,
-    and ``@staticmethod`` (descriptor protocol support is provided by
-    ``DecoratorSupport``).
-
-    Typically created via the :func:`function` decorator rather than
-    instantiated directly.
-
-    Args:
-        func_or_method: The function, method, ``classmethod``, or
-            ``staticmethod`` to wrap.
-        namespace: Optional namespace string for the resulting ``Promise``.
-            Defaults to the wrapped function's ``__qualname__``.
-        start_soon: Whether the ``Promise`` should start executing
-            immediately upon creation. Defaults to ``NOT_SET``, which
-            defers to the parent ``Promise``'s configuration.
-        children_start_soon: Whether child promises created during this
-            ``Promise``'s execution should start executing immediately.
-            Defaults to ``NOT_SET``.
-        start_soon_default: Default ``start_soon`` value propagated to
-            child promises. Defaults to ``INHERIT``, meaning the value
-            is inherited from the parent ``Promise``.
-    """
+    """Callable wrapper created by ``@promising.function``. See
+    :func:`promising.function` for usage details."""
 
     def __init__(
         self,

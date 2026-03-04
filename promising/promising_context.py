@@ -28,9 +28,51 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
-    # TODO Explain in docstring, when it comes to using it as a decorator, why
-    #  does it exist separately from @promising.function ? What's the
-    #  difference between the two ?
+    Decorator and context manager that establishes a lightweight
+    ``PromisingContext`` node in the promise hierarchy without creating
+    a ``Promise``.
+
+    Use ``promising.context`` when you need a parent node that groups
+    child promises (e.g. to ``await_children()`` on them later) but
+    does not represent an asynchronous computation itself.
+
+    As a **context manager**::
+
+        with promising.context() as ctx:
+            # Promises created here become children of `ctx`
+            ...
+
+    As a **decorator** (wraps a function so every call runs inside a
+    fresh ``PromisingContext``)::
+
+        @promising.context
+        async def pipeline():
+            ...
+
+    Compare with ``@promising.function``, which *does* create a
+    ``Promise``: calling a ``@promising.function``-decorated function
+    returns a ``Promise`` whose result must be awaited, whereas calling
+    a ``@promising.context``-decorated function executes the function
+    immediately (returning its result directly) while providing a
+    ``PromisingContext`` around its body.
+
+    Args:
+        namespace: Optional namespace string for the underlying
+            ``PromisingContext``. When used as a decorator and not
+            provided, defaults to the wrapped function's
+            ``__qualname__``.
+        loop: Event loop to use. If not provided, inherits from the
+            parent context (or uses the current event loop if there is
+            no parent).
+        parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses
+            the currently active context. ``None`` creates a root
+            context with no parent.
+        children_start_soon: Whether child promises created inside this
+            context should start executing immediately. ``INHERIT``
+            (default) copies the parent's setting.
+        start_soon_default: Local override for the global
+            ``START_SOON_DEFAULT``. ``INHERIT`` (default) propagates
+            from the parent.
     """
 
     def __init__(
@@ -185,35 +227,8 @@ def await_children_sync(*, recursively: bool = False) -> None:
 
 
 class PromisingContext:
-    """
-    Create a new PromisingContext.
-
-    A PromisingContext provides hierarchical context management for
-    asynchronous operations. It tracks parent-child relationships,
-    manages configuration inheritance (e.g. start_soon behavior), and
-    maintains a weak set of child contexts for awaiting.
-
-    Args:
-        namespace: Optional human-readable namespace string for this
-            context. Used in ``__repr__`` output.
-        loop: The event loop to use. If not provided, inherits from the
-            parent context. If no parent exists, uses the current event
-            loop. If provided explicitly and a parent exists, must be the
-            same event loop as the parent's.
-        parent: Parent PromisingContext. If INHERIT (default), uses the
-            currently active context as parent. If None, the context has
-            no parent.
-        children_start_soon: Default start_soon value enforced on child
-            contexts that leave start_soon as NOT_SET. NOT_SET means no
-            enforcement. INHERIT (default) copies the parent's setting of
-            the same name.
-        start_soon_default: Local override for the global START_SOON_DEFAULT.
-            INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
-            the current global setting without inheriting.
-
-    Raises:
-        ValueError: If invalid parameter values or combinations are provided.
-    """
+    """Hierarchical context node created by ``promising.context``. See
+    :class:`promising.context` for usage details."""
 
     namespace: str | None
 

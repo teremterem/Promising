@@ -258,9 +258,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
-                # TODO Find a way to borrow from MiniAgents the mechanism that
-                #  logs this "promising breadcrumb" together with the error
-                #  tracebacks
+                # TODO Borrow from MiniAgents the mechanism that logs this
+                #  "promising breadcrumb" together with the error tracebacks
                 if not hasattr(exception, "__promising_context__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy

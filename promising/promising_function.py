@@ -117,15 +117,39 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # NOTE: Allows overriding the start_soon, children_start_soon, and
-        # start_soon_default parameters from the PromisingFunction constructor
-        # by passing them as keyword arguments to the call() method.
-        # TODO Add the above info to a docstring. (Class docstring ? This
-        #  method's docstring ?)
-        # TODO Mention that the only way NOT to override the parameters is NOT
-        #  to pass them into the call() method at all (passing NOT_SET will
-        #  still override the parameters from the PromisingFunction
-        #  constructor).
+        """
+        Call the wrapped function and return a ``Promise`` for its result.
+
+        This is the core method that ``__call__`` delegates to. It creates
+        a ``Promise`` that wraps the function's execution (running sync
+        functions in a thread pool automatically).
+
+        The ``start_soon``, ``children_start_soon``, and
+        ``start_soon_default`` parameters can be passed as keyword
+        arguments to override the values set on the ``PromisingFunction``
+        at decoration time. To use the decorator-level values, simply
+        omit these keyword arguments — passing ``NOT_SET`` explicitly
+        will still override them (``NOT_SET`` is itself a valid value
+        with its own semantics in ``Promise``).
+
+        Args:
+            *args: Positional arguments forwarded to the wrapped function.
+            **kwargs: Keyword arguments forwarded to the wrapped function.
+                The following keyword arguments are intercepted and not
+                forwarded:
+
+                - **start_soon** — Whether the ``Promise`` should start
+                  executing immediately upon creation.
+                - **children_start_soon** — Default ``start_soon`` value
+                  enforced on child ``Promise`` objects created during
+                  this ``Promise``'s execution.
+                - **start_soon_default** — Local override for the global
+                  ``START_SOON_DEFAULT``.
+
+        Returns:
+            A ``Promise`` that will resolve to the wrapped function's
+            return value.
+        """
         start_soon = kwargs.pop(
             "start_soon",
             self.start_soon,

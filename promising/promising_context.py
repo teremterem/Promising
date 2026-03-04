@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
+    # TODO TODO TODO Fix inaccuracies in this docstring
     Decorator and context manager that establishes a lightweight
     ``PromisingContext`` node in the promise hierarchy without creating
     a ``Promise``.

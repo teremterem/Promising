@@ -66,8 +66,7 @@ class DecoratorSupport:
         # self.__wrapped__ is a staticmethod object). This is safe because
         # call() invokes self.__wrapped__(*args, **kwargs) directly, and
         # staticmethod objects are callable without going through the
-        # descriptor protocol since Python 3.10 (bpo-43682). No binding is
-        # required or desired here.
+        # descriptor protocol. No binding is required or desired here.
         return self
 
     @property

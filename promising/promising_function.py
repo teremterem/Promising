@@ -79,6 +79,43 @@ def function(
 
 
 class PromisingFunction(DecoratorSupport, Generic[T_co]):
+    """
+    A callable wrapper that turns a function into one that returns a
+    ``Promise`` instead of a plain result.
+
+    When called, a ``PromisingFunction`` creates and returns a ``Promise``
+    that encapsulates the wrapped function's execution. Promises
+    automatically form parent-child hierarchies: if a ``PromisingFunction``
+    is called during another ``Promise``'s execution, the newly created
+    ``Promise`` becomes a child of the active one.
+
+    Both sync and async functions are supported. Sync functions are
+    transparently executed in a thread pool so they can participate in
+    the async promise machinery.
+
+    Works as a method decorator for instance methods, ``@classmethod``,
+    and ``@staticmethod`` (descriptor protocol support is provided by
+    ``DecoratorSupport``).
+
+    Typically created via the :func:`function` decorator rather than
+    instantiated directly.
+
+    Args:
+        func_or_method: The function, method, ``classmethod``, or
+            ``staticmethod`` to wrap.
+        namespace: Optional namespace string for the resulting ``Promise``.
+            Defaults to the wrapped function's ``__qualname__``.
+        start_soon: Whether the ``Promise`` should start executing
+            immediately upon creation. Defaults to ``NOT_SET``, which
+            defers to the parent ``Promise``'s configuration.
+        children_start_soon: Whether child promises created during this
+            ``Promise``'s execution should start executing immediately.
+            Defaults to ``NOT_SET``.
+        start_soon_default: Default ``start_soon`` value propagated to
+            child promises. Defaults to ``INHERIT``, meaning the value
+            is inherited from the parent ``Promise``.
+    """
+
     # TODO Explain the idea behind parent-child relationships between Promise
     #  objects with respect to PromisingFunction calls
 

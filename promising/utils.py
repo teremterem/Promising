@@ -49,16 +49,18 @@ class DecoratorSupport:
         functools.update_wrapper(self, func_or_method)
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:
-        # TODO Explain in a docstring what this descriptor does and why. (This
-        #  happens BEFORE decorator is executed, "outside of it", in other
-        #  words.)
+        """
+        Descriptor hook that binds this wrapper to the appropriate first
+        argument before the decorated function is called.
+
+        For classmethods, binds the class; for regular instance methods,
+        binds the instance; for staticmethods (and class-level access of
+        plain functions), returns the wrapper unbound.
+        """
         if isinstance(self.__wrapped__, classmethod):
-            # Classmethod: bind the class as the first argument regardless of
-            # whether the lookup is via the class or an instance.
             cls = objtype if obj is None else type(obj)
             return MethodType(self, cls)
         if obj is not None and isinstance(self.__wrapped__, FunctionType):
-            # Regular instance method: bind the instance as the first argument.
             return MethodType(self, obj)
         # Intentionally return unbound self for all remaining cases (e.g. when
         # self.__wrapped__ is a staticmethod object). This is safe because

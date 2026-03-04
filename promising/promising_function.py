@@ -116,9 +116,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             is inherited from the parent ``Promise``.
     """
 
-    # TODO Explain the idea behind parent-child relationships between Promise
-    #  objects with respect to PromisingFunction calls
-
     def __init__(
         self,
         func_or_method: DecoratableFunctionType,

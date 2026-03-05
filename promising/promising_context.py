@@ -28,54 +28,55 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
-    # TODO TODO TODO Review previously generated version of this docstring and
-    #  maybe borrow code examples from it.
-    # TODO TODO TODO Fix inaccuracies in this docstring
     Decorator and context manager that establishes a lightweight
-    ``PromisingContext`` node in the promise hierarchy without creating
-    a ``Promise``.
+    ``PromisingContext`` node in the promise hierarchy without creating a
+    ``Promise``.
 
-    Use ``promising.context`` when you need a parent node that groups
-    child promises (e.g. to ``await_children()`` on them later) but
-    does not represent an asynchronous computation itself.
+    Use ``promising.context`` when you need a parent node that groups child
+    promises (e.g. to ``await_children()`` on them later) but does not
+    represent an asynchronous computation itself.
 
     As a **context manager**::
 
         with promising.context() as ctx:
             # Promises created here become children of `ctx`
             ...
+        ...
+        await ctx.await_children(recursively=True)
 
-    As a **decorator** (wraps a function so every call runs inside a
-    fresh ``PromisingContext``)::
+    As a **decorator** (wraps a function so every call runs inside a fresh
+    ``PromisingContext``)::
 
-        @promising.context
-        async def pipeline():
+        @promising.context(children_start_soon=False)
+        async def process(items):
+            # Promises created here become children of a fresh PromisingContext
             ...
 
-    Compare with ``@promising.function``, which *does* create a
-    ``Promise``: calling a ``@promising.function``-decorated function
-    returns a ``Promise`` whose result must be awaited, whereas calling
-    a ``@promising.context``-decorated function executes the function
-    immediately (returning its result directly) while providing a
-    ``PromisingContext`` around its body.
+    Compare with ``@promising.function``, which *does* create a ``Promise``:
+    calling a ``@promising.function``-decorated function returns a ``Promise``
+    whose result must be awaited, whereas calling a
+    ``@promising.context``-decorated function executes the function immediately
+    (returning its result directly) while providing a ``PromisingContext``
+    around its body.
 
     Args:
         namespace: Optional namespace string for the underlying
-            ``PromisingContext``. When used as a decorator and not
-            provided, defaults to the wrapped function's
-            ``__qualname__``.
-        loop: Event loop to use. If not provided, inherits from the
-            parent context (or uses the current event loop if there is
-            no parent).
-        parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses
-            the currently active context. ``None`` creates a root
-            context with no parent.
-        children_start_soon: Whether child promises created inside this
-            context should start executing immediately. ``INHERIT``
-            (default) copies the parent's setting.
+            ``PromisingContext``. When used as a decorator and not provided,
+            defaults to the wrapped function's ``__qualname__``.
+            # TODO Planned feature: Namespaces will show up in the form of
+            #  breadcrumbs in error logs to help trace the source of errors.
+        loop: Event loop to use. If not provided, inherits from the parent
+            context (or uses the current event loop if there is no parent).
+        parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
+            currently active context. ``None`` creates a root context with no
+            parent.
+        children_start_soon: Whether child promises created inside this context
+            should start executing immediately. ``INHERIT`` (default) copies
+            the parent's setting.
         start_soon_default: Local override for the global
-            ``START_SOON_DEFAULT``. ``INHERIT`` (default) propagates
-            from the parent.
+            ``START_SOON_DEFAULT``. ``INHERIT`` (default) propagates from the
+            parent.
+    # TODO TODO TODO List things to fix in this docstring
     """
 
     def __init__(

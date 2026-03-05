@@ -20,8 +20,6 @@ _sync_function_executor = ThreadPoolExecutor(max_workers=128)
 
 
 def function(
-    # TODO Split into two functions with the same name using @overload ?
-    #  https://github.com/teremterem/Promising/pull/51#discussion_r2832326017
     func_or_method: DecoratableFunctionType | None = None,
     *,
     namespace: str | None = None,
@@ -30,18 +28,36 @@ def function(
     start_soon_default: bool | Sentinel = INHERIT,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
-    TODO Finalize this docstring by explaining why we need the
-     PromisingFunction wrapper at all. List the advantages it provides:
+    A decorator that turns a function into one that returns a ``Promise``
+    instead of a plain result.
 
-    - Decorated functions always return Promises.
-    - Returned Promises can be awaited any number of times without
-      re-executing the function.
-    - TODO Should input parameters always be passed as promises as well ?
-       All of them ? Only those, that were typed as `Promise` explicitly ?
-    - Both, input parameters and results are strictly serializable and are
-      serialized/deserialized in transit
-    - All these interactions are stored/storable in graph databases, or any
-      other kinds of databases or caches that can handle the data structures.
+    When called, a decorated function creates and returns a ``Promise``
+    that encapsulates the function's execution. The ``Promise`` can be
+    awaited multiple times without re-executing the underlying function.
+
+    Promises automatically form parent-child hierarchies: if a decorated
+    function is called during another ``Promise``'s execution, the newly
+    created ``Promise`` becomes a child of the active one.
+
+    Both sync and async functions are supported. Sync functions are
+    transparently executed in a thread pool so they can participate in
+    the async promise machinery.
+
+    Works as a method decorator for instance methods, ``@classmethod``,
+    and ``@staticmethod``.
+
+    Args:
+        namespace: Optional namespace string for the resulting ``Promise``.
+            Defaults to the wrapped function's ``__qualname__``.
+        start_soon: Whether the ``Promise`` should start executing
+            immediately upon creation. Defaults to ``NOT_SET``, which
+            defers to the parent ``Promise``'s configuration.
+        children_start_soon: Whether child promises created during this
+            ``Promise``'s execution should start executing immediately.
+            Defaults to ``NOT_SET``.
+        start_soon_default: Default ``start_soon`` value propagated to
+            child promises. Defaults to ``INHERIT``, meaning the value
+            is inherited from the parent ``Promise``.
     """
     if func_or_method is None:
         # The decorator was used with arguments
@@ -68,16 +84,14 @@ def function(
 
 
 class PromisingFunction(DecoratorSupport, Generic[T_co]):
-    # TODO Explain the idea behind parent-child relationships between Promise
-    #  objects with respect to PromisingFunction calls
+    """Callable wrapper created by ``@promising.function``. See
+    :func:`promising.function` for usage details."""
 
     def __init__(
         self,
         func_or_method: DecoratableFunctionType,
         *,
         namespace: str | None = None,
-        # TODO Implement a custom __str__ and __repr__ methods and use this
-        #  namespace in them ? (Same as for Promise)
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -108,15 +122,39 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         *args: Any,
         **kwargs: Any,
     ) -> Promise[T_co]:
-        # NOTE: Allows overriding the start_soon, children_start_soon, and
-        # start_soon_default parameters from the PromisingFunction constructor
-        # by passing them as keyword arguments to the call() method.
-        # TODO Add the above info to a docstring. (Class docstring ? This
-        #  method's docstring ?)
-        # TODO Mention that the only way NOT to override the parameters is NOT
-        #  to pass them into the call() method at all (passing NOT_SET will
-        #  still override the parameters from the PromisingFunction
-        #  constructor).
+        """
+        Call the wrapped function and return a ``Promise`` for its result.
+
+        This is the core method that ``__call__`` delegates to. It creates
+        a ``Promise`` that wraps the function's execution (running sync
+        functions in a thread pool automatically).
+
+        The ``start_soon``, ``children_start_soon``, and
+        ``start_soon_default`` parameters can be passed as keyword
+        arguments to override the values set on the ``PromisingFunction``
+        at decoration time. To use the decorator-level values, simply
+        omit these keyword arguments — passing ``NOT_SET`` explicitly
+        will still override them (``NOT_SET`` is itself a valid value
+        with its own semantics in ``Promise``).
+
+        Args:
+            *args: Positional arguments forwarded to the wrapped function.
+            **kwargs: Keyword arguments forwarded to the wrapped function.
+                The following keyword arguments are intercepted and not
+                forwarded:
+
+                - **start_soon** — Whether the ``Promise`` should start
+                  executing immediately upon creation.
+                - **children_start_soon** — Default ``start_soon`` value
+                  enforced on child ``Promise`` objects created during
+                  this ``Promise``'s execution.
+                - **start_soon_default** — Local override for the global
+                  ``START_SOON_DEFAULT``.
+
+        Returns:
+            A ``Promise`` that will resolve to the wrapped function's
+            return value.
+        """
         start_soon = kwargs.pop(
             "start_soon",
             self.start_soon,
@@ -154,8 +192,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
             coro = _sync_to_async()
 
-        # TODO Pass a namespace to the Promise constructor that would include the
-        #  namespace of the function that was decorated
         return Promise[T_co](
             namespace=resolve_namespace(
                 provided_explicitly=self.namespace,

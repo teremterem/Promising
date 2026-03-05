@@ -49,33 +49,37 @@ class DecoratorSupport:
         functools.update_wrapper(self, func_or_method)
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:
-        # TODO Explain in a docstring what this descriptor does and why. (This
-        #  happens BEFORE decorator is executed, "outside of it", in other
-        #  words.)
+        """
+        Descriptor hook that binds this wrapper to the appropriate first
+        argument before the decorated function is called.
+
+        For classmethods, binds the class; for regular instance methods,
+        binds the instance; for staticmethods (and class-level access of
+        plain functions), returns the wrapper unbound.
+        """
         if isinstance(self.__wrapped__, classmethod):
-            # Classmethod: bind the class as the first argument regardless of
-            # whether the lookup is via the class or an instance.
             cls = objtype if obj is None else type(obj)
             return MethodType(self, cls)
         if obj is not None and isinstance(self.__wrapped__, FunctionType):
-            # Regular instance method: bind the instance as the first argument.
             return MethodType(self, obj)
         # Intentionally return unbound self for all remaining cases (e.g. when
         # self.__wrapped__ is a staticmethod object). This is safe because
         # call() invokes self.__wrapped__(*args, **kwargs) directly, and
         # staticmethod objects are callable without going through the
-        # descriptor protocol since Python 3.10 (bpo-43682). No binding is
-        # required or desired here.
+        # descriptor protocol. No binding is required or desired here.
         return self
 
     @property
     def _wrapped_as_callable(self) -> CallableType:
+        """
+        Return the wrapped object in a directly callable form.
+
+        For classmethod objects, returns the underlying ``__func__`` because
+        classmethod descriptors are not directly callable (the class argument
+        is already prepended by :class:`~types.MethodType` in ``__get__``).
+        For all other wrapped objects, returns ``__wrapped__`` as-is.
+        """
         if isinstance(self.__wrapped__, classmethod):
-            # self.__wrapped__ is a classmethod object; args[0] is the
-            # class, already prepended by MethodType in __get__.
-            # classmethod objects are not directly callable, so we reach
-            # through to the underlying function.
-            # TODO Turn the comment above into a docstring
             return self.__wrapped__.__func__
         return self.__wrapped__
 

@@ -226,7 +226,7 @@ Like `@promising.function`, it works with `@classmethod`, `@staticmethod`, and i
 
 ### `promising.context` vs `promising.function`
 
-The key difference: `@promising.function` creates a `Promise` (an `asyncio.Future` that can be awaited and appears in the parent promise chain), while `@promising.context` creates a bare `PromisingContext` that only participates in the context hierarchy. Use `@promising.context` when you want to scope configuration or group children without the function itself becoming a Promise.
+The key difference: `@promising.function` creates a `Promise` (an `asyncio.Future` that can be awaited and appears in the parent promise chain), while `@promising.context` creates a bare `PromisingContext` that only participates in the context hierarchy. Calling a `@promising.context`-decorated function executes the function as is and returns its result directly (not wrapped in a `Promise`). If the decorated function is async, the result will still need to be awaited, though. Use `@promising.context` when you want to scope configuration or group children without the function itself becoming a Promise.
 
 ## Execution Timing: `start_soon`
 
@@ -249,9 +249,9 @@ result = await promise                        # Now it starts
 
 Promises inherit configuration from their parents through three parameters:
 
-- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `NOT_SET` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`.
-- **`children_start_soon`** — enforces a `start_soon` default for child Promises. `NOT_SET` means no enforcement.
-- **`start_soon_default`** — a per-Promise local override for the global default. Inherited from the parent by default.
+- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `NOT_SET` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
+- **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `NOT_SET`. `NOT_SET` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `NOT_SET` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
+- **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `GLOBAL_DEFAULT` reads the current global setting directly, ignoring the parent chain.
 
 These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `NOT_SET` explicitly at call time overrides the decorator value:
 
@@ -402,6 +402,8 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 | `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). |
 | `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). |
 | `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. |
+| `promising.ContextUsageError` | Misuse of `promising.context` (e.g. using the same instance as both context manager and decorator, or incorrect argument usage). |
+| `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`). |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 

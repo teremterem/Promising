@@ -28,9 +28,58 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
-    # TODO Explain in docstring, when it comes to using it as a decorator, why
-    #  does it exist separately from @promising.function ? What's the
-    #  difference between the two ?
+    Decorator and context manager that establishes a lightweight
+    ``PromisingContext`` node in the promise hierarchy without creating an
+    actual ``Promise``.
+
+    Use ``promising.context`` when you need a parent node that groups child
+    promises but does not represent an asynchronous computation itself. You may
+    want it to do ``await_children()`` on such a PromisingContext later, or to
+    override the default settings for a specific block of code, etc.
+
+    As a **context manager**::
+
+        with promising.context() as ctx:
+            # Promises created here become children of `ctx`
+            ...
+        ...
+        await ctx.await_children(recursively=True)
+
+    As a **decorator** (wraps a function so every call runs inside a fresh
+    ``PromisingContext``)::
+
+        @promising.context(children_start_soon=False)
+        async def process(items):
+            # Promises created here become children of a fresh PromisingContext
+            ...
+
+    Compare with ``@promising.function``, which *does* create a ``Promise``:
+    calling a ``@promising.function``-decorated function returns a ``Promise``
+    whose result must be awaited, whereas calling a ``@promising.context``
+    -decorated function executes the function as is, and returns its result as
+    is. The only special thing it does is provide a ``PromisingContext`` around
+    its body. (NOTE: If the decorated function is async, the result will still
+    need to be awaited, of course.)
+
+    Args:
+        namespace: Optional namespace string for the underlying
+            ``PromisingContext``. When used as a decorator and not provided,
+            defaults to the wrapped function's ``__qualname__``.
+            # TODO Planned feature: Namespaces will show up in the form of
+            #  breadcrumbs in error logs to help trace the source of errors.
+            # TODO Anything else we could do with namespaces ?
+        loop: Event loop to use. If not provided, inherits from the parent
+            context (or uses the current event loop if there is no parent).
+        parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
+            currently active context. ``None`` creates a root context with no
+            parent.
+        children_start_soon: Whether child promises created directly within
+            this context should start executing immediately (i.e. as soon as
+            the event loop allows), or defer until awaited one way or another.
+            ``INHERIT`` (default) copies the parent's setting.
+        start_soon_default: Local override for the global
+            ``START_SOON_DEFAULT``, effective in the whole subtree of this
+            context. ``INHERIT`` (default) propagates from the parent.
     """
 
     def __init__(
@@ -39,7 +88,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -160,6 +209,9 @@ async def await_children(*, recursively: bool = False) -> None:
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
+    # TODO Do we need a check that ensures that this function was called in a
+    #  thread that contains the event loop of this particular
+    #  PromisingContext ? What other functions or methods might we need it in ?
     return await get_active_context().await_children(recursively=recursively)
 
 
@@ -167,8 +219,10 @@ def await_children_sync(*, recursively: bool = False) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
-    # TODO Elaborate more on why this method exists.
-    #  See promising/promise.py::Promise.sync() for more details.
+
+    This is the synchronous counterpart of ``await_children()`` — intended
+    for use inside sync promising functions that run in a thread pool
+    executor, where ``await`` is not available.
 
     Args:
         recursively: If True, wait for all descendants, not just direct
@@ -180,48 +234,21 @@ def await_children_sync(*, recursively: bool = False) -> None:
 
 
 class PromisingContext:
-    """
-    Create a new PromisingContext.
-
-    A PromisingContext provides hierarchical context management for
-    asynchronous operations. It tracks parent-child relationships,
-    manages configuration inheritance (e.g. start_soon behavior), and
-    maintains a weak set of child contexts for awaiting.
-
-    Args:
-        namespace: Optional human-readable namespace string for this
-            context. Used in ``__repr__`` output.
-        loop: The event loop to use. If not provided, inherits from the
-            parent context. If no parent exists, uses the current event
-            loop. If provided explicitly and a parent exists, must be the
-            same event loop as the parent's.
-        parent: Parent PromisingContext. If INHERIT (default), uses the
-            currently active context as parent. If None, the context has
-            no parent.
-        children_start_soon: Default start_soon value enforced on child
-            contexts that leave start_soon as NOT_SET. NOT_SET means no
-            enforcement. INHERIT (default) copies the parent's setting of
-            the same name.
-        start_soon_default: Local override for the global START_SOON_DEFAULT.
-            INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
-            the current global setting without inheriting.
-
-    Raises:
-        ValueError: If invalid parameter values or combinations are provided.
-    """
+    """Hierarchical context node created by ``promising.context``. See
+    :class:`promising.context` for usage details."""
 
     namespace: str | None
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO Support cancellation of the whole PromisingContext tree
+    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -356,10 +383,9 @@ class PromisingContext:
         Wait for all awaitable children to finish, blocking the calling
         thread.
 
-        This is the synchronous counterpart of await_children() — intended
-        for use from threads that are not running the event loop.
-        # TODO Elaborate more on why this method exists.
-        #  See promising/promise.py::Promise.sync() for more details.
+        This is the synchronous counterpart of ``await_children()`` — intended
+        for use inside sync promising functions that run in a thread pool
+        executor, where ``await`` is not available.
 
         Args:
             recursively: If True, wait for all descendants, not just direct

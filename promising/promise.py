@@ -65,16 +65,24 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             ``__repr__`` output. Passed to PromisingContext.
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
-        start_soon: Whether associated work should start immediately.
-            NOT_SET (default) defers to the parent's children_start_soon if
-            enforced, otherwise falls back to start_soon_default. INHERIT
-            copies the parent's start_soon directly.
-        children_start_soon: Default start_soon value enforced on child
-            contexts that leave start_soon as NOT_SET. NOT_SET (default)
-            means no enforcement. INHERIT copies the parent's setting of
-            the same name.
-            # TODO Explain why the default is NOT_SET, and not INHERIT, like it
-            #  is for bare PromisingContext ?
+        start_soon: Whether associated work should start immediately (True) or
+            not (False). NOT_SET (default) defers to the parent's
+            children_start_soon if enforced, otherwise falls back to
+            start_soon_default. INHERIT copies the parent's start_soon
+            directly.
+        children_start_soon: (Also boolean or Sentinel.) Default start_soon
+            value enforced on child Promises that left their start_soon setting
+            as NOT_SET. For the children_start_soon setting itself, NOT_SET
+            (default) means no enforcement. INHERIT in children_start_soon
+            copies the parent's children_start_soon setting.
+            NOTE: The default for children_start_soon is different in Promise
+            than it is in PromisingContext (the latter defaults to INHERIT).
+            This is to ensure that the enforcement by the Promise is meant to
+            be an explicit choice. PromisingContext, on the other hand, which
+            is usually created via `promising.context` context manager (and
+            decorator), is meant to be a transparent grouping layer that,
+            unless explicitly specified otherwise, simply passes the parent's
+            policy through.
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
             the current global setting without inheriting.
@@ -88,18 +96,26 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
+    # TODO TODO TODO Figure out how to support async generator interface as
+    #  well (together with its "sync" counterpart)
+
     def __init__(
         self,
         coro: Coroutine[Any, Any, T_co] | None = None,
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | Sentinel | None" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefill_result: T_co | Sentinel | None = NOT_SET,
-        # TODO Use NOT_SET instead of None below as well, for consistency ?
+        # TODO TODO TODO Introduce `use_thread_pool` with True as default for
+        #  sync functions. False would mean that the user is not worried about
+        #  running sync function directly in the async thread. Also, we need to
+        #  unit test that calling sync() or await_children_sync() from such a
+        #  function result in SyncUsageError (because we want to shield the
+        #  user from deadlocks).
+        prefill_result: T_co | None | Sentinel = NOT_SET,
         prefill_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(
@@ -170,6 +186,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
+        # TODO TODO TODO If the underlying coroutine upon awaiting also returns
+        #  a Promise, we need to seamlessly await it as well !!! (Should also
+        #  work with another Promise as a prefilled result)
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self.done():
@@ -185,13 +204,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Synchronously wait for and return the Promise result, blocking the
         calling thread.
 
-        This is the synchronous counterpart of `await promise` — intended for
+        This is the synchronous counterpart of ``await promise`` — intended for
         use inside sync promising functions that run in a thread pool executor.
-        It schedules the Promise's execution on the event loop via
-        `call_soon_threadsafe` and blocks until the result (or exception) is
-        available.
-        # TODO The reader does not need to be bothered by the implementation
-        #  details of this method.
 
         Returns:
             The resolved value of the Promise.
@@ -206,6 +220,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             "Use `await promise` instead."
         )
 
+        # Schedule the task on the event loop from this (non-loop) thread,
+        # then block until the result (or exception) is available.
         self._call_soon_threadsafe(self._ensure_task_scheduled)
         return self.as_concurrent_future().result()
 
@@ -252,13 +268,12 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
-                # TODO Find a way to borrow from MiniAgents the mechanism that
-                #  logs this "promising breadcrumb" together with the error
-                #  tracebacks
-                if not hasattr(exception, "__promising_trace__"):
+                # TODO Borrow from MiniAgents the mechanism that logs this
+                #  "promising breadcrumb" together with the error tracebacks
+                if not hasattr(exception, "__promising_context__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
-                    exception.__promising_trace__ = self
+                    exception.__promising_context__ = self
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
@@ -306,7 +321,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def _finish_initialization(
         self,
         *,
-        prefill_result: T_co | Sentinel | None,
+        prefill_result: T_co | None | Sentinel,
         prefill_exception: BaseException | None,
     ) -> None:
         if self._coro is None:

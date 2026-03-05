@@ -45,7 +45,7 @@ class Defaults:
 __all__ = [
     "BasePromisingError",
     "Defaults",
-    "GLOBAL_DEFAULT",
+    "GLOBAL_DEFAULT",  # TODO TODO TODO We might not need this at all
     "INHERIT",
     "NOT_SET",
     "ContextAlreadyActiveError",

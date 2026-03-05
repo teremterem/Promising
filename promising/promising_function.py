@@ -9,13 +9,14 @@ from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import DecoratorSupport, resolve_namespace
 
-# TODO Allow overriding this executor in local promise configurations
+# TODO TODO TODO Allow overriding this executor in local promise configurations
 # TODO What to do about potential deadlocks if recursive sync promises use up
 #  the executor's thread pool (when each such promise waits for its children to
 #  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
 #  and we need our own mechanism ? Or is it enough to issue a warning / throw
 #  an error when the number of nested sync function calls approaches this
 #  number ?
+# TODO Should it be moved to some other module ? utils.py ?
 _sync_function_executor = ThreadPoolExecutor(max_workers=128)
 
 

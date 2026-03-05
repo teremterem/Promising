@@ -1,23 +1,12 @@
 import contextvars
 import functools
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic
 
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import DecoratorSupport, resolve_namespace
-
-# TODO TODO TODO Allow overriding this executor in local promise configurations
-# TODO What to do about potential deadlocks if recursive sync promises use up
-#  the executor's thread pool (when each such promise waits for its children to
-#  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
-#  and we need our own mechanism ? Or is it enough to issue a warning / throw
-#  an error when the number of nested sync function calls approaches this
-#  number ?
-# TODO Should it be moved to some other module ? utils.py ?
-_sync_function_executor = ThreadPoolExecutor(max_workers=128)
 
 
 def function(
@@ -193,15 +182,16 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
+                from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
                 # Get the event loop from the active promise that is running
-                # this async function
+                # this async wrapper function
                 loop = get_active_promise().get_loop()
-                # Copy the current context so that ContextVars
-                # (in particular Promise._current) are accessible
-                # inside the executor thread
+                # Copy the current context so that ContextVars (in particular
+                # Promise._current) are accessible inside the executor thread
                 ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
-                    _sync_function_executor,
+                    Defaults.SYNC_THREAD_POOL,
                     functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )
 

@@ -29,12 +29,13 @@ if TYPE_CHECKING:
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
     Decorator and context manager that establishes a lightweight
-    ``PromisingContext`` node in the promise hierarchy without creating a
-    ``Promise``.
+    ``PromisingContext`` node in the promise hierarchy without creating an
+    actual ``Promise``.
 
     Use ``promising.context`` when you need a parent node that groups child
-    promises (e.g. to ``await_children()`` on them later) but does not
-    represent an asynchronous computation itself.
+    promises but does not represent an asynchronous computation itself. You may
+    want it to do ``await_children()`` on such a PromisingContext later, or to
+    override the default settings for a specific block of code, etc.
 
     As a **context manager**::
 
@@ -54,10 +55,11 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     Compare with ``@promising.function``, which *does* create a ``Promise``:
     calling a ``@promising.function``-decorated function returns a ``Promise``
-    whose result must be awaited, whereas calling a
-    ``@promising.context``-decorated function executes the function immediately
-    (returning its result directly) while providing a ``PromisingContext``
-    around its body.
+    whose result must be awaited, whereas calling a ``@promising.context``
+    -decorated function executes the function as is, and returns its result as
+    is. The only special thing it does is provide a ``PromisingContext`` around
+    its body. (NOTE: If the decorated function is async, the result will still
+    need to be awaited, of course.)
 
     Args:
         namespace: Optional namespace string for the underlying
@@ -65,18 +67,19 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             defaults to the wrapped function's ``__qualname__``.
             # TODO Planned feature: Namespaces will show up in the form of
             #  breadcrumbs in error logs to help trace the source of errors.
+            # TODO Anything else we could do with namespaces ?
         loop: Event loop to use. If not provided, inherits from the parent
             context (or uses the current event loop if there is no parent).
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
-        children_start_soon: Whether child promises created inside this context
-            should start executing immediately. ``INHERIT`` (default) copies
-            the parent's setting.
+        children_start_soon: Whether child promises created directly within
+            this context should start executing immediately (i.e. as soon as
+            the event loop allows), or defer until awaited one way or another.
+            ``INHERIT`` (default) copies the parent's setting.
         start_soon_default: Local override for the global
-            ``START_SOON_DEFAULT``. ``INHERIT`` (default) propagates from the
-            parent.
-    # TODO TODO TODO List things to fix in this docstring
+            ``START_SOON_DEFAULT``, effective in the whole subtree of this
+            context. ``INHERIT`` (default) propagates from the parent.
     """
 
     def __init__(

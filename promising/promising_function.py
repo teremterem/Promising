@@ -205,14 +205,14 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                     functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )
 
-            coro = _sync_to_async[Any, Any, T_co]()
+            coro = _sync_to_async()
         else:
 
             @functools.wraps(self.__wrapped__)
             async def _sync_inline() -> T_co:
                 return self._wrapped_as_callable(*args, **kwargs)
 
-            coro = _sync_inline[Any, Any, T_co]()
+            coro = _sync_inline()
 
         return Promise[T_co](
             namespace=resolve_namespace(

@@ -19,23 +19,23 @@ from promising.promising_context import (
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
-START_SOON_DEFAULT = True
 
+class Defaults:
+    """
+    Default values for the library's behavior. We use a class rather than
+    module-level constants because ``from promising import SOME_CONSTANT``
+    would copy the value into the importing module's namespace at import time,
+    making it impossible to override the default later. With a class,
+    ``Defaults.X`` always reads the current value from a single source.
+    """
 
-def should_start_soon_by_default() -> bool:
-    """
-    We don't want to import `START_SOON_DEFAULT` from this
-    module directly, because we want to allow users to override the default
-    value if they want. Importing `START_SOON_DEFAULT` directly
-    would copy the concrete value into the other modules' namespaces at the
-    time of import.
-    """
-    return START_SOON_DEFAULT
+    START_SOON = True
+    USE_THREAD_POOL = True
 
 
 __all__ = [
     "BasePromisingError",
-    "START_SOON_DEFAULT",
+    "Defaults",
     "GLOBAL_DEFAULT",
     "INHERIT",
     "NOT_SET",
@@ -56,5 +56,4 @@ __all__ = [
     "function",
     "get_active_context",
     "get_active_promise",
-    "should_start_soon_by_default",
 ]

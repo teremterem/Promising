@@ -529,7 +529,7 @@ class PromisingContext:
     #  method
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
-        from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
 
         if isinstance(start_soon_default, bool):
             # Concrete value was provided
@@ -537,12 +537,12 @@ class PromisingContext:
 
         if start_soon_default is GLOBAL_DEFAULT:
             # Use the global default
-            return should_start_soon_by_default()
+            return Defaults.START_SOON
 
         if start_soon_default is INHERIT:
             if self._parent is None:
                 # Use the global default
-                return should_start_soon_by_default()
+                return Defaults.START_SOON
 
             # Inherit from the parent
             return self._parent._start_soon_default

@@ -27,6 +27,7 @@ def function(
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon: bool | Sentinel = NOT_SET,
     start_soon_default: bool | Sentinel = INHERIT,
+    use_thread_pool: bool = True,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
     A decorator that turns a function into one that returns a ``Promise``
@@ -59,6 +60,15 @@ def function(
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
+        use_thread_pool: Whether to run the sync function in a thread pool
+            executor (default ``True``). When ``False``, the sync function
+            runs directly on the event loop thread. This is only relevant
+            for sync functions — async functions always run on the event
+            loop regardless of this setting. **Warning:** when
+            ``use_thread_pool=False``, calling ``sync()`` or
+            ``await_children_sync()`` from within the function will raise
+            ``SyncUsageError`` because those calls would deadlock the
+            event loop.
     """
     if func_or_method is None:
         # The decorator was used with arguments
@@ -69,6 +79,7 @@ def function(
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
+                use_thread_pool=use_thread_pool,
             )
 
         return _decorator
@@ -81,6 +92,7 @@ def function(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        use_thread_pool=use_thread_pool,
     )
 
 
@@ -96,12 +108,14 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
+        use_thread_pool: bool = True,
     ) -> None:
         super().__init__(func_or_method)
         self.namespace = namespace
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
+        self.use_thread_pool = use_thread_pool
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
         #  to resolve postponed type hints correctly, when you implement input
@@ -175,7 +189,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
         if self._is_wrapped_async:
             coro = self._wrapped_as_callable(*args, **kwargs)
-        else:
+        elif self.use_thread_pool:
 
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
@@ -192,6 +206,13 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 )
 
             coro = _sync_to_async()
+        else:
+
+            @functools.wraps(self.__wrapped__)
+            async def _sync_inline() -> T_co:
+                return self._wrapped_as_callable(*args, **kwargs)
+
+            coro = _sync_inline()
 
         return Promise[T_co](
             namespace=resolve_namespace(

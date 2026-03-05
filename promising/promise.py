@@ -109,12 +109,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        # TODO TODO TODO Introduce `use_thread_pool` with True as default for
-        #  sync functions. False would mean that the user is not worried about
-        #  running sync function directly in the async thread. Also, we need to
-        #  unit test that calling sync() or await_children_sync() from such a
-        #  function result in SyncUsageError (because we want to shield the
-        #  user from deadlocks).
         prefill_result: T_co | None | Sentinel = NOT_SET,
         prefill_exception: BaseException | None = None,
     ) -> None:

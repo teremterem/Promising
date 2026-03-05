@@ -3,6 +3,8 @@ from promising.errors import (
     ContextAlreadyActiveError,
     ContextNotActiveError,
     ContextNotFoundError,
+    ContextUsageError,
+    DecorationError,
     PromiseNotFoundError,
     SyncUsageError,
 )
@@ -40,6 +42,8 @@ __all__ = [
     "ContextAlreadyActiveError",
     "ContextNotActiveError",
     "ContextNotFoundError",
+    "ContextUsageError",
+    "DecorationError",
     "context",
     "PromiseNotFoundError",
     "Promise",

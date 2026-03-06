@@ -83,6 +83,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             decorator), is meant to be a transparent grouping layer that,
             unless explicitly specified otherwise, simply passes the parent's
             policy through.
+        thread_pool: Thread pool executor used to run sync promising
+            functions. INHERIT (default) inherits from the parent context,
+            falling back to GLOBAL_DEFAULT at the root. GLOBAL_DEFAULT uses
+            Defaults.SYNC_THREAD_POOL. ASYNCIO_DEFAULT passes None to
+            run_in_executor, letting the event loop use its own default
+            executor. A concrete ThreadPoolExecutor instance can also be
+            provided.
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
             the current global setting without inheriting.
@@ -106,6 +113,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -117,6 +125,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             namespace=namespace,
             loop=loop,
             parent=parent,
+            thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
         )

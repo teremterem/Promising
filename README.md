@@ -147,6 +147,48 @@ def sync_parent() -> str:
 
 Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `SyncUsageError`.
 
+### Thread Pool Configuration
+
+By default, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.SYNC_THREAD_POOL`). You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+import promising
+from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
+
+# Use a custom thread pool for a specific function
+my_pool = ThreadPoolExecutor(max_workers=4)
+
+@promising.function(thread_pool=my_pool)
+def cpu_bound_work(data: list) -> list:
+    return sorted(data)
+
+# Let the event loop use its own default executor
+@promising.function(thread_pool=ASYNCIO_DEFAULT)
+def io_work() -> str:
+    ...
+
+# Override at call time
+result = await cpu_bound_work(data, thread_pool=ASYNCIO_DEFAULT)
+```
+
+Thread pool settings inherit through the context hierarchy. A `promising.context` can set the thread pool for all sync functions within its scope:
+
+```python
+custom_pool = ThreadPoolExecutor(max_workers=8)
+
+with promising.context(thread_pool=custom_pool):
+    # All sync promising functions here use custom_pool
+    await compute(3, 4)
+```
+
+The `thread_pool` parameter accepts:
+
+- **`INHERIT`** (default) — inherit from the parent context; falls back to `GLOBAL_DEFAULT` at the root.
+- **`GLOBAL_DEFAULT`** — use `Defaults.SYNC_THREAD_POOL`.
+- **`ASYNCIO_DEFAULT`** — pass `None` to `run_in_executor`, letting the event loop use its own default executor.
+- A concrete **`ThreadPoolExecutor`** instance.
+
 ## Method Decorators
 
 `@promising.function` works with instance methods, `@classmethod`, and `@staticmethod`. Decorator order doesn't matter:
@@ -347,7 +389,7 @@ uv sync --extra examples
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `children_start_soon`, and `start_soon_default`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 
 ### Promise
 
@@ -373,6 +415,7 @@ uv sync --extra examples
 | `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
 | `ctx.await_children_sync(recursively=False)` | Sync — block until child contexts finish. |
 | `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
+| `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
 
 ### Top-Level Convenience Functions
 
@@ -391,7 +434,8 @@ uv sync --extra examples
 | `promising.NOT_SET` | No value provided / no enforcement. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
-| `promising.Sentinel` | The sentinel class. All three sentinels above are instances of it. |
+| `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
+| `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 
 All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 

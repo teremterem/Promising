@@ -49,7 +49,7 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 ### PromisingContext (`promising/promising_context.py`)
 
-The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`), and child-waiting (`await_children` / `await_children_sync`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `thread_pool`), and child-waiting (`await_children` / `await_children_sync`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
 
 This file also contains the `context` class — a context manager / decorator that creates a `PromisingContext` without producing a `Promise`. It implements the descriptor protocol (via `DecoratorSupport`) for use as a method decorator.
 
@@ -62,12 +62,12 @@ Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution l
 Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
 
 - **Async functions** produce coroutines directly.
-- **Sync functions** are detected via `inspect.iscoroutinefunction()` and run in a module-level `ThreadPoolExecutor` (`_sync_function_executor`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread.
+- **Sync functions** are detected via `inspect.iscoroutinefunction()` and run in a `ThreadPoolExecutor` (configurable via the `thread_pool` parameter, defaulting to `Defaults.SYNC_THREAD_POOL`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread.
 - Implements the descriptor protocol (`__get__`) to correctly bind `self`/`cls` for instance methods, `@classmethod`, and `@staticmethod`.
 
 ### Sentinel Pattern (`promising/sentinels.py`)
 
-`NOT_SET`, `INHERIT`, and `GLOBAL_DEFAULT` raise on boolean coercion to prevent misuse. `NOT_SET` means "unset / no enforcement", `INHERIT` means "inherit from parent", `GLOBAL_DEFAULT` means "read the current global setting directly".
+`NOT_SET`, `INHERIT`, `GLOBAL_DEFAULT`, and `ASYNCIO_DEFAULT` raise on boolean coercion to prevent misuse. `NOT_SET` means "unset / no enforcement", `INHERIT` means "inherit from parent", `GLOBAL_DEFAULT` means "read the current global setting directly", `ASYNCIO_DEFAULT` means "let the event loop use its own default executor".
 
 ### Error Classes (`promising/errors.py`)
 

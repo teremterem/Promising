@@ -19,7 +19,7 @@ from promising.promising_context import (
     get_active_context,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 
 
 class Defaults:
@@ -32,7 +32,6 @@ class Defaults:
     """
 
     START_SOON = True
-    # TODO TODO TODO Allow overriding this executor in local promise configurations
     SYNC_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
     # TODO What to do about potential deadlocks if recursive sync promises use up
     #  the executor's thread pool (when each such promise waits for its children to
@@ -43,9 +42,10 @@ class Defaults:
 
 
 __all__ = [
+    "ASYNCIO_DEFAULT",
     "BasePromisingError",
     "Defaults",
-    "GLOBAL_DEFAULT",  # TODO TODO TODO We might not need this at all
+    "GLOBAL_DEFAULT",
     "INHERIT",
     "NOT_SET",
     "ContextAlreadyActiveError",

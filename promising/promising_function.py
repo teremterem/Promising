@@ -1,3 +1,4 @@
+import concurrent.futures
 import contextvars
 import functools
 from collections.abc import Callable
@@ -16,6 +17,7 @@ def function(
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon: bool | Sentinel = NOT_SET,
     start_soon_default: bool | Sentinel = INHERIT,
+    thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool = True,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
@@ -49,6 +51,16 @@ def function(
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
+        thread_pool: Thread pool executor used to run sync
+            promising functions. ``INHERIT`` (default) inherits from
+            the parent context, falling back to ``GLOBAL_DEFAULT``
+            at the root. ``GLOBAL_DEFAULT`` uses
+            ``Defaults.SYNC_THREAD_POOL``. ``ASYNCIO_DEFAULT``
+            passes ``None`` to ``run_in_executor``, letting the
+            event loop use its own default executor. A concrete
+            ``ThreadPoolExecutor`` instance can also be provided.
+            Only relevant for sync functions — async functions
+            always run on the event loop regardless.
         use_thread_pool: Whether to run the sync function in a thread pool
             executor (default ``True``). When ``False``, the sync function
             runs directly on the event loop thread. This is only relevant
@@ -70,6 +82,7 @@ def function(
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
+                thread_pool=thread_pool,
                 use_thread_pool=use_thread_pool,
             )
 
@@ -83,6 +96,7 @@ def function(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        thread_pool=thread_pool,
         use_thread_pool=use_thread_pool,
     )
 
@@ -99,6 +113,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,
     ) -> None:
         super().__init__(func_or_method)
@@ -106,6 +121,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
+        self.thread_pool = thread_pool
         self.use_thread_pool = use_thread_pool
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
@@ -156,6 +172,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                   this ``Promise``'s execution.
                 - **start_soon_default** — Local override for the global
                   ``START_SOON_DEFAULT``.
+                - **thread_pool** — Thread pool executor for sync
+                  functions. See ``promising.function`` for details.
 
         Returns:
             A ``Promise`` that will resolve to the wrapped function's
@@ -173,6 +191,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             "start_soon_default",
             self.start_soon_default,
         )
+        thread_pool = kwargs.pop(
+            "thread_pool",
+            self.thread_pool,
+        )
 
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
@@ -184,16 +206,16 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
-                from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
-
                 # Get the event loop from the active promise that is running
                 # this async wrapper function
-                loop = get_active_promise().get_loop()
+                active_promise = get_active_promise()
+                loop = active_promise.get_loop()
+                executor = active_promise.get_thread_pool_executor()
                 # Copy the current context so that ContextVars (in particular
                 # Promise._current) are accessible inside the executor thread
                 ctx = contextvars.copy_context()
                 return await loop.run_in_executor(
-                    Defaults.SYNC_THREAD_POOL,
+                    executor,
                     functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )
 
@@ -215,4 +237,5 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             start_soon=start_soon,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            thread_pool=thread_pool,
         )

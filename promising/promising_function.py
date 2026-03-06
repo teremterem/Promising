@@ -58,6 +58,8 @@ def function(
             ``await_children_sync()`` from within the function will raise
             ``SyncUsageError`` because those calls would deadlock the
             event loop.
+            # TODO TODO TODO Raise SyncUsageError on the blocking methods of
+            #  as_concurrent_future() too
     """
     if func_or_method is None:
         # The decorator was used with arguments

@@ -381,6 +381,21 @@ uv sync --extra examples
 - `examples/keyword_agent.py` — an LLM-powered keyword extraction agent using `@promising.function` with `litellm` and `pydantic`.
 - `examples/htmx_ui/` — a web UI example using `python-fasthtml` and HTMX.
 
+## Design Note: Settings Are Frozen at Creation Time
+
+All configuration — `start_soon`, `children_start_soon`,
+`start_soon_default`, `thread_pool`, etc. — is resolved and frozen
+the moment a `Promise` or `PromisingContext` is created. Sentinels
+like `INHERIT` and `GLOBAL_DEFAULT` are replaced with concrete
+values immediately, so later changes to `Defaults` or parent
+contexts have no effect on already-created promises.
+
+This is intentional: because a `Promise` may execute eagerly
+(the default) or be deferred, the user cannot predict *when*
+the underlying coroutine will run. Freezing settings at creation
+time guarantees that the behavior a promise was *created with* is
+the behavior it *runs with*, regardless of scheduling.
+
 ## API Reference
 
 ### Decorator

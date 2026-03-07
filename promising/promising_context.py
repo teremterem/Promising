@@ -589,16 +589,25 @@ class PromisingContext:
     def _resolve_thread_pool(
         self,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel",
-    ) -> "concurrent.futures.ThreadPoolExecutor | Sentinel":
+    ) -> "concurrent.futures.ThreadPoolExecutor | None":
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
         if isinstance(thread_pool, concurrent.futures.ThreadPoolExecutor):
             return thread_pool
 
-        if thread_pool is GLOBAL_DEFAULT or thread_pool is ASYNCIO_DEFAULT:
-            return thread_pool
+        if thread_pool is ASYNCIO_DEFAULT:
+            # Use the event loop's default executor
+            return None
+
+        if thread_pool is GLOBAL_DEFAULT:
+            # Use the Promising framework's default thread pool
+            return Defaults.SYNC_THREAD_POOL
 
         if thread_pool is INHERIT:
             if self._parent is None:
-                return GLOBAL_DEFAULT
+                # INHERIT, when there is no parent, is the same as
+                # GLOBAL_DEFAULT (the framework's default thread pool)
+                return Defaults.SYNC_THREAD_POOL
             return self._parent._thread_pool
 
         raise ValueError(
@@ -608,19 +617,8 @@ class PromisingContext:
 
     def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
         """
-        Return the resolved thread pool executor for this context.
-
-        Returns:
-            A ``ThreadPoolExecutor`` instance if ``GLOBAL_DEFAULT`` or a
-            concrete pool is configured, or ``None`` if ``ASYNCIO_DEFAULT``
-            (which tells ``run_in_executor`` to use the loop's default).
+        Return the thread pool executor for ``loop.run_in_executor``.
         """
-        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
-
-        if self._thread_pool is GLOBAL_DEFAULT:
-            return Defaults.SYNC_THREAD_POOL
-        if self._thread_pool is ASYNCIO_DEFAULT:
-            return None
         return self._thread_pool
 
     def _repr_context(self, namespace: str | None = None) -> str:

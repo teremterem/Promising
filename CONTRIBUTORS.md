@@ -45,6 +45,8 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 ## Architecture
 
+**Settings are frozen at creation time.** All configuration (`start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc.) is fully resolved when a `Promise` or `PromisingContext` is constructed. Sentinels like `INHERIT` and `GLOBAL_DEFAULT` are replaced with concrete values immediately — no deferred resolution happens at execution time. This is a core design principle: because a promise may run eagerly or be deferred, the user cannot predict *when* execution will happen, so settings must reflect the state of the world at the moment the promise was created.
+
 **Core hierarchy flow:** `PromisingFunction` wraps an async or sync function → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises created during that execution become its children via `WeakSet`.
 
 ### PromisingContext (`promising/promising_context.py`)

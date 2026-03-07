@@ -203,14 +203,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             self.use_thread_pool,
         )
 
-        # TODO Develop a convenient and idiomatic (whatever that would mean)
-        #  way of serializing/deserializing the arguments and ensuring
+        # TODO Develop a convenient and idiomatic way (whatever that would
+        #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
 
         if self._is_wrapped_async:
+            # The wrapped function is already async, so we can just call it
+            # directly
             coro = self._wrapped_as_callable(*args, **kwargs)
-        elif use_thread_pool:
 
+        elif use_thread_pool:
+            # Run the sync function in a thread pool executor
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
                 # Get the event loop from the active promise that is running
@@ -227,8 +230,9 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 )
 
             coro = _sync_to_async()
-        else:
 
+        else:
+            # Run the sync function directly on the event loop thread
             @functools.wraps(self.__wrapped__)
             async def _sync_inline() -> T_co:
                 return self._wrapped_as_callable(*args, **kwargs)

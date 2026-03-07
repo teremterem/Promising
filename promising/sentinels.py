@@ -6,6 +6,7 @@ class Sentinel:
         raise RuntimeError("Sentinels should not be used in boolean expressions.")
 
 
+ASYNCIO_DEFAULT = Sentinel()
 GLOBAL_DEFAULT = Sentinel()
 INHERIT = Sentinel()
 NOT_SET = Sentinel()

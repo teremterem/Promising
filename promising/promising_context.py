@@ -18,7 +18,7 @@ from promising.errors import (
     PromiseNotFoundError,
     SyncUsageError,
 )
-from promising.sentinels import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import DecoratorSupport, resolve_namespace
 
@@ -73,6 +73,13 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
+        thread_pool: Thread pool executor used to run sync promising functions.
+            ``INHERIT`` (default) inherits from the parent context, falling
+            back to ``GLOBAL_DEFAULT`` at the root. ``GLOBAL_DEFAULT`` uses
+            ``Defaults.SYNC_THREAD_POOL``. ``ASYNCIO_DEFAULT`` passes ``None``
+            to ``run_in_executor``, letting the event loop use its own default
+            executor. A concrete ``ThreadPoolExecutor`` instance can also be
+            provided.
         children_start_soon: Whether child promises created directly within
             this context should start executing immediately (i.e. as soon as
             the event loop allows), or defer until awaited one way or another.
@@ -89,6 +96,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -96,6 +104,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self._namespace = namespace
         self._ctx_loop = loop
         self._parent = parent
+        self._thread_pool = thread_pool
         self._children_start_soon = children_start_soon
         self._start_soon_default = start_soon_default
 
@@ -118,6 +127,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
                 namespace=self._namespace,
                 loop=self._ctx_loop,
                 parent=self._parent,
+                thread_pool=self._thread_pool,
                 children_start_soon=self._children_start_soon,
                 start_soon_default=self._start_soon_default,
             )
@@ -161,6 +171,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             ),
             loop=self._ctx_loop,
             parent=self._parent,
+            thread_pool=self._thread_pool,
             children_start_soon=self._children_start_soon,
             start_soon_default=self._start_soon_default,
         )
@@ -249,6 +260,7 @@ class PromisingContext:
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
@@ -267,6 +279,7 @@ class PromisingContext:
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
+        self._thread_pool = self._resolve_thread_pool(thread_pool)
 
         if loop is None:
             if self._parent is None:
@@ -529,7 +542,7 @@ class PromisingContext:
     #  method
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
-        from promising import should_start_soon_by_default  # noqa: PLC0415 (import-outside-top-level)
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
 
         if isinstance(start_soon_default, bool):
             # Concrete value was provided
@@ -537,12 +550,12 @@ class PromisingContext:
 
         if start_soon_default is GLOBAL_DEFAULT:
             # Use the global default
-            return should_start_soon_by_default()
+            return Defaults.START_SOON
 
         if start_soon_default is INHERIT:
             if self._parent is None:
                 # Use the global default
-                return should_start_soon_by_default()
+                return Defaults.START_SOON
 
             # Inherit from the parent
             return self._parent._start_soon_default
@@ -572,6 +585,41 @@ class PromisingContext:
             "`children_start_soon` must be either NOT_SET, INHERIT or a boolean value, "
             f"but `{type(children_start_soon)}` was given instead"
         )
+
+    def _resolve_thread_pool(
+        self,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel",
+    ) -> "concurrent.futures.ThreadPoolExecutor | None":
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
+        if isinstance(thread_pool, concurrent.futures.ThreadPoolExecutor):
+            return thread_pool
+
+        if thread_pool is ASYNCIO_DEFAULT:
+            # Use the event loop's default executor
+            return None
+
+        if thread_pool is GLOBAL_DEFAULT:
+            # Use the Promising framework's default thread pool
+            return Defaults.SYNC_THREAD_POOL
+
+        if thread_pool is INHERIT:
+            if self._parent is None:
+                # INHERIT, when there is no parent, is the same as
+                # GLOBAL_DEFAULT (the framework's default thread pool)
+                return Defaults.SYNC_THREAD_POOL
+            return self._parent._thread_pool
+
+        raise ValueError(
+            "`thread_pool` must be either INHERIT, GLOBAL_DEFAULT, ASYNCIO_DEFAULT "
+            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given instead"
+        )
+
+    def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
+        """
+        Return the thread pool executor for ``loop.run_in_executor``.
+        """
+        return self._thread_pool
 
     def _repr_context(self, namespace: str | None = None) -> str:
         if namespace is not None:

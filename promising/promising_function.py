@@ -174,6 +174,9 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                   ``START_SOON_DEFAULT``.
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
+                - **use_thread_pool** — Whether to run a sync function
+                  in a thread pool executor. See ``promising.function``
+                  for details.
 
         Returns:
             A ``Promise`` that will resolve to the wrapped function's
@@ -195,6 +198,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             "thread_pool",
             self.thread_pool,
         )
+        use_thread_pool = kwargs.pop(
+            "use_thread_pool",
+            self.use_thread_pool,
+        )
 
         # TODO Develop a convenient and idiomatic (whatever that would mean)
         #  way of serializing/deserializing the arguments and ensuring
@@ -202,7 +209,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
         if self._is_wrapped_async:
             coro = self._wrapped_as_callable(*args, **kwargs)
-        elif self.use_thread_pool:
+        elif use_thread_pool:
 
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:

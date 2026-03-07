@@ -199,3 +199,51 @@ async def test_use_thread_pool_true_ignored_for_async_functions() -> None:
 
     worker_thread = await get_thread()
     assert worker_thread is main_thread
+
+
+# ── Override at call site via kwargs ─────────────────────────────────
+
+
+async def test_use_thread_pool_override_at_call_site() -> None:
+    """
+    use_thread_pool can be overridden at the call site via kwargs,
+    switching a decorator-level True to False at call time.
+    """
+    main_thread = threading.current_thread()
+
+    @promising.function  # use_thread_pool defaults to True
+    def get_thread() -> threading.Thread:
+        return threading.current_thread()
+
+    worker_thread = await get_thread(use_thread_pool=False)
+    assert worker_thread is main_thread
+
+
+async def test_use_thread_pool_call_site_false_to_true() -> None:
+    """
+    use_thread_pool=False at decoration time can be overridden
+    to True at call time, causing the sync function to run in
+    a thread pool.
+    """
+    main_thread = threading.current_thread()
+
+    @promising.function(use_thread_pool=False)
+    def get_thread() -> threading.Thread:
+        return threading.current_thread()
+
+    worker_thread = await get_thread(use_thread_pool=True)
+    assert worker_thread is not main_thread
+
+
+async def test_use_thread_pool_call_site_not_forwarded() -> None:
+    """
+    use_thread_pool passed at the call site is consumed by call()
+    and not forwarded to the wrapped function as a regular kwarg.
+    """
+
+    @promising.function
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    result = await add(3, 4, use_thread_pool=True)
+    assert result == 7

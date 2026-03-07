@@ -70,6 +70,15 @@ def function(
             ``await_children_sync()`` from within the function will raise
             ``SyncUsageError`` because those calls would deadlock the
             event loop.
+
+            Unlike ``thread_pool``, this parameter is intentionally not
+            inheritable through the context hierarchy — it must be set
+            per-function at decoration or call time. This is by design:
+            running sync functions on the event loop thread is
+            problematic for CPU-bound workloads (it blocks the loop),
+            so the user should make a conscious decision for each
+            specific case rather than blanket-disabling thread pools
+            for an entire subtree.
             # TODO TODO TODO Raise SyncUsageError on the blocking methods of
             #  as_concurrent_future() too
     """

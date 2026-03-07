@@ -312,10 +312,10 @@ The global default can be changed:
 import promising
 
 # All Promises start immediately by default (this is the initial value)
-promising.START_SOON_DEFAULT = True
+promising.Defaults.START_SOON = True
 
 # Change to lazy execution globally
-promising.START_SOON_DEFAULT = False
+promising.Defaults.START_SOON = False
 ```
 
 ## Thread-Safe Access
@@ -425,7 +425,7 @@ uv sync --extra examples
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
-| `promising.should_start_soon_by_default()` | Returns the current value of `START_SOON_DEFAULT`. Useful for reading the global default without importing the mutable variable directly. |
+| `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 
 ### Sentinels
 

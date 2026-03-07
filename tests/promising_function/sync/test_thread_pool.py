@@ -11,14 +11,11 @@ from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
 # ── GLOBAL_DEFAULT: uses Defaults.SYNC_THREAD_POOL ──────────────────
 
 
-async def test_global_default_runs_in_global_thread_pool() -> None:
+async def test_global_default_runs_off_main_thread() -> None:
     """
-    thread_pool=GLOBAL_DEFAULT uses Defaults.SYNC_THREAD_POOL,
-    which is the same as the default behavior.
+    thread_pool=GLOBAL_DEFAULT causes the sync function to run
+    in a different thread than the main/event-loop thread.
     """
-    # TODO The name and docstring of this test does not seem to reflect what is
-    #  actually being asserted. It only asserts that the function does not run
-    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function(thread_pool=GLOBAL_DEFAULT)
@@ -32,15 +29,11 @@ async def test_global_default_runs_in_global_thread_pool() -> None:
 # ── ASYNCIO_DEFAULT: uses the event loop's default executor ─────────
 
 
-async def test_asyncio_default_runs_in_asyncio_executor() -> None:
+async def test_asyncio_default_runs_off_main_thread() -> None:
     """
-    thread_pool=ASYNCIO_DEFAULT passes None to run_in_executor,
-    letting the event loop use its own default executor.
-    The sync function still runs off the event loop thread.
+    thread_pool=ASYNCIO_DEFAULT causes the sync function to run
+    in a different thread than the main/event-loop thread.
     """
-    # TODO The name and docstring of this test does not seem to reflect what is
-    #  actually being asserted. It only asserts that the function does not run
-    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function(thread_pool=ASYNCIO_DEFAULT)
@@ -275,14 +268,12 @@ async def test_nested_context_inner_inherits_outer() -> None:
 # ── ASYNCIO_DEFAULT via context ─────────────────────────────────────
 
 
-async def test_asyncio_default_via_context() -> None:
+async def test_asyncio_default_via_context_runs_off_main_thread() -> None:
     """
     Setting thread_pool=ASYNCIO_DEFAULT on a context causes
-    child sync functions to use the event loop's default executor.
+    child sync functions to run in a different thread than the
+    main/event-loop thread.
     """
-    # TODO The name and docstring of this test does not seem to reflect what is
-    #  actually being asserted. It only asserts that the function does not run
-    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function

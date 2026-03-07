@@ -180,31 +180,15 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
 # ── use_thread_pool has no effect on async functions ──
 
 
-async def test_use_thread_pool_false_ignored_for_async_functions() -> None:
+@pytest.mark.parametrize("use_thread_pool", [True, False])
+async def test_use_thread_pool_ignored_for_async_functions(use_thread_pool: bool) -> None:
     """
-    use_thread_pool=False has no effect on async functions — they
-    always run on the event loop thread.
-    """
-    # TODO Combine with the next test - just parameterize
-    main_thread = threading.current_thread()
-
-    @promising.function(use_thread_pool=False)
-    async def get_thread() -> threading.Thread:
-        return threading.current_thread()
-
-    worker_thread = await get_thread()
-    assert worker_thread is main_thread
-
-
-async def test_use_thread_pool_true_ignored_for_async_functions() -> None:
-    """
-    use_thread_pool=True has no effect on async functions — they
+    use_thread_pool has no effect on async functions — they
     always run on the event loop thread regardless.
     """
-    # TODO Combine with the previous test - just parameterize
     main_thread = threading.current_thread()
 
-    @promising.function(use_thread_pool=True)
+    @promising.function(use_thread_pool=use_thread_pool)
     async def get_thread() -> threading.Thread:
         return threading.current_thread()
 

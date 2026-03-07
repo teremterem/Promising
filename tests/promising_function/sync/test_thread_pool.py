@@ -16,6 +16,9 @@ async def test_global_default_runs_in_global_thread_pool() -> None:
     thread_pool=GLOBAL_DEFAULT uses Defaults.SYNC_THREAD_POOL,
     which is the same as the default behavior.
     """
+    # TODO The name and docstring of this test does not seem to reflect what is
+    #  actually being asserted. It only asserts that the function does not run
+    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function(thread_pool=GLOBAL_DEFAULT)
@@ -35,6 +38,9 @@ async def test_asyncio_default_runs_in_asyncio_executor() -> None:
     letting the event loop use its own default executor.
     The sync function still runs off the event loop thread.
     """
+    # TODO The name and docstring of this test does not seem to reflect what is
+    #  actually being asserted. It only asserts that the function does not run
+    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function(thread_pool=ASYNCIO_DEFAULT)
@@ -135,11 +141,13 @@ async def test_inherit_from_parent_promise() -> None:
 
     @promising.function
     def child_get_thread_name() -> str:
-        return threading.current_thread().name
+        with promising.context():  # Let's add one more level
+            return threading.current_thread().name
 
     @promising.function(thread_pool=custom_pool)
     async def parent() -> str:
-        return await child_get_thread_name()
+        with promising.context():  # Let's add one more level
+            return await child_get_thread_name()
 
     thread_name = await parent()
     assert "parent-pool" in thread_name
@@ -272,6 +280,9 @@ async def test_asyncio_default_via_context() -> None:
     Setting thread_pool=ASYNCIO_DEFAULT on a context causes
     child sync functions to use the event loop's default executor.
     """
+    # TODO The name and docstring of this test does not seem to reflect what is
+    #  actually being asserted. It only asserts that the function does not run
+    #  in the main thread. Either fix the test or update the docstring and name
     main_thread = threading.current_thread()
 
     @promising.function

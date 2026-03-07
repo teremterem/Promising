@@ -185,6 +185,7 @@ async def test_use_thread_pool_false_ignored_for_async_functions() -> None:
     use_thread_pool=False has no effect on async functions — they
     always run on the event loop thread.
     """
+    # TODO Combine with the next test - just parameterize
     main_thread = threading.current_thread()
 
     @promising.function(use_thread_pool=False)
@@ -200,6 +201,7 @@ async def test_use_thread_pool_true_ignored_for_async_functions() -> None:
     use_thread_pool=True has no effect on async functions — they
     always run on the event loop thread regardless.
     """
+    # TODO Combine with the previous test - just parameterize
     main_thread = threading.current_thread()
 
     @promising.function(use_thread_pool=True)

@@ -94,6 +94,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
     Calling promise.sync() inside a use_thread_pool=False
     function raises SyncUsageError because it would deadlock.
     """
+    child_promise = None
 
     @promising.function
     async def child() -> str:
@@ -101,10 +102,18 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
 
     @promising.function(use_thread_pool=False)
     def parent() -> str:
-        return child(start_soon=False).sync()
+        nonlocal child_promise
+        child_promise = child(start_soon=False)
+        return child_promise.sync()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         await parent()
+
+    assert child_promise is not None
+    assert not child_promise.done()
+
+    # Prevent the warning about the unawaited coroutine
+    await child_promise
 
 
 async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool() -> None:

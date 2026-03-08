@@ -57,7 +57,7 @@ This file also contains the `context` class — a context manager / decorator th
 
 ### Promise (`promising/promise.py`)
 
-Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `_AsyncioBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
+Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
 ### PromisingFunction (`promising/promising_function.py`)
 

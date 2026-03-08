@@ -145,7 +145,7 @@ def sync_parent() -> str:
     return "done"
 ```
 
-Both `sync()` and `await_children_sync()` guard against being called from the event loop thread (which would deadlock) by raising `SyncUsageError`.
+`sync()`, `await_children_sync()`, `concurrent_future.result()`, and `concurrent_future.exception()` all guard against being called from the event loop thread (which would deadlock) by raising `SyncUsageError`.
 
 ### Thread Pool Configuration
 
@@ -320,7 +320,7 @@ promising.Defaults.START_SOON = False
 
 ## Thread-Safe Access
 
-Every Promise has a `concurrent.futures.Future` counterpart for use from non-async threads:
+Every Promise has a `PromiseBackedConcurrentFuture` (a `concurrent.futures.Future` subclass) for use from non-async threads:
 
 ```python
 import threading
@@ -339,6 +339,8 @@ async def main():
     await promise
     thread.join()
 ```
+
+`promise.sync()`, `concurrent_future.result()`, and `concurrent_future.exception()` all raise `SyncUsageError` if called from the event loop thread (which would deadlock).
 
 ## Working with Promise Directly
 
@@ -404,10 +406,10 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | Method / Property | Description |
 |---|---|
 | `await promise` | Wait for and return the result. Can be awaited multiple times. |
-| `promise.sync()` | Synchronous counterpart of `await` — blocks the calling thread. Must not be called from the event loop thread. |
+| `promise.sync(timeout=None)` | Synchronous counterpart of `await` — blocks the calling thread. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
-| `promise.as_concurrent_future()` | Get a thread-safe `concurrent.futures.Future` view. |
+| `promise.as_concurrent_future()` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |
 
 ### PromisingContext
 
@@ -419,7 +421,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 | `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
-| `ctx.await_children_sync(recursively=False)` | Sync — block until child contexts finish. |
+| `ctx.await_children_sync(recursively=False, timeout=None)` | Sync — block until child contexts finish. |
 | `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
 
@@ -430,7 +432,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
-| `promising.await_children_sync(recursively=False)` | Sync counterpart — block until children finish. |
+| `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 
 ### Sentinels

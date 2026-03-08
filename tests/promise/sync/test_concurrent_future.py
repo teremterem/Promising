@@ -387,7 +387,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
              but no task switching occurs and, as a result, it does not have a
              chance to complete. In these cases, the coroutine was never
              scheduled, so coro_call_count must be 0.
-              - All threads should timeout (concurrent.futures.TimeoutError)
+              - All threads should timeout (TimeoutError)
            - Promise IS expected to be done - in all other scenarios
               - Threads 0 and 1 should get "Result from thread test!"
               - Thread 2 behavior depends on timing:
@@ -440,7 +440,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
     def thread_function(idx: int, timeout: float) -> None:
         try:
             results[idx] = concurrent_future.result(timeout=timeout, ensure_task_scheduled=False)
-        except concurrent.futures.TimeoutError as e:
+        except TimeoutError as e:
             results[idx] = e
 
     threads = [
@@ -468,9 +468,9 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
         #    all (no task switching happens)
         # 2. The promise does not start soon (and is not prefilled), but we
         #    don't await for it directly
-        assert isinstance(results[0], concurrent.futures.TimeoutError)
-        assert isinstance(results[1], concurrent.futures.TimeoutError)
-        assert isinstance(results[2], concurrent.futures.TimeoutError)
+        assert isinstance(results[0], TimeoutError)
+        assert isinstance(results[1], TimeoutError)
+        assert isinstance(results[2], TimeoutError)
 
         assert coro_call_count == 0
 
@@ -487,7 +487,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
             # even in the thread that did not wait long enough
             assert results[2] == "Result from thread test!"
         else:
-            assert isinstance(results[2], concurrent.futures.TimeoutError)
+            assert isinstance(results[2], TimeoutError)
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the

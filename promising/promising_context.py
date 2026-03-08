@@ -417,7 +417,7 @@ class PromisingContext:
         Raises:
             SyncUsageError: If called from the event loop thread, because this
                 would cause a deadlock.
-            concurrent.futures.TimeoutError: If timeout expires before
+            TimeoutError: If timeout expires before
                 completion.
         """
         assert_no_sync_usage_deadlock(

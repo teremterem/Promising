@@ -218,7 +218,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
-            concurrent.futures.TimeoutError: If timeout expires before
+            TimeoutError: If timeout expires before
                 completion.
         """
         return self.as_concurrent_future().result(timeout=timeout)
@@ -433,7 +433,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
-            concurrent.futures.TimeoutError: If timeout expires before
+            TimeoutError: If timeout expires before
                 completion.
             Exception: Any exception that occurred during Promise execution.
         """
@@ -488,7 +488,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
-            concurrent.futures.TimeoutError: If timeout expires before
+            TimeoutError: If timeout expires before
                 completion.
         """
         assert_no_sync_usage_deadlock(

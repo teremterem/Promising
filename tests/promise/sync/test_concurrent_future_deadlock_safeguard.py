@@ -81,6 +81,11 @@ async def test_result_raises_sync_usage_error_with_prefilled_exception() -> None
     with pytest.raises(SyncUsageError, match="deadlock"):
         concurrent_future.result()
 
+    # Now, let's retrieve the actual exception, so we don't get the asyncio
+    # warning about the exception not having been retrieved.
+    with pytest.raises(ValueError, match="test error"):
+        await promise
+
 
 async def test_exception_raises_sync_usage_error_with_prefilled_exception() -> None:
     """
@@ -92,6 +97,11 @@ async def test_exception_raises_sync_usage_error_with_prefilled_exception() -> N
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         concurrent_future.exception()
+
+    # Now, let's retrieve the actual exception, so we don't get the asyncio
+    # warning about the exception not having been retrieved.
+    with pytest.raises(ValueError, match="test error"):
+        await promise
 
 
 async def test_result_works_from_separate_thread() -> None:

@@ -148,13 +148,17 @@ async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool()
 # ── Verify that sync() works fine with use_thread_pool=True ──
 
 
-@pytest.mark.parametrize("via_concurrent_future", [False, True])
+@pytest.mark.parametrize(
+    "method",
+    ["sync", "concurrent_future_result", "concurrent_future_exception"],
+)
 @pytest.mark.parametrize("start_soon", [True, False])
-async def test_sync_works_with_thread_pool(via_concurrent_future: bool, start_soon: bool) -> None:
+async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> None:
     """
-    Calling promise.sync() or concurrent_future.result() inside a
-    use_thread_pool=True (default) function works fine because the
-    function runs in a separate thread.
+    Calling promise.sync(), concurrent_future.result(), or
+    concurrent_future.exception() inside a use_thread_pool=True
+    (default) function works fine because the function runs in a
+    separate thread.
     """
 
     @promising.function
@@ -162,13 +166,20 @@ async def test_sync_works_with_thread_pool(via_concurrent_future: bool, start_so
         return "child result"
 
     @promising.function
-    def parent() -> str:
+    def parent():
         p = child(start_soon=start_soon)
-        if via_concurrent_future:
+        if method == "sync":
+            return p.sync()
+        elif method == "concurrent_future_result":
             return p.as_concurrent_future().result()
-        return p.sync()
+        else:
+            return p.as_concurrent_future().exception()
 
-    assert await parent() == "child result"
+    result = await parent()
+    if method == "concurrent_future_exception":
+        assert result is None
+    else:
+        assert result == "child result"
 
 
 async def test_await_children_sync_works_with_thread_pool() -> None:
@@ -191,29 +202,6 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
 
     await parent()
     assert child_result == "child result"
-
-
-@pytest.mark.parametrize("start_soon", [True, False])
-async def test_concurrent_future_exception_works_with_thread_pool(start_soon: bool) -> None:
-    """
-    Calling concurrent_future.exception() inside a use_thread_pool=True
-    (default) function works fine because the function runs in a
-    separate thread.
-    """
-    child_exception = None
-
-    @promising.function
-    async def child() -> str:
-        return "child result"
-
-    @promising.function
-    def parent() -> None:
-        nonlocal child_exception
-        p = child(start_soon=start_soon)
-        child_exception = p.as_concurrent_future().exception()
-
-    await parent()
-    assert child_exception is None
 
 
 # ── use_thread_pool has no effect on async functions ──

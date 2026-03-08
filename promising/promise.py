@@ -454,7 +454,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
             # to issue a warning about the Future not having been awaited for
             # (which, by this point, would be done already)
             try:
-                self._promise._call_soon_threadsafe(self._promise.result)
+                self._promise._call_soon_threadsafe(self._promise.exception)
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here

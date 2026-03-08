@@ -137,7 +137,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             loop=self._ctx_loop,
         )
         self._task: Task[T_co] | None = None
-        self._concurrent_future = PromiseBackedConcurrentFuture(self)
+        self._concurrent_future = PromiseBackedConcurrentFuture[T_co](self)
 
         self._start_soon = self._resolve_start_soon(start_soon)
 
@@ -229,7 +229,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         )
         return self.as_concurrent_future().result(timeout=timeout)
 
-    def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
+    def as_concurrent_future(self) -> "PromiseBackedConcurrentFuture[T_co]":
         """
         Get a thread-safe `concurrent.futures.Future` view of this Promise.
 
@@ -394,7 +394,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._concurrent_future.set_exception(exception)
 
 
-class PromiseBackedConcurrentFuture(concurrent.futures.Future):
+class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
     """
     A thread-safe `concurrent.futures.Future` backed by a ``Promise``.
 
@@ -412,11 +412,11 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future):
             `concurrent.futures.Future`.
     """
 
-    def __init__(self, promise: Promise[Any]) -> None:
+    def __init__(self, promise: Promise[T_co]) -> None:
         super().__init__()
         self._promise = promise
 
-    def result(self, timeout: float | None = None, ensure_task_scheduled: bool = True) -> Any:
+    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> T_co:
         """
         Get the result of the Promise.
 
@@ -469,7 +469,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future):
         # even though it's going to be the same as the result from the Promise
         return result
 
-    def exception(self, timeout: float | None = None, ensure_task_scheduled: bool = True) -> BaseException | None:
+    def exception(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> BaseException | None:
         """
         Get the exception that occurred during Promise execution, if any.
 

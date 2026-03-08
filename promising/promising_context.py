@@ -226,7 +226,7 @@ async def await_children(*, recursively: bool = False) -> None:
     return await get_active_context().await_children(recursively=recursively)
 
 
-def await_children_sync(*, recursively: bool = False) -> None:
+def await_children_sync(*, recursively: bool = False, timeout: float | None = None) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -238,10 +238,11 @@ def await_children_sync(*, recursively: bool = False) -> None:
     Args:
         recursively: If True, wait for all descendants, not just direct
             children.
+        timeout: Maximum time to wait in seconds.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
-    return get_active_context().await_children_sync(recursively=recursively)
+    return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
 
 
 class PromisingContext:
@@ -391,7 +392,7 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = False) -> None:
+    def await_children_sync(self, *, recursively: bool = False, timeout: float | None = None) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -403,10 +404,13 @@ class PromisingContext:
         Args:
             recursively: If True, wait for all descendants, not just direct
                 children.
+            timeout: Maximum time to wait in seconds.
 
         Raises:
             SyncUsageError: If called from the event loop thread, because this
                 would cause a deadlock.
+            concurrent.futures.TimeoutError: If timeout expires before
+                completion.
         """
         assert_no_sync_usage_deadlock(
             self._ctx_loop,
@@ -431,7 +435,7 @@ class PromisingContext:
         self._call_soon_threadsafe(schedule_await_children)
         # Should any error happen in the underlying async `await_children`,
         # the call below will re-raise it
-        concurrent_future.result()
+        concurrent_future.result(timeout=timeout)
 
     def collect_remaining_children(
         self,

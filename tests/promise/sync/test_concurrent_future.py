@@ -439,7 +439,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
 
     def thread_function(idx: int, timeout: float) -> None:
         try:
-            results[idx] = concurrent_future.result(timeout=timeout)
+            results[idx] = concurrent_future.result(timeout=timeout, ensure_task_scheduled=False)
         except concurrent.futures.TimeoutError as e:
             results[idx] = e
 

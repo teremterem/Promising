@@ -1,4 +1,3 @@
-import asyncio
 import concurrent.futures
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Coroutine, Generator
@@ -138,7 +137,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             loop=self._ctx_loop,
         )
         self._task: Task[T_co] | None = None
-        self._concurrent_future = _AsyncioBackedConcurrentFuture(self)
+        self._concurrent_future = PromiseBackedConcurrentFuture(self)
 
         self._start_soon = self._resolve_start_soon(start_soon)
 
@@ -202,7 +201,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         yield from self._task
         return (yield from super().__await__())
 
-    def sync(self) -> T_co:
+    def sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread.
@@ -210,12 +209,17 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         This is the synchronous counterpart of ``await promise`` — intended for
         use inside sync promising functions that run in a thread pool executor.
 
+        Args:
+            timeout: Maximum time to wait for the result in seconds.
+
         Returns:
             The resolved value of the Promise.
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
+            concurrent.futures.TimeoutError: If timeout expires before
+                completion.
         """
         assert_no_sync_usage_deadlock(
             self._ctx_loop,
@@ -223,11 +227,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             "event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
-
-        # Schedule the task on the event loop from this (non-loop) thread,
-        # then block until the result (or exception) is available.
-        self._call_soon_threadsafe(self._ensure_task_scheduled)
-        return self.as_concurrent_future().result()
+        return self.as_concurrent_future().result(timeout=timeout)
 
     def as_concurrent_future(self) -> concurrent.futures.Future[T_co]:
         """
@@ -394,88 +394,101 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._concurrent_future.set_exception(exception)
 
 
-class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
+class PromiseBackedConcurrentFuture(concurrent.futures.Future):
     """
-    A thread-safe `concurrent.futures.Future` backed by an `asyncio.Future`.
+    A thread-safe `concurrent.futures.Future` backed by a ``Promise``.
 
-    This class provides a bridge between asyncio-based Futures and the
-    `concurrent.futures.Future` interface, allowing `asyncio.Future` instances
-    to be used in multi-threaded contexts while maintaining proper
-    result/exception synchronization.
+    This class provides a bridge between asyncio-based Promises and the
+    `concurrent.futures.Future` interface, allowing Promises to be used in
+    multi-threaded contexts while maintaining proper result/exception
+    synchronization.
+
+    Before blocking, both ``result()`` and ``exception()`` ensure that the
+    Promise's task is scheduled on the event loop, so that the Promise will
+    actually make progress while the calling thread waits.
 
     Args:
-        asyncio_future: The `asyncio.Future` instance that backs this
+        promise: The ``Promise`` instance that backs this
             `concurrent.futures.Future`.
     """
 
-    def __init__(self, asyncio_future: asyncio.Future[Any]) -> None:
+    def __init__(self, promise: Promise[Any]) -> None:
         super().__init__()
-        self._asyncio_future = asyncio_future
+        self._promise = promise
 
-    def result(self, timeout: float | None = None) -> Any:
+    def result(self, timeout: float | None = None, ensure_task_scheduled: bool = True) -> Any:
         """
-        Get the result of the `asyncio.Future`.
+        Get the result of the Promise.
 
-        This method blocks until the underlying `asyncio.Future` is done and ensures
-        that the `asyncio.Future`'s result is properly consumed (`asyncio` will not issue
-        a warning about the `asyncio.Future` not having been awaited for).
+        This method ensures the Promise's task is scheduled, then blocks until
+        the Promise is done. It also consumes the result from the underlying
+        asyncio Future so that asyncio will not issue a warning about the
+        Future not having been awaited for.
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
+            ensure_task_scheduled: If True (the default), schedules the
+                Promise's task on the event loop before blocking, so the
+                Promise can make progress while this thread waits. This
+                parameter is not part of the standard
+                ``concurrent.futures.Future`` interface.
 
         Returns:
-            The result value from the `asyncio.Future`.
+            The result value from the Promise.
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
-            Exception: Any exception that occurred during `asyncio.Future`
-                execution.
+            Exception: Any exception that occurred during Promise execution.
         """
         assert_no_sync_usage_deadlock(
-            self._asyncio_future.get_loop(),
+            self._promise.get_loop(),
             "`concurrent_future.result()` cannot be called from the "
             "event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
+        if ensure_task_scheduled:
+            self._promise._call_soon_threadsafe(self._promise._ensure_task_scheduled)
+
         try:
-            # Let's block until the underlying `asyncio.Future` is done (it will
-            # set the result/exception on this `concurrent.futures.Future`)
             result = super().result(timeout=timeout)
         finally:
             # Let's also read the result from the asyncio Future directly, so
             # it knows that its result has been consumed and there is no need
-            # to issue a warning about the `asyncio.Future` not having been
-            # awaited for (which, by this point, would be done already)
+            # to issue a warning about the Future not having been awaited for
+            # (which, by this point, would be done already)
             try:
-                self._asyncio_future.result()
+                self._promise.result()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here
                 pass
         # For consistency, let's return the result from this concurrent Future,
-        # even though it's going to be the same as the result from the asyncio
-        # Future
+        # even though it's going to be the same as the result from the Promise
         return result
 
-    def exception(self, timeout: float | None = None) -> BaseException | None:
+    def exception(self, timeout: float | None = None, ensure_task_scheduled: bool = True) -> BaseException | None:
         """
-        Get the exception that occurred during asyncio Future execution, if
-        any.
+        Get the exception that occurred during Promise execution, if any.
 
-        This method blocks until the underlying `asyncio.Future` is done and
-        ensures that the `asyncio.Future`'s exception is properly consumed
-        (asyncio will not issue a warning about the exception not having
-        been retrieved from the `asyncio.Future`).
+        This method ensures the Promise's task is scheduled, then blocks until
+        the Promise is done. It also consumes the exception from the underlying
+        asyncio Future so that asyncio will not issue a warning about the
+        exception not having been retrieved.
 
         Args:
             timeout: Maximum time to wait for completion in seconds.
+            ensure_task_scheduled: If True (the default), schedules the
+                Promise's task on the event loop before blocking, so the
+                Promise can make progress while this thread waits. This
+                parameter is not part of the standard
+                ``concurrent.futures.Future`` interface.
 
         Returns:
-            The exception that occurred, or None if the `asyncio.Future`
-            completed successfully.
+            The exception that occurred, or None if the Promise completed
+            successfully.
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
@@ -484,29 +497,28 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
                 completion.
         """
         assert_no_sync_usage_deadlock(
-            self._asyncio_future.get_loop(),
+            self._promise.get_loop(),
             "`concurrent_future.exception()` cannot be called from the "
             "event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
+        if ensure_task_scheduled:
+            self._promise._call_soon_threadsafe(self._promise._ensure_task_scheduled)
+
         try:
-            # Let's block until the underlying `asyncio.Future` is done
-            # (it will set the result/exception on this
-            # `concurrent.futures.Future`)
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also read the exception from the `asyncio.Future` directly,
-            # so it knows that its exception has been consumed and there is no
-            # need to issue a warning about the exception never being retrieved
-            # from the `asyncio.Future` (which, by this point, would be done
-            # already)
+            # Let's also read the exception from the Promise directly, so it
+            # knows that its exception has been consumed and there is no need
+            # to issue a warning about the exception never being retrieved
+            # (which, by this point, would be done already)
             try:
-                self._asyncio_future.exception()
+                self._promise.exception()
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
                 pass
         # For consistency, let's return the exception from this
-        # `concurrent.futures.Future`, even though it's going to be the same as
-        # the exception from the `asyncio.Future`
+        # concurrent.futures.Future, even though it's going to be the same as
+        # the exception from the Promise
         return exception

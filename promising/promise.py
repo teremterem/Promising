@@ -449,7 +449,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future):
             "event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
-        if ensure_task_scheduled:
+        if ensure_task_scheduled and not self.done():
             self._promise._call_soon_threadsafe(self._promise._ensure_task_scheduled)
 
         try:
@@ -502,7 +502,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future):
             "event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
-        if ensure_task_scheduled:
+        if ensure_task_scheduled and not self.done():
             self._promise._call_soon_threadsafe(self._promise._ensure_task_scheduled)
 
         try:

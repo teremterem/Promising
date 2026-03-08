@@ -455,7 +455,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
             # of outcome (returns None on success, the exception object on
             # failure), whereas .result() would re-raise on failure.
             try:
-                self._promise._call_soon_threadsafe(self._promise.exception)
+                self._promise._call_soon_threadsafe(self._consume_exception_in_promise)
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().result(), not from here
@@ -506,7 +506,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
             # Let's also consume the asyncio Future so it doesn't issue a
             # warning about the exception never being retrieved.
             try:
-                self._promise._call_soon_threadsafe(self._promise.exception)
+                self._promise._call_soon_threadsafe(self._consume_exception_in_promise)
             except BaseException:  # noqa: BLE001 (blind-except)
                 # Suppress the error if any - if there's an error, it should
                 # come from super().exception(), not from here
@@ -515,3 +515,10 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         # concurrent.futures.Future, even though it's going to be the same as
         # the exception from the Promise
         return exception
+
+    def _consume_exception_in_promise(self) -> None:
+        try:
+            self._promise.exception()
+        except BaseException:  # noqa: BLE001 (blind-except)
+            # Suppress any raised that `promise.exception()` itself might raise
+            pass

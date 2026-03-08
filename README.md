@@ -12,7 +12,7 @@ Promising extends `asyncio.Future` with automatic parent-child relationships bet
 pip install promising
 ```
 
-Requires Python 3.10+.
+Requires Python 3.11+.
 
 ## Quick Start
 

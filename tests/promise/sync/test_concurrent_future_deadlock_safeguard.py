@@ -73,27 +73,45 @@ async def test_raises_sync_usage_error_with_prefilled_exception(
 
 
 @pytest.mark.parametrize("method", ["result", "exception"])
-async def test_works_from_separate_thread(method: str) -> None:
+@pytest.mark.parametrize(
+    ("sleep_duration", "timeout"),
+    [(0.1, 0.2), (0.2, 0.1)],
+    ids=["completes", "times_out"],
+)
+async def test_works_from_separate_thread(method: str, sleep_duration: float, timeout: float) -> None:
     """
     Calling concurrent_future.result() or .exception() from a separate
     thread works fine.
     """
 
     async def sample_coro() -> str:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(sleep_duration)
         return "thread result"
 
     promise = Promise(sample_coro(), start_soon=True)
     concurrent_future = promise.as_concurrent_future()
 
-    value = await asyncio.get_running_loop().run_in_executor(
-        None,
-        lambda: concurrent_future.result(timeout=1)
-        if method == "result"
-        else concurrent_future.exception(timeout=1),
-    )
-
-    if method == "result":
-        assert value == "thread result"
+    if sleep_duration > timeout:
+        with pytest.raises(TimeoutError):
+            await asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: (
+                    concurrent_future.result(timeout=timeout)
+                    if method == "result"
+                    else concurrent_future.exception(timeout=timeout)
+                ),
+            )
     else:
-        assert value is None
+        value = await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: (
+                concurrent_future.result(timeout=timeout)
+                if method == "result"
+                else concurrent_future.exception(timeout=timeout)
+            ),
+        )
+
+        if method == "result":
+            assert value == "thread result"
+        else:
+            assert value is None

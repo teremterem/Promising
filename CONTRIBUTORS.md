@@ -39,7 +39,7 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 - Line length for all code: 119 characters (Ruff)
 - Line length for docstrings and comments specifically: 80 characters (to make them easily readable even when they are put in markdown blocks for documentation)
-- Python version: 3.10+
+- Python version: 3.11+ (one of the reasons: in 3.11, both `asyncio.TimeoutError` and `concurrent.futures.TimeoutError` became aliases for the builtin `TimeoutError`, so timeout handling across async and threaded code can use a single exception type — this matters for a library that bridges both worlds)
 - Pre-commit hooks enforce: trailing whitespace, end-of-file newline, YAML validation, large file check, Ruff linting (with `--fix`) and formatting
 - There is no CI/CD — pre-commit is the main automated gate
 

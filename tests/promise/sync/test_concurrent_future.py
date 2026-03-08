@@ -5,7 +5,8 @@ from typing import NoReturn
 
 import pytest
 
-from promising.promise import Promise
+import promising
+from promising import Promise
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
@@ -145,8 +146,15 @@ async def test_as_concurrent_future(
         await promise
     else:
         # In all other scenarios the promise should be done
-        assert concurrent_future.done()
-        assert concurrent_future.result() == "Hello from Promise!"
+
+        @promising.function
+        def assert_concurrent_future_done() -> None:
+            # To bypass deadlock safeguards, we need to do this in a separate
+            # thread, hence the @promising.function decorator
+            assert concurrent_future.done()
+            assert concurrent_future.result() == "Hello from Promise!"
+
+        await assert_concurrent_future_done()
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the
@@ -303,9 +311,16 @@ async def test_with_exception(
 
     else:
         # In all other scenarios the promise should be done (with exception)
-        assert concurrent_future.done()
-        with pytest.raises(ValueError, match="Test error from Promise!"):
-            concurrent_future.result()
+
+        @promising.function
+        def assert_concurrent_future_exception() -> None:
+            # To bypass deadlock safeguards, we need to do this in a separate
+            # thread, hence the @promising.function decorator
+            assert concurrent_future.done()
+            with pytest.raises(ValueError, match="Test error from Promise!"):
+                concurrent_future.result()
+
+        await assert_concurrent_future_exception()
 
     if start_soon is None:
         # `start_soon=None` means that the promise was prefilled, so the

@@ -8,7 +8,7 @@ from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import T_co
-from promising.utils import resolve_namespace
+from promising.utils import assert_no_sync_usage_deadlock, resolve_namespace
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -217,10 +217,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
         """
-        self._assert_no_sync_usage_deadlock(
+        assert_no_sync_usage_deadlock(
+            self._ctx_loop,
             "`promise.sync()` cannot be called from the "
             "event loop thread because it would deadlock. "
-            "Use `await promise` instead."
+            "Use `await promise` instead.",
         )
 
         # Schedule the task on the event loop from this (non-loop) thread,
@@ -426,11 +427,19 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
             The result value from the `asyncio.Future`.
 
         Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
             Exception: Any exception that occurred during `asyncio.Future`
                 execution.
         """
+        assert_no_sync_usage_deadlock(
+            self._asyncio_future.get_loop(),
+            "`concurrent_future.result()` cannot be called from the "
+            "event loop thread because it would deadlock. "
+            "Use `await promise` instead.",
+        )
         try:
             # Let's block until the underlying `asyncio.Future` is done (it will
             # set the result/exception on this `concurrent.futures.Future`)
@@ -469,9 +478,17 @@ class _AsyncioBackedConcurrentFuture(concurrent.futures.Future):
             completed successfully.
 
         Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
         """
+        assert_no_sync_usage_deadlock(
+            self._asyncio_future.get_loop(),
+            "`concurrent_future.exception()` cannot be called from the "
+            "event loop thread because it would deadlock. "
+            "Use `await promise` instead.",
+        )
         try:
             # Let's block until the underlying `asyncio.Future` is done
             # (it will set the result/exception on this

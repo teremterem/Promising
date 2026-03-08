@@ -20,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, resolve_namespace
+from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, resolve_namespace
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -408,11 +408,12 @@ class PromisingContext:
             SyncUsageError: If called from the event loop thread, because this
                 would cause a deadlock.
         """
-        self._assert_no_sync_usage_deadlock(
+        assert_no_sync_usage_deadlock(
+            self._ctx_loop,
             "`await_children_sync()` cannot be called from the "
             "event loop thread because it would deadlock. Use "
             "`await promise.await_children()` or "
-            "`await promising.await_children()` instead."
+            "`await promising.await_children()` instead.",
         )
         concurrent_future = concurrent.futures.Future[None]()
 
@@ -628,15 +629,6 @@ class PromisingContext:
 
     def __repr__(self) -> str:
         return self._repr_context(self.namespace)
-
-    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is self._ctx_loop:
-            raise SyncUsageError(message)
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():

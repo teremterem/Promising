@@ -221,12 +221,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             concurrent.futures.TimeoutError: If timeout expires before
                 completion.
         """
-        assert_no_sync_usage_deadlock(
-            self._ctx_loop,
-            "`promise.sync()` cannot be called from the "
-            "event loop thread because it would deadlock. "
-            "Use `await promise` instead.",
-        )
         return self.as_concurrent_future().result(timeout=timeout)
 
     def as_concurrent_future(self) -> "PromiseBackedConcurrentFuture[T_co]":
@@ -445,8 +439,8 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         """
         assert_no_sync_usage_deadlock(
             self._promise.get_loop(),
-            "`concurrent_future.result()` cannot be called from the "
-            "event loop thread because it would deadlock. "
+            "`promise.as_concurrent_future().result()` cannot be called "
+            "from the event loop thread because it would deadlock. "
             "Use `await promise` instead.",
         )
         if ensure_task_scheduled and not self.done():
@@ -498,9 +492,9 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         """
         assert_no_sync_usage_deadlock(
             self._promise.get_loop(),
-            "`concurrent_future.exception()` cannot be called from the "
-            "event loop thread because it would deadlock. "
-            "Use `await promise` instead.",
+            "`promise.as_concurrent_future().exception()` cannot be called "
+            "from the event loop thread because it would deadlock. "
+            "Use `await promise` with a try/except block instead.",
         )
         if ensure_task_scheduled and not self.done():
             self._promise._call_soon_threadsafe(self._promise._ensure_task_scheduled)

@@ -231,7 +231,8 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
     assert child_result == "child result"
 
 
-async def test_concurrent_future_result_works_with_thread_pool() -> None:
+@pytest.mark.parametrize("start_soon", [True, False])
+async def test_concurrent_future_result_works_with_thread_pool(start_soon: bool) -> None:
     """
     Calling concurrent_future.result() inside a use_thread_pool=True
     (default) function works fine because the function runs in a
@@ -244,12 +245,13 @@ async def test_concurrent_future_result_works_with_thread_pool() -> None:
 
     @promising.function
     def parent() -> str:
-        return child(start_soon=False).as_concurrent_future().result()
+        return child(start_soon=start_soon).as_concurrent_future().result()
 
     assert await parent() == "child result"
 
 
-async def test_concurrent_future_exception_works_with_thread_pool() -> None:
+@pytest.mark.parametrize("start_soon", [True, False])
+async def test_concurrent_future_exception_works_with_thread_pool(start_soon: bool) -> None:
     """
     Calling concurrent_future.exception() inside a use_thread_pool=True
     (default) function works fine because the function runs in a
@@ -264,7 +266,7 @@ async def test_concurrent_future_exception_works_with_thread_pool() -> None:
     @promising.function
     def parent() -> None:
         nonlocal child_exception
-        p = child(start_soon=False)
+        p = child(start_soon=start_soon)
         child_exception = p.as_concurrent_future().exception()
 
     await parent()

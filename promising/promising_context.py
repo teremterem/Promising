@@ -217,6 +217,8 @@ async def await_children(*, recursively: bool = False) -> None:
     Args:
         recursively: If True, wait for all descendants, not just direct
             children.
+            # TODO Why is it False by default, and not True ? Either change
+            #  or explain in the docstring.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
@@ -238,6 +240,8 @@ def await_children_sync(*, recursively: bool = False, timeout: float | None = No
     Args:
         recursively: If True, wait for all descendants, not just direct
             children.
+            # TODO Why is it False by default, and not True ? Either change
+            #  or explain in the docstring.
         timeout: Maximum time to wait in seconds.
     """
     # TODO We need unit tests that ensure this function works correctly even
@@ -374,6 +378,8 @@ class PromisingContext:
         Args:
             recursively: If True, wait for all descendants, not just direct
                 children.
+                # TODO Why is it False by default, and not True ? Either change
+                #  or explain in the docstring.
         """
         while children := self.collect_remaining_children(
             recursively=recursively,
@@ -404,6 +410,8 @@ class PromisingContext:
         Args:
             recursively: If True, wait for all descendants, not just direct
                 children.
+                # TODO Why is it False by default, and not True ? Either change
+                #  or explain in the docstring.
             timeout: Maximum time to wait in seconds.
 
         Raises:

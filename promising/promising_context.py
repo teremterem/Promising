@@ -433,6 +433,9 @@ class PromisingContext:
             try:
                 await self.await_children(recursively=recursively)
             except BaseException as exc:  # noqa: BLE001 (blind-except)
+                # This ideally should not happen (provided there are no bugs in
+                # the framework) - `await_children` gathers all exceptions from
+                # the children and suppresses them
                 concurrent_future.set_exception(exc)
             else:
                 concurrent_future.set_result(None)
@@ -441,8 +444,6 @@ class PromisingContext:
             self._ctx_loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
 
         self._call_soon_threadsafe(schedule_await_children)
-        # Should any error happen in the underlying async `await_children`,
-        # the call below will re-raise it
         concurrent_future.result(timeout=timeout)
 
     def collect_remaining_children(

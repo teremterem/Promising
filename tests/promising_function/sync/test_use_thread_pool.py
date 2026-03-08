@@ -135,6 +135,60 @@ async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool()
         await parent()
 
 
+async def test_concurrent_future_result_raises_sync_usage_error_with_no_thread_pool() -> None:
+    """
+    Calling concurrent_future.result() inside a use_thread_pool=False
+    function raises SyncUsageError because it would deadlock.
+    """
+    child_promise = None
+
+    @promising.function
+    async def child() -> str:
+        return "child result"
+
+    @promising.function(use_thread_pool=False)
+    def parent() -> str:
+        nonlocal child_promise
+        child_promise = child(start_soon=False)
+        return child_promise.as_concurrent_future().result()
+
+    with pytest.raises(SyncUsageError, match="deadlock"):
+        await parent()
+
+    assert child_promise is not None
+    assert not child_promise.done()
+
+    # Prevent the warning about the unawaited coroutine
+    await child_promise
+
+
+async def test_concurrent_future_exception_raises_sync_usage_error_with_no_thread_pool() -> None:
+    """
+    Calling concurrent_future.exception() inside a use_thread_pool=False
+    function raises SyncUsageError because it would deadlock.
+    """
+    child_promise = None
+
+    @promising.function
+    async def child() -> str:
+        return "child result"
+
+    @promising.function(use_thread_pool=False)
+    def parent() -> None:
+        nonlocal child_promise
+        child_promise = child(start_soon=False)
+        child_promise.as_concurrent_future().exception()
+
+    with pytest.raises(SyncUsageError, match="deadlock"):
+        await parent()
+
+    assert child_promise is not None
+    assert not child_promise.done()
+
+    # Prevent the warning about the unawaited coroutine
+    await child_promise
+
+
 # ── Verify that sync() works fine with use_thread_pool=True ──
 
 
@@ -175,6 +229,46 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
 
     await parent()
     assert child_result == "child result"
+
+
+async def test_concurrent_future_result_works_with_thread_pool() -> None:
+    """
+    Calling concurrent_future.result() inside a use_thread_pool=True
+    (default) function works fine because the function runs in a
+    separate thread.
+    """
+
+    @promising.function
+    async def child() -> str:
+        return "child result"
+
+    @promising.function
+    def parent() -> str:
+        return child(start_soon=False).as_concurrent_future().result()
+
+    assert await parent() == "child result"
+
+
+async def test_concurrent_future_exception_works_with_thread_pool() -> None:
+    """
+    Calling concurrent_future.exception() inside a use_thread_pool=True
+    (default) function works fine because the function runs in a
+    separate thread.
+    """
+    child_exception = None
+
+    @promising.function
+    async def child() -> str:
+        return "child result"
+
+    @promising.function
+    def parent() -> None:
+        nonlocal child_exception
+        p = child(start_soon=False)
+        child_exception = p.as_concurrent_future().exception()
+
+    await parent()
+    assert child_exception is None
 
 
 # ── use_thread_pool has no effect on async functions ──

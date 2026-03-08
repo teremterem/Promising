@@ -106,7 +106,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(method: str) -> 
         return "child result"
 
     @promising.function(use_thread_pool=False)
-    def parent():
+    def parent() -> str | None:
         nonlocal child_promise
         child_promise = child(start_soon=False)
         if method == "sync":
@@ -166,7 +166,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
         return "child result"
 
     @promising.function
-    def parent():
+    def parent() -> str | None:
         p = child(start_soon=start_soon)
         if method == "sync":
             return p.sync()

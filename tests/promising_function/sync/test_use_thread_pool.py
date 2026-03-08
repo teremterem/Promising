@@ -89,9 +89,14 @@ async def test_use_thread_pool_false_context_propagation() -> None:
 # ── SyncUsageError when calling sync() from use_thread_pool=False ──
 
 
-async def test_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
+@pytest.mark.parametrize(
+    "method",
+    ["sync", "concurrent_future_result", "concurrent_future_exception"],
+)
+async def test_sync_raises_sync_usage_error_with_no_thread_pool(method: str) -> None:
     """
-    Calling promise.sync() inside a use_thread_pool=False
+    Calling promise.sync(), concurrent_future.result(), or
+    concurrent_future.exception() inside a use_thread_pool=False
     function raises SyncUsageError because it would deadlock.
     """
     child_promise = None
@@ -101,10 +106,15 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
         return "child result"
 
     @promising.function(use_thread_pool=False)
-    def parent() -> str:
+    def parent() -> str | None:
         nonlocal child_promise
         child_promise = child(start_soon=False)
-        return child_promise.sync()
+        if method == "sync":
+            return child_promise.sync()
+        elif method == "concurrent_future_result":
+            return child_promise.as_concurrent_future().result()
+        else:
+            child_promise.as_concurrent_future().exception()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         await parent()
@@ -138,10 +148,17 @@ async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool()
 # ── Verify that sync() works fine with use_thread_pool=True ──
 
 
-async def test_sync_works_with_thread_pool() -> None:
+@pytest.mark.parametrize(
+    "method",
+    ["sync", "concurrent_future_result", "concurrent_future_exception"],
+)
+@pytest.mark.parametrize("start_soon", [True, False])
+async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> None:
     """
-    Calling promise.sync() inside a use_thread_pool=True (default)
-    function works fine because the function runs in a separate thread.
+    Calling promise.sync(), concurrent_future.result(), or
+    concurrent_future.exception() inside a use_thread_pool=True
+    (default) function works fine because the function runs in a
+    separate thread.
     """
 
     @promising.function
@@ -149,10 +166,20 @@ async def test_sync_works_with_thread_pool() -> None:
         return "child result"
 
     @promising.function
-    def parent() -> str:
-        return child(start_soon=False).sync()
+    def parent() -> str | None:
+        p = child(start_soon=start_soon)
+        if method == "sync":
+            return p.sync()
+        elif method == "concurrent_future_result":
+            return p.as_concurrent_future().result()
+        else:
+            return p.as_concurrent_future().exception()
 
-    assert await parent() == "child result"
+    result = await parent()
+    if method == "concurrent_future_exception":
+        assert result is None
+    else:
+        assert result == "child result"
 
 
 async def test_await_children_sync_works_with_thread_pool() -> None:

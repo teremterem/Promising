@@ -20,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, resolve_namespace
+from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, resolve_namespace
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -217,6 +217,8 @@ async def await_children(*, recursively: bool = False) -> None:
     Args:
         recursively: If True, wait for all descendants, not just direct
             children.
+            # TODO Why is it False by default, and not True ? Either change
+            #  or explain in the docstring.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
@@ -226,7 +228,7 @@ async def await_children(*, recursively: bool = False) -> None:
     return await get_active_context().await_children(recursively=recursively)
 
 
-def await_children_sync(*, recursively: bool = False) -> None:
+def await_children_sync(*, recursively: bool = False, timeout: float | None = None) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -238,10 +240,13 @@ def await_children_sync(*, recursively: bool = False) -> None:
     Args:
         recursively: If True, wait for all descendants, not just direct
             children.
+            # TODO Why is it False by default, and not True ? Either change
+            #  or explain in the docstring.
+        timeout: Maximum time to wait in seconds.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
-    return get_active_context().await_children_sync(recursively=recursively)
+    return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
 
 
 class PromisingContext:
@@ -373,6 +378,8 @@ class PromisingContext:
         Args:
             recursively: If True, wait for all descendants, not just direct
                 children.
+                # TODO Why is it False by default, and not True ? Either change
+                #  or explain in the docstring.
         """
         while children := self.collect_remaining_children(
             recursively=recursively,
@@ -391,7 +398,7 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = False) -> None:
+    def await_children_sync(self, *, recursively: bool = False, timeout: float | None = None) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -403,16 +410,22 @@ class PromisingContext:
         Args:
             recursively: If True, wait for all descendants, not just direct
                 children.
+                # TODO Why is it False by default, and not True ? Either change
+                #  or explain in the docstring.
+            timeout: Maximum time to wait in seconds.
 
         Raises:
             SyncUsageError: If called from the event loop thread, because this
                 would cause a deadlock.
+            TimeoutError: If timeout expires before
+                completion.
         """
-        self._assert_no_sync_usage_deadlock(
+        assert_no_sync_usage_deadlock(
+            self._ctx_loop,
             "`await_children_sync()` cannot be called from the "
             "event loop thread because it would deadlock. Use "
             "`await promise.await_children()` or "
-            "`await promising.await_children()` instead."
+            "`await promising.await_children()` instead.",
         )
         concurrent_future = concurrent.futures.Future[None]()
 
@@ -420,6 +433,9 @@ class PromisingContext:
             try:
                 await self.await_children(recursively=recursively)
             except BaseException as exc:  # noqa: BLE001 (blind-except)
+                # This ideally should not happen (provided there are no bugs in
+                # the framework) - `await_children` gathers all exceptions from
+                # the children and suppresses them
                 concurrent_future.set_exception(exc)
             else:
                 concurrent_future.set_result(None)
@@ -428,9 +444,7 @@ class PromisingContext:
             self._ctx_loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
 
         self._call_soon_threadsafe(schedule_await_children)
-        # Should any error happen in the underlying async `await_children`,
-        # the call below will re-raise it
-        concurrent_future.result()
+        concurrent_future.result(timeout=timeout)
 
     def collect_remaining_children(
         self,
@@ -628,15 +642,6 @@ class PromisingContext:
 
     def __repr__(self) -> str:
         return self._repr_context(self.namespace)
-
-    def _assert_no_sync_usage_deadlock(self, message: str) -> None:
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is self._ctx_loop:
-            raise SyncUsageError(message)
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():

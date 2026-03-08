@@ -362,12 +362,12 @@ async def test_from_concurrent_tasks(
     # `await_promise=None` in our test means that we don't want to await for
     # anything at all (no task switching)
 
-    results: list[str | asyncio.TimeoutError | None] = [None, None, None]
+    results: list[str | TimeoutError | None] = [None, None, None]
 
     async def task_function(idx: int, timeout: float) -> None:
         try:
             results[idx] = await asyncio.wait_for(asyncio.shield(promise), timeout=timeout)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             results[idx] = e
 
     tasks = [
@@ -381,9 +381,9 @@ async def test_from_concurrent_tasks(
     if start_soon is False and await_promise is not True:
         # The promise was never started (start_soon=False means it only
         # starts when directly awaited); all tasks time out
-        assert isinstance(results[0], asyncio.TimeoutError)
-        assert isinstance(results[1], asyncio.TimeoutError)
-        assert isinstance(results[2], asyncio.TimeoutError)
+        assert isinstance(results[0], TimeoutError)
+        assert isinstance(results[1], TimeoutError)
+        assert isinstance(results[2], TimeoutError)
 
         assert coro_call_count == 0
 
@@ -401,7 +401,7 @@ async def test_from_concurrent_tasks(
         # - Task 2 (0.1s timeout) times out before the promise completes
         assert results[0] == "Result from task test!"
         assert results[1] == "Result from task test!"
-        assert isinstance(results[2], asyncio.TimeoutError)
+        assert isinstance(results[2], TimeoutError)
 
     else:
         # In all other scenarios the promise was already done before the

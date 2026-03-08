@@ -1,10 +1,22 @@
+import asyncio
 import functools
 import inspect
+from asyncio import AbstractEventLoop
 from types import FunctionType, MethodType
 from typing import Any
 
-from promising.errors import DecorationError
+from promising.errors import DecorationError, SyncUsageError
 from promising.types import CallableType, DecoratableFunctionType
+
+
+def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop is loop_of_future:
+        raise SyncUsageError(message)
 
 
 def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str | None:

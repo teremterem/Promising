@@ -79,8 +79,6 @@ def function(
             so the user should make a conscious decision for each
             specific case rather than blanket-disabling thread pools
             for an entire subtree.
-            # TODO TODO TODO Raise SyncUsageError on the blocking methods of
-            #  as_concurrent_future() too
     """
     if func_or_method is None:
         # The decorator was used with arguments

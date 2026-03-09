@@ -52,10 +52,8 @@ dev = [
 ]
 examples = [
     "aiohttp",
-    "langfuse",
     "litellm",
     "pydantic",
-    "python-fasthtml",
 ]
 
 [build-system]

@@ -144,11 +144,11 @@ async def test_three_levels_unpack_once_returns_second_level() -> None:
 async def test_custom_coroutine_await_unpacks() -> None:
     """`await` unpacks through a coroutine to the final value."""
 
-    async def custom_coro(value: Any) -> Any:
-        return value
+    async def custom_coro() -> str:
+        return "custom_value"
 
     async def coro() -> Any:
-        return custom_coro("custom_value")
+        return custom_coro()
 
     promise = Promise(coro())
 
@@ -158,11 +158,11 @@ async def test_custom_coroutine_await_unpacks() -> None:
 async def test_custom_coroutine_unpack_once_stops() -> None:
     """`unpack_once()` returns the coroutine itself."""
 
-    async def custom_coro(value: Any) -> Any:
-        return value
+    async def custom_coro() -> str:
+        return "custom_value"
 
     async def coro() -> Any:
-        return custom_coro("custom_value")
+        return custom_coro()
 
     promise = Promise(coro())
 
@@ -181,11 +181,11 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
 async def test_mixed_chain_await_unpacks_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 
-    async def custom_coro(value: Any) -> Any:
-        return value
+    async def custom_coro() -> Promise[str]:
+        return Promise(prefilled_result="final")
 
     async def coro() -> Any:
-        return custom_coro(Promise(prefilled_result="final"))
+        return custom_coro()
 
     promise = Promise(coro())
 
@@ -197,15 +197,15 @@ async def test_mixed_chain_await_unpacks_all() -> None:
 async def test_mixed_chain_unpack_once() -> None:
     """`unpack_once()` on outer promise returns the coroutine."""
 
-    async def custom_coro(value: Any) -> Any:
-        return value
-
     inner = None
+
+    async def custom_coro() -> Promise[str]:
+        return inner
 
     async def coro() -> Any:
         nonlocal inner
         inner = Promise(prefilled_result="final")
-        return custom_coro(inner)
+        return custom_coro()
 
     promise = Promise(coro())
 
@@ -262,12 +262,12 @@ async def test_asyncio_future_unpack_once_stops() -> None:
 async def test_coroutine_with_sleep_await_unpacks() -> None:
     """`await` unpacks through a coroutine that yields control."""
 
-    async def sleeping_coro(value: Any) -> Any:
+    async def sleeping_coro() -> str:
         await asyncio.sleep(0.1)
-        return value
+        return "slept_value"
 
     async def coro() -> Any:
-        return sleeping_coro("slept_value")
+        return sleeping_coro()
 
     promise = Promise(coro())
 
@@ -277,12 +277,12 @@ async def test_coroutine_with_sleep_await_unpacks() -> None:
 async def test_coroutine_with_sleep_unpack_once_stops() -> None:
     """`unpack_once()` returns the coroutine."""
 
-    async def sleeping_coro(value: Any) -> Any:
+    async def sleeping_coro() -> str:
         await asyncio.sleep(0.1)
-        return value
+        return "slept_value"
 
     async def coro() -> Any:
-        return sleeping_coro("slept_value")
+        return sleeping_coro()
 
     promise = Promise(coro())
 

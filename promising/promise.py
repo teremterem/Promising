@@ -107,7 +107,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        coro: Coroutine[Any, Any, T_co] | None = None,
+        coro: Coroutine[Any, Any, Awaitable[Any] | T_co] | None = None,
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
@@ -116,7 +116,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: T_co | None | Sentinel = NOT_SET,
+        prefilled_result: Awaitable[Any] | T_co | None | Sentinel = NOT_SET,
         prefilled_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(

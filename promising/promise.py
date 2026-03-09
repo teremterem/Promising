@@ -102,7 +102,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If coro is not a coroutine when provided.
     """
 
-    # TODO TODO TODO Figure out how to support async generator interface as
+    # TODO [P1] Figure out how to support async generator interface as
     #  well (together with its "sync" counterpart)
 
     def __init__(
@@ -188,18 +188,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
-        return self.unpack_once()
+        return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
-    def unpack_once(self) -> T_co:
-        # TODO Ensure we are in the thread where the Promise's event loop is
-        #  running
-        if self.done():
-            return self.result()
-
-        self._ensure_task_scheduled()
-
-        yield from self._task
-        return (yield from super().__await__())
+    async def unpack_once(self) -> T_co:
+        """
+        # TODO [P1] Docstring
+        """
+        return await _AwaitablePromiseUnpacker(self, unpack_all=False)
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
@@ -524,3 +519,21 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         except BaseException:  # noqa: BLE001 (blind-except)
             # Suppress any raised that `promise.exception()` itself might raise
             pass
+
+
+class _AwaitablePromiseUnpacker(Generic[T_co]):
+    def __init__(self, promise: "Promise[T_co]", *, unpack_all: bool) -> None:
+        self._promise = promise
+        # TODO [P1]
+        self._unpack_all = unpack_all
+
+    def __await__(self) -> Generator[Any, None, T_co]:
+        # TODO Ensure we are in the thread where the Promise's event loop is
+        #  running
+        if self._promise.done():
+            return self._promise.result()
+
+        self._promise._ensure_task_scheduled()
+
+        yield from self._promise._task
+        return (yield from super(type(self._promise), self._promise).__await__())

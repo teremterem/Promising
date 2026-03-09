@@ -257,7 +257,7 @@ class PromisingContext:
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
+    # TODO [P1] Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,

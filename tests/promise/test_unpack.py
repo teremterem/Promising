@@ -422,9 +422,9 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
 
 
 async def test_exception_in_coroutine_at_beginning_of_chain() -> None:
-    """Exception in a leading coroutine propagates through Promise chain.
+    """Bare coroutine that raises is the first link after the root promise.
 
-    Chain: Promise → coroutine(raises) → Promise → scalar
+    Chain: Promise → coroutine(raises)
     """
 
     async def failing_coro() -> str:
@@ -440,19 +440,19 @@ async def test_exception_in_coroutine_at_beginning_of_chain() -> None:
 
 
 async def test_exception_in_coroutine_in_middle_of_chain() -> None:
-    """Exception in a middle coroutine propagates through Promise chain.
+    """Bare coroutine that raises sits between two Promise layers.
 
-    Chain: Promise → Promise → coroutine(raises) → Promise → scalar
+    Chain: Promise → Promise → coroutine(raises)
     """
 
     async def failing_coro() -> str:
         raise ValueError("coro error in middle")
 
-    async def mid_coro() -> Any:
-        return Promise(failing_coro())
+    async def inner_coro() -> Any:
+        return failing_coro()
 
     async def outer_coro() -> Any:
-        return Promise(mid_coro())
+        return Promise(inner_coro())
 
     outer = Promise(outer_coro())
 
@@ -461,7 +461,7 @@ async def test_exception_in_coroutine_in_middle_of_chain() -> None:
 
 
 async def test_exception_in_coroutine_at_end_of_chain() -> None:
-    """Exception in a trailing coroutine propagates through Promise chain.
+    """Bare coroutine that raises is the deepest link, after multiple Promises.
 
     Chain: Promise → Promise → Promise → coroutine(raises)
     """
@@ -469,8 +469,11 @@ async def test_exception_in_coroutine_at_end_of_chain() -> None:
     async def failing_coro() -> str:
         raise ValueError("coro error at end")
 
+    async def deep_coro() -> Any:
+        return failing_coro()
+
     async def mid_coro() -> Any:
-        return Promise(failing_coro())
+        return Promise(deep_coro())
 
     async def outer_coro() -> Any:
         return Promise(mid_coro())

@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+import promising
 from promising import Promise
 
 # ---------------------------------------------------------------------------
@@ -421,64 +422,33 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
         await result
 
 
-async def test_exception_in_coroutine_at_beginning_of_chain() -> None:
-    """Bare coroutine that raises is the first link after the root promise.
+async def test_coro_exception_at_depth_5_with_promising_context_and_functions() -> None:
+    """
+    Coroutine that raises in a PromisingContext is 5 levels deep in a mixed
+    chain of sync and async PromisingFunctions.
 
-    Chain: Promise → coroutine(raises)
+    Chain: PromisingFunction → coroutine → PromisingFunction[sync] →
+        → PromisingFunction → PromisingContext(coroutine[raises])
     """
 
-    async def failing_coro() -> str:
-        raise ValueError("coro error at start")
+    @promising.context
+    async def coro5_failing_in_context() -> str:
+        raise ValueError("coro error at the end")
 
-    async def outer_coro() -> Any:
-        return failing_coro()
+    @promising.function
+    async def func4() -> Any:
+        return coro5_failing_in_context()
 
-    outer = Promise(outer_coro())
+    @promising.function
+    def func3() -> Any:
+        return func4()
 
-    with pytest.raises(ValueError, match="coro error at start"):
-        await outer
+    async def coro2() -> Any:
+        return func3()
 
+    @promising.function
+    async def func1() -> Any:
+        return coro2()
 
-async def test_exception_in_coroutine_in_middle_of_chain() -> None:
-    """Bare coroutine that raises sits between two Promise layers.
-
-    Chain: Promise → Promise → coroutine(raises)
-    """
-
-    async def failing_coro() -> str:
-        raise ValueError("coro error in middle")
-
-    async def inner_coro() -> Any:
-        return failing_coro()
-
-    async def outer_coro() -> Any:
-        return Promise(inner_coro())
-
-    outer = Promise(outer_coro())
-
-    with pytest.raises(ValueError, match="coro error in middle"):
-        await outer
-
-
-async def test_exception_in_coroutine_at_end_of_chain() -> None:
-    """Bare coroutine that raises is the deepest link, after multiple Promises.
-
-    Chain: Promise → Promise → Promise → coroutine(raises)
-    """
-
-    async def failing_coro() -> str:
-        raise ValueError("coro error at end")
-
-    async def deep_coro() -> Any:
-        return failing_coro()
-
-    async def mid_coro() -> Any:
-        return Promise(deep_coro())
-
-    async def outer_coro() -> Any:
-        return Promise(mid_coro())
-
-    outer = Promise(outer_coro())
-
-    with pytest.raises(ValueError, match="coro error at end"):
-        await outer
+    with pytest.raises(ValueError, match="coro error at the end"):
+        await func1()

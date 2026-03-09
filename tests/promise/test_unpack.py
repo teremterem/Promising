@@ -82,12 +82,10 @@ async def test_two_levels_await_unpacks_all() -> None:
     async def inner_coro() -> str:
         return "deep value"
 
-    inner = Promise(inner_coro())
+    async def outer_coro() -> str:
+        return Promise(inner_coro())
 
-    async def outer_coro() -> Promise[str]:
-        return inner
-
-    outer: Promise[Promise[str]] = Promise(outer_coro())
+    outer: Promise[str] = Promise(outer_coro())
 
     result = await outer
     assert result == "deep value"
@@ -100,12 +98,14 @@ async def test_two_levels_unpack_once_stops_at_inner() -> None:
     async def inner_coro() -> str:
         return "deep value"
 
-    inner = Promise(inner_coro())
+    inner = None
 
-    async def outer_coro() -> Promise[str]:
+    async def outer_coro() -> str:
+        nonlocal inner
+        inner = Promise(inner_coro())
         return inner
 
-    outer: Promise[Promise[str]] = Promise(outer_coro())
+    outer: Promise[str] = Promise(outer_coro())
 
     result = await outer.unpack_once()
     assert isinstance(result, Promise)
@@ -122,17 +122,14 @@ async def test_two_levels_unpack_once_stops_at_inner() -> None:
 
 async def test_three_levels_await_unpacks_all() -> None:
     """`await` on a triply-nested promise returns the deepest value."""
-    p3 = Promise(prefilled_result="bottom")
 
-    async def mid_coro() -> Promise[str]:
-        return p3
+    async def mid_coro() -> str:
+        return Promise(prefilled_result="bottom")
 
-    p2: Promise[Promise[str]] = Promise(mid_coro())
+    async def top_coro() -> str:
+        return Promise(mid_coro())
 
-    async def top_coro() -> Promise[Promise[str]]:
-        return p2
-
-    p1: Promise[Promise[Promise[str]]] = Promise(top_coro())
+    p1 = Promise(top_coro())
 
     assert await p1 == "bottom"
 
@@ -140,17 +137,20 @@ async def test_three_levels_await_unpacks_all() -> None:
 async def test_three_levels_unpack_once_returns_second_level() -> None:
     """`unpack_once()` on a triply-nested promise returns the
     second-level promise."""
-    p3 = Promise(prefilled_result="bottom")
+    p2 = None
+    p3 = None
 
-    async def mid_coro() -> Promise[str]:
+    async def mid_coro() -> str:
+        nonlocal p3
+        p3 = Promise(prefilled_result="bottom")
         return p3
 
-    p2: Promise[Promise[str]] = Promise(mid_coro())
-
-    async def top_coro() -> Promise[Promise[str]]:
+    async def top_coro() -> str:
+        nonlocal p2
+        p2 = Promise(mid_coro())
         return p2
 
-    p1: Promise[Promise[Promise[str]]] = Promise(top_coro())
+    p1 = Promise(top_coro())
 
     level2 = await p1.unpack_once()
     assert isinstance(level2, Promise)

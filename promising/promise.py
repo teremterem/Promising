@@ -1,6 +1,6 @@
 import concurrent.futures
 from asyncio import AbstractEventLoop, Future, Task, coroutines
-from collections.abc import Coroutine, Generator
+from collections.abc import Awaitable, Coroutine, Generator
 from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
@@ -190,7 +190,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
-    async def unpack_once(self) -> T_co:
+    async def unpack_once(self) -> T_co | Awaitable[Any]:
         """
         # TODO [P1] Docstring
         """

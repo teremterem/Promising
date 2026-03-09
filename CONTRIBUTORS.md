@@ -59,6 +59,8 @@ This file also contains the `context` class — a context manager / decorator th
 
 Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
+**Unpacking semantics:** `await promise` fully unpacks nested awaitables — if the coroutine's result is itself awaitable, it is recursively awaited until a non-awaitable value is reached. `promise.unpack_once()` and `promise.sync()` resolve only one level, returning the raw result which may still be an awaitable. The unpacking logic lives in `_AwaitablePromiseUnpacker`, a helper class used by both `__await__` (with `unpack_all=True`) and `unpack_once` (with `unpack_all=False`).
+
 ### PromisingFunction (`promising/promising_function.py`)
 
 Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.

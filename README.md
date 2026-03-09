@@ -405,8 +405,9 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Method / Property | Description |
 |---|---|
-| `await promise` | Wait for and return the result. Can be awaited multiple times. |
-| `promise.sync(timeout=None)` | Synchronous counterpart of `await` — blocks the calling thread. Must not be called from the event loop thread. |
+| `await promise` | Wait for and return the fully unpacked result — recursively awaits nested awaitables until a non-awaitable value is reached. Can be awaited multiple times. |
+| `promise.unpack_once()` | Async — resolve the Promise but return the raw result without recursively unpacking nested awaitables (the result may itself be an awaitable). |
+| `promise.sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and returns the raw result without recursively unpacking nested awaitables. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
 | `promise.as_concurrent_future()` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |

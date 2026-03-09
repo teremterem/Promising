@@ -24,7 +24,7 @@ source = ["promising"]
 name = "promising"
 version = "0.1.0"
 description = """\
-TODO\
+TODO TODO TODO\
 """
 authors = [{name = "Oleksandr Tereshchenko", email = "toporok@gmail.com"}]
 readme = "README.md"

@@ -4,8 +4,7 @@ import asyncio
 
 import pytest
 
-from promising import Promise
-from promising.errors import SyncUsageError
+from promising import Promise, SyncUsageError
 
 
 @pytest.mark.parametrize("method", ["result", "exception"])

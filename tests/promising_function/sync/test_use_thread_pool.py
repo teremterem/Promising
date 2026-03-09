@@ -5,8 +5,7 @@ import threading
 import pytest
 
 import promising
-from promising import await_children_sync, get_active_promise
-from promising.errors import SyncUsageError
+from promising import SyncUsageError, await_children_sync, get_active_promise
 
 # ── use_thread_pool=True (default): sync function runs in a thread pool ──
 

@@ -6,8 +6,7 @@ from typing import NoReturn
 import pytest
 
 import promising
-from promising.errors import SyncUsageError
-from promising.promise import Promise
+from promising import Promise, SyncUsageError
 
 # ── Basic functionality ─────────────────────────────────────────
 

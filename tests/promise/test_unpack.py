@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from promising.promise import Promise
+from promising import Promise
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,7 +36,7 @@ class CustomAwaitableWithSleep:
         self._value = value
 
     def __await__(self):
-        yield from asyncio.sleep(0).__await__()
+        yield from asyncio.sleep(0.1).__await__()
         return self._value
 
 

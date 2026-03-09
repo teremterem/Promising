@@ -9,7 +9,7 @@ from typing import NoReturn
 
 import pytest
 
-from promising.promise import Promise
+from promising import Promise
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])

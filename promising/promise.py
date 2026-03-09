@@ -180,35 +180,51 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __await__(self) -> Generator[Any, None, T_co]:
         """
-        If the Promise hasn't started yet, start execution of the coro via
-        _fulfill() and run it to completion. If already started via
-        start_soon, wait for the existing task to complete.
+        Await the Promise, fully unpacking all nested awaitables.
+
+        If the Promise hasn't started yet, starts execution of the coro via
+        _fulfill(). If already started via start_soon, waits for the existing
+        task to complete. Once the Promise resolves, recursively awaits the
+        result as long as it is itself awaitable (has ``__await__``), returning
+        the final non-awaitable value.
 
         Returns:
-            A generator for the await protocol that eventually returns the
-            result of the Promise.
+            The fully unpacked result of the Promise (no remaining
+            awaitables).
         """
         return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
     async def unpack_once(self) -> T_co | Awaitable[Any]:
         """
-        # TODO [P1] Docstring
+        Await the Promise, resolving only one level without recursively
+        unpacking nested awaitables.
+
+        If the Promise hasn't started yet, starts execution of the coro via
+        _fulfill(). If already started via start_soon, waits for the existing
+        task to complete. Returns the raw result of the Promise's coroutine,
+        which may itself be an awaitable (e.g. another Promise).
+
+        Returns:
+            The direct result of the Promise's coroutine, potentially still
+            an awaitable.
         """
         return await _AwaitablePromiseUnpacker(self, unpack_all=False)
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread.
+        calling thread. Does not recursively unpack nested awaitables — returns
+        the raw result of the Promise's coroutine, similar to ``unpack_once``.
 
-        This is the synchronous counterpart of ``await promise`` — intended for
+        This is the synchronous counterpart of ``unpack_once`` — intended for
         use inside sync promising functions that run in a thread pool executor.
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The resolved value of the Promise.
+            The direct result of the Promise's coroutine, potentially still
+            an awaitable.
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,

@@ -393,6 +393,9 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     # We need a new coro for the new promise
     inner2 = Promise(prefilled_result="inner_val2")
 
+    # Get rid of the asyncio warning
+    await outer2
+
     async def outer_coro2() -> Promise[str]:
         return inner2
 

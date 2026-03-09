@@ -255,44 +255,6 @@ async def test_asyncio_future_unpack_once_stops() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Promise returning a coroutine object (also awaitable)
-# ---------------------------------------------------------------------------
-
-
-async def test_coroutine_object_await_unpacks() -> None:
-    """`await` should unpack a coroutine object returned as a result."""
-
-    async def inner() -> str:
-        return "from_coro"
-
-    async def outer() -> Any:
-        return inner()  # returns the coroutine object, doesn't await it
-
-    promise = Promise(outer())
-
-    assert await promise == "from_coro"
-
-
-async def test_coroutine_object_unpack_once_stops() -> None:
-    """`unpack_once()` returns the coroutine object without running it."""
-
-    async def inner() -> str:
-        return "from_coro"
-
-    async def outer() -> Any:
-        return inner()
-
-    promise = Promise(outer())
-
-    result = await promise.unpack_once()
-    # result should be the coroutine object itself
-    assert asyncio.iscoroutine(result)
-
-    # Clean up: await the coroutine so it doesn't trigger a warning
-    assert await result == "from_coro"
-
-
-# ---------------------------------------------------------------------------
 # Promise returning a coroutine that yields control
 # ---------------------------------------------------------------------------
 
@@ -326,6 +288,9 @@ async def test_coroutine_with_sleep_unpack_once_stops() -> None:
 
     result = await promise.unpack_once()
     assert asyncio.iscoroutine(result)
+
+    # Get rid of the asyncio warning
+    assert await result == "slept_value"
 
 
 # ---------------------------------------------------------------------------

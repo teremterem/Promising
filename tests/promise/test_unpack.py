@@ -18,26 +18,15 @@ from promising import Promise
 # ---------------------------------------------------------------------------
 
 
-class CustomAwaitable:
-    """A minimal custom awaitable (not a Promise) that resolves to a value."""
-
-    def __init__(self, value: Any) -> None:
-        self._value = value
-
-    def __await__(self):
-        return self._value
-        yield  # make it a generator  # noqa: RET503
+async def custom_awaitable(value: Any) -> Any:
+    """A minimal async function that resolves to a value."""
+    return value
 
 
-class CustomAwaitableWithSleep:
-    """A custom awaitable that yields control before returning."""
-
-    def __init__(self, value: Any) -> None:
-        self._value = value
-
-    def __await__(self):
-        yield from asyncio.sleep(0.1).__await__()
-        return self._value
+async def custom_awaitable_with_sleep(value: Any) -> Any:
+    """An async function that yields control before returning."""
+    await asyncio.sleep(0.1)
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -171,10 +160,10 @@ async def test_three_levels_unpack_once_returns_second_level() -> None:
 async def test_custom_awaitable_await_unpacks() -> None:
     """`await` unpacks through a custom awaitable to the final value."""
 
-    async def coro() -> CustomAwaitable:
-        return CustomAwaitable("custom_value")
+    async def coro() -> Any:
+        return custom_awaitable("custom_value")
 
-    promise: Promise[CustomAwaitable] = Promise(coro())
+    promise = Promise(coro())
 
     assert await promise == "custom_value"
 
@@ -182,13 +171,13 @@ async def test_custom_awaitable_await_unpacks() -> None:
 async def test_custom_awaitable_unpack_once_stops() -> None:
     """`unpack_once()` returns the custom awaitable itself."""
 
-    async def coro() -> CustomAwaitable:
-        return CustomAwaitable("custom_value")
+    async def coro() -> Any:
+        return custom_awaitable("custom_value")
 
-    promise: Promise[CustomAwaitable] = Promise(coro())
+    promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, CustomAwaitable)
+    assert asyncio.iscoroutine(result)
 
 
 # ---------------------------------------------------------------------------
@@ -197,31 +186,31 @@ async def test_custom_awaitable_unpack_once_stops() -> None:
 
 
 async def test_mixed_chain_await_unpacks_all() -> None:
-    """`await` unpacks through Promise → CustomAwaitable → scalar."""
+    """`await` unpacks through Promise → coroutine → scalar."""
 
-    async def coro() -> CustomAwaitable:
-        return CustomAwaitable(Promise(prefilled_result="final"))
+    async def coro() -> Any:
+        return custom_awaitable(Promise(prefilled_result="final"))
 
     promise = Promise(coro())
 
-    # CustomAwaitable wraps a Promise; `await promise` should unpack:
-    # promise → CustomAwaitable → inner Promise → "final"
+    # coroutine wraps a Promise; `await promise` should unpack:
+    # promise → coroutine → inner Promise → "final"
     assert await promise == "final"
 
 
 async def test_mixed_chain_unpack_once() -> None:
-    """`unpack_once()` on outer promise returns the CustomAwaitable."""
+    """`unpack_once()` on outer promise returns the coroutine."""
     inner = None
 
-    async def coro() -> CustomAwaitable:
+    async def coro() -> Any:
         nonlocal inner
         inner = Promise(prefilled_result="final")
-        return CustomAwaitable(inner)
+        return custom_awaitable(inner)
 
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, CustomAwaitable)
+    assert asyncio.iscoroutine(result)
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"
@@ -301,15 +290,15 @@ async def test_coroutine_object_unpack_once_stops() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Promise returning a CustomAwaitableWithSleep (yields control)
+# Promise returning a custom_awaitable_with_sleep coroutine (yields control)
 # ---------------------------------------------------------------------------
 
 
 async def test_awaitable_with_sleep_await_unpacks() -> None:
     """`await` unpacks through an awaitable that yields control."""
 
-    async def coro() -> CustomAwaitableWithSleep:
-        return CustomAwaitableWithSleep("slept_value")
+    async def coro() -> Any:
+        return custom_awaitable_with_sleep("slept_value")
 
     promise = Promise(coro())
 
@@ -317,15 +306,15 @@ async def test_awaitable_with_sleep_await_unpacks() -> None:
 
 
 async def test_awaitable_with_sleep_unpack_once_stops() -> None:
-    """`unpack_once()` returns the awaitable."""
+    """`unpack_once()` returns the coroutine."""
 
-    async def coro() -> CustomAwaitableWithSleep:
-        return CustomAwaitableWithSleep("slept_value")
+    async def coro() -> Any:
+        return custom_awaitable_with_sleep("slept_value")
 
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, CustomAwaitableWithSleep)
+    assert asyncio.iscoroutine(result)
 
 
 # ---------------------------------------------------------------------------

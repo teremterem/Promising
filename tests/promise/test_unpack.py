@@ -169,6 +169,9 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
     result = await promise.unpack_once()
     assert asyncio.iscoroutine(result)
 
+    # Get rid of the asyncio warning
+    assert await result == "custom_value"
+
 
 # ---------------------------------------------------------------------------
 # Promise → coroutine → Promise
@@ -211,6 +214,9 @@ async def test_mixed_chain_unpack_once() -> None:
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"
+
+    # Get rid of the asyncio warning
+    assert await result is inner
 
 
 # ---------------------------------------------------------------------------

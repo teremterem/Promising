@@ -524,16 +524,21 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
 class _AwaitablePromiseUnpacker(Generic[T_co]):
     def __init__(self, promise: "Promise[T_co]", *, unpack_all: bool) -> None:
         self._promise = promise
-        # TODO [P1]
         self._unpack_all = unpack_all
 
     def __await__(self) -> Generator[Any, None, T_co]:
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self._promise.done():
-            return self._promise.result()
+            result = self._promise.result()
+        else:
+            self._promise._ensure_task_scheduled()
 
-        self._promise._ensure_task_scheduled()
+            yield from self._promise._task
+            result = yield from super(type(self._promise), self._promise).__await__()
 
-        yield from self._promise._task
-        return (yield from super(type(self._promise), self._promise).__await__())
+        if self._unpack_all:
+            while hasattr(result, "__await__"):
+                result = yield from result.__await__()
+
+        return result

@@ -82,7 +82,7 @@ async def test_use_thread_pool_false_context_propagation() -> None:
         return get_active_promise(raise_if_none=False)
 
     promise = sync_func()
-    current_from_inside = await promise
+    current_from_inside = await promise.unpack_once()
     assert current_from_inside is promise
 
 

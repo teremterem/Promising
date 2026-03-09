@@ -462,17 +462,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         try:
             result = super().result(timeout=timeout)
         finally:
-            # Let's also consume the asyncio Future so it doesn't issue a
-            # warning about not having been awaited. We call .exception()
-            # rather than .result() because .exception() is safe regardless
-            # of outcome (returns None on success, the exception object on
-            # failure), whereas .result() would re-raise on failure.
-            try:
-                self._promise._call_soon_threadsafe(self._consume_exception_in_promise)
-            except BaseException:  # noqa: BLE001 (blind-except)
-                # Suppress the error if any - if there's an error, it should
-                # come from super().result(), not from here
-                pass
+            self._consume_asyncio_exception_if_any()
         # For consistency, let's return the result from this concurrent Future,
         # even though it's going to be the same as the result from the Promise
         return result
@@ -516,24 +506,29 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         try:
             exception = super().exception(timeout=timeout)
         finally:
-            # Let's also consume the asyncio Future so it doesn't issue a
-            # warning about the exception never being retrieved.
-            try:
-                self._promise._call_soon_threadsafe(self._consume_exception_in_promise)
-            except BaseException:  # noqa: BLE001 (blind-except)
-                # Suppress the error if any - if there's an error, it should
-                # come from super().exception(), not from here
-                pass
+            self._consume_asyncio_exception_if_any()
         # For consistency, let's return the exception from this
         # concurrent.futures.Future, even though it's going to be the same as
         # the exception from the Promise
         return exception
 
-    def _consume_exception_in_promise(self) -> None:
+    def _consume_asyncio_exception_if_any(self) -> None:
+        """
+        Consumes an exception from the asyncio Future (if any), so the asyncio
+        does not issue a warning about the exception never being retrieved.
+        """
+        try:
+            self._promise._call_soon_threadsafe(self._consume_asyncio_exception_inside_loop)
+        except BaseException:  # noqa: BLE001 (blind-except)
+            pass
+
+    def _consume_asyncio_exception_inside_loop(self) -> None:
         try:
             self._promise.exception()
         except BaseException:  # noqa: BLE001 (blind-except)
-            # Suppress any raised that `promise.exception()` itself might raise
+            # Suppress the error if any - if there's an error, it will either
+            # come from super().exception() or be raised from super().result()
+            # of the concurrent future
             pass
 
 

@@ -301,7 +301,7 @@ async def test_coroutine_with_sleep_unpack_once_stops() -> None:
 async def test_five_levels_await_unpacks_all() -> None:
     """`await` flattens 5 levels of promise nesting."""
 
-    async def make_chain(depth: int) -> str:
+    async def make_chain(depth: int) -> Any:
         if depth == 0:
             return "5 deep"
         return Promise(make_chain(depth - 1))
@@ -419,3 +419,63 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
     # The exception surfaces when we await the inner promise
     with pytest.raises(ValueError, match="inner error"):
         await result
+
+
+async def test_exception_in_coroutine_at_beginning_of_chain() -> None:
+    """Exception in a leading coroutine propagates through Promise chain.
+
+    Chain: Promise → coroutine(raises) → Promise → scalar
+    """
+
+    async def failing_coro() -> str:
+        raise ValueError("coro error at start")
+
+    async def outer_coro() -> Any:
+        return failing_coro()
+
+    outer = Promise(outer_coro())
+
+    with pytest.raises(ValueError, match="coro error at start"):
+        await outer
+
+
+async def test_exception_in_coroutine_in_middle_of_chain() -> None:
+    """Exception in a middle coroutine propagates through Promise chain.
+
+    Chain: Promise → Promise → coroutine(raises) → Promise → scalar
+    """
+
+    async def failing_coro() -> str:
+        raise ValueError("coro error in middle")
+
+    async def mid_coro() -> Any:
+        return Promise(failing_coro())
+
+    async def outer_coro() -> Any:
+        return Promise(mid_coro())
+
+    outer = Promise(outer_coro())
+
+    with pytest.raises(ValueError, match="coro error in middle"):
+        await outer
+
+
+async def test_exception_in_coroutine_at_end_of_chain() -> None:
+    """Exception in a trailing coroutine propagates through Promise chain.
+
+    Chain: Promise → Promise → Promise → coroutine(raises)
+    """
+
+    async def failing_coro() -> str:
+        raise ValueError("coro error at end")
+
+    async def mid_coro() -> Any:
+        return Promise(failing_coro())
+
+    async def outer_coro() -> Any:
+        return Promise(mid_coro())
+
+    outer = Promise(outer_coro())
+
+    with pytest.raises(ValueError, match="coro error at end"):
+        await outer

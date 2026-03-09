@@ -198,10 +198,9 @@ async def test_custom_awaitable_unpack_once_stops() -> None:
 
 async def test_mixed_chain_await_unpacks_all() -> None:
     """`await` unpacks through Promise → CustomAwaitable → scalar."""
-    inner = Promise(prefilled_result="final")
 
     async def coro() -> CustomAwaitable:
-        return CustomAwaitable(inner)
+        return CustomAwaitable(Promise(prefilled_result="final"))
 
     promise = Promise(coro())
 
@@ -212,9 +211,11 @@ async def test_mixed_chain_await_unpacks_all() -> None:
 
 async def test_mixed_chain_unpack_once() -> None:
     """`unpack_once()` on outer promise returns the CustomAwaitable."""
-    inner = Promise(prefilled_result="final")
+    inner = None
 
     async def coro() -> CustomAwaitable:
+        nonlocal inner
+        inner = Promise(prefilled_result="final")
         return CustomAwaitable(inner)
 
     promise = Promise(coro())
@@ -334,14 +335,13 @@ async def test_awaitable_with_sleep_unpack_once_stops() -> None:
 
 async def test_five_levels_await_unpacks_all() -> None:
     """`await` flattens 5 levels of promise nesting."""
-    p = Promise(prefilled_result="5 deep")
-    for _ in range(4):
-        inner = p
 
-        async def wrap(inner_ref=inner):
-            return inner_ref
+    async def make_chain(depth: int) -> str:
+        if depth == 0:
+            return "5 deep"
+        return Promise(make_chain(depth - 1))
 
-        p = Promise(wrap())
+    p = Promise(make_chain(4))
 
     assert await p == "5 deep"
 
@@ -379,24 +379,20 @@ async def test_five_levels_sequential_unpack_once() -> None:
 @pytest.mark.parametrize("start_soon", [True, False])
 async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     """Unpacking works regardless of start_soon setting."""
-    inner = Promise(prefilled_result="inner_val")
 
-    async def outer_coro() -> Promise[str]:
-        return inner
+    async def outer_coro() -> str:
+        return Promise(prefilled_result="inner_val")
 
     outer = Promise(outer_coro(), start_soon=start_soon)
 
     assert await outer == "inner_val"
 
     # Also verify unpack_once on a fresh promise
-    outer2 = Promise(outer_coro(), start_soon=start_soon)
-    # We need a new coro for the new promise
-    inner2 = Promise(prefilled_result="inner_val2")
+    inner2 = None
 
-    # Get rid of the asyncio warning
-    await outer2
-
-    async def outer_coro2() -> Promise[str]:
+    async def outer_coro2() -> str:
+        nonlocal inner2
+        inner2 = Promise(prefilled_result="inner_val2")
         return inner2
 
     outer2 = Promise(outer_coro2(), start_soon=start_soon)
@@ -430,10 +426,9 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
 
 async def test_exception_in_inner_promise_await() -> None:
     """`await` on outer propagates exception from inner promise."""
-    inner = Promise(prefilled_exception=ValueError("inner error"))
 
-    async def outer_coro() -> Promise:
-        return inner
+    async def outer_coro() -> str:
+        return Promise(prefilled_exception=ValueError("inner error"))
 
     outer = Promise(outer_coro())
 
@@ -443,9 +438,11 @@ async def test_exception_in_inner_promise_await() -> None:
 
 async def test_exception_in_inner_promise_unpack_once() -> None:
     """`unpack_once()` on outer returns the inner promise (doesn't raise)."""
-    inner = Promise(prefilled_exception=ValueError("inner error"))
+    inner = None
 
-    async def outer_coro() -> Promise:
+    async def outer_coro() -> str:
+        nonlocal inner
+        inner = Promise(prefilled_exception=ValueError("inner error"))
         return inner
 
     outer = Promise(outer_coro())

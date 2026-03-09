@@ -16,7 +16,7 @@ async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_res
     Calling concurrent_future.result() or .exception() from the event loop
     thread raises SyncUsageError because it would deadlock.
     """
-    promise = Promise(prefill_result="hello")
+    promise = Promise(prefilled_result="hello")
     concurrent_future = promise.as_concurrent_future()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
@@ -57,7 +57,7 @@ async def test_raises_sync_usage_error_with_prefilled_exception(
     Calling concurrent_future.result() or .exception() from the event loop
     thread raises SyncUsageError, not the prefilled exception.
     """
-    promise = Promise(prefill_exception=ValueError("test error"))
+    promise = Promise(prefilled_exception=ValueError("test error"))
     concurrent_future = promise.as_concurrent_future()
 
     with pytest.raises(SyncUsageError, match="deadlock"):

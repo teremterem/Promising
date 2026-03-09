@@ -92,10 +92,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
             the current global setting without inheriting.
-        prefill_result: Pre-set result value. Cannot be combined with coro
-            or prefill_exception.
-        prefill_exception: Pre-set exception. Cannot be combined with coro
-            or prefill_result.
+        prefilled_result: Pre-set result value. Cannot be combined with coro
+            or prefilled_exception.
+        prefilled_exception: Pre-set exception. Cannot be combined with coro
+            or prefilled_result.
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
@@ -116,8 +116,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefill_result: T_co | None | Sentinel = NOT_SET,
-        prefill_exception: BaseException | None = None,
+        prefilled_result: T_co | None | Sentinel = NOT_SET,
+        prefilled_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(
             self,
@@ -143,8 +143,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         self._coro = coro
         self._finish_initialization(
-            prefill_result=prefill_result,
-            prefill_exception=prefill_exception,
+            prefilled_result=prefilled_result,
+            prefilled_exception=prefilled_exception,
         )
 
     @classmethod
@@ -188,9 +188,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             A generator for the await protocol that eventually returns the
             result of the Promise.
         """
-        # TODO TODO TODO If the underlying coroutine upon awaiting also returns
-        #  a Promise, we need to seamlessly await it as well !!! (Should also
-        #  work with another Promise as a prefilled result)
+        return self.unpack_once()
+
+    def unpack_once(self) -> T_co:
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self.done():
@@ -319,25 +319,27 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def _finish_initialization(
         self,
         *,
-        prefill_result: T_co | None | Sentinel,
-        prefill_exception: BaseException | None,
+        prefilled_result: T_co | None | Sentinel,
+        prefilled_exception: BaseException | None,
     ) -> None:
         if self._coro is None:
-            if prefill_result is not NOT_SET and prefill_exception is not None:
-                raise ValueError("Cannot provide both 'prefill_result' and 'prefill_exception' parameters")
+            if prefilled_result is not NOT_SET and prefilled_exception is not None:
+                raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
-            if prefill_result is not NOT_SET:
-                self.set_result(prefill_result)
-            elif prefill_exception is not None:
-                self.set_exception(prefill_exception)
+            if prefilled_result is not NOT_SET:
+                self.set_result(prefilled_result)
+            elif prefilled_exception is not None:
+                self.set_exception(prefilled_exception)
 
             else:
                 raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
         else:
             if not coroutines.iscoroutine(self._coro):
                 raise TypeError(f"Promise must be created with a coroutine. Got {type(self._coro)}.")
-            if prefill_result is not NOT_SET or prefill_exception is not None:
-                raise ValueError("Cannot provide both 'coro' and 'prefill_result' or 'prefill_exception' parameters")
+            if prefilled_result is not NOT_SET or prefilled_exception is not None:
+                raise ValueError(
+                    "Cannot provide both 'coro' and 'prefilled_result' or 'prefilled_exception' parameters"
+                )
 
             if self._start_soon:
                 # We don't know which thread the Promise is created in, so we

@@ -48,7 +48,7 @@ async def test_sync_with_prefilled_promise() -> None:
     """
     sync() works with a prefilled Promise (immediate result).
     """
-    promise = Promise(prefill_result=42)
+    promise = Promise(prefilled_result=42)
 
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, promise.sync)
@@ -75,7 +75,7 @@ async def test_sync_propagates_prefilled_exception() -> None:
     """
     sync() propagates a prefilled exception.
     """
-    promise = Promise(prefill_exception=ValueError("prefilled"))
+    promise = Promise(prefilled_exception=ValueError("prefilled"))
 
     loop = asyncio.get_running_loop()
     with pytest.raises(ValueError, match="prefilled"):
@@ -108,7 +108,7 @@ async def test_sync_raises_on_event_loop_thread_prefilled() -> None:
     sync() raises even for a prefilled Promise when called
     from the event loop thread — the guard is unconditional.
     """
-    promise = Promise(prefill_result="already done")
+    promise = Promise(prefilled_result="already done")
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         promise.sync()

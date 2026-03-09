@@ -357,15 +357,15 @@ promise = Promise(my_coro(), start_soon=True)
 result = await promise
 
 # Prefilled with a result (immediately resolved)
-promise = Promise(prefill_result=42)
+promise = Promise(prefilled_result=42)
 assert promise.done()
 assert promise.result() == 42
 
 # Prefilled with an exception
-promise = Promise(prefill_exception=ValueError("oops"))
+promise = Promise(prefilled_exception=ValueError("oops"))
 
 # Explicit parent (overrides automatic context-based detection)
-parent = Promise(prefill_result="parent")
+parent = Promise(prefilled_result="parent")
 child = Promise(my_coro(), parent=parent)
 
 # No parent (opt out of automatic parent detection)

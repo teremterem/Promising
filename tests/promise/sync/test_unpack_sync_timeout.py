@@ -267,3 +267,116 @@ async def test_unpack_once_sync_no_timeout_waits_indefinitely() -> None:
 
     result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert result == "waited"
+
+
+# ---------------------------------------------------------------------------
+# Zero timeout
+# ---------------------------------------------------------------------------
+
+
+async def test_sync_zero_timeout_on_prefilled_promise() -> None:
+    """sync() with timeout=0 returns immediately for a
+    prefilled promise."""
+    promise = Promise(prefilled_result="instant")
+    loop = asyncio.get_running_loop()
+
+    result = await loop.run_in_executor(
+        None,
+        functools.partial(promise.sync, timeout=0),
+    )
+    assert result == "instant"
+
+
+async def test_unpack_once_sync_zero_timeout_on_prefilled_promise() -> None:
+    """unpack_once_sync() with timeout=0 returns immediately
+    for a prefilled promise."""
+    promise = Promise(prefilled_result="instant")
+    loop = asyncio.get_running_loop()
+
+    result = await loop.run_in_executor(
+        None,
+        functools.partial(promise.unpack_once_sync, timeout=0),
+    )
+    assert result == "instant"
+
+
+async def test_sync_zero_timeout_on_slow_promise() -> None:
+    """sync() with timeout=0 raises TimeoutError for an
+    unresolved promise."""
+
+    async def slow_coro() -> str:
+        await asyncio.sleep(1)
+        return "too late"
+
+    promise = Promise(slow_coro())
+    loop = asyncio.get_running_loop()
+
+    with pytest.raises(TimeoutError):
+        await loop.run_in_executor(
+            None,
+            functools.partial(promise.sync, timeout=0),
+        )
+
+
+async def test_unpack_once_sync_zero_timeout_on_slow_promise() -> None:
+    """unpack_once_sync() with timeout=0 raises TimeoutError
+    for an unresolved promise."""
+
+    async def slow_coro() -> str:
+        await asyncio.sleep(1)
+        return "too late"
+
+    promise = Promise(slow_coro())
+    loop = asyncio.get_running_loop()
+
+    with pytest.raises(TimeoutError):
+        await loop.run_in_executor(
+            None,
+            functools.partial(promise.unpack_once_sync, timeout=0),
+        )
+
+
+async def test_sync_zero_timeout_nested_prefilled() -> None:
+    """sync() with timeout=0 fully unpacks nested prefilled
+    promises (no waiting needed)."""
+
+    async def outer_coro() -> Promise[str]:
+        return Promise(prefilled_result="deep instant")
+
+    promise = Promise(outer_coro())
+    loop = asyncio.get_running_loop()
+
+    # Give the outer coroutine a moment to resolve so both
+    # levels are ready before we call sync(timeout=0)
+    await asyncio.sleep(0.1)
+
+    result = await loop.run_in_executor(
+        None,
+        functools.partial(promise.sync, timeout=0),
+    )
+    assert result == "deep instant"
+
+
+async def test_sync_zero_timeout_nested_slow_inner() -> None:
+    """sync() with timeout=0 raises TimeoutError when the
+    outer promise resolves but the inner is slow."""
+
+    async def slow_inner() -> str:
+        await asyncio.sleep(1)
+        return "too late"
+
+    async def outer_coro() -> Promise[str]:
+        return Promise(slow_inner())
+
+    promise = Promise(outer_coro())
+    loop = asyncio.get_running_loop()
+
+    # Let the outer promise resolve so we enter the unpacking
+    # loop, but the inner promise is still pending.
+    await asyncio.sleep(0.1)
+
+    with pytest.raises(TimeoutError):
+        await loop.run_in_executor(
+            None,
+            functools.partial(promise.sync, timeout=0),
+        )

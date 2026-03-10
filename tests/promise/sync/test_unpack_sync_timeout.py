@@ -33,9 +33,6 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
             functools.partial(promise.unpack_once_sync, timeout=0.1),
         )
 
-    # # Get rid of the asyncio warning
-    # assert await promise == "too late"
-
 
 async def test_unpack_once_sync_succeeds_within_timeout() -> None:
     """unpack_once_sync() returns the result when the promise
@@ -165,9 +162,6 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
             None,
             functools.partial(promise.sync, timeout=0.3),
         )
-
-    # # Get rid of the asyncio warning
-    # assert await promise == "done"
 
 
 async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:

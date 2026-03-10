@@ -239,11 +239,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         while hasattr(result, "__await__"):
             remaining = None if deadline is None else deadline - time.monotonic()
+            # TODO Add a test to ensure that unpacking of a chain of awaitables
+            #  goes on [roughly] for the duration of the timeout
             if remaining is not None:
-                # Make sure it doesn't go negative
+                # Make sure it does not go below zero
                 remaining = max(remaining, 0)
-                # TODO [P1] We need a unit test the case when timeout is
-                #  exactly 0
 
             if isinstance(result, Promise):
                 promise = result

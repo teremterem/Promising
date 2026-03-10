@@ -77,6 +77,9 @@ async def test_sync_times_out_on_slow_promise() -> None:
             functools.partial(promise.sync, timeout=0.1),
         )
 
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
+
 
 async def test_sync_succeeds_within_timeout() -> None:
     """sync() returns the result when the promise resolves
@@ -121,6 +124,9 @@ async def test_sync_times_out_on_slow_inner_promise() -> None:
             None,
             functools.partial(promise.sync, timeout=0.1),
         )
+
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
 
 
 async def test_sync_nested_succeeds_within_timeout() -> None:
@@ -196,14 +202,13 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("outer_sleep", [False, True])
-async def test_sync_times_out_on_slow_coroutine_result(
-    outer_sleep: bool,
-) -> None:
-    """sync() raises TimeoutError when the promise returns
-    a coroutine (not a Promise) that takes too long.
+@pytest.mark.parametrize("longer_timeout", [False, True])
+async def test_sync_times_out_on_slow_coroutine_result(longer_timeout: bool) -> None:
+    """
+    sync() raises TimeoutError when the promise returns a coroutine
+    (not a Promise) that takes too long.
 
-    When outer itself is slow enough to exhaust the timeout,
+    When the timeout is shorter than the outer coroutine's sleep time,
     slow_coro is never called.
     """
 
@@ -216,8 +221,7 @@ async def test_sync_times_out_on_slow_coroutine_result(
         return "too late"
 
     async def outer() -> Any:
-        if outer_sleep:
-            await asyncio.sleep(0.2)
+        await asyncio.sleep(0.2)
         return slow_coro()
 
     promise = Promise(outer())
@@ -226,13 +230,16 @@ async def test_sync_times_out_on_slow_coroutine_result(
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(promise.sync, timeout=0.1),
+            functools.partial(promise.sync, timeout=0.3 if longer_timeout else 0.1),
         )
 
-    if outer_sleep:
-        assert call_count == 0
-    else:
+    if longer_timeout:
         assert call_count == 1
+    else:
+        assert call_count == 0
+
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
 
 
 async def test_sync_coroutine_result_succeeds_within_timeout() -> None:

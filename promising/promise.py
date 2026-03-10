@@ -249,7 +249,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         return result
 
-    async def unpack_once(self) -> "T_co | Awaitable[Any]":
+    async def unpack_once(self) -> T_co | Awaitable[Any]:
         """
         Await the Promise, resolving only one level without recursively
         unpacking nested awaitables.
@@ -265,7 +265,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
 
-    def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Awaitable[Any]":
+    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | Awaitable[Any]:
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables — returns

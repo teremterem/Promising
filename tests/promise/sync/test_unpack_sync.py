@@ -18,22 +18,6 @@ import promising
 from promising import Promise
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _sync(promise: Promise, /) -> Any:
-    """Call promise.sync() — must be run in a worker thread."""
-    return promise.sync()
-
-
-def _unpack_once_sync(promise: Promise, /) -> Any:
-    """Call promise.unpack_once_sync() — must be run in a worker
-    thread."""
-    return promise.unpack_once_sync()
-
-
-# ---------------------------------------------------------------------------
 # 1 level – no nesting (baseline)
 # ---------------------------------------------------------------------------
 
@@ -50,9 +34,9 @@ async def test_single_promise_no_nesting(*, use_unpack_once_sync: bool) -> None:
     loop = asyncio.get_running_loop()
 
     if use_unpack_once_sync:
-        result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+        result = await loop.run_in_executor(None, promise.unpack_once_sync)
     else:
-        result = await loop.run_in_executor(None, _sync, promise)
+        result = await loop.run_in_executor(None, promise.sync)
 
     assert result == "hello"
 
@@ -62,8 +46,8 @@ async def test_prefilled_promise_no_nesting() -> None:
     promise = Promise(prefilled_result=42)
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, promise) == 42
-    assert await loop.run_in_executor(None, _unpack_once_sync, promise) == 42
+    assert await loop.run_in_executor(None, promise.sync) == 42
+    assert await loop.run_in_executor(None, promise.unpack_once_sync) == 42
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +68,7 @@ async def test_two_levels_sync_unpacks_all() -> None:
     outer: Promise[str] = Promise(outer_coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _sync, outer)
+    result = await loop.run_in_executor(None, outer.sync)
     assert result == "deep value"
 
 
@@ -105,7 +89,7 @@ async def test_two_levels_unpack_once_sync_stops_at_inner() -> None:
     outer: Promise[str] = Promise(outer_coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, outer)
+    result = await loop.run_in_executor(None, outer.unpack_once_sync)
     assert isinstance(result, Promise)
     assert result is inner
 
@@ -131,7 +115,7 @@ async def test_three_levels_sync_unpacks_all() -> None:
     p1 = Promise(top_coro())
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, p1) == "bottom"
+    assert await loop.run_in_executor(None, p1.sync) == "bottom"
 
 
 async def test_three_levels_unpack_once_sync_returns_second_level() -> None:
@@ -153,15 +137,15 @@ async def test_three_levels_unpack_once_sync_returns_second_level() -> None:
     p1 = Promise(top_coro())
     loop = asyncio.get_running_loop()
 
-    level2 = await loop.run_in_executor(None, _unpack_once_sync, p1)
+    level2 = await loop.run_in_executor(None, p1.unpack_once_sync)
     assert isinstance(level2, Promise)
     assert level2 is p2
 
-    level3 = await loop.run_in_executor(None, _unpack_once_sync, level2)
+    level3 = await loop.run_in_executor(None, level2.unpack_once_sync)
     assert isinstance(level3, Promise)
     assert level3 is p3
 
-    assert await loop.run_in_executor(None, _unpack_once_sync, level3) == "bottom"
+    assert await loop.run_in_executor(None, level3.unpack_once_sync) == "bottom"
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +166,7 @@ async def test_custom_coroutine_sync_unpacks() -> None:
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, promise) == "custom_value"
+    assert await loop.run_in_executor(None, promise.sync) == "custom_value"
 
 
 async def test_custom_coroutine_unpack_once_sync_stops() -> None:
@@ -197,7 +181,7 @@ async def test_custom_coroutine_unpack_once_sync_stops() -> None:
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+    result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert asyncio.iscoroutine(result)
 
     # Get rid of the asyncio warning
@@ -224,7 +208,7 @@ async def test_mixed_chain_sync_unpacks_all() -> None:
 
     # coroutine wraps a Promise; `sync()` should unpack:
     # promise → coroutine → inner Promise → "final"
-    assert await loop.run_in_executor(None, _sync, promise) == "final"
+    assert await loop.run_in_executor(None, promise.sync) == "final"
 
 
 async def test_mixed_chain_unpack_once_sync() -> None:
@@ -244,7 +228,7 @@ async def test_mixed_chain_unpack_once_sync() -> None:
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+    result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert asyncio.iscoroutine(result)
 
     # Awaiting the inner promise separately should work
@@ -271,7 +255,7 @@ async def test_asyncio_future_sync_unpacks() -> None:
 
     promise = Promise(coro())
 
-    assert await loop.run_in_executor(None, _sync, promise) == "from_future"
+    assert await loop.run_in_executor(None, promise.sync) == "from_future"
 
 
 async def test_asyncio_future_unpack_once_sync_stops() -> None:
@@ -285,7 +269,7 @@ async def test_asyncio_future_unpack_once_sync_stops() -> None:
 
     promise = Promise(coro())
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+    result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert isinstance(result, asyncio.Future)
     assert result is fut
 
@@ -309,7 +293,7 @@ async def test_coroutine_with_sleep_sync_unpacks() -> None:
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, promise) == "slept_value"
+    assert await loop.run_in_executor(None, promise.sync) == "slept_value"
 
 
 async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
@@ -325,7 +309,7 @@ async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+    result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert asyncio.iscoroutine(result)
 
     # Get rid of the asyncio warning
@@ -348,7 +332,7 @@ async def test_five_levels_sync_unpacks_all() -> None:
     p = Promise(make_chain(4))
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, p) == "5 deep"
+    assert await loop.run_in_executor(None, p.sync) == "5 deep"
 
 
 async def test_five_levels_sequential_unpack_once_sync() -> None:
@@ -370,13 +354,13 @@ async def test_five_levels_sequential_unpack_once_sync() -> None:
     loop = asyncio.get_running_loop()
     current = promises[-1]
     for i in range(4, 0, -1):
-        result = await loop.run_in_executor(None, _unpack_once_sync, current)
+        result = await loop.run_in_executor(None, current.unpack_once_sync)
         assert isinstance(result, Promise)
         assert result is promises[i - 1]
         current = result
 
     # Final unpack gives the scalar
-    assert await loop.run_in_executor(None, _unpack_once_sync, current) == "5 deep"
+    assert await loop.run_in_executor(None, current.unpack_once_sync) == "5 deep"
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +378,7 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     outer = Promise(outer_coro(), start_soon=start_soon)
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, outer) == "inner_val"
+    assert await loop.run_in_executor(None, outer.sync) == "inner_val"
 
     # Also verify unpack_once_sync on a fresh promise
     inner2 = None
@@ -405,7 +389,7 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
         return inner2
 
     outer2 = Promise(outer_coro2(), start_soon=start_soon)
-    result = await loop.run_in_executor(None, _unpack_once_sync, outer2)
+    result = await loop.run_in_executor(None, outer2.unpack_once_sync)
     assert isinstance(result, Promise)
     assert result is inner2
 
@@ -442,8 +426,8 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     promise = Promise(prefilled_result=value)
     loop = asyncio.get_running_loop()
 
-    assert await loop.run_in_executor(None, _sync, promise) == value
-    assert await loop.run_in_executor(None, _unpack_once_sync, promise) == value
+    assert await loop.run_in_executor(None, promise.sync) == value
+    assert await loop.run_in_executor(None, promise.unpack_once_sync) == value
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +446,7 @@ async def test_exception_in_inner_promise_sync() -> None:
     loop = asyncio.get_running_loop()
 
     with pytest.raises(ValueError, match="inner error"):
-        await loop.run_in_executor(None, _sync, outer)
+        await loop.run_in_executor(None, outer.sync)
 
 
 async def test_exception_in_inner_promise_unpack_once_sync() -> None:
@@ -478,7 +462,7 @@ async def test_exception_in_inner_promise_unpack_once_sync() -> None:
     outer = Promise(outer_coro())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, outer)
+    result = await loop.run_in_executor(None, outer.unpack_once_sync)
     assert isinstance(result, Promise)
     assert result is inner
 
@@ -521,4 +505,4 @@ async def test_coro_exception_at_depth_5_with_promising_context_and_functions() 
     loop = asyncio.get_running_loop()
 
     with pytest.raises(ValueError, match="coro error at the end"):
-        await loop.run_in_executor(None, _sync, promise)
+        await loop.run_in_executor(None, promise.sync)

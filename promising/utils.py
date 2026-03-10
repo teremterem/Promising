@@ -9,6 +9,12 @@ from promising.errors import DecorationError, SyncUsageError
 from promising.types import CallableType, DecoratableFunctionType
 
 
+def if_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
+    if isinstance(func_or_method, (classmethod, staticmethod)):
+        return inspect.iscoroutinefunction(func_or_method.__func__)
+    return inspect.iscoroutinefunction(func_or_method)
+
+
 def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
     try:
         running_loop = asyncio.get_running_loop()
@@ -94,13 +100,3 @@ class DecoratorSupport:
         if isinstance(self.__wrapped__, classmethod):
             return self.__wrapped__.__func__
         return self.__wrapped__
-
-    @property
-    def _is_wrapped_async(self) -> bool:
-        """
-        Check if the wrapped function or method is a coroutine function or
-        method.
-        """
-        if isinstance(self.__wrapped__, (classmethod, staticmethod)):
-            return inspect.iscoroutinefunction(self.__wrapped__.__func__)
-        return inspect.iscoroutinefunction(self.__wrapped__)

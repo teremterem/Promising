@@ -196,22 +196,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
-    async def unpack_once(self) -> T_co | Awaitable[Any]:
-        """
-        Await the Promise, resolving only one level without recursively
-        unpacking nested awaitables.
-
-        If the Promise hasn't started yet, starts execution of the coro via
-        _fulfill(). If already started via start_soon, waits for the existing
-        task to complete. Returns the raw result of the Promise's coroutine,
-        which may itself be an awaitable (e.g. another Promise).
-
-        Returns:
-            The direct result of the Promise's coroutine, potentially still
-            an awaitable.
-        """
-        return await _AwaitablePromiseUnpacker(self, unpack_all=False)
-
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
@@ -265,7 +249,23 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         return result
 
-    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co:
+    async def unpack_once(self) -> T_co | Awaitable[Any]:
+        """
+        Await the Promise, resolving only one level without recursively
+        unpacking nested awaitables.
+
+        If the Promise hasn't started yet, starts execution of the coro via
+        _fulfill(). If already started via start_soon, waits for the existing
+        task to complete. Returns the raw result of the Promise's coroutine,
+        which may itself be an awaitable (e.g. another Promise).
+
+        Returns:
+            The direct result of the Promise's coroutine, potentially still
+            an awaitable.
+        """
+        return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
+
+    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | Awaitable[Any]:
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables — returns

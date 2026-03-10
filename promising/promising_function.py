@@ -7,7 +7,7 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport, resolve_namespace
+from promising.utils import DecoratorSupport, if_func_or_method_async, resolve_namespace
 
 
 def function(
@@ -214,7 +214,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
 
-        if self._is_wrapped_async:
+        if if_func_or_method_async(self.__wrapped__):
             # The wrapped function is already async, so we can just call it
             # directly
             coro = self._wrapped_as_callable(*args, **kwargs)

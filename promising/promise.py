@@ -1,4 +1,5 @@
 import concurrent.futures
+import functools
 import time
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Awaitable, Coroutine, Generator
@@ -241,6 +242,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             if remaining is not None:
                 # Make sure it doesn't go negative
                 remaining = max(remaining, 0)
+                # TODO [P1] We need a unit test the case when timeout is
+                #  exactly 0
 
             if isinstance(result, Promise):
                 promise = result
@@ -250,7 +253,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                     return await awaitable
 
                 promise = Promise(
-                    _wrap_awaitable(result),
+                    # If `result` is not a real function,
+                    # `functools.update_wrapper` will simply do nothing
+                    # (it will not fail)
+                    functools.update_wrapper(wrapper=_wrap_awaitable, wrapped=result)(result),
                     loop=self._ctx_loop,
                     start_soon=True,
                 )

@@ -124,7 +124,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         use_thread_pool: bool = True,
     ) -> None:
         super().__init__(func_or_method)
-        self.namespace = namespace
+        self.namespace = resolve_namespace(
+            provided_explicitly=namespace,
+            named_object_fallback=self.__wrapped__,
+        )
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
@@ -189,6 +192,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
+        namespace = kwargs.pop(
+            "namespace",
+            self.namespace,
+        )
         start_soon = kwargs.pop(
             "start_soon",
             self.start_soon,
@@ -247,10 +254,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             coro = _sync_inline()
 
         return Promise[T_co](
-            namespace=resolve_namespace(
-                provided_explicitly=self.namespace,
-                named_object_fallback=self.__wrapped__,
-            ),
+            namespace=namespace,
             coro=coro,
             start_soon=start_soon,
             children_start_soon=children_start_soon,

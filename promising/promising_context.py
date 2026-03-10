@@ -101,7 +101,15 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method)
-        self._namespace = namespace
+
+        if self.__wrapped__ is None:
+            self._namespace = namespace
+        else:
+            self._namespace = resolve_namespace(
+                provided_explicitly=namespace,
+                named_object_fallback=self.__wrapped__,
+            )
+
         self._ctx_loop = loop
         self._parent = parent
         self._thread_pool = thread_pool
@@ -165,10 +173,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
-            namespace=resolve_namespace(
-                provided_explicitly=self._namespace,
-                named_object_fallback=self.__wrapped__,
-            ),
+            namespace=self._namespace,
             loop=self._ctx_loop,
             parent=self._parent,
             thread_pool=self._thread_pool,

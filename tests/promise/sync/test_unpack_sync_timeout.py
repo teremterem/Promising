@@ -348,6 +348,9 @@ async def test_sync_zero_timeout_on_slow_promise() -> None:
             functools.partial(promise.sync, timeout=0),
         )
 
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
+
 
 async def test_unpack_once_sync_zero_timeout_on_slow_promise() -> None:
     """unpack_once_sync() with timeout=0 raises TimeoutError
@@ -365,6 +368,9 @@ async def test_unpack_once_sync_zero_timeout_on_slow_promise() -> None:
             None,
             functools.partial(promise.unpack_once_sync, timeout=0),
         )
+
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
 
 
 async def test_sync_zero_timeout_nested_prefilled() -> None:

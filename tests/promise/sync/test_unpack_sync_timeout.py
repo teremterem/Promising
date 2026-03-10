@@ -21,7 +21,7 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
     promise doesn't resolve in time."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
         return "too late"
 
     promise = Promise(slow_coro())
@@ -65,7 +65,7 @@ async def test_sync_times_out_on_slow_promise() -> None:
     resolve in time."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
         return "too late"
 
     promise = Promise(slow_coro())
@@ -107,7 +107,7 @@ async def test_sync_times_out_on_slow_inner_promise() -> None:
     the entire unpacking chain."""
 
     async def slow_inner() -> str:
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
         return "too late"
 
     async def outer_coro() -> Promise[str]:
@@ -329,7 +329,7 @@ async def test_sync_zero_timeout_on_slow_promise() -> None:
     unresolved promise."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         return "too late"
 
     promise = Promise(slow_coro())
@@ -347,7 +347,7 @@ async def test_unpack_once_sync_zero_timeout_on_slow_promise() -> None:
     for an unresolved promise."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         return "too late"
 
     promise = Promise(slow_coro())

@@ -263,7 +263,7 @@ async def test_sync_no_timeout_waits_indefinitely() -> None:
     promise = Promise(outer())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _sync, promise)
+    result = await loop.run_in_executor(None, promise.sync)
     assert result == "waited"
 
 
@@ -278,5 +278,5 @@ async def test_unpack_once_sync_no_timeout_waits_indefinitely() -> None:
     promise = Promise(slow_ish())
     loop = asyncio.get_running_loop()
 
-    result = await loop.run_in_executor(None, _unpack_once_sync, promise)
+    result = await loop.run_in_executor(None, promise.unpack_once_sync)
     assert result == "waited"

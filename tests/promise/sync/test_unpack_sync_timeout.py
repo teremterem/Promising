@@ -21,7 +21,7 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
     promise doesn't resolve in time."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
         return "too late"
 
     promise = Promise(slow_coro())
@@ -33,13 +33,16 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
             functools.partial(promise.unpack_once_sync, timeout=0.1),
         )
 
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
+
 
 async def test_unpack_once_sync_succeeds_within_timeout() -> None:
     """unpack_once_sync() returns the result when the promise
     resolves before the timeout."""
 
     async def fast_coro() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "fast"
 
     promise = Promise(fast_coro())
@@ -47,7 +50,7 @@ async def test_unpack_once_sync_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(promise.unpack_once_sync, timeout=5.0),
+        functools.partial(promise.unpack_once_sync, timeout=1),
     )
     assert result == "fast"
 
@@ -62,7 +65,7 @@ async def test_sync_times_out_on_slow_promise() -> None:
     resolve in time."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
         return "too late"
 
     promise = Promise(slow_coro())
@@ -80,7 +83,7 @@ async def test_sync_succeeds_within_timeout() -> None:
     before the timeout."""
 
     async def fast_coro() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "fast"
 
     promise = Promise(fast_coro())
@@ -88,7 +91,7 @@ async def test_sync_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(promise.sync, timeout=5.0),
+        functools.partial(promise.sync, timeout=1),
     )
     assert result == "fast"
 
@@ -104,7 +107,7 @@ async def test_sync_times_out_on_slow_inner_promise() -> None:
     the entire unpacking chain."""
 
     async def slow_inner() -> str:
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
         return "too late"
 
     async def outer_coro() -> Promise[str]:
@@ -125,7 +128,7 @@ async def test_sync_nested_succeeds_within_timeout() -> None:
     resolve within the timeout."""
 
     async def inner_coro() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "nested fast"
 
     async def outer_coro() -> Promise[str]:
@@ -136,7 +139,7 @@ async def test_sync_nested_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(promise.sync, timeout=5.0),
+        functools.partial(promise.sync, timeout=1),
     )
     assert result == "nested fast"
 
@@ -152,7 +155,7 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
             return "done"
         return Promise(make_chain(depth - 1))
 
-    # 5 levels × 0.1s each = 0.5s total; 0.25s timeout
+    # 5 levels × 0.1s each = 0.5s total; 0.3s timeout
     # should fail
     promise = Promise(make_chain(4))
     loop = asyncio.get_running_loop()
@@ -160,7 +163,7 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(promise.sync, timeout=0.25),
+            functools.partial(promise.sync, timeout=0.3),
         )
 
 
@@ -169,18 +172,18 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
     should succeed."""
 
     async def make_chain(depth: int) -> Any:
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(0.1)
         if depth == 0:
             return "done"
         return Promise(make_chain(depth - 1))
 
-    # 3 levels × 0.02s each = ~0.06s total; 5s timeout
+    # 3 levels × 0.1s each = ~0.3s total; 1s timeout
     promise = Promise(make_chain(2))
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(promise.sync, timeout=5.0),
+        functools.partial(promise.sync, timeout=1),
     )
     assert result == "done"
 
@@ -195,7 +198,7 @@ async def test_sync_times_out_on_slow_coroutine_result() -> None:
     a coroutine (not a Promise) that takes too long."""
 
     async def slow_coro() -> str:
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
         return "too late"
 
     async def outer() -> Any:
@@ -216,7 +219,7 @@ async def test_sync_coroutine_result_succeeds_within_timeout() -> None:
     within the timeout."""
 
     async def fast_coro() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "fast coro"
 
     async def outer() -> Any:
@@ -227,7 +230,7 @@ async def test_sync_coroutine_result_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(promise.sync, timeout=5.0),
+        functools.partial(promise.sync, timeout=1),
     )
     assert result == "fast coro"
 
@@ -241,7 +244,7 @@ async def test_sync_no_timeout_waits_indefinitely() -> None:
     """sync() with timeout=None waits as long as needed."""
 
     async def slow_ish() -> str:
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.1)
         return "waited"
 
     async def outer() -> Promise[str]:
@@ -259,7 +262,7 @@ async def test_unpack_once_sync_no_timeout_waits_indefinitely() -> None:
     as needed."""
 
     async def slow_ish() -> str:
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.1)
         return "waited"
 
     promise = Promise(slow_ish())

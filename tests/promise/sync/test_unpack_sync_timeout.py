@@ -12,19 +12,6 @@ import pytest
 from promising import Promise
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _sync(promise: Promise, /, timeout: float) -> Any:
-    return promise.sync(timeout=timeout)
-
-
-def _unpack_once_sync(promise: Promise, /, timeout: float) -> Any:
-    return promise.unpack_once_sync(timeout=timeout)
-
-
-# ---------------------------------------------------------------------------
 # unpack_once_sync timeout
 # ---------------------------------------------------------------------------
 
@@ -43,7 +30,7 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(_unpack_once_sync, promise, timeout=0.1),
+            functools.partial(promise.unpack_once_sync, timeout=0.1),
         )
 
 
@@ -60,7 +47,7 @@ async def test_unpack_once_sync_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(_unpack_once_sync, promise, timeout=5.0),
+        functools.partial(promise.unpack_once_sync, timeout=5.0),
     )
     assert result == "fast"
 
@@ -84,7 +71,7 @@ async def test_sync_times_out_on_slow_promise() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(_sync, promise, timeout=0.1),
+            functools.partial(promise.sync, timeout=0.1),
         )
 
 
@@ -101,7 +88,7 @@ async def test_sync_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(_sync, promise, timeout=5.0),
+        functools.partial(promise.sync, timeout=5.0),
     )
     assert result == "fast"
 
@@ -129,7 +116,7 @@ async def test_sync_times_out_on_slow_inner_promise() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(_sync, promise, timeout=0.1),
+            functools.partial(promise.sync, timeout=0.1),
         )
 
 
@@ -149,7 +136,7 @@ async def test_sync_nested_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(_sync, promise, timeout=5.0),
+        functools.partial(promise.sync, timeout=5.0),
     )
     assert result == "nested fast"
 
@@ -173,7 +160,7 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(_sync, promise, timeout=0.25),
+            functools.partial(promise.sync, timeout=0.25),
         )
 
 
@@ -193,7 +180,7 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(_sync, promise, timeout=5.0),
+        functools.partial(promise.sync, timeout=5.0),
     )
     assert result == "done"
 
@@ -220,7 +207,7 @@ async def test_sync_times_out_on_slow_coroutine_result() -> None:
     with pytest.raises(TimeoutError):
         await loop.run_in_executor(
             None,
-            functools.partial(_sync, promise, timeout=0.1),
+            functools.partial(promise.sync, timeout=0.1),
         )
 
 
@@ -240,7 +227,7 @@ async def test_sync_coroutine_result_succeeds_within_timeout() -> None:
 
     result = await loop.run_in_executor(
         None,
-        functools.partial(_sync, promise, timeout=5.0),
+        functools.partial(promise.sync, timeout=5.0),
     )
     assert result == "fast coro"
 

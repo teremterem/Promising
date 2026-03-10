@@ -145,13 +145,12 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        **kwargs: Any,
-    ) -> Promise[T_co]:
-        return self.call(*args, **kwargs)
-
-    def call(
-        self,
-        *args: Any,
+        namespace: str | None = None,
+        start_soon: bool | Sentinel | None = None,
+        children_start_soon: bool | Sentinel | None = None,
+        start_soon_default: bool | Sentinel | None = None,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel | None = None,
+        use_thread_pool: bool | None = None,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
@@ -192,30 +191,18 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
-        namespace = kwargs.pop(
-            "namespace",
-            self.namespace,
-        )
-        start_soon = kwargs.pop(
-            "start_soon",
-            self.start_soon,
-        )
-        children_start_soon = kwargs.pop(
-            "children_start_soon",
-            self.children_start_soon,
-        )
-        start_soon_default = kwargs.pop(
-            "start_soon_default",
-            self.start_soon_default,
-        )
-        thread_pool = kwargs.pop(
-            "thread_pool",
-            self.thread_pool,
-        )
-        use_thread_pool = kwargs.pop(
-            "use_thread_pool",
-            self.use_thread_pool,
-        )
+        if namespace is None:
+            namespace = self.namespace
+        if start_soon is None:
+            start_soon = self.start_soon
+        if children_start_soon is None:
+            children_start_soon = self.children_start_soon
+        if start_soon_default is None:
+            start_soon_default = self.start_soon_default
+        if thread_pool is None:
+            thread_pool = self.thread_pool
+        if use_thread_pool is None:
+            use_thread_pool = self.use_thread_pool
 
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring

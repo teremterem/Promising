@@ -1,4 +1,5 @@
 import concurrent.futures
+import time
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Awaitable, Coroutine, Generator
 from typing import Any, Generic
@@ -211,6 +212,54 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         return await _AwaitablePromiseUnpacker(self, unpack_all=False)
 
     def sync(self, *, timeout: float | None = None) -> T_co:
+        """
+        Synchronously wait for and return the Promise result, blocking the
+        calling thread. Recursively unpacks nested awaitables until the result
+        is no longer awaitable, similar to ``__await__``.
+
+        This is the synchronous counterpart of ``__await__`` — intended for
+        use inside sync promising functions that run in a thread pool executor.
+
+        Args:
+            timeout: Maximum time to wait for the result in seconds.
+
+        Returns:
+            The fully unpacked result of the Promise (no remaining
+            awaitables).
+
+        Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
+            TimeoutError: If timeout expires before
+                completion.
+        """
+        deadline = None if timeout is None else time.monotonic() + timeout
+        result = self.as_concurrent_future().result(timeout=timeout)
+
+        while hasattr(result, "__await__"):
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None:
+                # Make sure it doesn't go negative
+                remaining = max(remaining, 0)
+
+            if isinstance(result, Promise):
+                promise = result
+            else:
+
+                async def _wrap_awaitable(awaitable: Awaitable[Any]) -> Any:
+                    return await awaitable
+
+                promise = Promise(
+                    _wrap_awaitable(result),
+                    loop=self._ctx_loop,
+                    start_soon=True,
+                )
+
+            result = promise.as_concurrent_future().result(timeout=remaining)
+
+        return result
+
+    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables — returns

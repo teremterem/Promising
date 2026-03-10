@@ -45,9 +45,9 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
 class DecoratorSupport:
     __wrapped__: DecoratableFunctionType
 
-    def __init__(self, func_or_method: DecoratableFunctionType | None) -> None:
+    def __init__(self, func_or_method: DecoratableFunctionType | Sentinel) -> None:
         self.__wrapped__ = None
-        if func_or_method is None:
+        if func_or_method is NOT_SET:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
             # decorator with parameters.
@@ -55,7 +55,7 @@ class DecoratorSupport:
         self._update_wrapper(func_or_method)
 
     def _update_wrapper(self, func_or_method: Any) -> None:
-        if func_or_method is None:
+        if func_or_method is NOT_SET:
             raise DecorationError("The function or method to decorate was not provided")
 
         if not callable(func_or_method) and not isinstance(func_or_method, classmethod):

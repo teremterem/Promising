@@ -91,10 +91,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     def __init__(
         self,
-        func_or_method: DecoratableFunctionType | None = None,
+        func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
         *,
         namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | None = None,
+        loop: AbstractEventLoop | Sentinel = NOT_SET,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
@@ -268,7 +268,7 @@ class PromisingContext:
         self,
         *,
         namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | None = None,
+        loop: AbstractEventLoop | Sentinel = NOT_SET,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
@@ -291,7 +291,7 @@ class PromisingContext:
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
 
-        if loop is None:
+        if loop is NOT_SET:
             if self._parent is None:
                 self._ctx_loop = asyncio.get_event_loop()
             else:

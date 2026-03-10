@@ -109,17 +109,17 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        coro: Coroutine[Any, Any, Awaitable[Any] | T_co] | None = None,
+        coro: Coroutine[Any, Any, Awaitable[Any] | T_co] | Sentinel = NOT_SET,
         *,
         namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | None = None,
+        loop: AbstractEventLoop | Sentinel = NOT_SET,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
         prefilled_result: Awaitable[Any] | T_co | None | Sentinel = NOT_SET,
-        prefilled_exception: BaseException | None = None,
+        prefilled_exception: BaseException | Sentinel = NOT_SET,
     ) -> None:
         PromisingContext.__init__(
             self,
@@ -317,7 +317,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
-        if self._coro is None:
+        if self._coro is NOT_SET:
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self}")
 
@@ -386,15 +386,15 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self,
         *,
         prefilled_result: T_co | None | Sentinel,
-        prefilled_exception: BaseException | None,
+        prefilled_exception: BaseException | Sentinel,
     ) -> None:
-        if self._coro is None:
-            if prefilled_result is not NOT_SET and prefilled_exception is not None:
+        if self._coro is NOT_SET:
+            if prefilled_result is not NOT_SET and prefilled_exception is not NOT_SET:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
             if prefilled_result is not NOT_SET:
                 self.set_result(prefilled_result)
-            elif prefilled_exception is not None:
+            elif prefilled_exception is not NOT_SET:
                 self.set_exception(prefilled_exception)
 
             else:
@@ -402,7 +402,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         else:
             if not coroutines.iscoroutine(self._coro):
                 raise TypeError(f"Promise must be created with a coroutine. Got {type(self._coro)}.")
-            if prefilled_result is not NOT_SET or prefilled_exception is not None:
+            if prefilled_result is not NOT_SET or prefilled_exception is not NOT_SET:
                 raise ValueError(
                     "Cannot provide both 'coro' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )

@@ -11,7 +11,7 @@ from promising.utils import DecoratorSupport, if_func_or_method_async, resolve_n
 
 
 def function(
-    func_or_method: DecoratableFunctionType | None = None,
+    func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
     *,
     namespace: str | Sentinel = NOT_SET,
     start_soon: bool | Sentinel = NOT_SET,
@@ -80,7 +80,7 @@ def function(
             specific case rather than blanket-disabling thread pools
             for an entire subtree.
     """
-    if func_or_method is None:
+    if func_or_method is NOT_SET:
         # The decorator was used with arguments
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](

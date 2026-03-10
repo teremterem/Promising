@@ -33,6 +33,9 @@ async def test_unpack_once_sync_times_out_on_slow_promise() -> None:
             functools.partial(promise.unpack_once_sync, timeout=0.1),
         )
 
+    # Get rid of the asyncio warning
+    assert await promise == "too late"
+
 
 async def test_unpack_once_sync_succeeds_within_timeout() -> None:
     """unpack_once_sync() returns the result when the promise
@@ -163,6 +166,9 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
             functools.partial(promise.sync, timeout=0.3),
         )
 
+    # Get rid of the asyncio warning
+    assert await promise == "done"
+
 
 async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
     """A chain of small delays that fits within the timeout
@@ -190,15 +196,28 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_sync_times_out_on_slow_coroutine_result() -> None:
+@pytest.mark.parametrize("outer_sleep", [False, True])
+async def test_sync_times_out_on_slow_coroutine_result(
+    outer_sleep: bool,
+) -> None:
     """sync() raises TimeoutError when the promise returns
-    a coroutine (not a Promise) that takes too long."""
+    a coroutine (not a Promise) that takes too long.
+
+    When outer itself is slow enough to exhaust the timeout,
+    slow_coro is never called.
+    """
+
+    call_count = 0
 
     async def slow_coro() -> str:
-        await asyncio.sleep(0.3)
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0.2)
         return "too late"
 
     async def outer() -> Any:
+        if outer_sleep:
+            await asyncio.sleep(0.2)
         return slow_coro()
 
     promise = Promise(outer())
@@ -209,6 +228,11 @@ async def test_sync_times_out_on_slow_coroutine_result() -> None:
             None,
             functools.partial(promise.sync, timeout=0.1),
         )
+
+    if outer_sleep:
+        assert call_count == 0
+    else:
+        assert call_count == 1
 
 
 async def test_sync_coroutine_result_succeeds_within_timeout() -> None:
@@ -362,7 +386,7 @@ async def test_sync_zero_timeout_nested_slow_inner() -> None:
     outer promise resolves but the inner is slow."""
 
     async def slow_inner() -> str:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
         return "too late"
 
     async def outer_coro() -> Promise[str]:
@@ -380,3 +404,6 @@ async def test_sync_zero_timeout_nested_slow_inner() -> None:
             None,
             functools.partial(promise.sync, timeout=0),
         )
+
+    # Get rid of the asyncio warning
+    assert await promise == "too late"

@@ -19,15 +19,16 @@ in ``__call__()``:
 - Staticmethods: ``(<user_args>)``
 """
 
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 import promising
 
-# ── helpers ──────────────────────────────────────────────────
+# ── fixtures ─────────────────────────────────────────────────
 
 
-@contextmanager
+@pytest.fixture()
 def spy_on_call():
     """Spy on ``PromisingFunction.__call__`` at the class level."""
     original = promising.PromisingFunction.__call__
@@ -44,7 +45,7 @@ def spy_on_call():
 # ── Instance method ──────────────────────────────────────────
 
 
-async def test_instance_method_via_instance():
+async def test_instance_method_via_instance(spy_on_call):
     """
     Instance method called on an instance: ``__call__()``
     receives ``(instance, <user_arg>)``.
@@ -56,14 +57,12 @@ async def test_instance_method_via_instance():
             return x
 
     obj = MyClass()
-
-    with spy_on_call() as spy:
-        result = obj.method(42)
-        spy.assert_called_once_with(obj, 42)
-        assert await result == 42
+    result = obj.method(42)
+    spy_on_call.assert_called_once_with(obj, 42)
+    assert await result == 42
 
 
-async def test_instance_method_via_instance__not_decorated():
+async def test_instance_method_via_instance__not_decorated(spy_on_call):
     """
     Instance method called on an instance (but promising.function
     is applied to a method that is already bound to the instance):
@@ -76,19 +75,17 @@ async def test_instance_method_via_instance__not_decorated():
 
     obj = MyClass()
     pf = promising.function(obj.method)
-
-    with spy_on_call() as spy:
-        result = pf(42)
-        # With this setup the obj does not go through the
-        # PromisingFunction, it's already bound with the method
-        spy.assert_called_once_with(42)
-        assert await result == 42
+    result = pf(42)
+    # With this setup the obj does not go through the
+    # PromisingFunction, it's already bound with the method
+    spy_on_call.assert_called_once_with(42)
+    assert await result == 42
 
 
 # ── Classmethods ─────────────────────────────────────────────
 
 
-async def test_classmethod_via_class__classmethod_on_top():
+async def test_classmethod_via_class__classmethod_on_top(spy_on_call):
     """
     ``@classmethod`` on top, called via the class:
     ``__call__()`` receives ``(cls, <user_arg>)``.
@@ -100,13 +97,12 @@ async def test_classmethod_via_class__classmethod_on_top():
         async def method(cls, x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass.method(42)
-        spy.assert_called_once_with(MyClass, 42)
-        assert await result == 42
+    result = MyClass.method(42)
+    spy_on_call.assert_called_once_with(MyClass, 42)
+    assert await result == 42
 
 
-async def test_classmethod_via_class__promising_on_top():
+async def test_classmethod_via_class__promising_on_top(spy_on_call):
     """
     ``@promising.function`` on top, called via the class:
     ``__call__()`` receives ``(cls, <user_arg>)``.
@@ -118,13 +114,12 @@ async def test_classmethod_via_class__promising_on_top():
         async def method(cls, x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass.method(42)
-        spy.assert_called_once_with(MyClass, 42)
-        assert await result == 42
+    result = MyClass.method(42)
+    spy_on_call.assert_called_once_with(MyClass, 42)
+    assert await result == 42
 
 
-async def test_classmethod_via_instance__classmethod_on_top():
+async def test_classmethod_via_instance__classmethod_on_top(spy_on_call):
     """
     ``@classmethod`` on top, called via an instance:
     ``__call__()`` receives ``(cls, <user_arg>)``.
@@ -136,13 +131,12 @@ async def test_classmethod_via_instance__classmethod_on_top():
         async def method(cls, x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass().method(42)
-        spy.assert_called_once_with(MyClass, 42)
-        assert await result == 42
+    result = MyClass().method(42)
+    spy_on_call.assert_called_once_with(MyClass, 42)
+    assert await result == 42
 
 
-async def test_classmethod_via_instance__promising_on_top():
+async def test_classmethod_via_instance__promising_on_top(spy_on_call):
     """
     ``@promising.function`` on top, called via an instance:
     ``__call__()`` receives ``(cls, <user_arg>)``.
@@ -154,16 +148,15 @@ async def test_classmethod_via_instance__promising_on_top():
         async def method(cls, x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass().method(42)
-        spy.assert_called_once_with(MyClass, 42)
-        assert await result == 42
+    result = MyClass().method(42)
+    spy_on_call.assert_called_once_with(MyClass, 42)
+    assert await result == 42
 
 
 # ── Staticmethods ────────────────────────────────────────────
 
 
-async def test_staticmethod_via_class__staticmethod_on_top():
+async def test_staticmethod_via_class__staticmethod_on_top(spy_on_call):
     """
     ``@staticmethod`` on top, called via the class:
     ``__call__()`` receives ``(<user_arg>,)`` only.
@@ -175,13 +168,12 @@ async def test_staticmethod_via_class__staticmethod_on_top():
         async def method(x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass.method(42)
-        spy.assert_called_once_with(42)
-        assert await result == 42
+    result = MyClass.method(42)
+    spy_on_call.assert_called_once_with(42)
+    assert await result == 42
 
 
-async def test_staticmethod_via_class__promising_on_top():
+async def test_staticmethod_via_class__promising_on_top(spy_on_call):
     """
     ``@promising.function`` on top, called via the class:
     ``__call__()`` receives ``(<user_arg>,)`` only.
@@ -193,13 +185,12 @@ async def test_staticmethod_via_class__promising_on_top():
         async def method(x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass.method(42)
-        spy.assert_called_once_with(42)
-        assert await result == 42
+    result = MyClass.method(42)
+    spy_on_call.assert_called_once_with(42)
+    assert await result == 42
 
 
-async def test_staticmethod_via_instance__staticmethod_on_top():
+async def test_staticmethod_via_instance__staticmethod_on_top(spy_on_call):
     """
     ``@staticmethod`` on top, called via an instance:
     ``__call__()`` receives ``(<user_arg>,)`` only.
@@ -211,13 +202,12 @@ async def test_staticmethod_via_instance__staticmethod_on_top():
         async def method(x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass().method(42)
-        spy.assert_called_once_with(42)
-        assert await result == 42
+    result = MyClass().method(42)
+    spy_on_call.assert_called_once_with(42)
+    assert await result == 42
 
 
-async def test_staticmethod_via_instance__promising_on_top():
+async def test_staticmethod_via_instance__promising_on_top(spy_on_call):
     """
     ``@promising.function`` on top, called via an instance:
     ``__call__()`` receives ``(<user_arg>,)`` only.
@@ -229,7 +219,6 @@ async def test_staticmethod_via_instance__promising_on_top():
         async def method(x: int) -> int:
             return x
 
-    with spy_on_call() as spy:
-        result = MyClass().method(42)
-        spy.assert_called_once_with(42)
-        assert await result == 42
+    result = MyClass().method(42)
+    spy_on_call.assert_called_once_with(42)
+    assert await result == 42

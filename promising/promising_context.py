@@ -93,7 +93,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self,
         func_or_method: DecoratableFunctionType | None = None,
         *,
-        namespace: str | None = None,
+        namespace: str | Sentinel = NOT_SET,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
@@ -258,7 +258,7 @@ class PromisingContext:
     """Hierarchical context node created by ``promising.context``. See
     :class:`promising.context` for usage details."""
 
-    namespace: str | None
+    namespace: str | Sentinel
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
@@ -267,7 +267,7 @@ class PromisingContext:
     def __init__(
         self,
         *,
-        namespace: str | None = None,
+        namespace: str | Sentinel = NOT_SET,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
@@ -640,8 +640,8 @@ class PromisingContext:
         """
         return self._thread_pool
 
-    def _repr_context(self, namespace: str | None = None) -> str:
-        if namespace is not None:
+    def _repr_context(self, namespace: str | Sentinel = NOT_SET) -> str:
+        if namespace is not NOT_SET:
             namespace = f"{namespace!r} "
         return f"<{namespace or ''}{self.__class__.__name__} id={id(self)}>"
 

@@ -13,7 +13,7 @@ from promising.utils import DecoratorSupport, if_func_or_method_async, resolve_n
 def function(
     func_or_method: DecoratableFunctionType | None = None,
     *,
-    namespace: str | None = None,
+    namespace: str | Sentinel = NOT_SET,
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon: bool | Sentinel = NOT_SET,
     start_soon_default: bool | Sentinel = INHERIT,
@@ -116,7 +116,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        namespace: str | None = None,
+        namespace: str | Sentinel = NOT_SET,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -145,7 +145,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        namespace: str | None = None,
+        namespace: str | Sentinel | None = None,
         start_soon: bool | Sentinel | None = None,
         children_start_soon: bool | Sentinel | None = None,
         start_soon_default: bool | Sentinel | None = None,

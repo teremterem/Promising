@@ -111,7 +111,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self,
         coro: Coroutine[Any, Any, Awaitable[Any] | T_co] | None = None,
         *,
-        namespace: str | None = None,
+        namespace: str | Sentinel = NOT_SET,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,

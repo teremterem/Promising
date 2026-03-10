@@ -6,6 +6,7 @@ from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError, SyncUsageError
+from promising.sentinels import NOT_SET, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 
 
@@ -25,12 +26,12 @@ def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: st
         raise SyncUsageError(message)
 
 
-def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str | None:
-    if provided_explicitly is not None:
+def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallback: Any) -> str | Sentinel:
+    if provided_explicitly is not NOT_SET:
         return provided_explicitly
 
     if named_object_fallback is None:
-        return None
+        return NOT_SET
 
     if hasattr(named_object_fallback, "__qualname__"):
         return named_object_fallback.__qualname__

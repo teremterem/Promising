@@ -248,8 +248,8 @@ async def test_asyncio_future_unpack_once_stops() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, asyncio.Future)
-    assert result is fut
+    assert isinstance(result, Promise)
+    assert result.get_parent_context() is promise
 
 
 # ---------------------------------------------------------------------------

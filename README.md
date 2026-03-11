@@ -121,7 +121,7 @@ async def main():
     assert result == 7
 ```
 
-Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result:
+Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result. Like `await`, `.sync()` recursively unpacks nested awaitables (see [Result Unpacking](#result-unpacking)):
 
 ```python
 @promising.function
@@ -188,6 +188,20 @@ The `thread_pool` parameter accepts:
 - **`GLOBAL_DEFAULT`** — use `Defaults.SYNC_THREAD_POOL`.
 - **`ASYNCIO_DEFAULT`** — pass `None` to `run_in_executor`, letting the event loop use its own default executor.
 - A concrete **`ThreadPoolExecutor`** instance.
+
+### Opting Out of the Thread Pool
+
+If a sync function is lightweight and you want to avoid the overhead of dispatching it to a thread pool, set `use_thread_pool=False` to run it directly on the event loop thread:
+
+```python
+@promising.function(use_thread_pool=False)
+def lightweight_transform(data: list) -> list:
+    return [x * 2 for x in data]
+```
+
+> **Warning:** When `use_thread_pool=False`, calling `.sync()` or `await_children_sync()` from within the function will raise `SyncUsageError` because those calls would deadlock the event loop.
+
+Unlike `thread_pool`, the `use_thread_pool` parameter is intentionally not inheritable through the context hierarchy — it must be set per-function at decoration or call time. Running sync functions on the event loop thread is problematic for CPU-bound workloads (it blocks the loop), so the user should make a conscious decision for each specific case.
 
 ## Method Decorators
 
@@ -257,11 +271,6 @@ async def do_work() -> str:
     return "done"
 
 await do_work()
-
-# Await all children in all contexts before finishing
-await promising.await_children(recursively=True)
-# TODO [P1] Awaiting children will fail here because there is no active context -
-#  fix it by describing how to set up the application properly
 ```
 
 Like `@promising.function`, it works with `@classmethod`, `@staticmethod`, and instance methods in either decorator order.
@@ -342,6 +351,38 @@ async def main():
 
 `promise.sync()`, `concurrent_future.result()`, and `concurrent_future.exception()` all raise `SyncUsageError` if called from the event loop thread (which would deadlock).
 
+## Result Unpacking
+
+When a Promise resolves to another awaitable (e.g. a nested Promise), `await promise` recursively unpacks the chain until a concrete, non-awaitable value is reached. If the resolved value is an awaitable that isn't already a `Promise`, it is automatically wrapped in a child `Promise`.
+
+```python
+@promising.function
+async def inner() -> str:
+    return "hello"
+
+@promising.function
+async def outer() -> Promise:
+    return inner()  # Returns a Promise, not a string
+
+result = await outer()  # Recursively unpacks: "hello"
+```
+
+To inspect intermediate layers, use `unpack_once()` (async) or `unpack_once_sync()` (sync) — they resolve only one level and return the raw result, which may itself be an awaitable:
+
+```python
+one_level = await outer().unpack_once()  # Returns the inner Promise
+final = await one_level                   # Returns "hello"
+```
+
+The sync counterparts follow the same pattern — `promise.sync()` fully unpacks, while `promise.unpack_once_sync()` resolves only one level:
+
+```python
+@promising.function
+def sync_example() -> str:
+    promise = outer()
+    return promise.sync()  # Fully unpacks to "hello"
+```
+
 ## Working with Promise Directly
 
 You can create Promises without `@promising.function` by passing a coroutine or a prefilled value:
@@ -381,7 +422,6 @@ uv sync --extra examples
 ```
 
 - `examples/keyword_agent.py` — an LLM-powered keyword extraction agent using `@promising.function` with `litellm` and `pydantic`.
-- `examples/htmx_ui/` — a web UI example using `python-fasthtml` and HTMX.
 
 ## Design Note: Settings Are Frozen at Creation Time
 
@@ -395,7 +435,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Symbol | Description |
 |---|---|
-| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. |
+| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. Accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, and `use_thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
 | `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 
@@ -436,6 +476,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
+| `promising.Defaults.SYNC_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `GLOBAL_DEFAULT`. |
 
 ### Sentinels
 

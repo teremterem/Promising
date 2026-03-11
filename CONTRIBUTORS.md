@@ -59,14 +59,18 @@ This file also contains the `context` class — a context manager / decorator th
 
 Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
-**Unpacking semantics:** `await promise` fully unpacks nested awaitables — if the coroutine's result is itself awaitable, it is recursively awaited until a non-awaitable value is reached. `promise.sync()` is the synchronous counterpart of `await promise` — it also fully unpacks nested awaitables, wrapping non-Promise awaitables into temporary Promises to resolve them synchronously. `promise.unpack_once()` and `promise.unpack_once_sync()` resolve only one level, returning the raw result which may still be an awaitable. The async unpacking logic lives in `_AwaitablePromiseUnpacker`, a helper class used by both `__await__` (with `unpack_all=True`) and `unpack_once` (with `unpack_all=False`).
+**Awaitable auto-wrapping:** When a Promise's result (set via `set_result()`) is an awaitable that is not already a `Promise`, it is automatically wrapped in a child `Promise`. This ensures that downstream unpacking logic (`sync()`, `__await__`, etc.) can always assume awaitable results are Promises.
+
+**Exception breadcrumbs:** During `_fulfill()`, if the awaitable raises an exception, the Promise attaches itself as `exception.__promising_context__` (only at the deepest level where the exception originates). This is intended for future error tracing / breadcrumb features.
+
+**Unpacking semantics:** `await promise` fully unpacks nested awaitables — if the coroutine's result is itself awaitable, it is recursively awaited until a non-awaitable value is reached. `promise.sync()` is the synchronous counterpart of `await promise` — it also fully unpacks nested awaitables (the auto-wrapping above ensures each layer is a `Promise`, so `sync()` can resolve them via their concurrent futures). `promise.unpack_once()` and `promise.unpack_once_sync()` resolve only one level, returning the raw result which may still be an awaitable. The async unpacking logic lives in `_AwaitablePromiseUnpacker`, a helper class used by both `__await__` (with `unpack_all=True`) and `unpack_once` (with `unpack_all=False`).
 
 ### PromisingFunction (`promising/promising_function.py`)
 
 Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`.
 
 - **Async functions** produce coroutines directly.
-- **Sync functions** are detected via `inspect.iscoroutinefunction()` and run in a `ThreadPoolExecutor` (configurable via the `thread_pool` parameter, defaulting to `Defaults.SYNC_THREAD_POOL`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread.
+- **Sync functions** are detected via `inspect.iscoroutinefunction()` and, by default, run in a `ThreadPoolExecutor` (configurable via the `thread_pool` parameter, defaulting to `Defaults.SYNC_THREAD_POOL`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread. When `use_thread_pool=False`, the sync function runs directly on the event loop thread instead (useful for lightweight transforms, but blocks the loop). Unlike `thread_pool`, `use_thread_pool` is intentionally not inheritable — it must be set per-function.
 - Implements the descriptor protocol (`__get__`) to correctly bind `self`/`cls` for instance methods, `@classmethod`, and `@staticmethod`.
 
 ### Sentinel Pattern (`promising/sentinels.py`)

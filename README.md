@@ -6,6 +6,20 @@ Hierarchical async Promise management for Python.
 
 Promising extends `asyncio.Future` with automatic parent-child relationships between asynchronous operations. When a Promise creates other Promises during its execution, those become its children — tracked via context variables, forming a tree you can await, inspect, or configure as a unit.
 
+## Why Promises?
+
+A plain coroutine in Python is a one-shot object: you can `await` it once, then it's consumed. You can't re-await it, you can't inspect its result from another thread, and there is no built-in way to know which coroutine spawned which. `asyncio.Task` solves some of this, but doesn't track parent-child relationships or propagate configuration.
+
+Wrapping every async (or sync) operation in a `Promise` gives you:
+
+- **Multiple awaits.** A Promise caches its result. Any number of consumers can `await` the same Promise and get the same value without re-executing the function.
+- **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
+- **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
+- **Consistent unpacking.** When a Promise resolves to another awaitable, `await` and `.sync()` recursively unpack the chain to a concrete value. Non-Promise awaitables are auto-wrapped in child Promises, so you always get a uniform `Promise` interface — whether the function returned a value, a coroutine, or another Promise.
+- **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
+
+In short, a `Promise` turns a fire-and-forget coroutine into a first-class object you can pass around, await from anywhere (async or sync), and organize into a tree.
+
 ## Installation
 
 ```bash
@@ -351,6 +365,8 @@ async def main():
     thread.join()
 ```
 
+Like `await`, blocking on the concurrent future (`concurrent_future.result()`, `concurrent_future.exception()`) or calling `promise.sync()` automatically triggers the Promise's execution if it was created with `start_soon=False`. There is no need to start the Promise manually before blocking on it.
+
 `promise.sync()`, `concurrent_future.result()`, and `concurrent_future.exception()` all raise `SyncUsageError` if called from the event loop thread (which would deadlock).
 
 ## Result Unpacking
@@ -376,11 +392,17 @@ one_level = await outer().unpack_once()  # Returns the inner Promise
 final = await one_level                   # Returns "hello"
 ```
 
-The sync counterparts follow the same pattern — `promise.sync()` fully unpacks, while `promise.unpack_once_sync()` resolves only one level:
+The sync counterparts follow the same pattern — `promise.sync()` fully unpacks, while `promise.unpack_once_sync()` resolves only one level. Like `unpack_once()`, it returns the same dual-purpose `Promise` objects that support both async and sync consumption — the caller can continue with `.sync()` if still in a sync context, or switch to `await` if the context is async:
 
 ```python
 @promising.function
 def sync_example() -> str:
+    promise = outer()
+    inner_promise = promise.unpack_once_sync()  # Returns the inner Promise
+    return inner_promise.sync()                  # Continue synchronously
+
+@promising.function
+def sync_full_unpack() -> str:
     promise = outer()
     return promise.sync()  # Fully unpacks to "hello"
 ```

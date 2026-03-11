@@ -41,9 +41,13 @@ def function(
 
     Decorated functions may return other awaitables or ``Promise`` objects
     (e.g. by calling other decorated functions) instead of concrete values.
-    When the resulting ``Promise`` is awaited (or resolved via ``.sync()``),
-    nested awaitables are automatically unpacked recursively until a
-    concrete, non-awaitable value is reached. To unpack only one level, use
+    If the return value is an awaitable that is not already a ``Promise``,
+    it is automatically wrapped in a child ``Promise`` of the current one,
+    inheriting settings (``thread_pool``, ``start_soon_default``, etc.)
+    through the standard ``Promise`` inheritance mechanism. When the
+    resulting ``Promise`` is awaited (or resolved via ``.sync()``), nested
+    awaitables are automatically unpacked recursively until a concrete,
+    non-awaitable value is reached. To unpack only one level, use
     ``unpack_once()`` or ``unpack_once_sync()`` instead.
 
     Args:

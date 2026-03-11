@@ -201,7 +201,7 @@ def lightweight_transform(data: list) -> list:
 
 > **Warning:** When `use_thread_pool=False`, calling `.sync()` or `await_children_sync()` from within the function will raise `SyncUsageError` because those calls would deadlock the event loop.
 
-An alternative to `use_thread_pool=False` is to simply mark the decorated function as `async` but treat it as synchronous (don't use `await` inside). This avoids the thread pool naturally, since async functions always run on the event loop.
+An alternative to `use_thread_pool=False` is to simply mark the decorated function as `async` but treat it as synchronous (don't use `await` inside). This avoids the thread pool naturally, since async functions always run on the event loop. The same caveat applies: CPU-heavy work in such a function will block the event loop.
 
 Unlike `thread_pool`, the `use_thread_pool` parameter is intentionally not inheritable through the context hierarchy — it must be set per-function at decoration or call time. Running sync functions on the event loop thread is problematic for CPU-bound workloads (it blocks the loop), so the user should make a conscious decision for each specific case.
 

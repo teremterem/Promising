@@ -237,7 +237,7 @@ async def test_asyncio_future_await_unpacks() -> None:
 
 
 async def test_asyncio_future_unpack_once_stops() -> None:
-    """`unpack_once()` returns the asyncio.Future."""
+    """`unpack_once()` wraps the returned asyncio.Future in a Promise."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
     fut.set_result("from_future")
@@ -250,6 +250,7 @@ async def test_asyncio_future_unpack_once_stops() -> None:
     result = await promise.unpack_once()
     assert isinstance(result, Promise)
     assert result.get_parent_context() is promise
+    assert await result == "from_future"
 
 
 # ---------------------------------------------------------------------------

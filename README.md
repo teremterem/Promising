@@ -201,6 +201,8 @@ def lightweight_transform(data: list) -> list:
 
 > **Warning:** When `use_thread_pool=False`, calling `.sync()` or `await_children_sync()` from within the function will raise `SyncUsageError` because those calls would deadlock the event loop.
 
+An alternative to `use_thread_pool=False` is to simply mark the decorated function as `async` but treat it as synchronous (don't use `await` inside). This avoids the thread pool naturally, since async functions always run on the event loop.
+
 Unlike `thread_pool`, the `use_thread_pool` parameter is intentionally not inheritable through the context hierarchy — it must be set per-function at decoration or call time. Running sync functions on the event loop thread is problematic for CPU-bound workloads (it blocks the loop), so the user should make a conscious decision for each specific case.
 
 ## Method Decorators
@@ -353,7 +355,7 @@ async def main():
 
 ## Result Unpacking
 
-When a Promise resolves to another awaitable (e.g. a nested Promise), `await promise` recursively unpacks the chain until a concrete, non-awaitable value is reached. If the resolved value is an awaitable that isn't already a `Promise`, it is automatically wrapped in a child `Promise`.
+When a Promise resolves to another awaitable (e.g. a nested Promise), `await promise` recursively unpacks the chain until a concrete, non-awaitable value is reached — `await` and `.sync()` are guaranteed to always return a concrete, non-awaitable value. If the resolved value is an awaitable that isn't already a `Promise`, it is automatically wrapped in a child `Promise`.
 
 ```python
 @promising.function
@@ -367,7 +369,7 @@ async def outer() -> Promise:
 result = await outer()  # Recursively unpacks: "hello"
 ```
 
-To inspect intermediate layers, use `unpack_once()` (async) or `unpack_once_sync()` (sync) — they resolve only one level and return the raw result, which may itself be an awaitable:
+To inspect intermediate layers, use `unpack_once()` (async) or `unpack_once_sync()` (sync) — they resolve only one level. Thanks to auto-wrapping, the result is guaranteed to be either a concrete value or a `Promise` (never a plain awaitable):
 
 ```python
 one_level = await outer().unpack_once()  # Returns the inner Promise

@@ -59,7 +59,7 @@ This file also contains the `context` class — a context manager / decorator th
 
 Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution lifecycle on top of the hierarchy: `__init__` → `_ensure_task_scheduled()` (if `start_soon`) → `_fulfill()` (activates context, runs coro, sets result) → context restoration (resets `ContextVar` token). Also contains `PromiseBackedConcurrentFuture` for thread-safe bridging to `concurrent.futures.Future`.
 
-**Awaitable auto-wrapping:** When a Promise's result (set via `set_result()`) is an awaitable that is not already a `Promise`, it is automatically wrapped in a child `Promise`. This ensures that downstream unpacking logic (`sync()`, `__await__`, etc.) can always assume awaitable results are Promises.
+**Awaitable auto-wrapping:** When a Promise's result (set via `set_result()`) is an awaitable that is not already a `Promise`, it is automatically wrapped in a child `Promise`. This guarantees that `unpack_once()` and `unpack_once_sync()` always return either a concrete value or a `Promise` (never a plain awaitable).
 
 **Exception breadcrumbs:** During `_fulfill()`, if the awaitable raises an exception, the Promise attaches itself as `exception.__promising_context__` (only at the deepest level where the exception originates). This is intended for future error tracing / breadcrumb features.
 

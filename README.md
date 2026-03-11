@@ -15,7 +15,7 @@ A plain coroutine in Python is a one-shot object: you can `await` it once, then 
 Wrapping every async (or sync) operation in a `Promise` gives you:
 
 - **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool. Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
-- **Multiple awaits.** A Promise caches its result. Any number of consumers can `await` the same Promise and get the same value without re-executing the function.
+- **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
 - **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value, a coroutine, or another Promise. `await` and `.sync()` always return a concrete value. Non-Promise awaitables are auto-wrapped into child Promises, so every layer in the chain is a `Promise` with the same uniform interface.
@@ -52,13 +52,14 @@ async def main():
 asyncio.run(main())
 ```
 
-A Promise can be awaited multiple times without re-executing the function:
+A Promise can be consumed multiple times — via `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` — without re-executing the underlying function. The result is cached on first resolution:
 
 ```python
 promise = fetch_data("https://example.com")
 result1 = await promise  # Executes the function
 result2 = await promise  # Returns the cached result
-assert result1 is result2
+result3 = promise.sync() # Same cached result, from another thread
+assert result1 is result2 is result3
 ```
 
 ## Parent-Child Hierarchy
@@ -475,7 +476,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Method / Property | Description |
 |---|---|
-| `await promise` | Wait for and return the result. Recursively unpacks nested Promises and always returns a concrete value. Can be awaited multiple times. |
+| `await promise` | Wait for and return the result. Recursively unpacks nested Promises and always returns a concrete value. All consumption methods (`await`, `sync`, `unpack_once`, `unpack_once_sync`) can be called multiple times and always return the same cached result. |
 | `promise.unpack_once()` | Async — resolve the Promise but unpack only one level. Returns either a concrete value or another `Promise`. |
 | `promise.sync(timeout=None)` | Synchronous counterpart of `await promise` — blocks the calling thread, recursively unpacks nested Promises, and always returns a concrete value. Must not be called from the event loop thread. |
 | `promise.unpack_once_sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and unpacks only one level. Returns either a concrete value or another `Promise`. Must not be called from the event loop thread. |

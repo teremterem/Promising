@@ -28,14 +28,17 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
-    Decorator and context manager that establishes a lightweight
-    ``PromisingContext`` node in the promise hierarchy without creating an
-    actual ``Promise``.
+    Decorator and context manager that creates a hierarchical context node
+    tracking parent-child relationships between promises and groups of
+    promises, without creating an actual ``Promise``.
 
     Use ``promising.context`` when you need a parent node that groups child
     promises but does not represent an asynchronous computation itself. You may
-    want it to do ``await_children()`` on such a PromisingContext later, or to
-    override the default settings for a specific block of code, etc.
+    want it to do ``await_children()`` on such a ``PromisingContext`` later, or
+    to override the default settings for a specific block of code, etc.
+
+    ``PromisingContext`` can also be instantiated directly for advanced use
+    cases, but ``promising.context`` is the recommended entry point.
 
     As a **context manager**::
 
@@ -62,14 +65,16 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     need to be awaited, of course.)
 
     Args:
-        namespace: Optional namespace string for the underlying
-            ``PromisingContext``. When used as a decorator and not provided,
+        namespace: Human-readable label for the underlying
+            ``PromisingContext``. Shows up in ``__repr__`` output and (planned)
+            error breadcrumbs. When used as a decorator and not provided,
             defaults to the wrapped function's ``__qualname__``.
             # TODO Planned feature: Namespaces will show up in the form of
             #  breadcrumbs in error logs to help trace the source of errors.
             # TODO Anything else we could do with namespaces ?
-        loop: Event loop to use. If not provided, inherits from the parent
-            context (or uses the current event loop if there is no parent).
+        loop: Event loop to use. ``NOT_SET`` (default) inherits from the
+            parent context, or falls back to ``asyncio.get_event_loop()`` at
+            the root.
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
@@ -80,12 +85,13 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             to ``run_in_executor``, letting the event loop use its own default
             executor. A concrete ``ThreadPoolExecutor`` instance can also be
             provided.
-        children_start_soon: Whether child promises created directly within
-            this context should start executing immediately (i.e. as soon as
-            the event loop allows), or defer until awaited one way or another.
-            ``INHERIT`` (default) copies the parent's setting.
+        children_start_soon: Default ``start_soon`` value enforced on child
+            Promises whose own ``start_soon`` is ``NOT_SET``. Controls whether
+            they start executing immediately (i.e. as soon as the event loop
+            allows), or defer until awaited one way or another. ``INHERIT``
+            (default) copies the parent's setting.
         start_soon_default: Local override for the global
-            ``START_SOON_DEFAULT``, effective in the whole subtree of this
+            ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
     """
 

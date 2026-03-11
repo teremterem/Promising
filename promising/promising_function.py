@@ -156,17 +156,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         """
         Call the wrapped function and return a ``Promise`` for its result.
 
-        This is the core method that ``__call__`` delegates to. It creates
-        a ``Promise`` that wraps the function's execution (running sync
-        functions in a thread pool automatically).
+        Creates a ``Promise`` that wraps the function's execution (running
+        sync functions in a thread pool automatically).
 
-        The ``start_soon``, ``children_start_soon``, and
-        ``start_soon_default`` parameters can be passed as keyword
-        arguments to override the values set on the ``PromisingFunction``
-        at decoration time. To use the decorator-level values, simply
-        omit these keyword arguments — passing ``NOT_SET`` explicitly
-        will still override them (``NOT_SET`` is itself a valid value
-        with its own semantics in ``Promise``).
+        The ``namespace``, ``start_soon``, ``children_start_soon``,
+        ``start_soon_default``, ``thread_pool``, and ``use_thread_pool``
+        parameters can be passed as keyword arguments to override the
+        values set on the ``PromisingFunction`` at decoration time. To
+        use the decorator-level values, simply omit these keyword
+        arguments or pass ``None`` — both are equivalent. Passing
+        ``NOT_SET`` explicitly will still override them (``NOT_SET`` is
+        itself a valid value with its own semantics in ``Promise``).
 
         Args:
             *args: Positional arguments forwarded to the wrapped function.
@@ -174,6 +174,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 The following keyword arguments are intercepted and not
                 forwarded:
 
+                - **namespace** — Namespace string for the resulting
+                  ``Promise``.
                 - **start_soon** — Whether the ``Promise`` should start
                   executing immediately upon creation.
                 - **children_start_soon** — Default ``start_soon`` value

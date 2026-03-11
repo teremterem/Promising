@@ -349,7 +349,7 @@ class PromisingContext:
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
-        Get the parent Promise of this Promise (skipping over any
+        Get the nearest ancestor Promise of this context (skipping over any
         PromisingContexts that aren't Promises).
 
         Args:

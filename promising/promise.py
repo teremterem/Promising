@@ -57,8 +57,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         T_co: The covariant type of the Promise's result.
 
     Args:
-        awaitable: The awaitable to execute. If None, the Promise must be
-            prefilled with a result or exception.
+        awaitable: The awaitable to execute. If not provided, the Promise
+            must be prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         namespace: Optional human-readable namespace string. Used in
@@ -473,9 +473,9 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         Get the result of the Promise.
 
         This method ensures the Promise's task is scheduled, then blocks until
-        the Promise is done. It also consumes the result from the underlying
-        asyncio Future so that asyncio will not issue a warning about the
-        Future not having been awaited for.
+        the Promise is done. It also consumes the exception from the underlying
+        asyncio Future (if any) so that asyncio will not issue a warning about
+        the exception not having been retrieved.
 
         Args:
             timeout: Maximum time to wait for the result in seconds.

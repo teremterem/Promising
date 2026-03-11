@@ -6,12 +6,15 @@ Hierarchical async Promise management for Python.
 
 Promising extends `asyncio.Future` with automatic parent-child relationships between asynchronous operations. When a Promise creates other Promises during its execution, those become its children — tracked via context variables, forming a tree you can await, inspect, or configure as a unit.
 
+Decorate any function with `@promising.function` — async or sync, it doesn't matter — and it runs concurrently. Async functions run on the event loop as usual; sync functions are dispatched to a thread pool automatically. The caller gets back a `Promise` either way, with the same interface for both. You don't have to think about whether a piece of work is async or sync — just call it and let it run. By default, everything starts eagerly and in parallel.
+
 ## Why Promises?
 
 A plain coroutine in Python is a one-shot object: you can `await` it once, then it's consumed. You can't re-await it, you can't inspect its result from another thread, and there is no built-in way to know which coroutine spawned which. `asyncio.Task` solves some of this, but doesn't track parent-child relationships or propagate configuration.
 
 Wrapping every async (or sync) operation in a `Promise` gives you:
 
+- **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool. Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await` the same Promise and get the same value without re-executing the function.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.

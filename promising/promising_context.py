@@ -37,6 +37,9 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     want it to do ``await_children()`` on such a PromisingContext later, or to
     override the default settings for a specific block of code, etc.
 
+    ``PromisingContext`` can also be instantiated directly for advanced use
+    cases, but ``promising.context`` is the recommended entry point.
+
     As a **context manager**::
 
         with promising.context() as ctx:

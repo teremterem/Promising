@@ -43,6 +43,15 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
 
 
 class DecoratorSupport:
+    """
+    Base class that provides decorator and descriptor plumbing for
+    ``promising.context`` and ``PromisingFunction``.
+
+    Handles ``functools.update_wrapper`` bookkeeping and implements
+    ``__get__`` so that the decorator works correctly on instance
+    methods, ``@classmethod``, and ``@staticmethod``.
+    """
+
     __wrapped__: DecoratableFunctionType
 
     def __init__(self, func_or_method: DecoratableFunctionType | Sentinel) -> None:

@@ -255,8 +255,35 @@ def await_children_sync(*, recursively: bool = False, timeout: float | None = No
 
 
 class PromisingContext:
-    """Hierarchical context node created by ``promising.context``. See
-    :class:`promising.context` for usage details."""
+    """
+    Hierarchical context node that tracks parent-child relationships
+    between promises and groups of promises.
+
+    Usually created indirectly via ``promising.context`` (context manager /
+    decorator) or as part of a ``Promise``. Can also be instantiated
+    directly when you need a grouping node without either of those
+    conveniences.
+
+    Args:
+        namespace: Human-readable label for this context node. Shows
+            up in ``__repr__`` output and (planned) error breadcrumbs.
+        loop: Event loop to use. ``NOT_SET`` (default) inherits from
+            the parent context, or falls back to
+            ``asyncio.get_event_loop()`` at the root.
+        parent: Parent context. ``INHERIT`` (default) uses the
+            currently active context. ``None`` creates a root.
+        thread_pool: Thread pool executor for sync promising
+            functions. ``INHERIT`` (default) inherits from the parent,
+            falling back to ``Defaults.SYNC_THREAD_POOL`` at the
+            root. See ``promising.function`` for the full list of
+            accepted values.
+        children_start_soon: Default ``start_soon`` value enforced on
+            child Promises whose own ``start_soon`` is ``NOT_SET``.
+            ``INHERIT`` (default) copies the parent's setting.
+        start_soon_default: Local override for the global
+            ``Defaults.START_SOON``. ``INHERIT`` (default) propagates
+            from the parent.
+    """
 
     namespace: str | Sentinel
 

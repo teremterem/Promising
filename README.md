@@ -58,7 +58,11 @@ A Promise can be consumed multiple times — via `await`, `.sync()`, `unpack_onc
 promise = fetch_data("https://example.com")
 result1 = await promise  # Executes the function
 result2 = await promise  # Returns the cached result
-result3 = promise.sync() # Same cached result, from another thread
+
+...
+
+# In a sync promising function (runs in a worker thread)
+result3 = promise.sync()  # Same cached result
 assert result1 is result2 is result3
 ```
 

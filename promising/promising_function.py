@@ -39,6 +39,13 @@ def function(
     Works as a method decorator for instance methods, ``@classmethod``,
     and ``@staticmethod``.
 
+    Decorated functions may return other awaitables or ``Promise`` objects
+    (e.g. by calling other decorated functions) instead of concrete values.
+    When the resulting ``Promise`` is awaited (or resolved via ``.sync()``),
+    nested awaitables are automatically unpacked recursively until a
+    concrete, non-awaitable value is reached. To unpack only one level, use
+    ``unpack_once()`` or ``unpack_once_sync()`` instead.
+
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
             Defaults to the wrapped function's ``__qualname__``.

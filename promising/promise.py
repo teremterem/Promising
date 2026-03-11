@@ -1,7 +1,7 @@
 import concurrent.futures
 import time
-from asyncio import AbstractEventLoop, Future, Task, coroutines
-from collections.abc import Awaitable, Coroutine, Generator
+from asyncio import AbstractEventLoop, Future, Task
+from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
@@ -37,19 +37,19 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     with asyncio Future functionality.
 
     Promise extends both PromisingContext and asyncio Future to provide:
-    - Asynchronous computation backed by a coroutine
+    - Asynchronous computation backed by an awaitable
     - Result/exception propagation via the Future interface
     - Thread-safe synchronous access via concurrent.futures compatibility
     - Hierarchical parent-child relationships (inherited from
       PromisingContext)
 
     Parent-child relationships (inherited from PromisingContext):
-    - If a Promise's coroutine creates other Promises or
+    - If a Promise's awaitable creates other Promises or
       PromisingContexts during execution, they are attached as children
       of that context.
     - The exact time when a child's execution starts, finishes, or when
       its resolution is triggered does not matter; it is still registered
-      as a child of the context whose coroutine created it.
+      as a child of the context whose awaitable created it.
     - If a parent is explicitly specified at creation time, that explicit
       parent takes precedence.
 
@@ -57,7 +57,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         T_co: The covariant type of the Promise's result.
 
     Args:
-        coro: The coroutine to execute. If None, the Promise must be
+        awaitable: The awaitable to execute. If None, the Promise must be
             prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
@@ -93,14 +93,14 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. GLOBAL_DEFAULT reads
             the current global setting without inheriting.
-        prefilled_result: Pre-set result value. Cannot be combined with coro
+        prefilled_result: Pre-set result value. Cannot be combined with awaitable
             or prefilled_exception.
-        prefilled_exception: Pre-set exception. Cannot be combined with coro
+        prefilled_exception: Pre-set exception. Cannot be combined with awaitable
             or prefilled_result.
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
-        TypeError: If coro is not a coroutine when provided.
+        TypeError: If awaitable does not have __await__ when provided.
     """
 
     # TODO [P1] Figure out how to support async generator interface as
@@ -108,7 +108,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        coro: Coroutine[Any, Any, T_co | Awaitable[Any]] | Sentinel = NOT_SET,
+        awaitable: Awaitable[T_co | Awaitable[Any]] | Sentinel = NOT_SET,
         *,
         namespace: str | Sentinel = NOT_SET,
         loop: AbstractEventLoop | Sentinel = NOT_SET,
@@ -142,7 +142,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         self._start_soon = self._resolve_start_soon(start_soon)
 
-        self._coro = coro
+        self._awaitable = awaitable
         self._finish_initialization(
             prefilled_result=prefilled_result,
             prefilled_exception=prefilled_exception,
@@ -183,11 +183,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         Await the Promise, fully unpacking all nested awaitables.
 
-        If the Promise hasn't started yet, starts execution of the coro via
-        _fulfill(). If already started via start_soon, waits for the existing
-        task to complete. Once the Promise resolves, recursively awaits the
-        result as long as it is itself awaitable (has ``__await__``), returning
-        the final non-awaitable value.
+        If the Promise hasn't started yet, starts execution via _fulfill().
+        If already started via start_soon, waits for the existing task to
+        complete. Once the Promise resolves, recursively awaits the result as
+        long as it is itself awaitable (has ``__await__``), returning the final
+        non-awaitable value.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
@@ -237,13 +237,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Await the Promise, resolving only one level without recursively
         unpacking nested awaitables.
 
-        If the Promise hasn't started yet, starts execution of the coro via
-        _fulfill(). If already started via start_soon, waits for the existing
-        task to complete. Returns the raw result of the Promise's coroutine,
-        which may itself be an awaitable (e.g. another Promise).
+        If the Promise hasn't started yet, starts execution via _fulfill().
+        If already started via start_soon, waits for the existing task to
+        complete. Returns the raw result of the Promise's awaitable, which may
+        itself be an awaitable (e.g. another Promise).
 
         Returns:
-            The direct result of the Promise's coroutine, potentially still
+            The direct result of the Promise's awaitable, potentially still
             an awaitable.
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
@@ -252,7 +252,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables — returns
-        the raw result of the Promise's coroutine, similar to ``unpack_once``.
+        the raw result of the Promise's awaitable, similar to ``unpack_once``.
 
         This is the synchronous counterpart of ``unpack_once`` — intended for
         use inside sync promising functions that run in a thread pool executor.
@@ -261,7 +261,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The direct result of the Promise's coroutine, potentially still
+            The direct result of the Promise's awaitable, potentially still
             an awaitable.
 
         Raises:
@@ -286,30 +286,30 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     async def _fulfill(self) -> None:
         """
-        Execute the Promise's coroutine and manage its lifecycle.
+        Execute the Promise's awaitable and manage its lifecycle.
 
         This method:
         1. Activates the Promise as the current context
-        2. Executes the coroutine
+        2. Executes the awaitable
         3. Sets the result or exception
 
         Raises:
-            RuntimeError: If the Promise is already done or has no coroutine.
+            RuntimeError: If the Promise is already done or has no awaitable.
         """
         # ruff: BLE001 (blind-except)
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
-        if self._coro is NOT_SET:
+        if self._awaitable is NOT_SET:
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no coroutine: {self}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
 
         result = NOT_SET
         exception = NOT_SET
 
         try:
             with self:
-                result = await self._coro
+                result = await self._awaitable
 
         except BaseException as exc:
             exception = exc
@@ -371,7 +371,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         prefilled_result: T_co | Awaitable[Any] | Sentinel,
         prefilled_exception: BaseException | Sentinel,
     ) -> None:
-        if self._coro is NOT_SET:
+        if self._awaitable is NOT_SET:
             if prefilled_result is not NOT_SET and prefilled_exception is not NOT_SET:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
@@ -381,13 +381,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 self.set_exception(prefilled_exception)
 
             else:
-                raise ValueError("Cannot create a Promise without a coroutine or prefilled result/exception")
+                raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
         else:
-            if not coroutines.iscoroutine(self._coro):
-                raise TypeError(f"Promise must be created with a coroutine. Got {type(self._coro)}.")
+            if not hasattr(self._awaitable, "__await__"):
+                raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
             if prefilled_result is not NOT_SET or prefilled_exception is not NOT_SET:
                 raise ValueError(
-                    "Cannot provide both 'coro' and 'prefilled_result' or 'prefilled_exception' parameters"
+                    "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )
 
             if self._start_soon:
@@ -400,7 +400,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         return self._repr_context(
             resolve_namespace(
                 provided_explicitly=self.namespace,
-                named_object_fallback=self._coro,
+                named_object_fallback=self._awaitable,
             ),
         )
 

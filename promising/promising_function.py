@@ -242,7 +242,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
 
         return Promise[T_co](
             namespace=namespace,
-            coro=coro,
+            awaitable=coro,
             start_soon=start_soon,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,

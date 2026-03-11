@@ -1,5 +1,4 @@
 import concurrent.futures
-import functools
 import time
 from asyncio import AbstractEventLoop, Future, Task, coroutines
 from collections.abc import Awaitable, Coroutine, Generator
@@ -109,7 +108,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        coro: Coroutine[Any, Any, Awaitable[Any] | T_co] | Sentinel = NOT_SET,
+        coro: Coroutine[Any, Any, T_co | Awaitable[Any]] | Sentinel = NOT_SET,
         *,
         namespace: str | Sentinel = NOT_SET,
         loop: AbstractEventLoop | Sentinel = NOT_SET,
@@ -118,7 +117,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: Awaitable[Any] | T_co | None | Sentinel = NOT_SET,
+        prefilled_result: T_co | Awaitable[Any] | Sentinel = NOT_SET,
         prefilled_exception: BaseException | Sentinel = NOT_SET,
     ) -> None:
         PromisingContext.__init__(
@@ -221,7 +220,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         deadline = None if timeout is None else time.monotonic() + timeout
         result = self.as_concurrent_future().result(timeout=timeout)
 
-        while hasattr(result, "__await__"):
+        while isinstance(result, Promise):
             remaining = None if deadline is None else deadline - time.monotonic()
             # TODO Add a test to ensure that unpacking of a chain of awaitables
             #  goes on [roughly] for the duration of the timeout
@@ -229,27 +228,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # Make sure it does not go below zero
                 remaining = max(remaining, 0)
 
-            if isinstance(result, Promise):
-                promise = result
-            else:
-
-                async def _wrap_awaitable(awaitable: Awaitable[Any]) -> Any:
-                    return await awaitable
-
-                promise = Promise(
-                    # If `result` is not a real function,
-                    # `functools.update_wrapper` will simply do nothing
-                    # (it will not fail)
-                    functools.update_wrapper(wrapper=_wrap_awaitable, wrapped=result)(result),
-                    loop=self._ctx_loop,
-                    start_soon=True,
-                )
-
-            result = promise.as_concurrent_future().result(timeout=remaining)
+            result = result.as_concurrent_future().result(timeout=remaining)
 
         return result
 
-    async def unpack_once(self) -> T_co | Awaitable[Any]:
+    async def unpack_once(self) -> "T_co | Promise[Any]":
         """
         Await the Promise, resolving only one level without recursively
         unpacking nested awaitables.
@@ -265,7 +248,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
 
-    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | Awaitable[Any]:
+    def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Awaitable[Any]":
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables — returns
@@ -385,7 +368,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def _finish_initialization(
         self,
         *,
-        prefilled_result: T_co | None | Sentinel,
+        prefilled_result: T_co | Awaitable[Any] | Sentinel,
         prefilled_exception: BaseException | Sentinel,
     ) -> None:
         if self._coro is NOT_SET:
@@ -421,10 +404,14 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             ),
         )
 
-    def set_result(self, result: T_co) -> None:
+    def set_result(self, result: T_co | Awaitable[Any]) -> None:
         """
         Set the result of the Promise. This method is not intended to be called
         directly by users; it is managed by the Promise's lifecycle.
+
+        If the result is an awaitable but not a Promise, it is automatically
+        wrapped in a Promise so that downstream unpacking (in ``sync()``,
+        ``__await__``, etc.) can always assume awaitable results are Promises.
 
         Also sets the result on the concurrent.futures.Future for thread
         compatibility (see `as_concurrent_future()` method).
@@ -432,6 +419,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Args:
             result: The result value to set.
         """
+        if hasattr(result, "__await__") and not isinstance(result, Promise):
+            result = Promise[Any](result, parent=self)
+
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be
         #  cancelled by the user:
@@ -478,7 +468,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         super().__init__()
         self._promise = promise
 
-    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> T_co:
+    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> "T_co | Promise[Any]":
         """
         Get the result of the Promise.
 
@@ -588,11 +578,11 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
 
 
 class _AwaitablePromiseUnpacker(Generic[T_co]):
-    def __init__(self, promise: "Promise[T_co]", *, unpack_all: bool) -> None:
+    def __init__(self, promise: Promise[T_co], *, unpack_all: bool) -> None:
         self._promise = promise
         self._unpack_all = unpack_all
 
-    def __await__(self) -> Generator[Any, None, T_co]:
+    def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
         # TODO Ensure we are in the thread where the Promise's event loop is
         #  running
         if self._promise.done():
@@ -604,7 +594,7 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
             result = yield from super(type(self._promise), self._promise).__await__()
 
         if self._unpack_all:
-            while hasattr(result, "__await__"):
+            while isinstance(result, Promise):
                 result = yield from result.__await__()
 
         return result

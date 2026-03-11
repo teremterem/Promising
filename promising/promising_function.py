@@ -50,6 +50,25 @@ def function(
     non-awaitable value is reached. To unpack only one level, use
     ``unpack_once()`` or ``unpack_once_sync()`` instead.
 
+    Inside a decorated function body, the following utilities are
+    available:
+
+    - **Consuming other promises from sync functions:** sync decorated
+      functions run in a thread pool and can call ``.sync()`` on other
+      ``Promise`` objects to block until their result is available.
+      Async decorated functions simply ``await`` other promises as usual.
+    - **Waiting for child promises:** call
+      ``await promising.await_children()`` (or
+      ``promising.await_children_sync()`` from sync functions) to wait
+      for all child promises spawned during the current function's
+      execution. The same methods are available directly on the
+      ``Promise`` object as well.
+    - **Grouping children:** use ``promising.context`` (as a context
+      manager or decorator) to create lightweight grouping nodes in
+      the promise hierarchy without creating a full ``Promise``. This
+      is useful for overriding settings for a block of code or for
+      selectively awaiting a subset of children.
+
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
             Defaults to the wrapped function's ``__qualname__``.

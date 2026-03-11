@@ -157,7 +157,7 @@ async def test_custom_coroutine_await_unpacks() -> None:
 
 
 async def test_custom_coroutine_unpack_once_stops() -> None:
-    """`unpack_once()` returns the coroutine itself."""
+    """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def custom_coro() -> str:
         return "custom_value"
@@ -168,7 +168,7 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Get rid of the asyncio warning
     assert await result == "custom_value"
@@ -196,7 +196,7 @@ async def test_mixed_chain_await_unpacks_all() -> None:
 
 
 async def test_mixed_chain_unpack_once() -> None:
-    """`unpack_once()` on outer promise returns the coroutine."""
+    """`unpack_once()` on outer promise returns the coroutine wrapped in a Promise."""
 
     inner = None
 
@@ -211,13 +211,10 @@ async def test_mixed_chain_unpack_once() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"
-
-    # Get rid of the asyncio warning
-    assert await result is inner
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +273,7 @@ async def test_coroutine_with_sleep_await_unpacks() -> None:
 
 
 async def test_coroutine_with_sleep_unpack_once_stops() -> None:
-    """`unpack_once()` returns the coroutine."""
+    """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def sleeping_coro() -> str:
         await asyncio.sleep(0.1)
@@ -288,7 +285,7 @@ async def test_coroutine_with_sleep_unpack_once_stops() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Get rid of the asyncio warning
     assert await result == "slept_value"

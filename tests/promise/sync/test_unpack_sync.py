@@ -170,7 +170,7 @@ async def test_custom_coroutine_sync_unpacks() -> None:
 
 
 async def test_custom_coroutine_unpack_once_sync_stops() -> None:
-    """`unpack_once_sync()` returns the coroutine itself."""
+    """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
 
     async def custom_coro() -> str:
         return "custom_value"
@@ -182,7 +182,7 @@ async def test_custom_coroutine_unpack_once_sync_stops() -> None:
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Get rid of the asyncio warning
     assert await result == "custom_value"
@@ -213,7 +213,7 @@ async def test_mixed_chain_sync_unpacks_all() -> None:
 
 async def test_mixed_chain_unpack_once_sync() -> None:
     """`unpack_once_sync()` on outer promise returns the
-    coroutine."""
+    coroutine wrapped in a Promise."""
 
     inner = None
 
@@ -229,13 +229,10 @@ async def test_mixed_chain_unpack_once_sync() -> None:
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"
-
-    # Get rid of the asyncio warning
-    assert await result is inner
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +294,7 @@ async def test_coroutine_with_sleep_sync_unpacks() -> None:
 
 
 async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
-    """`unpack_once_sync()` returns the coroutine."""
+    """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
 
     async def sleeping_coro() -> str:
         await asyncio.sleep(0.1)
@@ -310,7 +307,7 @@ async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert asyncio.iscoroutine(result)
+    assert isinstance(result, Promise)
 
     # Get rid of the asyncio warning
     assert await result == "slept_value"

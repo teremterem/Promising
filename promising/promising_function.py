@@ -7,13 +7,13 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport, resolve_namespace
+from promising.utils import DecoratorSupport, is_func_or_method_async
 
 
 def function(
-    func_or_method: DecoratableFunctionType | None = None,
+    func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
     *,
-    namespace: str | None = None,
+    namespace: str | Sentinel = NOT_SET,
     start_soon: bool | Sentinel = NOT_SET,
     children_start_soon: bool | Sentinel = NOT_SET,
     start_soon_default: bool | Sentinel = INHERIT,
@@ -38,6 +38,37 @@ def function(
 
     Works as a method decorator for instance methods, ``@classmethod``,
     and ``@staticmethod``.
+
+    Decorated functions may return other awaitables or ``Promise`` objects
+    (e.g. by calling other decorated functions) instead of concrete values.
+    If the return value is an awaitable that is not already a ``Promise``,
+    it is automatically wrapped in a child ``Promise`` of the current one,
+    inheriting settings (``thread_pool``, ``start_soon_default``, etc.)
+    through the standard ``Promise`` inheritance mechanism. When the
+    resulting ``Promise`` is awaited (or resolved via ``.sync()``), nested
+    awaitables (non-Promise awaitables are auto-wrapped into Promises
+    by ``set_result``) are automatically unpacked recursively until a
+    concrete, non-awaitable value is reached. To unpack only one level, use
+    ``unpack_once()`` or ``unpack_once_sync()`` instead.
+
+    Inside a decorated function body, the following utilities are
+    available:
+
+    - **Consuming other promises from sync functions:** sync decorated
+      functions run in a thread pool and can call ``.sync()`` on other
+      ``Promise`` objects to block until their result is available.
+      Async decorated functions simply ``await`` other promises as usual.
+    - **Waiting for child promises:** call
+      ``await promising.await_children()`` (or
+      ``promising.await_children_sync()`` from sync functions) to wait
+      for all child promises spawned during the current function's
+      execution. The same methods are available directly on the
+      ``Promise`` object as well.
+    - **Grouping children:** use ``promising.context`` (as a context
+      manager or decorator) to create lightweight grouping nodes in
+      the promise hierarchy without creating a full ``Promise``. This
+      is useful for overriding settings for a block of code or for
+      selectively awaiting a subset of children.
 
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
@@ -80,7 +111,7 @@ def function(
             specific case rather than blanket-disabling thread pools
             for an entire subtree.
     """
-    if func_or_method is None:
+    if func_or_method is NOT_SET:
         # The decorator was used with arguments
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
@@ -116,15 +147,14 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        namespace: str | None = None,
+        namespace: str | Sentinel = NOT_SET,
         start_soon: bool | Sentinel = NOT_SET,
         children_start_soon: bool | Sentinel = NOT_SET,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,
     ) -> None:
-        super().__init__(func_or_method)
-        self.namespace = namespace
+        super().__init__(func_or_method, namespace=namespace)
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
@@ -142,29 +172,28 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        **kwargs: Any,
-    ) -> Promise[T_co]:
-        return self.call(*args, **kwargs)
-
-    def call(
-        self,
-        *args: Any,
+        namespace: str | Sentinel | None = None,
+        start_soon: bool | Sentinel | None = None,
+        children_start_soon: bool | Sentinel | None = None,
+        start_soon_default: bool | Sentinel | None = None,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel | None = None,
+        use_thread_pool: bool | None = None,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
         Call the wrapped function and return a ``Promise`` for its result.
 
-        This is the core method that ``__call__`` delegates to. It creates
-        a ``Promise`` that wraps the function's execution (running sync
-        functions in a thread pool automatically).
+        Creates a ``Promise`` that wraps the function's execution (running
+        sync functions in a thread pool automatically).
 
-        The ``start_soon``, ``children_start_soon``, and
-        ``start_soon_default`` parameters can be passed as keyword
-        arguments to override the values set on the ``PromisingFunction``
-        at decoration time. To use the decorator-level values, simply
-        omit these keyword arguments — passing ``NOT_SET`` explicitly
-        will still override them (``NOT_SET`` is itself a valid value
-        with its own semantics in ``Promise``).
+        The ``namespace``, ``start_soon``, ``children_start_soon``,
+        ``start_soon_default``, ``thread_pool``, and ``use_thread_pool``
+        parameters can be passed as keyword arguments to override the
+        values set on the ``PromisingFunction`` at decoration time. To
+        use the decorator-level values, simply omit these keyword
+        arguments or pass ``None`` — both are equivalent. Passing
+        ``NOT_SET`` explicitly will still override them (``NOT_SET`` is
+        itself a valid value with its own semantics in ``Promise``).
 
         Args:
             *args: Positional arguments forwarded to the wrapped function.
@@ -172,6 +201,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 The following keyword arguments are intercepted and not
                 forwarded:
 
+                - **namespace** — Namespace string for the resulting
+                  ``Promise``.
                 - **start_soon** — Whether the ``Promise`` should start
                   executing immediately upon creation.
                 - **children_start_soon** — Default ``start_soon`` value
@@ -189,32 +220,24 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
-        start_soon = kwargs.pop(
-            "start_soon",
-            self.start_soon,
-        )
-        children_start_soon = kwargs.pop(
-            "children_start_soon",
-            self.children_start_soon,
-        )
-        start_soon_default = kwargs.pop(
-            "start_soon_default",
-            self.start_soon_default,
-        )
-        thread_pool = kwargs.pop(
-            "thread_pool",
-            self.thread_pool,
-        )
-        use_thread_pool = kwargs.pop(
-            "use_thread_pool",
-            self.use_thread_pool,
-        )
+        if namespace is None:
+            namespace = self.namespace
+        if start_soon is None:
+            start_soon = self.start_soon
+        if children_start_soon is None:
+            children_start_soon = self.children_start_soon
+        if start_soon_default is None:
+            start_soon_default = self.start_soon_default
+        if thread_pool is None:
+            thread_pool = self.thread_pool
+        if use_thread_pool is None:
+            use_thread_pool = self.use_thread_pool
 
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
 
-        if self._is_wrapped_async:
+        if is_func_or_method_async(self.__wrapped__):
             # The wrapped function is already async, so we can just call it
             # directly
             coro = self._wrapped_as_callable(*args, **kwargs)
@@ -247,11 +270,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             coro = _sync_inline()
 
         return Promise[T_co](
-            namespace=resolve_namespace(
-                provided_explicitly=self.namespace,
-                named_object_fallback=self.__wrapped__,
-            ),
-            coro=coro,
+            namespace=namespace,
+            awaitable=coro,
             start_soon=start_soon,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,

@@ -226,7 +226,7 @@ async def test_active_promise_accessible_inside_sync_function() -> None:
         return get_active_promise(raise_if_none=False)
 
     promise = sync_func()
-    current_from_inside = await promise
+    current_from_inside = await promise.unpack_once()
     assert current_from_inside is promise
 
 

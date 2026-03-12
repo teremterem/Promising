@@ -20,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, resolve_namespace
+from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, is_func_or_method_async
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -28,14 +28,17 @@ if TYPE_CHECKING:
 
 class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     """
-    Decorator and context manager that establishes a lightweight
-    ``PromisingContext`` node in the promise hierarchy without creating an
-    actual ``Promise``.
+    Decorator and context manager that creates a hierarchical context node
+    tracking parent-child relationships between promises and groups of
+    promises, without creating an actual ``Promise``.
 
     Use ``promising.context`` when you need a parent node that groups child
     promises but does not represent an asynchronous computation itself. You may
-    want it to do ``await_children()`` on such a PromisingContext later, or to
-    override the default settings for a specific block of code, etc.
+    want it to do ``await_children()`` on such a ``PromisingContext`` later, or
+    to override the default settings for a specific block of code, etc.
+
+    ``PromisingContext`` can also be instantiated directly for advanced use
+    cases, but ``promising.context`` is the recommended entry point.
 
     As a **context manager**::
 
@@ -62,14 +65,16 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
     need to be awaited, of course.)
 
     Args:
-        namespace: Optional namespace string for the underlying
-            ``PromisingContext``. When used as a decorator and not provided,
+        namespace: Human-readable label for the underlying
+            ``PromisingContext``. Shows up in ``__repr__`` output and (planned)
+            error breadcrumbs. When used as a decorator and not provided,
             defaults to the wrapped function's ``__qualname__``.
             # TODO Planned feature: Namespaces will show up in the form of
             #  breadcrumbs in error logs to help trace the source of errors.
             # TODO Anything else we could do with namespaces ?
-        loop: Event loop to use. If not provided, inherits from the parent
-            context (or uses the current event loop if there is no parent).
+        loop: Event loop to use. ``NOT_SET`` (default) inherits from the
+            parent context, or falls back to ``asyncio.get_event_loop()`` at
+            the root.
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
@@ -80,33 +85,34 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             to ``run_in_executor``, letting the event loop use its own default
             executor. A concrete ``ThreadPoolExecutor`` instance can also be
             provided.
-        children_start_soon: Whether child promises created directly within
-            this context should start executing immediately (i.e. as soon as
-            the event loop allows), or defer until awaited one way or another.
-            ``INHERIT`` (default) copies the parent's setting.
+        children_start_soon: Default ``start_soon`` value enforced on child
+            Promises whose own ``start_soon`` is ``NOT_SET``. Controls whether
+            they start executing immediately (i.e. as soon as the event loop
+            allows), or defer until awaited one way or another. ``INHERIT``
+            (default) copies the parent's setting.
         start_soon_default: Local override for the global
-            ``START_SOON_DEFAULT``, effective in the whole subtree of this
+            ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
     """
 
     def __init__(
         self,
-        func_or_method: DecoratableFunctionType | None = None,
+        func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
         *,
-        namespace: str | None = None,
-        loop: AbstractEventLoop | None = None,
+        namespace: str | Sentinel = NOT_SET,
+        loop: AbstractEventLoop | Sentinel = NOT_SET,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
-        super().__init__(func_or_method)
-        self._namespace = namespace
-        self._ctx_loop = loop
-        self._parent = parent
-        self._thread_pool = thread_pool
-        self._children_start_soon = children_start_soon
-        self._start_soon_default = start_soon_default
+        super().__init__(func_or_method, namespace=namespace)
+
+        self.ctx_loop = loop
+        self.parent = parent
+        self.thread_pool = thread_pool
+        self.children_start_soon = children_start_soon
+        self.start_soon_default = start_soon_default
 
         self._promising_context = None
 
@@ -124,12 +130,12 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
-                namespace=self._namespace,
-                loop=self._ctx_loop,
-                parent=self._parent,
-                thread_pool=self._thread_pool,
-                children_start_soon=self._children_start_soon,
-                start_soon_default=self._start_soon_default,
+                namespace=self.namespace,
+                loop=self.ctx_loop,
+                parent=self.parent,
+                thread_pool=self.thread_pool,
+                children_start_soon=self.children_start_soon,
+                start_soon_default=self.start_soon_default,
             )
         return self._promising_context.__enter__()
 
@@ -165,18 +171,15 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
-            namespace=resolve_namespace(
-                provided_explicitly=self._namespace,
-                named_object_fallback=self.__wrapped__,
-            ),
-            loop=self._ctx_loop,
-            parent=self._parent,
-            thread_pool=self._thread_pool,
-            children_start_soon=self._children_start_soon,
-            start_soon_default=self._start_soon_default,
+            namespace=self.namespace,
+            loop=self.ctx_loop,
+            parent=self.parent,
+            thread_pool=self.thread_pool,
+            children_start_soon=self.children_start_soon,
+            start_soon_default=self.start_soon_default,
         )
 
-        if self._is_wrapped_async:
+        if is_func_or_method_async(self.__wrapped__):
             # Wrapped function or method is async
 
             @functools.wraps(self.__wrapped__)
@@ -250,20 +253,22 @@ def await_children_sync(*, recursively: bool = False, timeout: float | None = No
 
 
 class PromisingContext:
-    """Hierarchical context node created by ``promising.context``. See
-    :class:`promising.context` for usage details."""
+    """Hierarchical context node that tracks parent-child relationships
+    between promises. Usually created via ``promising.context``; see
+    :class:`promising.context` for usage details and parameter
+    descriptions."""
 
-    namespace: str | None
+    namespace: str | Sentinel
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO TODO TODO Support cancellation of the whole PromisingContext tree
+    # TODO [P1] Support cancellation of the whole PromisingContext tree
 
     def __init__(
         self,
         *,
-        namespace: str | None = None,
-        loop: AbstractEventLoop | None = None,
+        namespace: str | Sentinel = NOT_SET,
+        loop: AbstractEventLoop | Sentinel = NOT_SET,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,
@@ -286,7 +291,7 @@ class PromisingContext:
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
 
-        if loop is None:
+        if loop is NOT_SET:
             if self._parent is None:
                 self._ctx_loop = asyncio.get_event_loop()
             else:
@@ -344,7 +349,7 @@ class PromisingContext:
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
         """
-        Get the parent Promise of this Promise (skipping over any
+        Get the nearest ancestor Promise of this context (skipping over any
         PromisingContexts that aren't Promises).
 
         Args:
@@ -390,7 +395,7 @@ class PromisingContext:
             # children may be spawned by existing ones while the existing ones
             # are being awaited
             await asyncio.gather(
-                *children,
+                *[child.unpack_once() for child in children],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until
@@ -432,7 +437,7 @@ class PromisingContext:
         async def await_children_and_notify() -> None:
             try:
                 await self.await_children(recursively=recursively)
-            except BaseException as exc:  # noqa: BLE001 (blind-except)
+            except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from
                 # the children and suppresses them
@@ -544,7 +549,7 @@ class PromisingContext:
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
 
-        except BaseException as exc:  # noqa: BLE001 (blind-except)
+        except BaseException as exc:
             if exc_value is None:
                 raise exc
             else:
@@ -635,10 +640,9 @@ class PromisingContext:
         """
         return self._thread_pool
 
-    def _repr_context(self, namespace: str | None = None) -> str:
-        if namespace is not None:
-            namespace = f"{namespace!r} "
-        return f"<{namespace or ''}{self.__class__.__name__} id={id(self)}>"
+    def _repr_context(self, namespace: str | Sentinel = NOT_SET) -> str:
+        namespace = "" if namespace is NOT_SET else f"{namespace!r} "
+        return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
 
     def __repr__(self) -> str:
         return self._repr_context(self.namespace)

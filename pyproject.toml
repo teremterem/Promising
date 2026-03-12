@@ -24,7 +24,9 @@ source = ["promising"]
 name = "promising"
 version = "0.1.0"
 description = """\
-TODO\
+A new, general-purpose hierarchical async framework for Python which, among \
+other use cases, is adapted to the emerging reality of building highly \
+parallel LLM-based multi-agent systems.\
 """
 authors = [{name = "Oleksandr Tereshchenko", email = "toporok@gmail.com"}]
 readme = "README.md"

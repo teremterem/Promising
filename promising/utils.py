@@ -6,7 +6,14 @@ from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError, SyncUsageError
+from promising.sentinels import NOT_SET, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
+
+
+def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
+    if isinstance(func_or_method, (classmethod, staticmethod)):
+        return inspect.iscoroutinefunction(func_or_method.__func__)
+    return inspect.iscoroutinefunction(func_or_method)
 
 
 def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
@@ -19,12 +26,12 @@ def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: st
         raise SyncUsageError(message)
 
 
-def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any) -> str | None:
-    if provided_explicitly is not None:
+def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallback: Any | Sentinel) -> str | Sentinel:
+    if provided_explicitly is not NOT_SET:
         return provided_explicitly
 
-    if named_object_fallback is None:
-        return None
+    if named_object_fallback is NOT_SET:
+        return NOT_SET
 
     if hasattr(named_object_fallback, "__qualname__"):
         return named_object_fallback.__qualname__
@@ -36,11 +43,27 @@ def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback:
 
 
 class DecoratorSupport:
-    __wrapped__: DecoratableFunctionType
+    """
+    Base class that provides decorator and descriptor plumbing for
+    ``promising.context`` and ``PromisingFunction``.
 
-    def __init__(self, func_or_method: DecoratableFunctionType | None) -> None:
+    Handles ``functools.update_wrapper`` bookkeeping and implements
+    ``__get__`` so that the decorator works correctly on instance
+    methods, ``@classmethod``, and ``@staticmethod``.
+    """
+
+    __wrapped__: DecoratableFunctionType | None
+    namespace: str | Sentinel
+
+    def __init__(
+        self,
+        func_or_method: DecoratableFunctionType | Sentinel,  # can be NOT_SET
+        *,
+        namespace: str | Sentinel,  # can be NOT_SET
+    ) -> None:
         self.__wrapped__ = None
-        if func_or_method is None:
+        self.namespace = namespace
+        if func_or_method is NOT_SET:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
             # decorator with parameters.
@@ -48,7 +71,7 @@ class DecoratorSupport:
         self._update_wrapper(func_or_method)
 
     def _update_wrapper(self, func_or_method: Any) -> None:
-        if func_or_method is None:
+        if func_or_method is NOT_SET:
             raise DecorationError("The function or method to decorate was not provided")
 
         if not callable(func_or_method) and not isinstance(func_or_method, classmethod):
@@ -59,6 +82,13 @@ class DecoratorSupport:
             )
         # This also sets `self.__wrapped__` to equal `func_or_method`
         functools.update_wrapper(self, func_or_method)
+
+        # Update the namespace to the new function or method (if it wasn't set
+        # explicitly)
+        self.namespace = resolve_namespace(
+            provided_explicitly=self.namespace,
+            named_object_fallback=func_or_method,
+        )
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:
         """
@@ -94,13 +124,3 @@ class DecoratorSupport:
         if isinstance(self.__wrapped__, classmethod):
             return self.__wrapped__.__func__
         return self.__wrapped__
-
-    @property
-    def _is_wrapped_async(self) -> bool:
-        """
-        Check if the wrapped function or method is a coroutine function or
-        method.
-        """
-        if isinstance(self.__wrapped__, (classmethod, staticmethod)):
-            return inspect.iscoroutinefunction(self.__wrapped__.__func__)
-        return inspect.iscoroutinefunction(self.__wrapped__)

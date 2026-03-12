@@ -5,8 +5,7 @@ import threading
 import pytest
 
 import promising
-from promising import await_children_sync, get_active_promise
-from promising.errors import SyncUsageError
+from promising import SyncUsageError, await_children_sync, get_active_promise
 
 # ── use_thread_pool=True (default): sync function runs in a thread pool ──
 
@@ -82,7 +81,7 @@ async def test_use_thread_pool_false_context_propagation() -> None:
         return get_active_promise(raise_if_none=False)
 
     promise = sync_func()
-    current_from_inside = await promise
+    current_from_inside = await promise.unpack_once()
     assert current_from_inside is promise
 
 

@@ -9,7 +9,7 @@ from typing import NoReturn
 
 import pytest
 
-from promising.promise import Promise
+from promising import Promise
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
@@ -85,7 +85,7 @@ async def test_promise(
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise
-        promise = Promise(prefill_result="Hello from Promise!")
+        promise = Promise(prefilled_result="Hello from Promise!")
     else:
 
         async def sample_coro() -> str:
@@ -206,7 +206,7 @@ async def test_promise_with_exception(
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise with exception
-        promise = Promise(prefill_exception=ValueError("Test error from Promise!"))
+        promise = Promise(prefilled_exception=ValueError("Test error from Promise!"))
     else:
 
         async def failing_coro() -> NoReturn:
@@ -343,7 +343,7 @@ async def test_from_concurrent_tasks(
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise
-        promise = Promise(prefill_result="Result from task test!")
+        promise = Promise(prefilled_result="Result from task test!")
     else:
 
         async def sample_coro() -> str:
@@ -463,7 +463,7 @@ async def test_parallel_await(*, start_soon: bool | None) -> None:
     coro_call_count = 0
 
     if start_soon is None:
-        promise = Promise(prefill_result="Hello from Promise!")
+        promise = Promise(prefilled_result="Hello from Promise!")
     else:
 
         async def sample_coro() -> str:

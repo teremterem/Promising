@@ -101,7 +101,7 @@ async def test_as_concurrent_future(
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise
-        promise = Promise(prefill_result="Hello from Promise!")
+        promise = Promise(prefilled_result="Hello from Promise!")
     else:
 
         async def sample_coro() -> str:
@@ -263,7 +263,7 @@ async def test_with_exception(
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise with exception
-        promise = Promise(prefill_exception=ValueError("Test error from Promise!"))
+        promise = Promise(prefilled_exception=ValueError("Test error from Promise!"))
     else:
 
         async def failing_coro() -> NoReturn:
@@ -422,7 +422,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
     if start_soon is None:
         # `start_soon=None` in our test means that we want to create a
         # prefilled promise
-        promise = Promise(prefill_result="Result from thread test!")
+        promise = Promise(prefilled_result="Result from thread test!")
     else:
 
         async def sample_coro() -> str:

@@ -30,7 +30,7 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
     if provided_explicitly is not NOT_SET:
         return provided_explicitly
 
-    if named_object_fallback is None:
+    if named_object_fallback is NOT_SET:
         return NOT_SET
 
     if hasattr(named_object_fallback, "__qualname__"):

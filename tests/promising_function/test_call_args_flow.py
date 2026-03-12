@@ -25,10 +25,8 @@ import pytest
 
 import promising
 
-# ── fixtures ─────────────────────────────────────────────────
 
-
-@pytest.fixture()
+@pytest.fixture
 def spy_on_call():
     """Spy on ``PromisingFunction.__call__`` at the class level."""
     original = promising.PromisingFunction.__call__

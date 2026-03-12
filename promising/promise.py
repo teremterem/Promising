@@ -296,7 +296,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done or has no awaitable.
         """
-        # ruff: BLE001 (blind-except)
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
@@ -321,7 +320,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
                     exception.__promising_context__ = self
-            except BaseException:  # noqa: BLE001 (blind-except)
+            except BaseException:
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
                 pass
@@ -564,13 +563,13 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         """
         try:
             self._promise._call_soon_threadsafe(self._consume_asyncio_exception_inside_loop)
-        except BaseException:  # noqa: BLE001 (blind-except)
+        except BaseException:
             pass
 
     def _consume_asyncio_exception_inside_loop(self) -> None:
         try:
             self._promise.exception()
-        except BaseException:  # noqa: BLE001 (blind-except)
+        except BaseException:
             # Suppress the error if any - if there's an error, it will either
             # come from super().exception() or be raised from super().result()
             # of the concurrent future

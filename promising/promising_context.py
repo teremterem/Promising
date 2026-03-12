@@ -437,7 +437,7 @@ class PromisingContext:
         async def await_children_and_notify() -> None:
             try:
                 await self.await_children(recursively=recursively)
-            except BaseException as exc:  # noqa: BLE001 (blind-except)
+            except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from
                 # the children and suppresses them
@@ -549,7 +549,7 @@ class PromisingContext:
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
 
-        except BaseException as exc:  # noqa: BLE001 (blind-except)
+        except BaseException as exc:
             if exc_value is None:
                 raise exc
             else:

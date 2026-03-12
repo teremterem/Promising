@@ -186,7 +186,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to
         complete. Once the Promise resolves, recursively awaits the result as
-        long as it is itself awaitable (has ``__await__``), returning the final
+        long as it is itself a Promise (non-Promise awaitables are
+        auto-wrapped into Promises by ``set_result``), returning the final
         non-awaitable value.
 
         Returns:
@@ -198,8 +199,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread. Recursively unpacks nested awaitables until the result
-        is no longer awaitable, similar to ``__await__``.
+        calling thread. Recursively unpacks nested awaitables (non-Promise
+        awaitables are auto-wrapped into Promises by ``set_result``) until
+        the result is no longer a Promise, similar to ``__await__``.
 
         This is the synchronous counterpart of ``__await__`` — intended for
         use inside sync promising functions that run in a thread pool executor.
@@ -239,20 +241,23 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to
-        complete. Returns the raw result of the Promise's awaitable, which may
-        itself be an awaitable (e.g. another Promise).
+        complete. Returns the raw result of the Promise's awaitable, which
+        may itself be a Promise (non-Promise awaitables are auto-wrapped
+        into Promises by ``set_result``).
 
         Returns:
-            The direct result of the Promise's awaitable, potentially still
-            an awaitable.
+            The direct result of the Promise's awaitable — either a
+            concrete value or another Promise.
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread. Does not recursively unpack nested awaitables — returns
-        the raw result of the Promise's awaitable, similar to ``unpack_once``.
+        calling thread. Does not recursively unpack nested awaitables
+        (non-Promise awaitables are auto-wrapped into Promises by
+        ``set_result``) — returns the raw result of the Promise's
+        awaitable, similar to ``unpack_once``.
 
         This is the synchronous counterpart of ``unpack_once`` — intended for
         use inside sync promising functions that run in a thread pool executor.
@@ -261,8 +266,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The direct result of the Promise's awaitable, potentially still
-            an awaitable.
+            The direct result of the Promise's awaitable — either a
+            concrete value or another Promise.
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,

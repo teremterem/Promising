@@ -395,7 +395,7 @@ class PromisingContext:
             # children may be spawned by existing ones while the existing ones
             # are being awaited
             await asyncio.gather(
-                *children,
+                *[child.unpack_once() for child in children],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until

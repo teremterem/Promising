@@ -591,7 +591,10 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
             self._promise._ensure_task_scheduled()
 
             yield from self._promise._task
-            result = yield from super(type(self._promise), self._promise).__await__()
+            # Use the direct parent class of `Promise` class explicitly, so
+            # that the logic below works with potential subclasses of `Promise`
+            # too
+            result = yield from super(Promise, self._promise).__await__()
 
         if self._unpack_all:
             while isinstance(result, Promise):

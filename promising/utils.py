@@ -26,7 +26,7 @@ def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: st
         raise SyncUsageError(message)
 
 
-def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallback: Any) -> str | Sentinel:
+def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallback: Any | Sentinel) -> str | Sentinel:
     if provided_explicitly is not NOT_SET:
         return provided_explicitly
 

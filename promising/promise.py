@@ -419,7 +419,14 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result: The result value to set.
         """
         if hasattr(result, "__await__") and not isinstance(result, Promise):
-            result = Promise[Any](result, parent=self)
+            result = Promise[Any](
+                result,
+                namespace=resolve_namespace(
+                    provided_explicitly=NOT_SET,
+                    named_object_fallback=result,
+                ),
+                parent=self,
+            )
 
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be

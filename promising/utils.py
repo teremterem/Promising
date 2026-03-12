@@ -10,7 +10,7 @@ from promising.sentinels import NOT_SET, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 
 
-def if_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
+def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
     if isinstance(func_or_method, (classmethod, staticmethod)):
         return inspect.iscoroutinefunction(func_or_method.__func__)
     return inspect.iscoroutinefunction(func_or_method)
@@ -52,7 +52,7 @@ class DecoratorSupport:
     methods, ``@classmethod``, and ``@staticmethod``.
     """
 
-    __wrapped__: DecoratableFunctionType
+    __wrapped__: DecoratableFunctionType | None
     namespace: str | Sentinel
 
     def __init__(

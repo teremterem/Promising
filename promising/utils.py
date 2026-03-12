@@ -57,12 +57,12 @@ class DecoratorSupport:
 
     def __init__(
         self,
-        func_or_method: DecoratableFunctionType | Sentinel,
+        func_or_method: DecoratableFunctionType | Sentinel,  # can be NOT_SET
         *,
-        namespace: str | Sentinel,
+        namespace: str | Sentinel,  # can be NOT_SET
     ) -> None:
         self.__wrapped__ = None
-        self.namespace = NOT_SET
+        self.namespace = namespace
         if func_or_method is NOT_SET:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a

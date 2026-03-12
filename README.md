@@ -25,6 +25,8 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 
 ## Installation
 
+***TODO [P1]*** *Working version not yet published to PyPI*
+
 ```bash
 pip install promising
 ```

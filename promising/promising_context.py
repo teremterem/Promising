@@ -20,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, if_func_or_method_async, resolve_namespace
+from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, if_func_or_method_async
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -106,21 +106,13 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         children_start_soon: bool | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
-        super().__init__(func_or_method)
+        super().__init__(func_or_method, namespace=namespace)
 
-        if self.__wrapped__ is None:
-            self._namespace = namespace
-        else:
-            self._namespace = resolve_namespace(
-                provided_explicitly=namespace,
-                named_object_fallback=self.__wrapped__,
-            )
-
-        self._ctx_loop = loop
-        self._parent = parent
-        self._thread_pool = thread_pool
-        self._children_start_soon = children_start_soon
-        self._start_soon_default = start_soon_default
+        self.ctx_loop = loop
+        self.parent = parent
+        self.thread_pool = thread_pool
+        self.children_start_soon = children_start_soon
+        self.start_soon_default = start_soon_default
 
         self._promising_context = None
 
@@ -138,12 +130,12 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
-                namespace=self._namespace,
-                loop=self._ctx_loop,
-                parent=self._parent,
-                thread_pool=self._thread_pool,
-                children_start_soon=self._children_start_soon,
-                start_soon_default=self._start_soon_default,
+                namespace=self.namespace,
+                loop=self.ctx_loop,
+                parent=self.parent,
+                thread_pool=self.thread_pool,
+                children_start_soon=self.children_start_soon,
+                start_soon_default=self.start_soon_default,
             )
         return self._promising_context.__enter__()
 
@@ -179,12 +171,12 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # being called with arguments - let's pass this call through to the
         # underlying function or method
         ctx = PromisingContext(
-            namespace=self._namespace,
-            loop=self._ctx_loop,
-            parent=self._parent,
-            thread_pool=self._thread_pool,
-            children_start_soon=self._children_start_soon,
-            start_soon_default=self._start_soon_default,
+            namespace=self.namespace,
+            loop=self.ctx_loop,
+            parent=self.parent,
+            thread_pool=self.thread_pool,
+            children_start_soon=self.children_start_soon,
+            start_soon_default=self.start_soon_default,
         )
 
         if if_func_or_method_async(self.__wrapped__):
@@ -649,9 +641,8 @@ class PromisingContext:
         return self._thread_pool
 
     def _repr_context(self, namespace: str | Sentinel = NOT_SET) -> str:
-        if namespace is not NOT_SET:
-            namespace = f"{namespace!r} "
-        return f"<{namespace or ''}{self.__class__.__name__} id={id(self)}>"
+        namespace = "" if namespace is NOT_SET else f"{namespace!r} "
+        return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
 
     def __repr__(self) -> str:
         return self._repr_context(self.namespace)

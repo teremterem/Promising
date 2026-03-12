@@ -7,7 +7,7 @@ from typing import Any, Generic
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, NOT_SET, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport, if_func_or_method_async, resolve_namespace
+from promising.utils import DecoratorSupport, if_func_or_method_async
 
 
 def function(
@@ -153,11 +153,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,
     ) -> None:
-        super().__init__(func_or_method)
-        self.namespace = resolve_namespace(
-            provided_explicitly=namespace,
-            named_object_fallback=self.__wrapped__,
-        )
+        super().__init__(func_or_method, namespace=namespace)
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default

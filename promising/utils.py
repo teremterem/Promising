@@ -53,9 +53,16 @@ class DecoratorSupport:
     """
 
     __wrapped__: DecoratableFunctionType
+    namespace: str | Sentinel
 
-    def __init__(self, func_or_method: DecoratableFunctionType | Sentinel) -> None:
+    def __init__(
+        self,
+        func_or_method: DecoratableFunctionType | Sentinel,
+        *,
+        namespace: str | Sentinel,
+    ) -> None:
         self.__wrapped__ = None
+        self.namespace = NOT_SET
         if func_or_method is NOT_SET:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
@@ -75,6 +82,13 @@ class DecoratorSupport:
             )
         # This also sets `self.__wrapped__` to equal `func_or_method`
         functools.update_wrapper(self, func_or_method)
+
+        # Update the namespace to the new function or method (if it wasn't set
+        # explicitly)
+        self.namespace = resolve_namespace(
+            provided_explicitly=self.namespace,
+            named_object_fallback=func_or_method,
+        )
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:
         """

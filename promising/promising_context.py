@@ -18,7 +18,7 @@ from promising.errors import (
     PromiseNotFoundError,
     SyncUsageError,
 )
-from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, is_func_or_method_async
 
@@ -72,7 +72,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             # TODO Planned feature: Namespaces will show up in the form of
             #  breadcrumbs in error logs to help trace the source of errors.
             # TODO Anything else we could do with namespaces ?
-        loop: Event loop to use. ``NOT_SET`` (default) inherits from the
+        loop: Event loop to use. None (default) inherits from the
             parent context, or falls back to ``asyncio.get_event_loop()`` at
             the root.
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
@@ -86,7 +86,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             executor. A concrete ``ThreadPoolExecutor`` instance can also be
             provided.
         children_start_soon: Default ``start_soon`` value enforced on child
-            Promises whose own ``start_soon`` is ``NOT_SET``. Controls whether
+            Promises whose own ``start_soon`` is None. Controls whether
             they start executing immediately (i.e. as soon as the event loop
             allows), or defer until awaited one way or another. ``INHERIT``
             (default) copies the parent's setting.
@@ -97,13 +97,13 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     def __init__(
         self,
-        func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
+        func_or_method: DecoratableFunctionType | None = None,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        children_start_soon: bool | Sentinel = INHERIT,
+        children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
@@ -258,7 +258,7 @@ class PromisingContext:
     :class:`promising.context` for usage details and parameter
     descriptions."""
 
-    namespace: str | Sentinel
+    namespace: str | None
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
@@ -291,7 +291,7 @@ class PromisingContext:
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
 
-        if loop is NOT_SET:
+        if loop is None:
             if self._parent is None:
                 self._ctx_loop = asyncio.get_event_loop()
             else:
@@ -584,12 +584,12 @@ class PromisingContext:
             f"but `{type(start_soon_default)}` was given instead"
         )
 
-    def _resolve_children_start_soon(self, children_start_soon: bool | Sentinel) -> bool | Sentinel:
-        if isinstance(children_start_soon, bool) or children_start_soon is NOT_SET:
+    def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:
+        if isinstance(children_start_soon, bool) or children_start_soon is None:
             # Apart from the concrete value, we also want to allow
-            # `self._children_start_soon` to stay as NOT_SET, so we
+            # `self._children_start_soon` to stay as None, so we
             # can later tell whether it is being enforced on children or not
-            # (NOT_SET means "no enforcement").
+            # (None means "no enforcement").
             return children_start_soon
 
         if children_start_soon is INHERIT:
@@ -601,7 +601,7 @@ class PromisingContext:
             return self._parent._children_start_soon
 
         raise ValueError(
-            "`children_start_soon` must be either NOT_SET, INHERIT or a boolean value, "
+            "`children_start_soon` must be either None, INHERIT or a boolean value, "
             f"but `{type(children_start_soon)}` was given instead"
         )
 
@@ -640,8 +640,8 @@ class PromisingContext:
         """
         return self._thread_pool
 
-    def _repr_context(self, namespace: str | Sentinel = NOT_SET) -> str:
-        namespace = "" if namespace is NOT_SET else f"{namespace!r} "
+    def _repr_context(self, namespace: str | None = None) -> str:
+        namespace = "" if namespace is None else f"{namespace!r} "
         return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
 
     def __repr__(self) -> str:

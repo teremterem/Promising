@@ -267,8 +267,8 @@ class PromisingContext:
     def __init__(
         self,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | Sentinel = INHERIT,

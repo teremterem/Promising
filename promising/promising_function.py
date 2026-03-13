@@ -11,11 +11,11 @@ from promising.utils import DecoratorSupport, is_func_or_method_async
 
 
 def function(
-    func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
+    func_or_method: DecoratableFunctionType | None = None,
     *,
-    namespace: str | Sentinel = NOT_SET,
-    start_soon: bool | Sentinel = NOT_SET,
-    children_start_soon: bool | Sentinel = NOT_SET,
+    namespace: str | None = None,
+    start_soon: bool | None = None,
+    children_start_soon: bool | None = None,
     start_soon_default: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool = True,
@@ -147,9 +147,9 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon: bool | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        start_soon: bool | None = None,
+        children_start_soon: bool | None = None,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,
@@ -172,12 +172,12 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        namespace: str | Sentinel | None = None,
-        start_soon: bool | Sentinel | None = None,
-        children_start_soon: bool | Sentinel | None = None,
-        start_soon_default: bool | Sentinel | None = None,
-        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel | None = None,
-        use_thread_pool: bool | None = None,
+        namespace: str | None | Sentinel = NOT_SET,
+        start_soon: bool | None | Sentinel = NOT_SET,
+        children_start_soon: bool | None | Sentinel = NOT_SET,
+        start_soon_default: bool | None | Sentinel = NOT_SET,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = NOT_SET,
+        use_thread_pool: bool | Sentinel = NOT_SET,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """

@@ -108,17 +108,17 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        awaitable: Awaitable[T_co | Awaitable[Any]] | Sentinel = NOT_SET,
+        awaitable: Awaitable[T_co | Awaitable[Any]] | None = None,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon: bool | Sentinel = NOT_SET,
+        start_soon: bool | None = None,
+        children_start_soon: bool | None = None,
         start_soon_default: bool | Sentinel = INHERIT,
         prefilled_result: T_co | Awaitable[Any] | Sentinel = NOT_SET,
-        prefilled_exception: BaseException | Sentinel = NOT_SET,
+        prefilled_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(
             self,

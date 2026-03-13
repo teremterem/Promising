@@ -111,7 +111,7 @@ def test_name_fallback_with_module_but_no_qualname() -> None:
     assert result == "some.module::my_thing"
 
 
-# ── Promise.__repr__ ────────────────────────────────────────────
+# ── Promise.__repr__ and __str__ ────────────────────────────────
 
 
 @pytest.mark.parametrize("use_repr", [True, False])

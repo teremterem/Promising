@@ -42,7 +42,7 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
     if hasattr(named_object_fallback, "__name__"):
         return f"{prefix}{named_object_fallback.__name__}"
 
-    return f"{prefix}{named_object_fallback}" if prefix else str(named_object_fallback)
+    return f"{prefix}{named_object_fallback}"
 
 
 def resolve_module_name(obj: Any) -> str | None:

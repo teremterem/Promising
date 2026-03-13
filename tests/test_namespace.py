@@ -147,9 +147,8 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
     promise = promising.Promise(do_work())
     result = repr(promise) if use_repr else str(promise)
-    # TODO [P1] Find a way to extract the module name from the coroutine too ?
     assert re.fullmatch(
-        r"<'test_promise_repr_auto_resolves_from_coroutine"
+        r"<'tests\.test_namespace::test_promise_repr_auto_resolves_from_coroutine"
         r"\.<locals>\.do_work' Promise id=\d+>",
         result,
     )

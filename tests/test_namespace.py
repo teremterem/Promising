@@ -168,7 +168,11 @@ def test_plain_instance_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # The module prefix comes from the CLASS, not from the instance itself
-    assert result == f"{M}::{obj!s}"
+    assert re.fullmatch(
+        r"tests\.test_namespace::<tests\.test_namespace\."
+        r"test_plain_instance_inherits_module_from_class\.<locals>\.SomeObject object at 0x[0-9a-f]+>",
+        result,
+    )
 
 
 def test_instance_with_name_inherits_module_from_class() -> None:
@@ -197,7 +201,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # Module prefix comes from Widget's class, not the instance
-    assert result == f"{M}::custom_name"
+    assert result == "tests.test_namespace::custom_name"
 
 
 def test_callable_instance_inherits_module_from_class() -> None:
@@ -223,7 +227,11 @@ def test_callable_instance_inherits_module_from_class() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=handler,
     )
-    assert result == f"{M}::{handler!s}"
+    assert re.fullmatch(
+        r"tests\.test_namespace::<tests\.test_namespace\."
+        r"test_callable_instance_inherits_module_from_class\.<locals>\.Handler object at 0x[0-9a-f]+>",
+        result,
+    )
 
 
 def test_builtin_int_has_no_inherited_module() -> None:

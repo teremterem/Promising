@@ -33,13 +33,40 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
     if named_object_fallback is NOT_SET:
         return NOT_SET
 
+    prefix = resolve_module_name(named_object_fallback)
+    prefix = f"{prefix}::" if prefix else ""
+
     if hasattr(named_object_fallback, "__qualname__"):
-        return named_object_fallback.__qualname__
+        return f"{prefix}{named_object_fallback.__qualname__}"
 
     if hasattr(named_object_fallback, "__name__"):
-        return named_object_fallback.__name__
+        return f"{prefix}{named_object_fallback.__name__}"
 
-    return str(named_object_fallback)
+    return f"{prefix}{named_object_fallback}"
+
+
+def resolve_module_name(obj: Any) -> str | None:
+    module = getattr(obj, "__module__", None)
+    if module is not None:
+        return module
+
+    # Coroutine and async-generator objects carry __qualname__ (inherited
+    # from the function that created them) but NOT __module__.  However,
+    # they do hold a reference to their compiled code object via cr_code
+    # (coroutines) or ag_code (async generators).  The code object's
+    # co_filename lets inspect.getmodule() map back to the originating
+    # module.
+    code = getattr(obj, "cr_code", None) or getattr(obj, "ag_code", None)
+    if code is None:
+        return None
+
+    # The reason we are giving inspect.getmodule() the code object is because
+    # it does not work on coroutines directly.
+    code_module = inspect.getmodule(code)
+    if code_module is None:
+        return None
+
+    return code_module.__name__
 
 
 class DecoratorSupport:

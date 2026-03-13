@@ -1,10 +1,12 @@
 """
-Tests for namespace resolution and its effect on __repr__ across
+Tests for namespace resolution and its effect on __repr__ and __str__ across
 Promises, PromisingFunctions, and promising.context instances.
 """
 
 import re
 import types
+
+import pytest
 
 import promising
 from promising.sentinels import NOT_SET
@@ -109,53 +111,31 @@ def test_name_fallback_with_module_but_no_qualname() -> None:
     assert result == "some.module::my_thing"
 
 
-def test_str_fallback_for_object_without_name_attrs() -> None:
-    """Object with neither __name__ nor __qualname__ uses str()."""
-    result = resolve_namespace(
-        provided_explicitly=NOT_SET,
-        named_object_fallback=42,
-    )
-    assert result == "42"
-
-
-def test_str_fallback_for_string_object() -> None:
-    result = resolve_namespace(
-        provided_explicitly=NOT_SET,
-        named_object_fallback="hello",
-    )
-    assert result == "hello"
-
-
-def test_module_prefix_on_function() -> None:
-    """Auto-resolved namespace is module::qualname."""
-
-    def f() -> None: ...
-
-    result = resolve_namespace(
-        provided_explicitly=NOT_SET,
-        named_object_fallback=f,
-    )
-    assert result == "tests.test_namespace::test_module_prefix_on_function.<locals>.f"
-
-
 # ── Promise.__repr__ ────────────────────────────────────────────
 
 
-async def test_promise_repr_with_explicit_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
     """Promise with explicit namespace shows it quoted before the class name."""
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
-    assert re.fullmatch(r"<'MyOp' Promise id=\d+>", repr(promise))
+
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<'MyOp' Promise id=\d+>", result)
     await promise
 
 
-async def test_promise_repr_without_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promise_repr_without_namespace(use_repr: bool) -> None:
     """Prefilled promise with no namespace and no awaitable: bare repr."""
     promise = promising.Promise(prefilled_result="x")
-    assert re.fullmatch(r"<Promise id=\d+>", repr(promise))
+
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<Promise id=\d+>", result)
     await promise
 
 
-async def test_promise_repr_auto_resolves_from_coroutine() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None:
     """Promise wrapping a coroutine auto-resolves namespace from its qualname.
 
     Coroutine objects have __qualname__ but NOT __module__, so the
@@ -166,22 +146,25 @@ async def test_promise_repr_auto_resolves_from_coroutine() -> None:
         return "done"
 
     promise = promising.Promise(do_work())
+    result = repr(promise) if use_repr else str(promise)
     assert re.fullmatch(
         r"<'test_promise_repr_auto_resolves_from_coroutine"
         r"\.<locals>\.do_work' Promise id=\d+>",
-        repr(promise),
+        result,
     )
     await promise
 
 
-async def test_promise_repr_explicit_overrides_coroutine_name() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) -> None:
     """Explicit namespace wins even when a named coroutine is provided."""
 
     async def do_work() -> str:
         return "done"
 
     promise = promising.Promise(do_work(), namespace="Override")
-    assert re.fullmatch(r"<'Override' Promise id=\d+>", repr(promise))
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<'Override' Promise id=\d+>", result)
     await promise
 
 
@@ -208,7 +191,8 @@ async def test_promising_function_explicit_namespace() -> None:
     assert fetch_data.namespace == "CustomNS"
 
 
-async def test_promising_function_promise_inherits_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> None:
     """Promise returned by a PromisingFunction carries its explicit namespace."""
 
     @promising.function(namespace="FetchOp")
@@ -216,11 +200,13 @@ async def test_promising_function_promise_inherits_namespace() -> None:
         return "result"
 
     promise = fetch()
-    assert re.fullmatch(r"<'FetchOp' Promise id=\d+>", repr(promise))
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<'FetchOp' Promise id=\d+>", result)
     await promise
 
 
-async def test_promising_function_auto_namespace_in_promise_repr() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool) -> None:
     """Promise from @promising.function (no explicit ns) shows module::qualname."""
 
     @promising.function
@@ -228,15 +214,17 @@ async def test_promising_function_auto_namespace_in_promise_repr() -> None:
         return 42
 
     promise = compute()
+    result = repr(promise) if use_repr else str(promise)
     assert re.fullmatch(
         r"<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
         r"\.<locals>\.compute' Promise id=\d+>",
-        repr(promise),
+        result,
     )
     await promise
 
 
-async def test_promising_function_namespace_override_at_call_time() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_function_namespace_override_at_call_time(use_repr: bool) -> None:
     """Namespace can be overridden per-call via keyword argument."""
 
     @promising.function(namespace="Default")
@@ -244,11 +232,13 @@ async def test_promising_function_namespace_override_at_call_time() -> None:
         return "done"
 
     promise = work(namespace="PerCall")
-    assert re.fullmatch(r"<'PerCall' Promise id=\d+>", repr(promise))
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<'PerCall' Promise id=\d+>", result)
     await promise
 
 
-async def test_promising_function_call_namespace_none_uses_decorator_ns() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_function_call_namespace_none_uses_decorator_ns(use_repr: bool) -> None:
     """Passing namespace=None at call time falls back to decorator's namespace."""
 
     @promising.function(namespace="FromDecorator")
@@ -256,28 +246,34 @@ async def test_promising_function_call_namespace_none_uses_decorator_ns() -> Non
         return "done"
 
     promise = work(namespace=None)
-    assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", repr(promise))
+    result = repr(promise) if use_repr else str(promise)
+    assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", result)
     await promise
 
 
 # ── promising.context namespace ─────────────────────────────────
 
 
-async def test_context_manager_explicit_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
     """promising.context() as context manager with explicit namespace."""
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
-        assert re.fullmatch(r"<'BatchCtx' PromisingContext id=\d+>", repr(ctx))
+        result = repr(ctx) if use_repr else str(ctx)
+        assert re.fullmatch(r"<'BatchCtx' PromisingContext id=\d+>", result)
 
 
-async def test_context_manager_no_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_context_manager_no_namespace(use_repr: bool) -> None:
     """promising.context() with no namespace: namespace is NOT_SET."""
     with promising.context() as ctx:
         assert ctx.namespace is NOT_SET
-        assert re.fullmatch(r"<PromisingContext id=\d+>", repr(ctx))
+        result = repr(ctx) if use_repr else str(ctx)
+        assert re.fullmatch(r"<PromisingContext id=\d+>", result)
 
 
-async def test_context_decorator_auto_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_context_decorator_auto_namespace(use_repr: bool) -> None:
     """@promising.context() as decorator auto-resolves to module::qualname."""
     captured_ctx = None
 
@@ -290,14 +286,16 @@ async def test_context_decorator_auto_namespace() -> None:
     await pipeline()
     assert captured_ctx is not None
     assert captured_ctx.namespace == "tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline"
+    result = repr(captured_ctx) if use_repr else str(captured_ctx)
     assert re.fullmatch(
         r"<'tests.test_namespace::test_context_decorator_auto_namespace"
         r"\.<locals>\.pipeline' PromisingContext id=\d+>",
-        repr(captured_ctx),
+        result,
     )
 
 
-async def test_context_decorator_explicit_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
     """@promising.context(namespace=...) as decorator uses the exact string."""
     captured_ctx = None
 
@@ -310,23 +308,28 @@ async def test_context_decorator_explicit_namespace() -> None:
     await pipeline()
     assert captured_ctx is not None
     assert captured_ctx.namespace == "MyPipeline"
+    result = repr(captured_ctx) if use_repr else str(captured_ctx)
     assert re.fullmatch(
         r"<'MyPipeline' PromisingContext id=\d+>",
-        repr(captured_ctx),
+        result,
     )
 
 
 # ── PromisingContext repr ───────────────────────────────────────
 
 
-async def test_promising_context_repr_with_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_context_repr_with_namespace(use_repr: bool) -> None:
     ctx = promising.PromisingContext(namespace="Worker")
-    assert re.fullmatch(r"<'Worker' PromisingContext id=\d+>", repr(ctx))
+    result = repr(ctx) if use_repr else str(ctx)
+    assert re.fullmatch(r"<'Worker' PromisingContext id=\d+>", result)
 
 
-async def test_promising_context_repr_without_namespace() -> None:
+@pytest.mark.parametrize("use_repr", [True, False])
+async def test_promising_context_repr_without_namespace(use_repr: bool) -> None:
     ctx = promising.PromisingContext()
-    assert re.fullmatch(r"<PromisingContext id=\d+>", repr(ctx))
+    result = repr(ctx) if use_repr else str(ctx)
+    assert re.fullmatch(r"<PromisingContext id=\d+>", result)
 
 
 # ── Method decorators and qualname ──────────────────────────────

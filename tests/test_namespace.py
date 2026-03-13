@@ -338,7 +338,8 @@ async def test_promising_context_repr_without_namespace(use_repr: bool) -> None:
 # ── Method decorators and qualname ──────────────────────────────
 
 
-async def test_promising_function_on_instance_method_qualname() -> None:
+@pytest.mark.parametrize("use_promise_repr", [True, False, None])
+async def test_promising_function_on_instance_method_qualname(use_promise_repr: bool | None) -> None:
     """Decorating an instance method: namespace is module::Class.method."""
 
     class Service:
@@ -346,14 +347,26 @@ async def test_promising_function_on_instance_method_qualname() -> None:
         async def process(self) -> str:
             return "processed"
 
-    assert Service.process.namespace == (
-        "tests.test_namespace::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
-    )
+    if use_promise_repr is None:
+        assert Service.process.namespace == (
+            "tests.test_namespace::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
+        )
+
     svc = Service()
-    assert await svc.process() == "processed"
+    promise = svc.process()
+
+    if use_promise_repr is not None:
+        result = repr(promise) if use_promise_repr else str(promise)
+        assert re.fullmatch(
+            r"<'tests.test_namespace::test_promising_function_on_instance_method_qualname\."
+            r"<locals>\.Service\.process' Promise id=\d+>",
+            result,
+        )
+    assert await promise == "processed"
 
 
-async def test_promising_function_on_static_method_qualname() -> None:
+@pytest.mark.parametrize("use_promise_repr", [True, False, None])
+async def test_promising_function_on_static_method_qualname(use_promise_repr: bool | None) -> None:
     """Decorating a staticmethod: namespace is module::Class.method."""
 
     class Service:
@@ -362,13 +375,25 @@ async def test_promising_function_on_static_method_qualname() -> None:
         async def helper() -> str:
             return "helped"
 
-    assert Service.helper.namespace == (
-        "tests.test_namespace::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
-    )
-    assert await Service.helper() == "helped"
+    if use_promise_repr is None:
+        assert Service.helper.namespace == (
+            "tests.test_namespace::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
+        )
+
+    promise = Service.helper()
+
+    if use_promise_repr is not None:
+        result = repr(promise) if use_promise_repr else str(promise)
+        assert re.fullmatch(
+            r"<'tests.test_namespace::test_promising_function_on_static_method_qualname"
+            r"\.<locals>\.Service\.helper' Promise id=\d+>",
+            result,
+        )
+    assert await promise == "helped"
 
 
-async def test_promising_function_on_class_method_qualname() -> None:
+@pytest.mark.parametrize("use_promise_repr", [True, False, None])
+async def test_promising_function_on_class_method_qualname(use_promise_repr: bool | None) -> None:
     """Decorating a classmethod: namespace is module::Class.method."""
 
     class Service:
@@ -377,10 +402,21 @@ async def test_promising_function_on_class_method_qualname() -> None:
         async def create(cls) -> str:
             return "created"
 
-    assert Service.create.namespace == (
-        "tests.test_namespace::test_promising_function_on_class_method_qualname.<locals>.Service.create"
-    )
-    assert await Service.create() == "created"
+    if use_promise_repr is None:
+        assert Service.create.namespace == (
+            "tests.test_namespace::test_promising_function_on_class_method_qualname.<locals>.Service.create"
+        )
+
+    promise = Service.create()
+
+    if use_promise_repr is not None:
+        result = repr(promise) if use_promise_repr else str(promise)
+        assert re.fullmatch(
+            r"<'tests.test_namespace::test_promising_function_on_class_method_qualname"
+            r"\.<locals>\.Service\.create' Promise id=\d+>",
+            result,
+        )
+    assert await promise == "created"
 
 
 # ── Inherited __module__ on plain instances (reviewer edge cases) ──

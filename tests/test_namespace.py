@@ -141,6 +141,130 @@ def test_module_prefix_on_function() -> None:
     assert result == "tests.test_namespace::test_module_prefix_on_function.<locals>.f"
 
 
+# ── Inherited __module__ on plain instances (reviewer edge cases) ──
+
+
+def test_plain_instance_inherits_module_from_class() -> None:
+    """A plain instance of a user-defined class inherits __module__ from its
+    class but has no __qualname__ or __name__ of its own.
+
+    Current behavior: the inherited __module__ is used as prefix, and str(obj)
+    becomes the name — producing something like
+    "tests.test_namespace::<...SomeObject object at 0x...>".
+    """
+
+    class SomeObject:
+        pass
+
+    obj = SomeObject()
+
+    # Verify the attribute inheritance that causes this:
+    assert hasattr(obj, "__module__")  # inherited from SomeObject
+    assert not hasattr(obj, "__qualname__")  # NOT inherited
+    assert not hasattr(obj, "__name__")  # NOT inherited
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=obj,
+    )
+    # The module prefix comes from the CLASS, not from the instance itself
+    assert result == f"{M}::{obj!s}"
+
+
+def test_instance_with_name_inherits_module_from_class() -> None:
+    """An instance that has __name__ set also inherits __module__ from its
+    class.
+
+    Current behavior: the class's __module__ is used as prefix together with
+    the instance's __name__ — e.g. "tests.test_namespace::custom_name".
+    The module refers to where the CLASS is defined, not where the instance's
+    __name__ semantically belongs.
+    """
+
+    class Widget:
+        pass
+
+    obj = Widget()
+    obj.__name__ = "custom_name"  # type: ignore[attr-defined]
+
+    # Verify: __module__ is inherited, __name__ is instance-level
+    assert hasattr(obj, "__module__")  # inherited from Widget
+    assert not hasattr(obj, "__qualname__")  # NOT inherited
+    assert obj.__name__ == "custom_name"  # type: ignore[attr-defined]
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=obj,
+    )
+    # Module prefix comes from Widget's class, not the instance
+    assert result == f"{M}::custom_name"
+
+
+def test_callable_instance_inherits_module_from_class() -> None:
+    """A callable instance (with __call__) still inherits __module__ from its
+    class but is not a function or type.
+
+    Current behavior: treated like any other instance — the class's __module__
+    is used as prefix even though the object is "just" a callable instance.
+    """
+
+    class Handler:
+        def __call__(self) -> str:
+            return "handled"
+
+    handler = Handler()
+
+    assert callable(handler)
+    assert hasattr(handler, "__module__")  # inherited from Handler
+    assert not hasattr(handler, "__qualname__")
+    assert not hasattr(handler, "__name__")
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=handler,
+    )
+    assert result == f"{M}::{handler!s}"
+
+
+def test_builtin_int_has_no_inherited_module() -> None:
+    """Built-in type instances (int, str, list) do NOT inherit __module__.
+
+    Unlike user-defined class instances, built-ins block attribute inheritance
+    for __module__ and __qualname__, so no misleading prefix appears.
+    """
+    assert not hasattr(42, "__module__")
+    assert not hasattr(42, "__qualname__")
+    assert not hasattr(42, "__name__")
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=42,
+    )
+    assert result == "42"
+
+
+def test_builtin_str_has_no_inherited_module() -> None:
+    assert not hasattr("hello", "__module__")
+    assert not hasattr("hello", "__qualname__")
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback="hello",
+    )
+    assert result == "hello"
+
+
+def test_builtin_list_has_no_inherited_module() -> None:
+    assert not hasattr([], "__module__")
+    assert not hasattr([], "__qualname__")
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=[1, 2, 3],
+    )
+    assert result == "[1, 2, 3]"
+
+
 # ── Promise.__repr__ ────────────────────────────────────────────
 
 

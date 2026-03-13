@@ -33,13 +33,16 @@ def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallb
     if named_object_fallback is NOT_SET:
         return NOT_SET
 
+    module = getattr(named_object_fallback, "__module__", None)
+    prefix = f"{module}::" if module else ""
+
     if hasattr(named_object_fallback, "__qualname__"):
-        return named_object_fallback.__qualname__
+        return f"{prefix}{named_object_fallback.__qualname__}"
 
     if hasattr(named_object_fallback, "__name__"):
-        return named_object_fallback.__name__
+        return f"{prefix}{named_object_fallback.__name__}"
 
-    return str(named_object_fallback)
+    return f"{prefix}{named_object_fallback}" if prefix else str(named_object_fallback)
 
 
 class DecoratorSupport:

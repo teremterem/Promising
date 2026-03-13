@@ -278,10 +278,9 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
 async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_decorator: bool) -> None:
     """@promising.context() as decorator auto-resolves to module::qualname."""
     captured_ctx = None
+    ctx_decorator = promising.context() if parametrized_decorator else promising.context
 
-    decorator = promising.context() if parametrized_decorator else promising.context
-
-    @decorator
+    @ctx_decorator
     async def pipeline() -> str:
         nonlocal captured_ctx
         captured_ctx = promising.get_active_context()

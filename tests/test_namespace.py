@@ -10,9 +10,6 @@ import promising
 from promising.sentinels import NOT_SET
 from promising.utils import resolve_namespace
 
-M = "tests.test_namespace"
-
-
 # ── resolve_namespace (unit) ────────────────────────────────────
 
 
@@ -364,7 +361,7 @@ async def test_promising_function_auto_namespace_in_promise_repr() -> None:
 
     promise = compute()
     assert re.fullmatch(
-        rf"<'{re.escape(M)}::test_promising_function_auto_namespace_in_promise_repr"
+        r"<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
         r"\.<locals>\.compute' Promise id=\d+>",
         repr(promise),
     )
@@ -426,7 +423,7 @@ async def test_context_decorator_auto_namespace() -> None:
     assert captured_ctx is not None
     assert captured_ctx.namespace == "tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline"
     assert re.fullmatch(
-        rf"<'{re.escape(M)}::test_context_decorator_auto_namespace"
+        r"<'tests.test_namespace::test_context_decorator_auto_namespace"
         r"\.<locals>\.pipeline' PromisingContext id=\d+>",
         repr(captured_ctx),
     )

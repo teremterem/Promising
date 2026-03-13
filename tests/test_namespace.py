@@ -65,6 +65,27 @@ def test_qualname_from_sync_function() -> None:
     assert result == "tests.test_namespace::test_qualname_from_sync_function.<locals>.my_sync_func"
 
 
+async def test_qualname_from_async_generator_object() -> None:
+    """Async generator *objects* have __qualname__ but not __module__.
+
+    The ag_code path in resolve_namespace recovers the module from the
+    code object, mirroring what cr_code does for coroutines.
+    """
+
+    async def gen():
+        yield 1
+
+    ag = gen()
+
+    result = resolve_namespace(
+        provided_explicitly=NOT_SET,
+        named_object_fallback=ag,
+    )
+    assert result == "tests.test_namespace::test_qualname_from_async_generator_object.<locals>.gen"
+    # Close to avoid ResourceWarning
+    await ag.aclose()
+
+
 def test_qualname_from_class() -> None:
     """Classes have __qualname__ and __module__."""
 
@@ -138,8 +159,9 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
 async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None:
     """Promise wrapping a coroutine auto-resolves namespace from its qualname.
 
-    Coroutine objects have __qualname__ but NOT __module__, so the
-    auto-resolved namespace is just the qualname without a module prefix.
+    Coroutine objects have __qualname__ but NOT __module__. The module is
+    recovered from the coroutine's underlying code object (cr_code), so the
+    auto-resolved namespace includes the module prefix.
     """
 
     async def do_work() -> str:

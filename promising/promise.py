@@ -66,13 +66,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or
-            not (False). NOT_SET (default) defers to the parent's
+            not (False). None (default) defers to the parent's
             children_start_soon if enforced, otherwise falls back to
             start_soon_default. INHERIT copies the parent's start_soon
             directly.
         children_start_soon: (Also boolean or Sentinel.) Default start_soon
             value enforced on child Promises that left their start_soon setting
-            as NOT_SET. For the children_start_soon setting itself, NOT_SET
+            as None. For the children_start_soon setting itself, None
             (default) means no enforcement. INHERIT in children_start_soon
             copies the parent's children_start_soon setting.
             NOTE: The default for children_start_soon is different in Promise
@@ -304,12 +304,12 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
-        if self._awaitable is NOT_SET:
+        if self._awaitable is None:
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
 
         result = NOT_SET
-        exception = NOT_SET
+        exception = None
 
         try:
             with self:
@@ -330,10 +330,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # not affect the exception handling
                 pass
         finally:
-            if exception is not NOT_SET:
-                self.set_exception(exception)
-            else:
+            if exception is None:
                 self.set_result(result)
+            else:
+                self.set_exception(exception)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
@@ -344,10 +344,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # Concrete value was provided
             return start_soon
 
-        if start_soon is NOT_SET:
+        if start_soon is None:
             parent_context = self.get_parent_context(raise_if_none=False)
 
-            if parent_context is not None and parent_context._children_start_soon is not NOT_SET:
+            if parent_context is not None and parent_context._children_start_soon is not None:
                 # The parent is enforcing this setting for its children
                 return parent_context._children_start_soon
 
@@ -365,8 +365,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             return parent_promise._start_soon
 
         raise ValueError(
-            "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
-            f"but `{type(start_soon)}` was given instead"
+            f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
 
     def _finish_initialization(
@@ -375,13 +374,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         prefilled_result: T_co | Awaitable[Any] | Sentinel,
         prefilled_exception: BaseException | Sentinel,
     ) -> None:
-        if self._awaitable is NOT_SET:
-            if prefilled_result is not NOT_SET and prefilled_exception is not NOT_SET:
+        if self._awaitable is None:
+            if prefilled_result is not NOT_SET and prefilled_exception is not None:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
             if prefilled_result is not NOT_SET:
                 self.set_result(prefilled_result)
-            elif prefilled_exception is not NOT_SET:
+            elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
 
             else:
@@ -389,7 +388,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         else:
             if not hasattr(self._awaitable, "__await__"):
                 raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
-            if prefilled_result is not NOT_SET or prefilled_exception is not NOT_SET:
+            if prefilled_result is not NOT_SET or prefilled_exception is not None:
                 raise ValueError(
                     "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )
@@ -427,7 +426,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result = Promise[Any](
                 result,
                 namespace=resolve_namespace(
-                    provided_explicitly=NOT_SET,
+                    provided_explicitly=None,
                     named_object_fallback=result,
                 ),
                 parent=self,

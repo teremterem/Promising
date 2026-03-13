@@ -74,11 +74,11 @@ def function(
         namespace: Optional namespace string for the resulting ``Promise``.
             Defaults to the wrapped function's ``__qualname__``.
         start_soon: Whether the ``Promise`` should start executing
-            immediately upon creation. Defaults to ``NOT_SET``, which
+            immediately upon creation. Defaults to None, which
             defers to the parent ``Promise``'s configuration.
         children_start_soon: Whether child promises created during this
             ``Promise``'s execution should start executing immediately.
-            Defaults to ``NOT_SET``.
+            Defaults to None.
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
@@ -111,7 +111,7 @@ def function(
             specific case rather than blanket-disabling thread pools
             for an entire subtree.
     """
-    if func_or_method is NOT_SET:
+    if func_or_method is None:
         # The decorator was used with arguments
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
@@ -191,8 +191,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
-        arguments or pass ``None`` — both are equivalent. Passing
-        ``NOT_SET`` explicitly will still override them (``NOT_SET`` is
+        arguments or pass ``NOT_SET`` — both are equivalent. Passing
+        None explicitly will still override them (None is
         itself a valid value with its own semantics in ``Promise``).
 
         Args:
@@ -220,17 +220,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
-        if namespace is None:
+        if namespace is NOT_SET:
             namespace = self.namespace
-        if start_soon is None:
+        if start_soon is NOT_SET:
             start_soon = self.start_soon
-        if children_start_soon is None:
+        if children_start_soon is NOT_SET:
             children_start_soon = self.children_start_soon
-        if start_soon_default is None:
+        if start_soon_default is NOT_SET:
             start_soon_default = self.start_soon_default
-        if thread_pool is None:
+        if thread_pool is NOT_SET:
             thread_pool = self.thread_pool
-        if use_thread_pool is None:
+        if use_thread_pool is NOT_SET:
             use_thread_pool = self.use_thread_pool
 
         # TODO Develop a convenient and idiomatic way (whatever that would

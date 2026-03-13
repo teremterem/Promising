@@ -53,7 +53,7 @@ def test_qualname_from_function() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=my_func,
     )
-    assert result == f"{M}::test_qualname_from_function.<locals>.my_func"
+    assert result == "tests.test_namespace::test_qualname_from_function.<locals>.my_func"
 
 
 def test_qualname_from_sync_function() -> None:
@@ -63,7 +63,7 @@ def test_qualname_from_sync_function() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=my_sync_func,
     )
-    assert result == f"{M}::test_qualname_from_sync_function.<locals>.my_sync_func"
+    assert result == "tests.test_namespace::test_qualname_from_sync_function.<locals>.my_sync_func"
 
 
 def test_qualname_from_class() -> None:
@@ -75,7 +75,7 @@ def test_qualname_from_class() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=Foo,
     )
-    assert result == f"{M}::test_qualname_from_class.<locals>.Foo"
+    assert result == "tests.test_namespace::test_qualname_from_class.<locals>.Foo"
 
 
 def test_qualname_from_method_of_class() -> None:
@@ -86,9 +86,7 @@ def test_qualname_from_method_of_class() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=MyClass.method,
     )
-    assert result == (
-        f"{M}::test_qualname_from_method_of_class.<locals>.MyClass.method"
-    )
+    assert result == "tests.test_namespace::test_qualname_from_method_of_class.<locals>.MyClass.method"
 
 
 def test_name_fallback_when_no_qualname() -> None:
@@ -140,7 +138,7 @@ def test_module_prefix_on_function() -> None:
         provided_explicitly=NOT_SET,
         named_object_fallback=f,
     )
-    assert result == f"{M}::test_module_prefix_on_function.<locals>.f"
+    assert result == "tests.test_namespace::test_module_prefix_on_function.<locals>.f"
 
 
 # ── Promise.__repr__ ────────────────────────────────────────────
@@ -200,9 +198,7 @@ async def test_promising_function_auto_namespace() -> None:
     async def fetch_data() -> str:
         return "data"
 
-    assert fetch_data.namespace == (
-        f"{M}::test_promising_function_auto_namespace.<locals>.fetch_data"
-    )
+    assert fetch_data.namespace == "tests.test_namespace::test_promising_function_auto_namespace.<locals>.fetch_data"
 
 
 async def test_promising_function_explicit_namespace() -> None:
@@ -296,9 +292,7 @@ async def test_context_decorator_auto_namespace() -> None:
 
     await pipeline()
     assert captured_ctx is not None
-    assert captured_ctx.namespace == (
-        f"{M}::test_context_decorator_auto_namespace.<locals>.pipeline"
-    )
+    assert captured_ctx.namespace == "tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline"
     assert re.fullmatch(
         rf"<'{re.escape(M)}::test_context_decorator_auto_namespace"
         r"\.<locals>\.pipeline' PromisingContext id=\d+>",
@@ -349,9 +343,8 @@ async def test_promising_function_on_instance_method_qualname() -> None:
         async def process(self) -> str:
             return "processed"
 
-    assert Service.process.namespace == (  # type: ignore[attr-defined]
-        f"{M}::test_promising_function_on_instance_method_qualname"
-        ".<locals>.Service.process"
+    assert Service.process.namespace == (
+        "tests.test_namespace::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
     )
     svc = Service()
     assert await svc.process() == "processed"
@@ -366,9 +359,8 @@ async def test_promising_function_on_static_method_qualname() -> None:
         async def helper() -> str:
             return "helped"
 
-    assert Service.helper.namespace == (  # type: ignore[attr-defined]
-        f"{M}::test_promising_function_on_static_method_qualname"
-        ".<locals>.Service.helper"
+    assert Service.helper.namespace == (
+        "tests.test_namespace::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
     )
     assert await Service.helper() == "helped"
 
@@ -382,8 +374,7 @@ async def test_promising_function_on_class_method_qualname() -> None:
         async def create(cls) -> str:
             return "created"
 
-    assert Service.create.namespace == (  # type: ignore[attr-defined]
-        f"{M}::test_promising_function_on_class_method_qualname"
-        ".<locals>.Service.create"
+    assert Service.create.namespace == (
+        "tests.test_namespace::test_promising_function_on_class_method_qualname.<locals>.Service.create"
     )
     assert await Service.create() == "created"

@@ -5,7 +5,7 @@ to __call__ / call()).
 """
 
 import promising
-from promising import GLOBAL_DEFAULT, INHERIT, NOT_SET
+from promising import GLOBAL_DEFAULT, INHERIT
 
 # ── start_soon ────────────────────────────────────────────────────────────────
 
@@ -40,21 +40,21 @@ async def test_call_without_start_soon_uses_constructor_value() -> None:
     await promise
 
 
-async def test_call_start_soon_not_set_overrides_constructor() -> None:
+async def test_call_start_soon_none_overrides_constructor() -> None:
     """
-    Explicitly passing NOT_SET at call time overrides the
-    constructor's concrete bool value (falling back to
-    start_soon_default at root level, which
-    defaults to True globally).
+    Explicitly passing None at call time overrides the constructor's
+    concrete bool value (in this particular case, falling back to the global
+    Defaults.START_SOON_DEFAULT, as there is no context hierarchy and no
+    intermediate defaults).
     """
 
     @promising.function(start_soon=False)
     async def noop() -> None:
         pass
 
-    # Passing NOT_SET explicitly still overrides the constructor's False
-    promise = noop(start_soon=NOT_SET)
-    # At root, NOT_SET falls back to start_soon_default (True)
+    # Passing None explicitly still overrides the constructor's False
+    promise = noop(start_soon=None)
+    # At root, None falls back to start_soon_default (True)
     assert promise._start_soon is True
     await promise
 

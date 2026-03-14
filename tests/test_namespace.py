@@ -260,8 +260,10 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_call_namespace_none_uses_decorator_ns(use_repr: bool) -> None:
-    """Passing namespace=None at call time falls back to decorator's namespace."""
+async def test_promising_function_call_namespace_not_set_uses_decorator_ns(use_repr: bool) -> None:
+    """
+    Passing namespace=NOT_SET at call time falls back to decorator's namespace.
+    """
 
     @promising.function(namespace="FromDecorator")
     async def work() -> str:

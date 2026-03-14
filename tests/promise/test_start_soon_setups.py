@@ -3,12 +3,12 @@ import asyncio
 import pytest
 
 import promising
-from promising import GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising import GLOBAL_DEFAULT, INHERIT, Sentinel
 
 
 @pytest.mark.parametrize("start_soon_default", [True, False, INHERIT, GLOBAL_DEFAULT])
-@pytest.mark.parametrize("start_soon", [True, False, INHERIT, NOT_SET])
-@pytest.mark.parametrize("children_start_soon", [True, False, INHERIT, NOT_SET])
+@pytest.mark.parametrize("start_soon", [True, False, INHERIT, None])
+@pytest.mark.parametrize("children_start_soon", [True, False, INHERIT, None])
 async def test_config_forwarding(
     *,
     start_soon: bool | Sentinel,
@@ -20,10 +20,10 @@ async def test_config_forwarding(
     level (no parent), INHERIT and GLOBAL_DEFAULT for
     start_soon_default both resolve to the
     global default (True). For start_soon, both INHERIT and
-    NOT_SET fall back to start_soon_default.
+    None fall back to start_soon_default.
     For children_start_soon, INHERIT resolves to
-    start_soon_default, while NOT_SET stays
-    as NOT_SET (no enforcement on children).
+    start_soon_default, while None stays
+    as None (no enforcement on children).
     """
 
     @promising.function(
@@ -39,11 +39,11 @@ async def test_config_forwarding(
     # At root level, INHERIT and GLOBAL_DEFAULT both read
     # the global default (True).
     expected_everything = start_soon_default if isinstance(start_soon_default, bool) else True
-    # INHERIT and NOT_SET for start_soon fall back to
+    # INHERIT and None for start_soon fall back to
     # start_soon_default at root.
     expected_start_soon = start_soon if isinstance(start_soon, bool) else expected_everything
     # INHERIT resolves to start_soon_default;
-    # NOT_SET stays as NOT_SET (no enforcement).
+    # None stays as None (no enforcement).
     expected_children = expected_everything if children_start_soon is INHERIT else children_start_soon
 
     assert promise._start_soon_default is expected_everything
@@ -98,7 +98,7 @@ async def test_start_soon_default_inherits_from_parent(
     """
     child_promise = None
 
-    @promising.function  # start_soon=NOT_SET, start_soon_default=INHERIT
+    @promising.function  # start_soon=None, start_soon_default=INHERIT
     async def child_func() -> None:
         pass
 
@@ -112,7 +112,7 @@ async def test_start_soon_default_inherits_from_parent(
 
     await parent_func()
     assert child_promise._start_soon_default is start_soon_default
-    # NOT_SET for start_soon falls back to the inherited value.
+    # None for start_soon falls back to the inherited value.
     assert child_promise._start_soon is start_soon_default
     await child_promise
     # TODO Also test it NOT being inherited if it is overridden on the child
@@ -148,7 +148,7 @@ async def test_start_soon_default_global_default_ignores_parent(
     await child_promise
 
 
-@pytest.mark.parametrize("children_start_soon", [True, False, NOT_SET])
+@pytest.mark.parametrize("children_start_soon", [True, False, None])
 @pytest.mark.parametrize("parent_start_soon", [True, False])
 async def test_children_start_soon_enforced_on_children(
     *,
@@ -158,13 +158,13 @@ async def test_children_start_soon_enforced_on_children(
     """
     children_start_soon on the parent controls
     the start_soon resolution of child Promises that leave
-    start_soon as NOT_SET. A concrete bool enforces that
-    value; NOT_SET means no enforcement (child falls back
+    start_soon as None. A concrete bool enforces that
+    value; None means no enforcement (child falls back
     to start_soon_default).
     """
     child_promise = None
 
-    @promising.function  # start_soon=NOT_SET
+    @promising.function  # start_soon=None
     async def child_func() -> None:
         pass
 
@@ -178,9 +178,9 @@ async def test_children_start_soon_enforced_on_children(
 
     await parent_func()
 
-    # NOT_SET means no enforcement; child falls back to
+    # None means no enforcement; child falls back to
     # start_soon_default (global default: True).
-    expected_start_soon = True if children_start_soon is NOT_SET else children_start_soon
+    expected_start_soon = True if children_start_soon is None else children_start_soon
     assert child_promise._start_soon is expected_start_soon
     await child_promise
     # TODO Also test it NOT being enforced if it is overridden on the child

@@ -339,7 +339,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if self._task is None and not self.done():
             self._task = self._ctx_loop.create_task(self._fulfill(), name=str(self) + "-Task")
 
-    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
+    def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):
             # Concrete value was provided
             return start_soon
@@ -372,7 +372,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self,
         *,
         prefilled_result: T_co | Awaitable[Any] | Sentinel,
-        prefilled_exception: BaseException | Sentinel,
+        prefilled_exception: BaseException | None,
     ) -> None:
         if self._awaitable is None:
             if prefilled_result is not NOT_SET and prefilled_exception is not None:

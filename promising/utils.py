@@ -6,7 +6,6 @@ from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError, SyncUsageError
-from promising.sentinels import Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 
 
@@ -80,7 +79,7 @@ class DecoratorSupport:
     """
 
     __wrapped__: DecoratableFunctionType | None
-    namespace: str | Sentinel
+    namespace: str | None
 
     def __init__(
         self,

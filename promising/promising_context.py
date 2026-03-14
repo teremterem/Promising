@@ -271,7 +271,7 @@ class PromisingContext:
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        children_start_soon: bool | Sentinel = INHERIT,
+        children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
     ) -> None:
         self.namespace = namespace

@@ -175,7 +175,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         namespace: str | None | Sentinel = NOT_SET,
         start_soon: bool | None | Sentinel = NOT_SET,
         children_start_soon: bool | None | Sentinel = NOT_SET,
-        start_soon_default: bool | None | Sentinel = NOT_SET,
+        start_soon_default: bool | Sentinel = NOT_SET,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = NOT_SET,
         use_thread_pool: bool | Sentinel = NOT_SET,
         **kwargs: Any,

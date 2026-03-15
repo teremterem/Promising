@@ -6,7 +6,7 @@ from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
-from promising.sentinels import INHERIT, NOT_SET, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
 from promising.utils import assert_no_sync_usage_deadlock, resolve_namespace
 
@@ -119,7 +119,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: T_co | Awaitable[Any] | Sentinel = NOT_SET,
+        prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
         PromisingContext.__init__(
@@ -310,7 +310,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
 
-        result = NOT_SET
+        result = UNCHANGED
         exception = None
 
         try:
@@ -378,10 +378,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         prefilled_exception: BaseException | None,
     ) -> None:
         if self._awaitable is None:
-            if prefilled_result is not NOT_SET and prefilled_exception is not None:
+            if prefilled_result is not UNCHANGED and prefilled_exception is not None:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
-            if prefilled_result is not NOT_SET:
+            if prefilled_result is not UNCHANGED:
                 self.set_result(prefilled_result)
             elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
@@ -391,7 +391,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         else:
             if not hasattr(self._awaitable, "__await__"):
                 raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
-            if prefilled_result is not NOT_SET or prefilled_exception is not None:
+            if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
                     "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )

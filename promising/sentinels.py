@@ -18,4 +18,4 @@ class Sentinel:
 ASYNCIO_DEFAULT = Sentinel()
 GLOBAL_DEFAULT = Sentinel()
 INHERIT = Sentinel()
-NOT_SET = Sentinel()
+UNCHANGED = Sentinel()

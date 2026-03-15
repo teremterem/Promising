@@ -324,11 +324,11 @@ result = await promise                        # Now it starts
 
 Promises inherit configuration from their parents through three parameters:
 
-- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `NOT_SET` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
-- **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `NOT_SET`. `NOT_SET` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `NOT_SET` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
+- **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `UNCHANGED` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
+- **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `UNCHANGED`. `UNCHANGED` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `UNCHANGED` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
 - **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `GLOBAL_DEFAULT` reads the current global setting directly, ignoring the parent chain.
 
-These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `NOT_SET` explicitly at call time overrides the decorator value:
+These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `UNCHANGED` explicitly at call time overrides the decorator value:
 
 ```python
 @promising.function(children_start_soon=False)
@@ -517,7 +517,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Sentinel | Meaning |
 |---|---|
-| `promising.NOT_SET` | No value provided / no enforcement. |
+| `promising.UNCHANGED` | No value provided / no enforcement. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |

@@ -9,7 +9,7 @@ import types
 import pytest
 
 import promising
-from promising.sentinels import NOT_SET
+from promising.sentinels import UNCHANGED
 from promising.utils import resolve_namespace
 
 # ── resolve_namespace (unit) ────────────────────────────────────
@@ -260,16 +260,16 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_call_namespace_not_set_uses_decorator_ns(use_repr: bool) -> None:
+async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use_repr: bool) -> None:
     """
-    Passing namespace=NOT_SET at call time falls back to decorator's namespace.
+    Passing namespace=UNCHANGED at call time falls back to decorator's namespace.
     """
 
     @promising.function(namespace="FromDecorator")
     async def work() -> str:
         return "done"
 
-    promise = work(namespace=NOT_SET)
+    promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
     assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", result)
     await promise

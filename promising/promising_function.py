@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any, Generic
 
 from promising.promise import Promise, get_active_promise
-from promising.sentinels import INHERIT, NOT_SET, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import DecoratorSupport, is_func_or_method_async
 
@@ -174,12 +174,12 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        namespace: str | None | Sentinel = NOT_SET,
-        start_soon: bool | None | Sentinel = NOT_SET,
-        children_start_soon: bool | None | Sentinel = NOT_SET,
-        start_soon_default: bool | Sentinel = NOT_SET,
-        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = NOT_SET,
-        use_thread_pool: bool | Sentinel = NOT_SET,
+        namespace: str | None | Sentinel = UNCHANGED,
+        start_soon: bool | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        use_thread_pool: bool | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
@@ -193,7 +193,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
-        arguments or pass ``NOT_SET`` — both are equivalent. Passing
+        arguments or pass ``UNCHANGED`` — both are equivalent. Passing
         None explicitly will still override them (None is
         itself a valid value with its own semantics in ``Promise``).
 
@@ -222,17 +222,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
-        if namespace is NOT_SET:
+        if namespace is UNCHANGED:
             namespace = self.namespace
-        if start_soon is NOT_SET:
+        if start_soon is UNCHANGED:
             start_soon = self.start_soon
-        if children_start_soon is NOT_SET:
+        if children_start_soon is UNCHANGED:
             children_start_soon = self.children_start_soon
-        if start_soon_default is NOT_SET:
+        if start_soon_default is UNCHANGED:
             start_soon_default = self.start_soon_default
-        if thread_pool is NOT_SET:
+        if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
-        if use_thread_pool is NOT_SET:
+        if use_thread_pool is UNCHANGED:
             use_thread_pool = self.use_thread_pool
 
         # TODO Develop a convenient and idiomatic way (whatever that would

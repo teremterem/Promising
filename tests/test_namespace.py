@@ -27,7 +27,7 @@ def test_explicit_namespace_wins_over_fallback() -> None:
     assert result == "custom"
 
 
-def test_explicit_namespace_wins_even_with_not_set_fallback() -> None:
+def test_explicit_namespace_wins_even_with_none_fallback() -> None:
     result = resolve_namespace(
         provided_explicitly="explicit",
         named_object_fallback=None,
@@ -35,7 +35,7 @@ def test_explicit_namespace_wins_even_with_not_set_fallback() -> None:
     assert result == "explicit"
 
 
-def test_not_set_when_both_are_not_set() -> None:
+def test_none_when_both_are_none() -> None:
     result = resolve_namespace(
         provided_explicitly=None,
         named_object_fallback=None,

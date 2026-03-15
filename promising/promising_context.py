@@ -640,12 +640,9 @@ class PromisingContext:
         """
         return self._thread_pool
 
-    def _repr_context(self, namespace: str | None = None) -> str:
-        namespace = "" if namespace is None else f"{namespace!r} "
-        return f"<{namespace}{self.__class__.__name__} id={id(self)}>"
-
     def __repr__(self) -> str:
-        return self._repr_context(self.namespace)
+        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
+        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():

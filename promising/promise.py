@@ -122,6 +122,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
+        namespace = resolve_namespace(
+            provided_explicitly=namespace,
+            named_object_fallback=awaitable,
+        )
+
         PromisingContext.__init__(
             self,
             namespace=namespace,
@@ -139,6 +144,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # None)
             loop=self._ctx_loop,
         )
+
         self._task: Task[T_co] | None = None
         self._concurrent_future = PromiseBackedConcurrentFuture[T_co](self)
 
@@ -402,14 +408,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # safe side"
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
 
-    def __repr__(self) -> str:
-        return self._repr_context(
-            resolve_namespace(
-                provided_explicitly=self.namespace,
-                named_object_fallback=self._awaitable,
-            ),
-        )
-
     def set_result(self, result: T_co | Awaitable[Any]) -> None:
         """
         Set the result of the Promise. This method is not intended to be called
@@ -426,14 +424,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result: The result value to set.
         """
         if hasattr(result, "__await__") and not isinstance(result, Promise):
-            result = Promise[Any](
-                result,
-                namespace=resolve_namespace(
-                    provided_explicitly=None,
-                    named_object_fallback=result,
-                ),
-                parent=self,
-            )
+            result = Promise[Any](result, parent=self)
 
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be

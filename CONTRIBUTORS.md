@@ -73,7 +73,7 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 
 ### Sentinel Pattern (`promising/sentinels.py`)
 
-`UNCHANGED`, `INHERIT`, `GLOBAL_DEFAULT`, and `ASYNCIO_DEFAULT` raise on boolean coercion to prevent misuse. `UNCHANGED` means "unset / no enforcement", `INHERIT` means "inherit from parent", `GLOBAL_DEFAULT` means "read the current global setting directly", `ASYNCIO_DEFAULT` means "let the event loop use its own default executor".
+`UNCHANGED`, `INHERIT`, `GLOBAL_DEFAULT`, and `ASYNCIO_DEFAULT` raise on boolean coercion to prevent misuse. `UNCHANGED` means "no call-time override — use the decorator-level value", `INHERIT` means "inherit from parent", `GLOBAL_DEFAULT` means "read the current global setting directly", `ASYNCIO_DEFAULT` means "let the event loop use its own default executor".
 
 ### Error Classes (`promising/errors.py`)
 

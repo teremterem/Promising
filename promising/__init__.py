@@ -19,7 +19,7 @@ from promising.promising_context import (
     get_active_context,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, NOT_SET, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, UNCHANGED, Sentinel
 
 
 class Defaults:
@@ -52,7 +52,6 @@ __all__ = [
     "Defaults",
     "GLOBAL_DEFAULT",
     "INHERIT",
-    "NOT_SET",
     "Promise",
     "PromiseNotFoundError",
     "PromiseBackedConcurrentFuture",
@@ -60,6 +59,7 @@ __all__ = [
     "PromisingFunction",
     "Sentinel",
     "SyncUsageError",
+    "UNCHANGED",
     "await_children",
     "await_children_sync",
     "context",

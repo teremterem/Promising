@@ -6,7 +6,7 @@ from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
-from promising.sentinels import INHERIT, NOT_SET, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
 from promising.utils import assert_no_sync_usage_deadlock, resolve_namespace
 
@@ -61,18 +61,20 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             must be prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
+            # TODO Copy the explanation over instead of referencing it ?
         namespace: Optional human-readable namespace string. Used in
             ``__repr__`` output. Passed to PromisingContext.
+            # TODO Copy the explanation over instead of referencing it ?
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or
-            not (False). NOT_SET (default) defers to the parent's
+            not (False). None (default) defers to the parent's
             children_start_soon if enforced, otherwise falls back to
             start_soon_default. INHERIT copies the parent's start_soon
             directly.
         children_start_soon: (Also boolean or Sentinel.) Default start_soon
             value enforced on child Promises that left their start_soon setting
-            as NOT_SET. For the children_start_soon setting itself, NOT_SET
+            as None. For the children_start_soon setting itself, None
             (default) means no enforcement. INHERIT in children_start_soon
             copies the parent's children_start_soon setting.
             NOTE: The default for children_start_soon is different in Promise
@@ -108,18 +110,23 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __init__(
         self,
-        awaitable: Awaitable[T_co | Awaitable[Any]] | Sentinel = NOT_SET,
+        awaitable: Awaitable[T_co | Awaitable[Any]] | None = None,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        loop: AbstractEventLoop | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon: bool | Sentinel = NOT_SET,
+        start_soon: bool | None | Sentinel = None,
+        children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: T_co | Awaitable[Any] | Sentinel = NOT_SET,
-        prefilled_exception: BaseException | Sentinel = NOT_SET,
+        prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
+        prefilled_exception: BaseException | None = None,
     ) -> None:
+        namespace = resolve_namespace(
+            provided_explicitly=namespace,
+            named_object_fallback=awaitable,
+        )
+
         PromisingContext.__init__(
             self,
             namespace=namespace,
@@ -137,6 +144,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # None)
             loop=self._ctx_loop,
         )
+
         self._task: Task[T_co] | None = None
         self._concurrent_future = PromiseBackedConcurrentFuture[T_co](self)
 
@@ -304,12 +312,12 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         if self.done():
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
-        if self._awaitable is NOT_SET:
+        if self._awaitable is None:
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
 
-        result = NOT_SET
-        exception = NOT_SET
+        result = UNCHANGED
+        exception = None
 
         try:
             with self:
@@ -330,30 +338,31 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # not affect the exception handling
                 pass
         finally:
-            if exception is not NOT_SET:
-                self.set_exception(exception)
-            else:
+            if exception is None:
                 self.set_result(result)
+            else:
+                self.set_exception(exception)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
             self._task = self._ctx_loop.create_task(self._fulfill(), name=str(self) + "-Task")
 
-    def _resolve_start_soon(self, start_soon: bool | Sentinel) -> bool:
+    def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):
             # Concrete value was provided
             return start_soon
 
-        if start_soon is NOT_SET:
+        if start_soon is None:
             parent_context = self.get_parent_context(raise_if_none=False)
 
-            if parent_context is not None and parent_context._children_start_soon is not NOT_SET:
+            if parent_context is not None and parent_context._children_start_soon is not None:
                 # The parent is enforcing this setting for its children
                 return parent_context._children_start_soon
 
             # Use the default
             return self._start_soon_default
 
+        # TODO Do we even need this kind of inheritance for start_soon ?
         if start_soon is INHERIT:
             parent_promise = self.get_parent_promise(raise_if_none=False)
 
@@ -365,23 +374,22 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             return parent_promise._start_soon
 
         raise ValueError(
-            "`start_soon` must be either NOT_SET, INHERIT or a boolean value, "
-            f"but `{type(start_soon)}` was given instead"
+            f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
 
     def _finish_initialization(
         self,
         *,
         prefilled_result: T_co | Awaitable[Any] | Sentinel,
-        prefilled_exception: BaseException | Sentinel,
+        prefilled_exception: BaseException | None,
     ) -> None:
-        if self._awaitable is NOT_SET:
-            if prefilled_result is not NOT_SET and prefilled_exception is not NOT_SET:
+        if self._awaitable is None:
+            if prefilled_result is not UNCHANGED and prefilled_exception is not None:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
-            if prefilled_result is not NOT_SET:
+            if prefilled_result is not UNCHANGED:
                 self.set_result(prefilled_result)
-            elif prefilled_exception is not NOT_SET:
+            elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
 
             else:
@@ -389,7 +397,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         else:
             if not hasattr(self._awaitable, "__await__"):
                 raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
-            if prefilled_result is not NOT_SET or prefilled_exception is not NOT_SET:
+            if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
                     "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )
@@ -399,14 +407,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # use the event loop's `call_soon_threadsafe` to "stay on the
                 # safe side"
                 self._call_soon_threadsafe(self._ensure_task_scheduled)
-
-    def __repr__(self) -> str:
-        return self._repr_context(
-            resolve_namespace(
-                provided_explicitly=self.namespace,
-                named_object_fallback=self._awaitable,
-            ),
-        )
 
     def set_result(self, result: T_co | Awaitable[Any]) -> None:
         """
@@ -424,14 +424,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result: The result value to set.
         """
         if hasattr(result, "__await__") and not isinstance(result, Promise):
-            result = Promise[Any](
-                result,
-                namespace=resolve_namespace(
-                    provided_explicitly=NOT_SET,
-                    named_object_fallback=result,
-                ),
-                parent=self,
-            )
+            result = Promise[Any](result, parent=self)
 
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be

@@ -6,7 +6,6 @@ from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError, SyncUsageError
-from promising.sentinels import NOT_SET, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 
 
@@ -26,12 +25,12 @@ def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: st
         raise SyncUsageError(message)
 
 
-def resolve_namespace(*, provided_explicitly: str | Sentinel, named_object_fallback: Any | Sentinel) -> str | Sentinel:
-    if provided_explicitly is not NOT_SET:
+def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any | None) -> str | None:
+    if provided_explicitly is not None:
         return provided_explicitly
 
-    if named_object_fallback is NOT_SET:
-        return NOT_SET
+    if named_object_fallback is None:
+        return None
 
     prefix = resolve_module_name(named_object_fallback)
     prefix = f"{prefix}::" if prefix else ""
@@ -80,17 +79,17 @@ class DecoratorSupport:
     """
 
     __wrapped__: DecoratableFunctionType | None
-    namespace: str | Sentinel
+    namespace: str | None
 
     def __init__(
         self,
-        func_or_method: DecoratableFunctionType | Sentinel,  # can be NOT_SET
+        func_or_method: DecoratableFunctionType | None,
         *,
-        namespace: str | Sentinel,  # can be NOT_SET
+        namespace: str | None,
     ) -> None:
         self.__wrapped__ = None
         self.namespace = namespace
-        if func_or_method is NOT_SET:
+        if func_or_method is None:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
             # decorator with parameters.
@@ -98,7 +97,7 @@ class DecoratorSupport:
         self._update_wrapper(func_or_method)
 
     def _update_wrapper(self, func_or_method: Any) -> None:
-        if func_or_method is NOT_SET:
+        if func_or_method is None:
             raise DecorationError("The function or method to decorate was not provided")
 
         if not callable(func_or_method) and not isinstance(func_or_method, classmethod):

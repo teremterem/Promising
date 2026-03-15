@@ -306,16 +306,13 @@ async def test_thread_pool_ignored_for_async_functions() -> None:
     custom_pool.shutdown(wait=False)
 
 
-# ── Decorator-level explicit thread_pool beats INHERIT from context ─
+# ── Inner thread_pool takes precedence over outer thread_pool ────────
 
 
-async def test_decorator_thread_pool_beats_context_inherit() -> None:
+async def test_inner_thread_pool_overrides_outer() -> None:
     """
-    When a function is decorated with an explicit thread_pool, it is
-    NOT overridden by INHERIT from the enclosing context — the
-    decorator-level value is used because INHERIT is the default at
-    the Promise level and is resolved from the decorator, not the
-    context.
+    A thread_pool set closer to the function wins over one set
+    further up in the hierarchy.
     """
     decorator_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="deco")
     context_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ctx")

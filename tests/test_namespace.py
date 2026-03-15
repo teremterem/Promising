@@ -9,7 +9,7 @@ import types
 import pytest
 
 import promising
-from promising.sentinels import NOT_SET
+from promising.sentinels import UNCHANGED
 from promising.utils import resolve_namespace
 
 # ── resolve_namespace (unit) ────────────────────────────────────
@@ -27,20 +27,20 @@ def test_explicit_namespace_wins_over_fallback() -> None:
     assert result == "custom"
 
 
-def test_explicit_namespace_wins_even_with_not_set_fallback() -> None:
+def test_explicit_namespace_wins_even_with_none_fallback() -> None:
     result = resolve_namespace(
         provided_explicitly="explicit",
-        named_object_fallback=NOT_SET,
+        named_object_fallback=None,
     )
     assert result == "explicit"
 
 
-def test_not_set_when_both_are_not_set() -> None:
+def test_none_when_both_are_none() -> None:
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
-        named_object_fallback=NOT_SET,
+        provided_explicitly=None,
+        named_object_fallback=None,
     )
-    assert result is NOT_SET
+    assert result is None
 
 
 def test_qualname_from_function() -> None:
@@ -49,7 +49,7 @@ def test_qualname_from_function() -> None:
     async def my_func() -> None: ...
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=my_func,
     )
     assert result == "tests.test_namespace::test_qualname_from_function.<locals>.my_func"
@@ -59,7 +59,7 @@ def test_qualname_from_sync_function() -> None:
     def my_sync_func() -> None: ...
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=my_sync_func,
     )
     assert result == "tests.test_namespace::test_qualname_from_sync_function.<locals>.my_sync_func"
@@ -78,7 +78,7 @@ async def test_qualname_from_async_generator_object() -> None:
     ag = gen()
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=ag,
     )
     assert result == "tests.test_namespace::test_qualname_from_async_generator_object.<locals>.gen"
@@ -92,7 +92,7 @@ def test_qualname_from_class() -> None:
     class Foo: ...
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=Foo,
     )
     assert result == "tests.test_namespace::test_qualname_from_class.<locals>.Foo"
@@ -103,7 +103,7 @@ def test_qualname_from_method_of_class() -> None:
         def method(self) -> None: ...
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=MyClass.method,
     )
     assert result == "tests.test_namespace::test_qualname_from_method_of_class.<locals>.MyClass.method"
@@ -115,7 +115,7 @@ def test_name_fallback_when_no_qualname() -> None:
     # SimpleNamespace has neither __qualname__ nor __module__
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=ns,
     )
     assert result == "simple_ns"
@@ -126,7 +126,7 @@ def test_name_fallback_with_module_but_no_qualname() -> None:
     ns = types.SimpleNamespace(__name__="my_thing", __module__="some.module")
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=ns,
     )
     assert result == "some.module::my_thing"
@@ -260,14 +260,16 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_call_namespace_none_uses_decorator_ns(use_repr: bool) -> None:
-    """Passing namespace=None at call time falls back to decorator's namespace."""
+async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use_repr: bool) -> None:
+    """
+    Passing namespace=UNCHANGED at call time falls back to decorator's namespace.
+    """
 
     @promising.function(namespace="FromDecorator")
     async def work() -> str:
         return "done"
 
-    promise = work(namespace=None)
+    promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
     assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", result)
     await promise
@@ -287,9 +289,9 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
 
 @pytest.mark.parametrize("use_repr", [True, False])
 async def test_context_manager_no_namespace(use_repr: bool) -> None:
-    """promising.context() with no namespace: namespace is NOT_SET."""
+    """promising.context() with no namespace: namespace is None."""
     with promising.context() as ctx:
-        assert ctx.namespace is NOT_SET
+        assert ctx.namespace is None
         result = repr(ctx) if use_repr else str(ctx)
         assert re.fullmatch(r"<PromisingContext id=\d+>", result)
 
@@ -463,7 +465,7 @@ def test_plain_instance_inherits_module_from_class() -> None:
     assert not hasattr(obj, "__name__")  # NOT inherited
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=obj,
     )
     # The module prefix comes from the CLASS, not from the instance itself
@@ -499,7 +501,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
     assert obj.__name__ == "custom_name"  # type: ignore[attr-defined]
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=obj,
     )
     # Module prefix comes from Widget's class, not the instance
@@ -529,7 +531,7 @@ def test_callable_instance_inherits_module_from_class() -> None:
     assert not hasattr(handler, "__name__")
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=handler,
     )
     # TODO Do we even care about this edge case ?
@@ -553,7 +555,7 @@ def test_builtin_int_has_no_inherited_module() -> None:
     assert not hasattr(42, "__name__")
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=42,
     )
     assert result == "42"
@@ -564,7 +566,7 @@ def test_builtin_str_has_no_inherited_module() -> None:
     assert not hasattr("hello", "__qualname__")
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback="hello",
     )
     assert result == "hello"
@@ -575,7 +577,7 @@ def test_builtin_list_has_no_inherited_module() -> None:
     assert not hasattr([], "__qualname__")
 
     result = resolve_namespace(
-        provided_explicitly=NOT_SET,
+        provided_explicitly=None,
         named_object_fallback=[1, 2, 3],
     )
     assert result == "[1, 2, 3]"

@@ -5,17 +5,17 @@ from collections.abc import Callable
 from typing import Any, Generic
 
 from promising.promise import Promise, get_active_promise
-from promising.sentinels import INHERIT, NOT_SET, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import DecoratorSupport, is_func_or_method_async
 
 
 def function(
-    func_or_method: DecoratableFunctionType | Sentinel = NOT_SET,
+    func_or_method: DecoratableFunctionType | None = None,
     *,
-    namespace: str | Sentinel = NOT_SET,
-    start_soon: bool | Sentinel = NOT_SET,
-    children_start_soon: bool | Sentinel = NOT_SET,
+    namespace: str | None = None,
+    start_soon: bool | None | Sentinel = None,
+    children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool = True,
@@ -74,11 +74,16 @@ def function(
         namespace: Optional namespace string for the resulting ``Promise``.
             Defaults to the wrapped function's ``__qualname__``.
         start_soon: Whether the ``Promise`` should start executing
-            immediately upon creation. Defaults to ``NOT_SET``, which
-            defers to the parent ``Promise``'s configuration.
-        children_start_soon: Whether child promises created during this
-            ``Promise``'s execution should start executing immediately.
-            Defaults to ``NOT_SET``.
+            immediately upon creation. Defaults to ``None``,
+            which defers to the parent's
+            ``children_start_soon`` if enforced, otherwise
+            falls back to ``start_soon_default``. ``INHERIT``
+            copies the parent's ``start_soon`` directly.
+        children_start_soon: Whether child promises created
+            during this ``Promise``'s execution should start
+            executing immediately. Defaults to ``None`` (no
+            enforcement). ``INHERIT`` copies the parent's
+            ``children_start_soon`` setting.
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
@@ -111,7 +116,7 @@ def function(
             specific case rather than blanket-disabling thread pools
             for an entire subtree.
     """
-    if func_or_method is NOT_SET:
+    if func_or_method is None:
         # The decorator was used with arguments
         def _decorator(f_or_m: Callable[..., T_co]) -> PromisingFunction[T_co]:
             return PromisingFunction[T_co](
@@ -147,9 +152,9 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self,
         func_or_method: DecoratableFunctionType,
         *,
-        namespace: str | Sentinel = NOT_SET,
-        start_soon: bool | Sentinel = NOT_SET,
-        children_start_soon: bool | Sentinel = NOT_SET,
+        namespace: str | None = None,
+        start_soon: bool | None | Sentinel = None,
+        children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,
@@ -172,12 +177,12 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
     def __call__(
         self,
         *args: Any,
-        namespace: str | Sentinel | None = None,
-        start_soon: bool | Sentinel | None = None,
-        children_start_soon: bool | Sentinel | None = None,
-        start_soon_default: bool | Sentinel | None = None,
-        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel | None = None,
-        use_thread_pool: bool | None = None,
+        namespace: str | None | Sentinel = UNCHANGED,
+        start_soon: bool | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        use_thread_pool: bool | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
@@ -191,8 +196,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
-        arguments or pass ``None`` — both are equivalent. Passing
-        ``NOT_SET`` explicitly will still override them (``NOT_SET`` is
+        arguments or pass ``UNCHANGED`` — both are equivalent. Passing
+        None explicitly will still override them (None is
         itself a valid value with its own semantics in ``Promise``).
 
         Args:
@@ -220,17 +225,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's
             return value.
         """
-        if namespace is None:
+        if namespace is UNCHANGED:
             namespace = self.namespace
-        if start_soon is None:
+        if start_soon is UNCHANGED:
             start_soon = self.start_soon
-        if children_start_soon is None:
+        if children_start_soon is UNCHANGED:
             children_start_soon = self.children_start_soon
-        if start_soon_default is None:
+        if start_soon_default is UNCHANGED:
             start_soon_default = self.start_soon_default
-        if thread_pool is None:
+        if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
-        if use_thread_pool is None:
+        if use_thread_pool is UNCHANGED:
             use_thread_pool = self.use_thread_pool
 
         # TODO Develop a convenient and idiomatic way (whatever that would

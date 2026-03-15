@@ -517,7 +517,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Sentinel | Meaning |
 |---|---|
-| `promising.UNCHANGED` | No value provided / no enforcement. |
+| `promising.UNCHANGED` | No call-time override — use the decorator-level value. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |

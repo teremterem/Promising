@@ -61,8 +61,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             must be prefilled with a result or exception.
         loop: The event loop to use. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
+            # TODO Copy the explanation over instead of referencing it ?
         namespace: Optional human-readable namespace string. Used in
             ``__repr__`` output. Passed to PromisingContext.
+            # TODO Copy the explanation over instead of referencing it ?
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or
@@ -114,8 +116,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        start_soon: bool | None = None,
-        children_start_soon: bool | None = None,
+        start_soon: bool | None | Sentinel = None,
+        children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
         prefilled_result: T_co | Awaitable[Any] | Sentinel = NOT_SET,
         prefilled_exception: BaseException | None = None,

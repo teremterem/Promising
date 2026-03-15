@@ -14,8 +14,8 @@ def function(
     func_or_method: DecoratableFunctionType | None = None,
     *,
     namespace: str | None = None,
-    start_soon: bool | None = None,
-    children_start_soon: bool | None = None,
+    start_soon: bool | None | Sentinel = None,
+    children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool = True,
@@ -76,9 +76,11 @@ def function(
         start_soon: Whether the ``Promise`` should start executing
             immediately upon creation. Defaults to None, which
             defers to the parent ``Promise``'s configuration.
+            # TODO Explain INHERIT
         children_start_soon: Whether child promises created during this
             ``Promise``'s execution should start executing immediately.
             Defaults to None.
+            # TODO Explain INHERIT
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
@@ -148,8 +150,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         func_or_method: DecoratableFunctionType,
         *,
         namespace: str | None = None,
-        start_soon: bool | None = None,
-        children_start_soon: bool | None = None,
+        start_soon: bool | None | Sentinel = None,
+        children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool = True,

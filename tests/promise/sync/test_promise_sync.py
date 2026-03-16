@@ -126,7 +126,7 @@ async def test_sync_inside_sync_promising_function() -> None:
     async def async_greet(name: str) -> str:
         return f"hello, {name}"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def sync_caller() -> str:
         greeting_promise = async_greet("world", start_soon=False)
         return greeting_promise.sync()
@@ -145,7 +145,7 @@ async def test_sync_exception_inside_sync_promising_function() -> None:
     async def failing_child() -> NoReturn:
         raise RuntimeError("child failed")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def sync_caller() -> str:
         return failing_child(start_soon=False).sync()
 

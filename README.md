@@ -4,7 +4,7 @@ Hierarchical async Promise management for Python.
 
 Promising extends `asyncio.Future` with automatic parent-child relationships between asynchronous operations. When a Promise creates other Promises during its execution, those become its children — tracked via context variables, forming a tree you can await, inspect, or configure as a unit.
 
-Decorate any function with `@promising.function` — async or sync, it doesn't matter — and it runs concurrently. Async functions run on the event loop as usual; sync functions are dispatched to a thread pool automatically. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value, a coroutine, or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
+Decorate any function with `@promising.function` and it runs concurrently. Async functions run on the event loop as usual; sync functions require an explicit `use_thread_pool` setting — `True` (recommended) dispatches them to a thread pool, `False` runs them directly on the event loop thread. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value, a coroutine, or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
 
 ## Why Promises?
 
@@ -12,7 +12,7 @@ A plain coroutine in Python is a one-shot object: you can `await` it once, then 
 
 Wrapping every async (or sync) operation in a `Promise` gives you:
 
-- **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool. Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
+- **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool (with `use_thread_pool=True`). Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
@@ -130,10 +130,10 @@ await promising.await_children(recursively=True)
 
 ## Sync Function Support
 
-`@promising.function` works on regular (non-async) functions too. They run in a thread pool while still participating in the Promise hierarchy:
+`@promising.function` works on regular (non-async) functions too. Sync functions require an explicit `use_thread_pool` setting — `True` (recommended for most cases) runs them in a thread pool so CPU-heavy workloads don't block the event loop thread:
 
 ```python
-@promising.function
+@promising.function(use_thread_pool=True)
 def compute(x: int, y: int) -> int:
     # Runs in a ThreadPoolExecutor
     return x + y
@@ -150,7 +150,7 @@ Inside a sync promising function, use `.sync()` instead of `await` to get a chil
 async def async_greet(name: str) -> str:
     return f"hello, {name}"
 
-@promising.function
+@promising.function(use_thread_pool=True)
 def sync_caller() -> str:
     greeting = async_greet("world", start_soon=False)
     return greeting.sync()  # Blocks until resolved
@@ -159,7 +159,7 @@ def sync_caller() -> str:
 The sync counterpart of `await_children()` is also available:
 
 ```python
-@promising.function
+@promising.function(use_thread_pool=True)
 def sync_parent() -> str:
     child_task("a")
     child_task("b")
@@ -171,22 +171,22 @@ def sync_parent() -> str:
 
 ### Thread Pool Configuration
 
-By default, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.SYNC_THREAD_POOL`). You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
+When `use_thread_pool=True`, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.PROMISING_THREAD_POOL`) by default. You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
 import promising
-from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
+from promising import ASYNCIO_DEFAULT, PROMISING_DEFAULT
 
 # Use a custom thread pool for a specific function
 my_pool = ThreadPoolExecutor(max_workers=4)
 
-@promising.function(thread_pool=my_pool)
+@promising.function(use_thread_pool=True, thread_pool=my_pool)
 def cpu_bound_work(data: list) -> list:
     return sorted(data)
 
 # Let the event loop use its own default executor
-@promising.function(thread_pool=ASYNCIO_DEFAULT)
+@promising.function(use_thread_pool=True, thread_pool=ASYNCIO_DEFAULT)
 def io_work() -> str:
     ...
 
@@ -206,16 +206,20 @@ with promising.context(thread_pool=custom_pool):
 
 The `thread_pool` parameter accepts:
 
-- **`INHERIT`** (default) — inherit from the parent context; falls back to `GLOBAL_DEFAULT` at the root.
-- **`GLOBAL_DEFAULT`** — use `Defaults.SYNC_THREAD_POOL`.
+- **`INHERIT`** (default) — inherit from the parent context; falls back to `PROMISING_DEFAULT` at the root.
+- **`PROMISING_DEFAULT`** — use `Defaults.PROMISING_THREAD_POOL`.
 - **`ASYNCIO_DEFAULT`** — pass `None` to `run_in_executor`, letting the event loop use its own default executor.
 - A concrete **`ThreadPoolExecutor`** instance.
 
-### Opting Out of the Thread Pool
+### `use_thread_pool`: Required for Sync, Disallowed for Async
 
-If a sync function is lightweight and you want to avoid the overhead of dispatching it to a thread pool, set `use_thread_pool=False` to run it directly on the event loop thread:
+The `use_thread_pool` parameter is **required** when decorating a sync function — omitting it raises `DecorationError`. Set it to `True` (recommended for most cases) to run in a thread pool, or `False` for lightweight transforms that won't block the event loop:
 
 ```python
+@promising.function(use_thread_pool=True)
+def cpu_heavy(data: list) -> list:
+    return sorted(data)
+
 @promising.function(use_thread_pool=False)
 def lightweight_transform(data: list) -> list:
     return [x * 2 for x in data]
@@ -223,9 +227,11 @@ def lightweight_transform(data: list) -> list:
 
 > **Warning:** When `use_thread_pool=False`, calling `.sync()` or `await_children_sync()` from within the function will raise `SyncUsageError` because those calls would deadlock the event loop.
 
+For async functions, `use_thread_pool` is **disallowed** — passing it (at decoration or call time) raises `DecorationError`. Async functions always run on the event loop regardless, so the parameter would be misleading.
+
 An alternative to `use_thread_pool=False` is to simply mark the decorated function as `async` but treat it as synchronous (don't use `await` inside). This avoids the thread pool naturally, since async functions always run on the event loop. The same caveat applies: CPU-heavy work in such a function will block the event loop.
 
-Unlike `thread_pool`, the `use_thread_pool` parameter is intentionally not inheritable through the context hierarchy — it must be set per-function at decoration or call time. Running sync functions on the event loop thread is problematic for CPU-bound workloads (it blocks the loop), so the user should make a conscious decision for each specific case.
+Unlike `thread_pool`, the `use_thread_pool` parameter is intentionally not inheritable through the context hierarchy — it must be set per-function at decoration time. For sync functions, it can also be overridden at call time. Running sync functions on the event loop thread is problematic for CPU-bound workloads (it blocks the loop), so the user should make a conscious decision for each specific case.
 
 ## Method Decorators
 
@@ -326,7 +332,7 @@ Promises inherit configuration from their parents through three parameters:
 
 - **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `None` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
 - **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `None`. `None` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `None` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
-- **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `GLOBAL_DEFAULT` reads the current global setting directly, ignoring the parent chain.
+- **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `PROMISING_DEFAULT` reads the current global setting directly, ignoring the parent chain.
 
 These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `None` explicitly at call time overrides the decorator value:
 
@@ -406,13 +412,13 @@ final = await one_level                   # Returns "hello"
 The sync counterparts follow the same pattern — `promise.sync()` fully unpacks, while `promise.unpack_once_sync()` resolves only one level. Like `unpack_once()`, it returns the same dual-purpose `Promise` objects that support both async and sync consumption — the caller can continue with `.sync()` if still in a sync context, or switch to `await` if the context is async:
 
 ```python
-@promising.function
+@promising.function(use_thread_pool=True)
 def sync_example() -> str:
     promise = outer()
     inner_promise = promise.unpack_once_sync()  # Returns the inner Promise
     return inner_promise.sync()                  # Continue synchronously
 
-@promising.function
+@promising.function(use_thread_pool=True)
 def sync_full_unpack() -> str:
     promise = outer()
     return promise.sync()  # Fully unpacks to "hello"
@@ -460,7 +466,7 @@ uv sync --extra examples
 
 ## Design Note: Settings Are Frozen at Creation Time
 
-All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `GLOBAL_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
+All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
 
 This is intentional: because a `Promise` may execute eagerly (the default) or be deferred, the user cannot predict *when* the underlying coroutine will run. Freezing settings at creation time guarantees that the behavior a promise was *created with* is the behavior it *runs with*, regardless of scheduling.
 
@@ -470,7 +476,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Symbol | Description |
 |---|---|
-| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` or `@promising.function(start_soon=...)`. Accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, and `use_thread_pool`. |
+| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
 | `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 
@@ -511,7 +517,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
-| `promising.Defaults.SYNC_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `GLOBAL_DEFAULT`. |
+| `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 
 ### Sentinels
 
@@ -519,7 +525,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 |---|---|
 | `promising.UNCHANGED` | No call-time override — use the decorator-level value. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
-| `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
+| `promising.PROMISING_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
 | `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 
@@ -533,7 +539,7 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 | `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). |
 | `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. |
 | `promising.ContextUsageError` | Misuse of `promising.context` (e.g. using the same instance as both context manager and decorator, or incorrect argument usage). |
-| `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`). |
+| `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, or setting `use_thread_pool` on an async function). |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 

@@ -147,7 +147,7 @@ async def test_as_concurrent_future(
     else:
         # In all other scenarios the promise should be done
 
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def assert_concurrent_future_done() -> None:
             # To bypass deadlock safeguards, we need to do this in a separate
             # thread, hence the @promising.function decorator
@@ -312,7 +312,7 @@ async def test_with_exception(
     else:
         # In all other scenarios the promise should be done (with exception)
 
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def assert_concurrent_future_exception() -> None:
             # To bypass deadlock safeguards, we need to do this in a separate
             # thread, hence the @promising.function decorator

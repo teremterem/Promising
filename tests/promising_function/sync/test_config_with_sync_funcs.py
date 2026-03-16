@@ -12,6 +12,7 @@ async def test_config_params_work_with_sync_functions() -> None:
         start_soon=False,
         children_start_soon=False,
         start_soon_default=False,
+        use_thread_pool=True,
     )
     def noop() -> None:
         pass
@@ -33,6 +34,7 @@ async def test_call_time_config_overrides_work_with_sync_functions() -> None:
         start_soon=False,
         children_start_soon=False,
         start_soon_default=False,
+        use_thread_pool=True,
     )
     def noop() -> None:
         pass
@@ -54,7 +56,7 @@ async def test_config_kwargs_do_not_leak_into_sync_function() -> None:
     call() and not forwarded to the wrapped sync function.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def add(a: int, b: int) -> int:
         return a + b
 

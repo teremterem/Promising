@@ -14,7 +14,7 @@ async def test_calling_sync_promising_function_returns_promise() -> None:
     awaiting it returns the expected value.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def greet() -> str:
         return "hello"
 
@@ -30,7 +30,7 @@ async def test_forwards_positional_args() -> None:
     wrapped sync function.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def add(a: int, b: int) -> int:
         return a + b
 
@@ -43,7 +43,7 @@ async def test_forwards_keyword_args() -> None:
     wrapped sync function.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def greet(*, greeting: str, name: str) -> str:
         return f"{greeting}, {name}"
 
@@ -56,7 +56,7 @@ async def test_forwards_mixed_args() -> None:
     correctly.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def mixed(a: int, b: int, *, suffix: str = "!") -> str:
         return f"{a + b}{suffix}"
 
@@ -69,7 +69,7 @@ async def test_default_args() -> None:
     explicit args overrides them.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def with_defaults(x: int = 10, y: int = 20) -> int:
         return x + y
 
@@ -83,7 +83,7 @@ async def test_star_args_and_kwargs() -> None:
     sync function correctly.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def variadic(*args: int, **kwargs: str) -> tuple:
         return (args, kwargs)
 
@@ -98,7 +98,7 @@ async def test_sync_function_executes_once() -> None:
     """
     call_count = 0
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def counted() -> str:
         nonlocal call_count
         call_count += 1
@@ -125,7 +125,7 @@ async def test_sync_function_runs_in_different_thread() -> None:
     """
     main_thread = threading.current_thread()
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -142,7 +142,7 @@ async def test_exception_propagates_through_promise() -> None:
     propagates through the Promise when awaited.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def failing() -> None:
         raise ValueError("test error")
 
@@ -160,7 +160,7 @@ async def test_various_exception_types(*, exc_type: type) -> None:
     through the Promise correctly.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def failing() -> None:
         raise exc_type("specific error")
 
@@ -177,7 +177,7 @@ async def test_decorator_with_empty_parens() -> None:
     identically to bare @promising.function for sync functions.
     """
 
-    @promising.function()
+    @promising.function(use_thread_pool=True)
     def greet() -> str:
         return "hello"
 
@@ -194,7 +194,7 @@ async def test_used_as_direct_call() -> None:
     def my_func() -> str:
         return "direct"
 
-    pf = promising.function(my_func)
+    pf = promising.function(my_func, use_thread_pool=True)
     assert isinstance(pf, promising.PromisingFunction)
     assert await pf() == "direct"
 
@@ -208,7 +208,7 @@ async def test_preserves_original_func() -> None:
     def original() -> str:
         return "preserved"
 
-    decorated = promising.function(original)
+    decorated = promising.function(original, use_thread_pool=True)
     assert decorated.__wrapped__ is original
 
 
@@ -221,7 +221,7 @@ async def test_active_promise_accessible_inside_sync_function() -> None:
     (running in a thread pool) returns the wrapping Promise.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def sync_func() -> promising.Promise:
         return get_active_promise(raise_if_none=False)
 
@@ -241,7 +241,7 @@ async def test_sync_parent_child_relationship() -> None:
     async def child_func() -> str:
         return "child"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def sync_parent() -> None:
         nonlocal child_promise
         child_promise = child_func(start_soon=False)

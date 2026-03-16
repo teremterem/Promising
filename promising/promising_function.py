@@ -4,10 +4,11 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
+from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport, is_func_or_method_async
+from promising.utils import DecoratorSupport
 
 
 def function(
@@ -18,7 +19,7 @@ def function(
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
-    use_thread_pool: bool = True,
+    use_thread_pool: bool | None = None,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
     A decorator that turns a function into one that returns a ``Promise``
@@ -89,27 +90,36 @@ def function(
             is inherited from the parent ``Promise``.
         thread_pool: Thread pool executor used to run sync
             promising functions. ``INHERIT`` (default) inherits from
-            the parent context, falling back to ``GLOBAL_DEFAULT``
-            at the root. ``GLOBAL_DEFAULT`` uses
-            ``Defaults.SYNC_THREAD_POOL``. ``ASYNCIO_DEFAULT``
+            the parent context, falling back to ``PROMISING_DEFAULT``
+            at the root. ``PROMISING_DEFAULT`` uses
+            ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT``
             passes ``None`` to ``run_in_executor``, letting the
             event loop use its own default executor. A concrete
             ``ThreadPoolExecutor`` instance can also be provided.
             Only relevant for sync functions — async functions
             always run on the event loop regardless.
         use_thread_pool: Whether to run the sync function in a thread pool
-            executor (default ``True``). When ``False``, the sync function
-            runs directly on the event loop thread. This is only relevant
-            for sync functions — async functions always run on the event
-            loop regardless of this setting. **Warning:** when
+            executor. ``True`` (recommended for most cases) runs the
+            function in a thread pool so CPU-heavy workloads don't block
+            the event loop thread. ``False`` runs the sync function
+            directly on the event loop thread. **Warning:** when
             ``use_thread_pool=False``, calling ``sync()`` or
             ``await_children_sync()`` from within the function will raise
             ``SyncUsageError`` because those calls would deadlock the
             event loop.
 
+            This parameter is **required** for sync functions — omitting
+            it will raise ``DecorationError``. This is by design: the
+            user should make a conscious decision about thread pool usage
+            for each specific sync function.
+
+            This parameter is **disallowed** for async functions — passing
+            it will raise ``DecorationError``. Async functions always run
+            on the event loop regardless of this setting.
+
             Unlike ``thread_pool``, this parameter is intentionally not
             inheritable through the context hierarchy — it must be set
-            per-function at decoration or call time. This is by design:
+            per-function at decoration time. This is by design:
             running sync functions on the event loop thread is
             problematic for CPU-bound workloads (it blocks the loop),
             so the user should make a conscious decision for each
@@ -157,14 +167,14 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
-        use_thread_pool: bool = True,
+        use_thread_pool: bool | None = None,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
         self.thread_pool = thread_pool
-        self.use_thread_pool = use_thread_pool
+        self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
         #  to resolve postponed type hints correctly, when you implement input
@@ -192,13 +202,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         sync functions in a thread pool automatically).
 
         The ``namespace``, ``start_soon``, ``children_start_soon``,
-        ``start_soon_default``, ``thread_pool``, and ``use_thread_pool``
+        ``start_soon_default``, and ``thread_pool``
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
         arguments or pass ``UNCHANGED`` — both are equivalent. Passing
         None explicitly will still override them (None is
         itself a valid value with its own semantics in ``Promise``).
+
+        For sync functions, ``use_thread_pool`` can also be overridden
+        at call time. For async functions, passing ``use_thread_pool``
+        at call time will raise ``DecorationError``.
 
         Args:
             *args: Positional arguments forwarded to the wrapped function.
@@ -218,8 +232,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
                 - **use_thread_pool** — Whether to run a sync function
-                  in a thread pool executor. See ``promising.function``
-                  for details.
+                  in a thread pool executor (sync functions only). See
+                  ``promising.function`` for details.
 
         Returns:
             A ``Promise`` that will resolve to the wrapped function's
@@ -235,14 +249,17 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             start_soon_default = self.start_soon_default
         if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
+
         if use_thread_pool is UNCHANGED:
             use_thread_pool = self.use_thread_pool
+        else:
+            use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
 
-        if is_func_or_method_async(self.__wrapped__):
+        if self._is_wrapped_async:
             # The wrapped function is already async, so we can just call it
             # directly
             coro = self._wrapped_as_callable(*args, **kwargs)
@@ -282,3 +299,24 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             start_soon_default=start_soon_default,
             thread_pool=thread_pool,
         )
+
+    def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:
+        func_name = getattr(self.__wrapped__, "__qualname__", None) or getattr(
+            self.__wrapped__, "__name__", repr(self.__wrapped__)
+        )
+        if self._is_wrapped_async:
+            if use_thread_pool is not None:
+                raise DecorationError(
+                    f"`use_thread_pool` cannot be set for async function "
+                    f"'{func_name}' — it is only applicable to sync functions. "
+                    f"Async functions always run on the event loop regardless."
+                )
+        elif use_thread_pool is None:
+            raise DecorationError(
+                f"Sync function '{func_name}' requires an explicit "
+                f"`use_thread_pool` setting. Set `use_thread_pool=True` "
+                f"(recommended for most cases, so CPU-heavy workloads "
+                f"don't block the event loop thread) or "
+                f"`use_thread_pool=False`."
+            )
+        return use_thread_pool

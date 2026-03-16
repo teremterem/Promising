@@ -26,7 +26,7 @@ async def test_await_children_sync(*, await_children: bool) -> None:
         execution_order.append("child_done")
         return "child"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def parent_func() -> str:
         nonlocal child_promise
         child_promise = child_func()
@@ -80,7 +80,7 @@ async def test_await_children_sync_recursively(
         execution_order.append("child_done")
         return "child"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def root_func() -> str:
         child_func()
         time.sleep(0.1)
@@ -122,26 +122,26 @@ async def test_await_children_sync_recursively_all_sync(
     """
     execution_order: list[str] = []
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def great_grandchild_func() -> str:
         time.sleep(0.3)
         execution_order.append("great_grandchild_done")
         return "great_grandchild"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
         time.sleep(0.2)
         great_grandchild_func()
         execution_order.append("grandchild_done")
         return "grandchild"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def child_func() -> str:
         grandchild_func()
         execution_order.append("child_done")
         return "child"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def root_func() -> str:
         child_func()
         time.sleep(0.1)

@@ -9,7 +9,7 @@ import types
 import pytest
 
 import promising
-from promising.sentinels import UNCHANGED
+from promising import UNCHANGED
 from promising.utils import resolve_namespace
 
 # ── resolve_namespace (unit) ────────────────────────────────────

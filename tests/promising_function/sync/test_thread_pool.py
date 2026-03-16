@@ -6,19 +6,19 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 import promising
-from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
+from promising import ASYNCIO_DEFAULT, PROMISING_DEFAULT
 
-# ── GLOBAL_DEFAULT: uses Defaults.SYNC_THREAD_POOL ──────────────────
+# ── PROMISING_DEFAULT: uses Defaults.PROMISING_THREAD_POOL ──────────────────
 
 
 async def test_global_default_runs_off_main_thread() -> None:
     """
-    thread_pool=GLOBAL_DEFAULT causes the sync function to run
+    thread_pool=PROMISING_DEFAULT causes the sync function to run
     in a different thread than the main/event-loop thread.
     """
     main_thread = threading.current_thread()
 
-    @promising.function(thread_pool=GLOBAL_DEFAULT)
+    @promising.function(thread_pool=PROMISING_DEFAULT, use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -36,7 +36,7 @@ async def test_asyncio_default_runs_off_main_thread() -> None:
     """
     main_thread = threading.current_thread()
 
-    @promising.function(thread_pool=ASYNCIO_DEFAULT)
+    @promising.function(thread_pool=ASYNCIO_DEFAULT, use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -50,7 +50,7 @@ async def test_asyncio_default_returns_correct_result() -> None:
     the correct result.
     """
 
-    @promising.function(thread_pool=ASYNCIO_DEFAULT)
+    @promising.function(thread_pool=ASYNCIO_DEFAULT, use_thread_pool=True)
     def greet(name: str) -> str:
         return f"hello, {name}"
 
@@ -66,7 +66,7 @@ async def test_custom_thread_pool_is_used() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="custom")
 
-    @promising.function(thread_pool=custom_pool)
+    @promising.function(thread_pool=custom_pool, use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -81,7 +81,7 @@ async def test_custom_thread_pool_returns_correct_result() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=2)
 
-    @promising.function(thread_pool=custom_pool)
+    @promising.function(thread_pool=custom_pool, use_thread_pool=True)
     def add(a: int, b: int) -> int:
         return a + b
 
@@ -95,7 +95,7 @@ async def test_custom_thread_pool_exception_propagates() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1)
 
-    @promising.function(thread_pool=custom_pool)
+    @promising.function(thread_pool=custom_pool, use_thread_pool=True)
     def failing() -> None:
         raise ValueError("custom pool error")
 
@@ -114,7 +114,7 @@ async def test_inherit_from_context() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="inherited")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -132,7 +132,7 @@ async def test_inherit_from_parent_promise() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="parent-pool")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def child_get_thread_name() -> str:
         with promising.context():  # Let's add one more level
             return threading.current_thread().name
@@ -150,11 +150,11 @@ async def test_inherit_from_parent_promise() -> None:
 async def test_inherit_falls_back_to_global_default() -> None:
     """
     When there is no parent context, INHERIT falls back to
-    GLOBAL_DEFAULT (Defaults.SYNC_THREAD_POOL).
+    PROMISING_DEFAULT (Defaults.PROMISING_THREAD_POOL).
     """
     main_thread = threading.current_thread()
 
-    @promising.function  # thread_pool defaults to INHERIT
+    @promising.function(use_thread_pool=True)  # thread_pool defaults to INHERIT
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -172,7 +172,7 @@ async def test_thread_pool_override_at_call_site() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="call-site")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -189,7 +189,7 @@ async def test_call_site_override_takes_precedence_over_decorator() -> None:
     decorator_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="decorator")
     call_site_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="call-site")
 
-    @promising.function(thread_pool=decorator_pool)
+    @promising.function(thread_pool=decorator_pool, use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -200,7 +200,7 @@ async def test_call_site_override_takes_precedence_over_decorator() -> None:
     call_site_pool.shutdown(wait=False)
 
 
-# ── Context override takes precedence over GLOBAL_DEFAULT ───────────
+# ── Context override takes precedence over PROMISING_DEFAULT ───────────
 
 
 async def test_context_thread_pool_overrides_global_default() -> None:
@@ -210,7 +210,7 @@ async def test_context_thread_pool_overrides_global_default() -> None:
     """
     custom_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ctx-pool")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -232,7 +232,7 @@ async def test_nested_context_inner_overrides_outer() -> None:
     outer_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="outer")
     inner_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="inner")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -253,7 +253,7 @@ async def test_nested_context_inner_inherits_outer() -> None:
     """
     outer_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="outer")
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 
@@ -276,7 +276,7 @@ async def test_asyncio_default_via_context_runs_off_main_thread() -> None:
     """
     main_thread = threading.current_thread()
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -317,7 +317,7 @@ async def test_inner_thread_pool_overrides_outer() -> None:
     decorator_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="deco")
     context_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ctx")
 
-    @promising.function(thread_pool=decorator_pool)
+    @promising.function(thread_pool=decorator_pool, use_thread_pool=True)
     def get_thread_name() -> str:
         return threading.current_thread().name
 

@@ -19,7 +19,7 @@ from promising.promising_context import (
     get_active_context,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, UNCHANGED, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 
 
 class Defaults:
@@ -32,7 +32,7 @@ class Defaults:
     """
 
     START_SOON = True
-    SYNC_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
+    PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
     # TODO What to do about potential deadlocks if recursive sync promises use up
     #  the executor's thread pool (when each such promise waits for its children to
     #  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
@@ -50,8 +50,8 @@ __all__ = [
     "ContextUsageError",
     "DecorationError",
     "Defaults",
-    "GLOBAL_DEFAULT",
     "INHERIT",
+    "PROMISING_DEFAULT",
     "Promise",
     "PromiseNotFoundError",
     "PromiseBackedConcurrentFuture",

@@ -117,20 +117,20 @@ async def test_await_children_recursively_sync_children(
     """
     execution_order: list[str] = []
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def great_grandchild_func() -> str:
         time.sleep(0.3)
         execution_order.append("great_grandchild_done")
         return "great_grandchild"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
         time.sleep(0.2)
         great_grandchild_func()
         execution_order.append("grandchild_done")
         return "grandchild"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def child_func() -> str:
         grandchild_func()
         execution_order.append("child_done")

@@ -5,7 +5,7 @@ to __call__ / call()).
 """
 
 import promising
-from promising import GLOBAL_DEFAULT, INHERIT
+from promising import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT
 
 # ── start_soon ────────────────────────────────────────────────────────────────
 
@@ -169,10 +169,12 @@ async def test_config_kwargs_do_not_leak_into_function() -> None:
     result = await add(
         3,
         4,
+        namespace="hello world",
         start_soon=True,
         children_start_soon=True,
         start_soon_default=True,
-        use_thread_pool=True,
+        thread_pool=ASYNCIO_DEFAULT,
+        use_thread_pool=None,
     )
     assert result == 7
 
@@ -215,7 +217,7 @@ async def test_call_override_with_inherit() -> None:
 
 async def test_call_override_with_global_default() -> None:
     """
-    Passing GLOBAL_DEFAULT at call time for
+    Passing PROMISING_DEFAULT at call time for
     start_soon_default overrides a concrete bool from
     the constructor; at root level it also resolves to True.
     """
@@ -224,6 +226,6 @@ async def test_call_override_with_global_default() -> None:
     async def noop() -> None:
         pass
 
-    promise = noop(start_soon_default=GLOBAL_DEFAULT)
+    promise = noop(start_soon_default=PROMISING_DEFAULT)
     assert promise._start_soon_default is True
     await promise

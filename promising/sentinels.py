@@ -16,6 +16,6 @@ class Sentinel:
 
 
 ASYNCIO_DEFAULT = Sentinel()
-GLOBAL_DEFAULT = Sentinel()
 INHERIT = Sentinel()
+PROMISING_DEFAULT = Sentinel()
 UNCHANGED = Sentinel()

@@ -20,7 +20,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock, is_func_or_method_async
+from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -179,7 +179,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             start_soon_default=self.start_soon_default,
         )
 
-        if is_func_or_method_async(self.__wrapped__):
+        if self._is_wrapped_async:
             # Wrapped function or method is async
 
             @functools.wraps(self.__wrapped__)

@@ -12,7 +12,7 @@ async def test_instance_method_returns_promise() -> None:
     """
 
     class Greeter:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def greet(self) -> str:
             return "hello"
 
@@ -31,7 +31,7 @@ async def test_instance_method_receives_self() -> None:
         def __init__(self, value: int) -> None:
             self.value = value
 
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def get_value(self) -> int:
             return self.value
 
@@ -49,7 +49,7 @@ async def test_instance_method_forwards_args() -> None:
         def __init__(self, base: int) -> None:
             self.base = base
 
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def add(self, x: int, *, multiplier: int = 1) -> int:
             return (self.base + x) * multiplier
 
@@ -65,7 +65,7 @@ async def test_instance_method_exception_propagates() -> None:
     """
 
     class MyClass:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def failing(self) -> None:
             raise ValueError("instance method error")
 
@@ -84,7 +84,7 @@ async def test_static_method_via_class_returns_promise() -> None:
 
     class MathUtils:
         @staticmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def double(x: int) -> int:
             return x * 2
 
@@ -102,7 +102,7 @@ async def test_static_method_via_instance_returns_promise() -> None:
 
     class MathUtils:
         @staticmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def double(x: int) -> int:
             return x * 2
 
@@ -120,7 +120,7 @@ async def test_static_method_exception_propagates() -> None:
 
     class MyClass:
         @staticmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def failing() -> None:
             raise RuntimeError("static method error")
 
@@ -142,7 +142,7 @@ async def test_class_method_via_class_returns_promise() -> None:
 
     class Factory:
         @classmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def create_name(cls) -> str:
             return cls.__name__
 
@@ -159,7 +159,7 @@ async def test_class_method_via_instance_returns_promise() -> None:
 
     class Factory:
         @classmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def create_name(cls) -> str:
             return cls.__name__
 
@@ -177,7 +177,7 @@ async def test_class_method_receives_cls() -> None:
 
     class Base:
         @classmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def get_class_name(cls) -> str:
             return cls.__name__
 
@@ -196,7 +196,7 @@ async def test_class_method_exception_propagates() -> None:
 
     class MyClass:
         @classmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def failing(cls) -> None:
             raise TypeError("class method error")
 
@@ -217,7 +217,7 @@ async def test_promising_function_on_top_of_staticmethod() -> None:
     """
 
     class MyClass:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         @staticmethod
         def my_method() -> str:
             return "success"
@@ -234,7 +234,7 @@ async def test_promising_function_on_top_of_classmethod() -> None:
     """
 
     class MyClass:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         @classmethod
         def my_method(cls) -> type:
             return cls

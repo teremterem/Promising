@@ -488,7 +488,7 @@ async def test_coro_exception_at_depth_5_with_promising_context_and_functions() 
     async def func4() -> Any:
         return coro5_failing_in_context()
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def func3() -> Any:
         return func4()
 

@@ -22,7 +22,7 @@ async def test_sync_promise_inside_outer_context() -> None:
         inner3 -> inner2 -> inner1 -> promise -> outer
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def some_func() -> tuple[promising.PromisingContext, promising.PromisingContext, promising.PromisingContext]:
         with promising.context() as inner1:
             with promising.context() as inner2:
@@ -52,7 +52,7 @@ async def test_sync_promise_outside_outer_context() -> None:
         inner3 -> inner2 -> inner1 -> promise   (no outer)
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def some_func() -> tuple[promising.PromisingContext, promising.PromisingContext, promising.PromisingContext]:
         with promising.context() as inner1:
             with promising.context() as inner2:
@@ -82,7 +82,7 @@ async def test_sync_promise_await_outside_outer_context() -> None:
         inner3 -> inner2 -> inner1 -> promise -> outer
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def some_func() -> tuple[promising.PromisingContext, promising.PromisingContext, promising.PromisingContext]:
         with promising.context() as inner1:
             with promising.context() as inner2:

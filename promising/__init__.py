@@ -32,7 +32,7 @@ class Defaults:
     """
 
     START_SOON = True
-    SYNC_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
+    PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
     # TODO What to do about potential deadlocks if recursive sync promises use up
     #  the executor's thread pool (when each such promise waits for its children to
     #  complete) ? Is setting `max_workers` to 128 just a provisional workaround,

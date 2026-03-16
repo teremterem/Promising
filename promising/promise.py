@@ -88,7 +88,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         thread_pool: Thread pool executor used to run sync promising
             functions. INHERIT (default) inherits from the parent context,
             falling back to GLOBAL_DEFAULT at the root. GLOBAL_DEFAULT uses
-            Defaults.SYNC_THREAD_POOL. ASYNCIO_DEFAULT passes None to
+            Defaults.PROMISING_THREAD_POOL. ASYNCIO_DEFAULT passes None to
             run_in_executor, letting the event loop use its own default
             executor. A concrete ThreadPoolExecutor instance can also be
             provided.

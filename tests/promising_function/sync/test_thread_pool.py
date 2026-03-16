@@ -8,7 +8,7 @@ import pytest
 import promising
 from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
 
-# ── GLOBAL_DEFAULT: uses Defaults.SYNC_THREAD_POOL ──────────────────
+# ── GLOBAL_DEFAULT: uses Defaults.PROMISING_THREAD_POOL ──────────────────
 
 
 async def test_global_default_runs_off_main_thread() -> None:
@@ -150,7 +150,7 @@ async def test_inherit_from_parent_promise() -> None:
 async def test_inherit_falls_back_to_global_default() -> None:
     """
     When there is no parent context, INHERIT falls back to
-    GLOBAL_DEFAULT (Defaults.SYNC_THREAD_POOL).
+    GLOBAL_DEFAULT (Defaults.PROMISING_THREAD_POOL).
     """
     main_thread = threading.current_thread()
 

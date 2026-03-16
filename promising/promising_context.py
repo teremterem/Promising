@@ -81,7 +81,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         thread_pool: Thread pool executor used to run sync promising functions.
             ``INHERIT`` (default) inherits from the parent context, falling
             back to ``GLOBAL_DEFAULT`` at the root. ``GLOBAL_DEFAULT`` uses
-            ``Defaults.SYNC_THREAD_POOL``. ``ASYNCIO_DEFAULT`` passes ``None``
+            ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT`` passes ``None``
             to ``run_in_executor``, letting the event loop use its own default
             executor. A concrete ``ThreadPoolExecutor`` instance can also be
             provided.
@@ -621,13 +621,13 @@ class PromisingContext:
 
         if thread_pool is GLOBAL_DEFAULT:
             # Use the Promising framework's default thread pool
-            return Defaults.SYNC_THREAD_POOL
+            return Defaults.PROMISING_THREAD_POOL
 
         if thread_pool is INHERIT:
             if self._parent is None:
                 # INHERIT, when there is no parent, is the same as
                 # GLOBAL_DEFAULT (the framework's default thread pool)
-                return Defaults.SYNC_THREAD_POOL
+                return Defaults.PROMISING_THREAD_POOL
             return self._parent._thread_pool
 
         raise ValueError(

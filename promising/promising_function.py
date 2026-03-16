@@ -92,7 +92,7 @@ def function(
             promising functions. ``INHERIT`` (default) inherits from
             the parent context, falling back to ``GLOBAL_DEFAULT``
             at the root. ``GLOBAL_DEFAULT`` uses
-            ``Defaults.SYNC_THREAD_POOL``. ``ASYNCIO_DEFAULT``
+            ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT``
             passes ``None`` to ``run_in_executor``, letting the
             event loop use its own default executor. A concrete
             ``ThreadPoolExecutor`` instance can also be provided.

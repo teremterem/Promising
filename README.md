@@ -171,7 +171,7 @@ def sync_parent() -> str:
 
 ### Thread Pool Configuration
 
-When `use_thread_pool=True`, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.SYNC_THREAD_POOL`) by default. You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
+When `use_thread_pool=True`, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.PROMISING_THREAD_POOL`) by default. You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -207,7 +207,7 @@ with promising.context(thread_pool=custom_pool):
 The `thread_pool` parameter accepts:
 
 - **`INHERIT`** (default) — inherit from the parent context; falls back to `GLOBAL_DEFAULT` at the root.
-- **`GLOBAL_DEFAULT`** — use `Defaults.SYNC_THREAD_POOL`.
+- **`GLOBAL_DEFAULT`** — use `Defaults.PROMISING_THREAD_POOL`.
 - **`ASYNCIO_DEFAULT`** — pass `None` to `run_in_executor`, letting the event loop use its own default executor.
 - A concrete **`ThreadPoolExecutor`** instance.
 
@@ -517,7 +517,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
-| `promising.Defaults.SYNC_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `GLOBAL_DEFAULT`. |
+| `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `GLOBAL_DEFAULT`. |
 
 ### Sentinels
 

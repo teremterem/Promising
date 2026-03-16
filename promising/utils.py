@@ -108,14 +108,25 @@ class DecoratorSupport:
                 "Expected a function, a method, a staticmethod, or a "
                 f"classmethod, but `{type(func_or_method)}` was given instead"
             )
-        # This also sets `self.__wrapped__` to equal `func_or_method`
+
+        # Backup `namespace` value just in case before calling
+        # `functools.update_wrapper()`
+        namespace_backup = self.namespace
+
+        # Set `self.__wrapped__` to equal `func_or_method` as well as other
+        # implicit attributes using `functools`.
+        # NOTE: `functools.update_wrapper()` copies `func_or_method.__dict__`
+        # onto `self.__dict__`, so all the other attribute assignments for this
+        # instance must come *after* `update_wrapper()` to guarantee the
+        # correct value.
         functools.update_wrapper(self, func_or_method)
         self._is_wrapped_async = is_func_or_method_async(func_or_method)
 
-        # Update the namespace to the new function or method (if it wasn't set
-        # explicitly)
+        # Update `namespace` to the fully-qualified name of `func_or_method`
+        # (provided it was not already set via the `namespace` decorator
+        # parameter)
         self.namespace = resolve_namespace(
-            provided_explicitly=self.namespace,
+            provided_explicitly=namespace_backup,
             named_object_fallback=func_or_method,
         )
 

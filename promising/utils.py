@@ -6,6 +6,7 @@ from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError, SyncUsageError
+from promising.sentinels import UNCHANGED
 from promising.types import CallableType, DecoratableFunctionType
 
 
@@ -88,7 +89,7 @@ class DecoratorSupport:
         namespace: str | None,
     ) -> None:
         self.__wrapped__ = None
-        self._is_wrapped_async: bool | None = None
+        self._is_wrapped_async = UNCHANGED  # Prevent boolean coercion to None
         self.namespace = namespace
         if func_or_method is None:
             # For the constructor it is OK not to have a function or method to

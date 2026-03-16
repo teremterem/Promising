@@ -5,7 +5,7 @@ to __call__ / call()).
 """
 
 import promising
-from promising import GLOBAL_DEFAULT, INHERIT
+from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT
 
 # ── start_soon ────────────────────────────────────────────────────────────────
 
@@ -169,9 +169,12 @@ async def test_config_kwargs_do_not_leak_into_function() -> None:
     result = await add(
         3,
         4,
+        namespace="hello world",
         start_soon=True,
         children_start_soon=True,
         start_soon_default=True,
+        thread_pool=ASYNCIO_DEFAULT,
+        use_thread_pool=None,
     )
     assert result == 7
 

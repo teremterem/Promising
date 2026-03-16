@@ -184,27 +184,6 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         #  `children_start_soon`, `start_soon_default`):
         #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
 
-    def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:
-        func_name = getattr(self.__wrapped__, "__qualname__", None) or getattr(
-            self.__wrapped__, "__name__", repr(self.__wrapped__)
-        )
-        if self._is_wrapped_async:
-            if use_thread_pool is not None:
-                raise DecorationError(
-                    f"`use_thread_pool` cannot be set for async function "
-                    f"'{func_name}' — it is only applicable to sync functions. "
-                    f"Async functions always run on the event loop regardless."
-                )
-        elif use_thread_pool is None:
-            raise DecorationError(
-                f"Sync function '{func_name}' requires an explicit "
-                f"`use_thread_pool` setting. Set `use_thread_pool=True` "
-                f"(recommended for most cases, so CPU-heavy workloads "
-                f"don't block the event loop thread) or "
-                f"`use_thread_pool=False`."
-            )
-        return use_thread_pool
-
     def __call__(
         self,
         *args: Any,
@@ -320,3 +299,24 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             start_soon_default=start_soon_default,
             thread_pool=thread_pool,
         )
+
+    def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:
+        func_name = getattr(self.__wrapped__, "__qualname__", None) or getattr(
+            self.__wrapped__, "__name__", repr(self.__wrapped__)
+        )
+        if self._is_wrapped_async:
+            if use_thread_pool is not None:
+                raise DecorationError(
+                    f"`use_thread_pool` cannot be set for async function "
+                    f"'{func_name}' — it is only applicable to sync functions. "
+                    f"Async functions always run on the event loop regardless."
+                )
+        elif use_thread_pool is None:
+            raise DecorationError(
+                f"Sync function '{func_name}' requires an explicit "
+                f"`use_thread_pool` setting. Set `use_thread_pool=True` "
+                f"(recommended for most cases, so CPU-heavy workloads "
+                f"don't block the event loop thread) or "
+                f"`use_thread_pool=False`."
+            )
+        return use_thread_pool

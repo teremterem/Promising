@@ -3,10 +3,10 @@ import asyncio
 import pytest
 
 import promising
-from promising import GLOBAL_DEFAULT, INHERIT, Sentinel
+from promising import INHERIT, PROMISING_DEFAULT, Sentinel
 
 
-@pytest.mark.parametrize("start_soon_default", [True, False, INHERIT, GLOBAL_DEFAULT])
+@pytest.mark.parametrize("start_soon_default", [True, False, INHERIT, PROMISING_DEFAULT])
 @pytest.mark.parametrize("start_soon", [True, False, INHERIT, None])
 @pytest.mark.parametrize("children_start_soon", [True, False, INHERIT, None])
 async def test_config_forwarding(
@@ -17,7 +17,7 @@ async def test_config_forwarding(
 ) -> None:
     """
     Parametrized over all three config parameters. At root
-    level (no parent), INHERIT and GLOBAL_DEFAULT for
+    level (no parent), INHERIT and PROMISING_DEFAULT for
     start_soon_default both resolve to the
     global default (True). For start_soon, both INHERIT and
     None fall back to start_soon_default.
@@ -36,7 +36,7 @@ async def test_config_forwarding(
 
     promise = noop()
 
-    # At root level, INHERIT and GLOBAL_DEFAULT both read
+    # At root level, INHERIT and PROMISING_DEFAULT both read
     # the global default (True).
     expected_everything = start_soon_default if isinstance(start_soon_default, bool) else True
     # INHERIT and None for start_soon fall back to
@@ -128,12 +128,12 @@ async def test_start_soon_default_global_default_ignores_parent(
     child_start_soon: bool,
 ) -> None:
     """
-    GLOBAL_DEFAULT always reads the live global setting,
+    PROMISING_DEFAULT always reads the live global setting,
     ignoring the parent's start_soon_default.
     """
     child_promise = None
 
-    @promising.function(start_soon_default=GLOBAL_DEFAULT, start_soon=child_start_soon)
+    @promising.function(start_soon_default=PROMISING_DEFAULT, start_soon=child_start_soon)
     async def child_func() -> None:
         pass
 
@@ -143,7 +143,7 @@ async def test_start_soon_default_global_default_ignores_parent(
         child_promise = child_func()
 
     await parent_func()
-    # GLOBAL_DEFAULT always reads the live global (True).
+    # PROMISING_DEFAULT always reads the live global (True).
     assert child_promise._start_soon_default is True
     await child_promise
 

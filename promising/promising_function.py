@@ -90,8 +90,8 @@ def function(
             is inherited from the parent ``Promise``.
         thread_pool: Thread pool executor used to run sync
             promising functions. ``INHERIT`` (default) inherits from
-            the parent context, falling back to ``GLOBAL_DEFAULT``
-            at the root. ``GLOBAL_DEFAULT`` uses
+            the parent context, falling back to ``PROMISING_DEFAULT``
+            at the root. ``PROMISING_DEFAULT`` uses
             ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT``
             passes ``None`` to ``run_in_executor``, letting the
             event loop use its own default executor. A concrete

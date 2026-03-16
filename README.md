@@ -176,7 +176,7 @@ When `use_thread_pool=True`, sync promising functions run in a global `ThreadPoo
 ```python
 from concurrent.futures import ThreadPoolExecutor
 import promising
-from promising import ASYNCIO_DEFAULT, GLOBAL_DEFAULT
+from promising import ASYNCIO_DEFAULT, PROMISING_DEFAULT
 
 # Use a custom thread pool for a specific function
 my_pool = ThreadPoolExecutor(max_workers=4)
@@ -206,8 +206,8 @@ with promising.context(thread_pool=custom_pool):
 
 The `thread_pool` parameter accepts:
 
-- **`INHERIT`** (default) — inherit from the parent context; falls back to `GLOBAL_DEFAULT` at the root.
-- **`GLOBAL_DEFAULT`** — use `Defaults.PROMISING_THREAD_POOL`.
+- **`INHERIT`** (default) — inherit from the parent context; falls back to `PROMISING_DEFAULT` at the root.
+- **`PROMISING_DEFAULT`** — use `Defaults.PROMISING_THREAD_POOL`.
 - **`ASYNCIO_DEFAULT`** — pass `None` to `run_in_executor`, letting the event loop use its own default executor.
 - A concrete **`ThreadPoolExecutor`** instance.
 
@@ -332,7 +332,7 @@ Promises inherit configuration from their parents through three parameters:
 
 - **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `None` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
 - **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `None`. `None` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `None` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
-- **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `GLOBAL_DEFAULT` reads the current global setting directly, ignoring the parent chain.
+- **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `PROMISING_DEFAULT` reads the current global setting directly, ignoring the parent chain.
 
 These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `None` explicitly at call time overrides the decorator value:
 
@@ -466,7 +466,7 @@ uv sync --extra examples
 
 ## Design Note: Settings Are Frozen at Creation Time
 
-All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `GLOBAL_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
+All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
 
 This is intentional: because a `Promise` may execute eagerly (the default) or be deferred, the user cannot predict *when* the underlying coroutine will run. Freezing settings at creation time guarantees that the behavior a promise was *created with* is the behavior it *runs with*, regardless of scheduling.
 
@@ -517,7 +517,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 | `promising.await_children(recursively=False)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
-| `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `GLOBAL_DEFAULT`. |
+| `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 
 ### Sentinels
 
@@ -525,7 +525,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 |---|---|
 | `promising.UNCHANGED` | No call-time override — use the decorator-level value. |
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
-| `promising.GLOBAL_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
+| `promising.PROMISING_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
 | `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 

@@ -18,7 +18,7 @@ from promising.errors import (
     PromiseNotFoundError,
     SyncUsageError,
 )
-from promising.sentinels import ASYNCIO_DEFAULT, GLOBAL_DEFAULT, INHERIT, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock
 
@@ -80,7 +80,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             parent.
         thread_pool: Thread pool executor used to run sync promising functions.
             ``INHERIT`` (default) inherits from the parent context, falling
-            back to ``GLOBAL_DEFAULT`` at the root. ``GLOBAL_DEFAULT`` uses
+            back to ``PROMISING_DEFAULT`` at the root. ``PROMISING_DEFAULT`` uses
             ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT`` passes ``None``
             to ``run_in_executor``, letting the event loop use its own default
             executor. A concrete ``ThreadPoolExecutor`` instance can also be
@@ -568,7 +568,7 @@ class PromisingContext:
             # Concrete value was provided
             return start_soon_default
 
-        if start_soon_default is GLOBAL_DEFAULT:
+        if start_soon_default is PROMISING_DEFAULT:
             # Use the global default
             return Defaults.START_SOON
 
@@ -581,7 +581,7 @@ class PromisingContext:
             return self._parent._start_soon_default
 
         raise ValueError(
-            "`start_soon_default` must be either GLOBAL_DEFAULT, INHERIT or a boolean value, "
+            "`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
             f"but `{type(start_soon_default)}` was given instead"
         )
 
@@ -619,19 +619,19 @@ class PromisingContext:
             # Use the event loop's default executor
             return None
 
-        if thread_pool is GLOBAL_DEFAULT:
+        if thread_pool is PROMISING_DEFAULT:
             # Use the Promising framework's default thread pool
             return Defaults.PROMISING_THREAD_POOL
 
         if thread_pool is INHERIT:
             if self._parent is None:
                 # INHERIT, when there is no parent, is the same as
-                # GLOBAL_DEFAULT (the framework's default thread pool)
+                # PROMISING_DEFAULT (the framework's default thread pool)
                 return Defaults.PROMISING_THREAD_POOL
             return self._parent._thread_pool
 
         raise ValueError(
-            "`thread_pool` must be either INHERIT, GLOBAL_DEFAULT, ASYNCIO_DEFAULT "
+            "`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given instead"
         )
 

@@ -19,7 +19,7 @@ def function(
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
-    use_thread_pool: bool | Sentinel = UNCHANGED,
+    use_thread_pool: bool | None = None,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
     """
     A decorator that turns a function into one that returns a ``Promise``
@@ -167,16 +167,14 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
-        use_thread_pool: bool | Sentinel = UNCHANGED,
+        use_thread_pool: bool | None = None,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
         self.thread_pool = thread_pool
-
-        self._validate_use_thread_pool(use_thread_pool, at_decoration_time=True)
-        self.use_thread_pool = use_thread_pool
+        self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
         #  to resolve postponed type hints correctly, when you implement input
@@ -186,23 +184,18 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         #  `children_start_soon`, `start_soon_default`):
         #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
 
-    def _validate_use_thread_pool(
-        self,
-        use_thread_pool: bool | Sentinel,
-        *,
-        at_decoration_time: bool,
-    ) -> None:
+    def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:
         func_name = getattr(self.__wrapped__, "__qualname__", None) or getattr(
             self.__wrapped__, "__name__", repr(self.__wrapped__)
         )
         if self._is_wrapped_async:
-            if use_thread_pool is not UNCHANGED:
+            if use_thread_pool is not None:
                 raise DecorationError(
                     f"`use_thread_pool` cannot be set for async function "
                     f"'{func_name}' — it is only applicable to sync functions. "
                     f"Async functions always run on the event loop regardless."
                 )
-        elif at_decoration_time and use_thread_pool is UNCHANGED:
+        elif use_thread_pool is None:
             raise DecorationError(
                 f"Sync function '{func_name}' requires an explicit "
                 f"`use_thread_pool` setting. Set `use_thread_pool=True` "
@@ -210,6 +203,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                 f"don't block the event loop thread) or "
                 f"`use_thread_pool=False`."
             )
+        return use_thread_pool
 
     def __call__(
         self,
@@ -277,9 +271,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
 
-        self._validate_use_thread_pool(use_thread_pool, at_decoration_time=False)
         if use_thread_pool is UNCHANGED:
             use_thread_pool = self.use_thread_pool
+        else:
+            use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring

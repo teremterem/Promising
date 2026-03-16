@@ -171,7 +171,7 @@ def sync_parent() -> str:
 
 ### Thread Pool Configuration
 
-By default, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.SYNC_THREAD_POOL`). You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
+When `use_thread_pool=True`, sync promising functions run in a global `ThreadPoolExecutor` (`Defaults.SYNC_THREAD_POOL`) by default. You can control which thread pool is used via the `thread_pool` parameter on `@promising.function`, `promising.context`, or `Promise`:
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -476,7 +476,7 @@ This is intentional: because a `Promise` may execute eagerly (the default) or be
 
 | Symbol | Description |
 |---|---|
-| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True)` (sync). Accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, and `use_thread_pool`. `use_thread_pool` is **required** for sync functions and **disallowed** for async functions. |
+| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
 | `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 

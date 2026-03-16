@@ -175,7 +175,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self.start_soon_default = start_soon_default
         self.thread_pool = thread_pool
 
-        self._validate_use_thread_pool(use_thread_pool)
+        self._validate_use_thread_pool(use_thread_pool, at_decoration_time=True)
         self.use_thread_pool = use_thread_pool
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
@@ -186,7 +186,12 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         #  `children_start_soon`, `start_soon_default`):
         #  https://github.com/teremterem/Promising/pull/52#discussion_r2834995579
 
-    def _validate_use_thread_pool(self, use_thread_pool: bool | Sentinel) -> None:
+    def _validate_use_thread_pool(
+        self,
+        use_thread_pool: bool | Sentinel,
+        *,
+        at_decoration_time: bool,
+    ) -> None:
         func_name = getattr(self.__wrapped__, "__qualname__", None) or getattr(
             self.__wrapped__, "__name__", repr(self.__wrapped__)
         )
@@ -197,7 +202,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                     f"'{func_name}' — it is only applicable to sync functions. "
                     f"Async functions always run on the event loop regardless."
                 )
-        elif use_thread_pool is UNCHANGED:
+        elif at_decoration_time and use_thread_pool is UNCHANGED:
             raise DecorationError(
                 f"Sync function '{func_name}' requires an explicit "
                 f"`use_thread_pool` setting. Set `use_thread_pool=True` "
@@ -272,7 +277,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
 
-        self._validate_use_thread_pool(use_thread_pool)
+        self._validate_use_thread_pool(use_thread_pool, at_decoration_time=False)
         if use_thread_pool is UNCHANGED:
             use_thread_pool = self.use_thread_pool
 

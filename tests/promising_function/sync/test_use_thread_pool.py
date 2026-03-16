@@ -5,19 +5,19 @@ import threading
 import pytest
 
 import promising
-from promising import SyncUsageError, await_children_sync, get_active_promise
+from promising import DecorationError, SyncUsageError, await_children_sync, get_active_promise
 
-# ── use_thread_pool=True (default): sync function runs in a thread pool ──
+# ── use_thread_pool=True: sync function runs in a thread pool ──
 
 
-async def test_default_use_thread_pool_runs_in_different_thread() -> None:
+async def test_use_thread_pool_true_runs_in_different_thread() -> None:
     """
-    With the default use_thread_pool=True, a sync function
+    With use_thread_pool=True, a sync function
     runs in a different thread than the event loop.
     """
     main_thread = threading.current_thread()
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -156,7 +156,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
     """
     Calling promise.sync(), concurrent_future.result(), or
     concurrent_future.exception() inside a use_thread_pool=True
-    (default) function works fine because the function runs in a
+    function works fine because the function runs in a
     separate thread.
     """
 
@@ -164,7 +164,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
     async def child() -> str:
         return "child result"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def parent() -> str | None:
         p = child(start_soon=start_soon)
         if method == "sync":
@@ -184,7 +184,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
 async def test_await_children_sync_works_with_thread_pool() -> None:
     """
     Calling await_children_sync() inside a use_thread_pool=True
-    (default) function works fine.
+    function works fine.
     """
     child_result = None
 
@@ -192,7 +192,7 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
     async def child() -> str:
         return "child result"
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def parent() -> None:
         nonlocal child_result
         p = child()
@@ -203,23 +203,48 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
     assert child_result == "child result"
 
 
-# ── use_thread_pool has no effect on async functions ──
+# ── use_thread_pool is disallowed for async functions ──
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
-async def test_use_thread_pool_ignored_for_async_functions(use_thread_pool: bool) -> None:
+async def test_use_thread_pool_raises_for_async_functions(use_thread_pool: bool) -> None:
     """
-    use_thread_pool has no effect on async functions — they
-    always run on the event loop thread regardless.
+    Setting use_thread_pool on an async function raises DecorationError —
+    the parameter is only applicable to sync functions.
     """
-    main_thread = threading.current_thread()
+    with pytest.raises(DecorationError, match="cannot be set for async function"):
 
-    @promising.function(use_thread_pool=use_thread_pool)
-    async def get_thread() -> threading.Thread:
-        return threading.current_thread()
+        @promising.function(use_thread_pool=use_thread_pool)
+        async def get_thread() -> threading.Thread:
+            return threading.current_thread()
 
-    worker_thread = await get_thread()
-    assert worker_thread is main_thread
+
+async def test_use_thread_pool_at_call_site_raises_for_async_functions() -> None:
+    """
+    Passing use_thread_pool at call time on an async function raises
+    DecorationError.
+    """
+
+    @promising.function
+    async def get_value() -> int:
+        return 42
+
+    with pytest.raises(DecorationError, match="cannot be set for async function"):
+        get_value(use_thread_pool=True)
+
+
+# ── use_thread_pool is required for sync functions ──
+
+
+async def test_use_thread_pool_required_for_sync_functions() -> None:
+    """
+    Omitting use_thread_pool on a sync function raises DecorationError.
+    """
+    with pytest.raises(DecorationError, match="requires an explicit"):
+
+        @promising.function
+        def get_value() -> int:
+            return 42
 
 
 # ── Override at call site via kwargs ─────────────────────────────────
@@ -232,7 +257,7 @@ async def test_use_thread_pool_override_at_call_site() -> None:
     """
     main_thread = threading.current_thread()
 
-    @promising.function  # use_thread_pool defaults to True
+    @promising.function(use_thread_pool=True)
     def get_thread() -> threading.Thread:
         return threading.current_thread()
 
@@ -262,7 +287,7 @@ async def test_use_thread_pool_call_site_not_forwarded() -> None:
     and not forwarded to the wrapped function as a regular kwarg.
     """
 
-    @promising.function
+    @promising.function(use_thread_pool=True)
     def add(a: int, b: int) -> int:
         return a + b
 

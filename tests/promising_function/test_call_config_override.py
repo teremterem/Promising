@@ -172,7 +172,6 @@ async def test_config_kwargs_do_not_leak_into_function() -> None:
         start_soon=True,
         children_start_soon=True,
         start_soon_default=True,
-        use_thread_pool=True,
     )
     assert result == 7
 

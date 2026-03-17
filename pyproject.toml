@@ -1,6 +1,6 @@
 [project]
 name = "promising"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 description = """\
 A new, general-purpose hierarchical async framework for Python, adapted to \
 the emerging reality of building highly parallel LLM-based multi-agent \

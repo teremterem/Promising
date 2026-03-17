@@ -2,8 +2,6 @@
 
 Hierarchical async Promise management for Python.
 
-Promising extends `asyncio.Future` with automatic parent-child relationships between asynchronous operations. When a Promise creates other Promises during its execution, those become its children — tracked via context variables, forming a tree you can await, inspect, or configure as a unit.
-
 Decorate any function with `@promising.function` and it runs concurrently. Async functions run on the event loop as usual; sync functions require an explicit `use_thread_pool` setting — `True` (recommended) dispatches them to a thread pool, `False` runs them directly on the event loop thread. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value, a coroutine, or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
 
 ## Installation

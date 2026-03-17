@@ -1,6 +1,6 @@
 # Promising
 
-Hierarchical async (and sync) Promise management for Python.
+Hierarchical async and sync Promise management for Python.
 
 Decorate any function with `@promising.function` and it runs concurrently. Async functions run on the event loop as usual; sync functions require an explicit `use_thread_pool` setting — `True` (recommended) dispatches them to a thread pool, `False` runs them directly on the event loop thread. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value, a coroutine, or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
 

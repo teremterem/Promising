@@ -1,32 +1,10 @@
-[tool.ruff]
-line-length = 119
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "PL"]
-ignore = [
-    "PLR0913",  # too-many-arguments
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = [
-    "PLR2004",  # magic-value-comparison
-]
-
-[tool.ruff.format]
-quote-style = "double"
-
-[tool.coverage.run]
-branch = true
-source = ["promising"]
-
 [project]
 name = "promising"
-version = "0.1.0"
+version = "0.1.0a1"
 description = """\
-A new, general-purpose hierarchical async framework for Python which, among \
-other use cases, is adapted to the emerging reality of building highly \
-parallel LLM-based multi-agent systems.\
+A new, general-purpose hierarchical async framework for Python, adapted to \
+the emerging reality of building highly parallel LLM-based multi-agent \
+systems.\
 """
 authors = [{name = "Oleksandr Tereshchenko", email = "toporok@gmail.com"}]
 readme = "README.md"
@@ -67,3 +45,25 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_default_test_loop_scope = "function"
 addopts = "-n auto"
+
+[tool.coverage.run]
+branch = true
+source = ["promising"]
+
+[tool.ruff]
+line-length = 119
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "PL"]
+ignore = [
+    "PLR0913",  # too-many-arguments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "PLR2004",  # magic-value-comparison
+]
+
+[tool.ruff.format]
+quote-style = "double"

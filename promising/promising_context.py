@@ -366,6 +366,23 @@ class PromisingContext:
             raise PromiseNotFoundError("No parent Promise found")
         return parent
 
+    def get_promising_trace(self, top_to_bottom: bool = True) -> "list[PromisingContext]":
+        """
+        Return a list of PromisingContext objects from this context up to the
+        topmost parent. If *top_to_bottom* is True (the default), the list is
+        reversed so the topmost parent comes first.
+        """
+        trace = []
+        current = self
+
+        while current is not None:
+            trace.append(current)
+            current = current._parent
+
+        if top_to_bottom:
+            trace.reverse()
+        return trace
+
     async def await_children(self, *, recursively: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
@@ -545,23 +562,6 @@ class PromisingContext:
                 raise exc from exc_value
 
         return False  # Let's not suppress any exceptions
-
-    def get_promising_trace(self, top_to_bottom: bool = True) -> "list[PromisingContext]":
-        """
-        Return a list of PromisingContext objects from this context up to the
-        topmost parent. If *top_to_bottom* is True (the default), the list is
-        reversed so the topmost parent comes first.
-        """
-        trace = []
-        current = self
-
-        while current is not None:
-            trace.append(current)
-            current = current._parent
-
-        if top_to_bottom:
-            trace.reverse()
-        return trace
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)

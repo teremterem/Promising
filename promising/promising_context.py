@@ -549,12 +549,16 @@ class PromisingContext:
         return False  # Let's not suppress any exceptions
 
     def get_promising_trace(self) -> list[str]:
-        """Return a list of repr strings from the topmost parent context down to this context."""
+        """
+        Return a list of repr strings from the topmost parent context down to
+        this context.
+        """
         trace: list[str] = []
         current: PromisingContext | None = self
         while current is not None:
             trace.append(repr(current))
             current = current._parent
+        # TODO Introduce `top_to_bottom` method parameter (True by default)
         trace.reverse()
         return trace
 

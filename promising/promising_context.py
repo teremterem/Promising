@@ -548,7 +548,15 @@ class PromisingContext:
 
         return False  # Let's not suppress any exceptions
 
-    # TODO Implement `get_promising_trace()` method
+    def get_promising_trace(self) -> list[str]:
+        """Return a list of repr strings from the topmost parent context down to this context."""
+        trace: list[str] = []
+        current: PromisingContext | None = self
+        while current is not None:
+            trace.append(repr(current))
+            current = current._parent
+        trace.reverse()
+        return trace
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)

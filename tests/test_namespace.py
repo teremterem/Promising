@@ -581,3 +581,144 @@ def test_builtin_list_has_no_inherited_module() -> None:
         named_object_fallback=[1, 2, 3],
     )
     assert result == "[1, 2, 3]"
+
+
+# ── get_promising_trace ─────────────────────────────────────────
+
+
+async def test_get_promising_trace_single_context() -> None:
+    """A single context with no parent returns a one-element trace."""
+    with promising.context(namespace="Root", parent=None) as ctx:
+        trace = ctx.get_promising_trace()
+        assert len(trace) == 1
+        assert "'Root'" in trace[0]
+        assert "PromisingContext" in trace[0]
+
+
+async def test_get_promising_trace_nested_contexts() -> None:
+    """Nested contexts produce a trace from topmost parent to innermost child."""
+    with promising.context(namespace="Grandparent", parent=None):
+        with promising.context(namespace="Parent"):
+            with promising.context(namespace="Child") as c:
+                trace = c.get_promising_trace()
+                assert len(trace) == 3
+                assert "'Grandparent'" in trace[0]
+                assert "'Parent'" in trace[1]
+                assert "'Child'" in trace[2]
+
+                joined = "\n".join(trace)
+                assert "Grandparent" in joined.split("\n")[0]
+                assert "Child" in joined.split("\n")[2]
+
+
+async def test_get_promising_trace_with_promise() -> None:
+    """A Promise inside a context shows in the trace as the innermost entry."""
+    with promising.context(namespace="Outer", parent=None):
+        promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
+        trace = promise.get_promising_trace()
+        assert len(trace) == 2
+        assert "'Outer'" in trace[0]
+        assert "'MyPromise'" in trace[1]
+        assert "Promise" in trace[1]
+        await promise
+
+
+async def test_get_promising_trace_join_output() -> None:
+    """Validate the output of '\\n'.join(ctx.get_promising_trace())."""
+    with promising.context(namespace="App", parent=None):
+        with promising.context(namespace="Service"):
+            with promising.context(namespace="Handler") as handler:
+                output = "\n".join(handler.get_promising_trace())
+                lines = output.split("\n")
+                assert len(lines) == 3
+                assert re.fullmatch(r"<'App' PromisingContext id=\d+>", lines[0])
+                assert re.fullmatch(r"<'Service' PromisingContext id=\d+>", lines[1])
+                assert re.fullmatch(r"<'Handler' PromisingContext id=\d+>", lines[2])
+
+
+async def test_get_promising_trace_no_namespace() -> None:
+    """Contexts without namespaces still appear in the trace."""
+    with promising.context(parent=None):
+        with promising.context() as child:
+            trace = child.get_promising_trace()
+            assert len(trace) == 2
+            assert re.fullmatch(r"<PromisingContext id=\d+>", trace[0])
+            assert re.fullmatch(r"<PromisingContext id=\d+>", trace[1])
+
+
+async def test_get_promising_trace_nested_promising_functions() -> None:
+    """Nested @promising.function calls with auto-derived namespaces produce a
+    correct trace from outermost to innermost."""
+    captured_traces: dict[str, list[str]] = {}
+
+    @promising.function
+    async def outer() -> str:
+        captured_traces["outer"] = promising.get_active_context().get_promising_trace()
+        result = await middle()
+        return result
+
+    @promising.function
+    async def middle() -> str:
+        captured_traces["middle"] = promising.get_active_context().get_promising_trace()
+        result = await inner()
+        return result
+
+    @promising.function
+    async def inner() -> str:
+        captured_traces["inner"] = promising.get_active_context().get_promising_trace()
+        return "done"
+
+    assert await outer() == "done"
+
+    # outer is the root — one entry
+    assert len(captured_traces["outer"]) == 1
+    assert re.fullmatch(
+        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions"
+        r"\.<locals>\.outer' Promise id=\d+>",
+        captured_traces["outer"][0],
+    )
+
+    # middle is a child of outer — two entries
+    assert len(captured_traces["middle"]) == 2
+    assert "outer' Promise" in captured_traces["middle"][0]
+    assert "middle' Promise" in captured_traces["middle"][1]
+
+    # inner is a child of middle — three entries
+    inner_trace = captured_traces["inner"]
+    assert len(inner_trace) == 3
+    assert "outer' Promise" in inner_trace[0]
+    assert "middle' Promise" in inner_trace[1]
+    assert "inner' Promise" in inner_trace[2]
+
+    # Validate joined output format
+    output = "\n".join(inner_trace)
+    lines = output.split("\n")
+    assert len(lines) == 3
+    for line in lines:
+        assert re.fullmatch(
+            r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions"
+            r"\.<locals>\.\w+' Promise id=\d+>",
+            line,
+        )
+
+
+async def test_get_promising_trace_mixed_context_and_function() -> None:
+    """A @promising.function nested inside a promising.context, with another
+    @promising.function nested further, produces a mixed trace."""
+    captured_trace: list[str] = []
+
+    @promising.function
+    async def do_work() -> str:
+        captured_trace.extend(promising.get_active_context().get_promising_trace())
+        return "result"
+
+    with promising.context(namespace="AppCtx", parent=None):
+        assert await do_work() == "result"
+
+    assert len(captured_trace) == 2
+    assert re.fullmatch(r"<'AppCtx' PromisingContext id=\d+>", captured_trace[0])
+    assert re.fullmatch(
+        r"<'tests\.test_namespace::test_get_promising_trace_mixed_context_and_function"
+        r"\.<locals>\.do_work' Promise id=\d+>",
+        captured_trace[1],
+    )

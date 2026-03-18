@@ -59,12 +59,13 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     Args:
         awaitable: The awaitable to execute. If not provided, the Promise
             must be prefilled with a result or exception.
-        loop: The event loop to use. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
-            # TODO Copy the explanation over instead of referencing it ?
-        namespace: Optional human-readable namespace string. Used in
-            ``__repr__`` output. Passed to PromisingContext.
-            # TODO Copy the explanation over instead of referencing it ?
+        loop: Event loop to use. None (default) inherits from the
+            parent context, or falls back to ``asyncio.get_event_loop()`` at
+            the root.
+        namespace: Human-readable label for this Promise. Shows up in
+            ``__repr__`` output and (planned) error breadcrumbs. When created
+            via ``@promising.function`` and not provided, defaults to the
+            wrapped function's ``__qualname__``.
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or

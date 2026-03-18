@@ -66,6 +66,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             ``__repr__`` output and (planned) error breadcrumbs. When created
             via ``@promising.function`` and not provided, defaults to the
             wrapped function's ``__qualname__``.
+            TODO Remove the word "planned" from above when ready.
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or

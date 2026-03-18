@@ -33,12 +33,12 @@ class Defaults:
 
     START_SOON = True
     PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
-    # TODO What to do about potential deadlocks if recursive sync promises use up
-    #  the executor's thread pool (when each such promise waits for its children to
-    #  complete) ? Is setting `max_workers` to 128 just a provisional workaround,
-    #  and we need our own mechanism ? Or is it enough to issue a warning / throw
-    #  an error when the number of nested sync function calls approaches this
-    #  number ?
+    # TODO Raise a disableable error when synchronous function call depth
+    #  reaches the maximum number of workers in the thread pool, to prevent
+    #  potential deadlocks (The deepest synchronous function might be waiting
+    #  for an even deeper promise, which, in turn, cannot be scheduled because
+    #  the thread pool is already fully occupied exactly with the promise chain
+    #  that is awaiting)
 
 
 __all__ = [

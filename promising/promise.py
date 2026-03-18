@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import time
 from asyncio import AbstractEventLoop, Future, Task
@@ -589,8 +590,12 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._unpack_all = unpack_all
 
     def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
-        # TODO Ensure we are in the thread where the Promise's event loop is
-        #  running
+        running_loop = asyncio.get_running_loop()
+        if running_loop is not self._promise._ctx_loop:
+            raise RuntimeError(
+                f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
+            )
+
         if self._promise.done():
             result = self._promise.result()
         else:

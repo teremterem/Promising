@@ -69,8 +69,6 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             ``PromisingContext``. Shows up in ``__repr__`` output and (planned)
             error breadcrumbs. When used as a decorator and not provided,
             defaults to the wrapped function's ``__qualname__``.
-            TODO Namespaces should show up in the form of breadcrumbs in error
-             logs to help trace the sources of errors.
             TODO Remove the word "planned" from above when ready.
         loop: Event loop to use. None (default) inherits from the
             parent context, or falls back to ``asyncio.get_event_loop()`` at

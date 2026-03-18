@@ -1,6 +1,20 @@
+import re
 from typing import Any
 
 import promising
+
+
+def normalize_object_repr(s: str) -> str:
+    """
+    Replace hex addresses and digit sequences with X for stable comparisons.
+    """
+    assert isinstance(s, str)
+    s = re.sub(r"\d+", "999", s)
+    # After the previous sub, hex addresses like "0x7f3a" have become
+    # "999x999f999a". This pattern matches that mangled form and normalizes
+    # it to "0xfff".
+    s = re.sub(r"999x[(999)a-f]+", "0xfff", s)
+    return s
 
 
 def collect_parent_contexts(ctx: promising.PromisingContext) -> list[promising.PromisingContext]:

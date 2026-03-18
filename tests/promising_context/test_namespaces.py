@@ -3,7 +3,6 @@ Tests for namespace resolution and its effect on __repr__ and __str__ across
 Promises, PromisingFunctions, and promising.context instances.
 """
 
-import re
 import types
 
 import pytest
@@ -11,13 +10,7 @@ import pytest
 import promising
 from promising import UNCHANGED
 from promising.utils import resolve_namespace
-
-
-def _norm(s: str) -> str:
-    """Replace hex addresses and digit sequences with X for stable comparisons."""
-    s = re.sub(r"\d+", "999", s)
-    return re.sub(r"999x[(999)a-f]+", "0xfff", s)
-
+from tests.utils_for_tests import normalize_object_repr
 
 # ── resolve_namespace (unit) ────────────────────────────────────
 
@@ -148,7 +141,7 @@ async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<'MyOp' Promise id=999>"
+    assert normalize_object_repr(result) == "<'MyOp' Promise id=999>"
     await promise
 
 
@@ -158,7 +151,7 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x")
 
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<Promise id=999>"
+    assert normalize_object_repr(result) == "<Promise id=999>"
     await promise
 
 
@@ -176,7 +169,7 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
     promise = promising.Promise(do_work())
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == (
+    assert normalize_object_repr(result) == (
         "<'test_namespaces::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work' Promise id=999>"
     )
     await promise
@@ -191,7 +184,7 @@ async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) ->
 
     promise = promising.Promise(do_work(), namespace="Override")
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<'Override' Promise id=999>"
+    assert normalize_object_repr(result) == "<'Override' Promise id=999>"
     await promise
 
 
@@ -228,7 +221,7 @@ async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> 
 
     promise = fetch()
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<'FetchOp' Promise id=999>"
+    assert normalize_object_repr(result) == "<'FetchOp' Promise id=999>"
     await promise
 
 
@@ -242,7 +235,7 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
 
     promise = compute()
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == (
+    assert normalize_object_repr(result) == (
         "<'test_namespaces::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute' Promise id=999>"
     )
     await promise
@@ -258,7 +251,7 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
     promise = work(namespace="PerCall")
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<'PerCall' Promise id=999>"
+    assert normalize_object_repr(result) == "<'PerCall' Promise id=999>"
     await promise
 
 
@@ -274,7 +267,7 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use
 
     promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
-    assert _norm(result) == "<'FromDecorator' Promise id=999>"
+    assert normalize_object_repr(result) == "<'FromDecorator' Promise id=999>"
     await promise
 
 
@@ -287,7 +280,7 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
         result = repr(ctx) if use_repr else str(ctx)
-        assert _norm(result) == "<'BatchCtx' PromisingContext id=999>"
+        assert normalize_object_repr(result) == "<'BatchCtx' PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -296,7 +289,7 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
     with promising.context() as ctx:
         assert ctx.namespace is None
         result = repr(ctx) if use_repr else str(ctx)
-        assert _norm(result) == "<PromisingContext id=999>"
+        assert normalize_object_repr(result) == "<PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -316,7 +309,7 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
     assert captured_ctx is not None
     assert captured_ctx.namespace == "test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert _norm(result) == (
+    assert normalize_object_repr(result) == (
         "<'test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline' PromisingContext id=999>"
     )
 
@@ -336,7 +329,7 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
     assert captured_ctx is not None
     assert captured_ctx.namespace == "MyPipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert _norm(result) == "<'MyPipeline' PromisingContext id=999>"
+    assert normalize_object_repr(result) == "<'MyPipeline' PromisingContext id=999>"
 
 
 # ── Method decorators and qualname ──────────────────────────────
@@ -361,7 +354,7 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert _norm(result) == (
+        assert normalize_object_repr(result) == (
             "<'test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
             " Promise id=999>"
         )
@@ -387,7 +380,7 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert _norm(result) == (
+        assert normalize_object_repr(result) == (
             "<'test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
             " Promise id=999>"
         )
@@ -413,7 +406,7 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert _norm(result) == (
+        assert normalize_object_repr(result) == (
             "<'test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
             " Promise id=999>"
         )
@@ -450,7 +443,7 @@ def test_plain_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert _norm(result) == (
+    assert normalize_object_repr(result) == (
         "test_namespaces::<test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject "
         "object at 0xfff>"
     )
@@ -514,7 +507,7 @@ def test_callable_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert _norm(result) == (
+    assert normalize_object_repr(result) == (
         "test_namespaces::<test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler "
         "object at 0xfff>"
     )
@@ -535,100 +528,3 @@ def test_builtin_type_has_no_inherited_module() -> None:
         named_object_fallback=42,
     )
     assert result == "42"
-
-
-# ── get_promising_trace / get_promising_trace_repr ───────────────
-
-
-async def test_get_promising_trace_single_context() -> None:
-    """A single context with no parent returns a one-element trace."""
-    with promising.context(namespace="Root") as ctx:
-        trace = ctx.get_promising_trace()
-        assert isinstance(trace, list)
-        assert len(trace) == 1
-        assert trace[0] is ctx
-
-
-async def test_get_promising_trace_with_promise() -> None:
-    """A Promise inside a context shows in the trace as the innermost entry."""
-    with promising.context(namespace="Outer") as outer:
-        promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
-        trace = promise.get_promising_trace()
-        assert isinstance(trace, list)
-        assert len(trace) == 2
-        assert trace[0] is outer
-        assert trace[1] is promise
-        await promise
-
-
-async def test_get_promising_trace_repr_nested_contexts() -> None:
-    """get_promising_trace_repr returns string representations top-to-bottom."""
-    with promising.context(namespace="App"):
-        with promising.context(namespace="Service"):
-            with promising.context(namespace="Handler") as handler:
-                trace_repr = handler.get_promising_trace_repr()
-                assert isinstance(trace_repr, list)
-                assert [_norm(s) for s in trace_repr] == [
-                    "<'App' PromisingContext id=999>",
-                    "<'Service' PromisingContext id=999>",
-                    "<'Handler' PromisingContext id=999>",
-                ]
-
-
-async def test_get_promising_trace_repr_no_namespace() -> None:
-    """Contexts without namespaces still appear in the trace repr."""
-    with promising.context():
-        with promising.context() as child:
-            trace_repr = child.get_promising_trace_repr()
-            assert isinstance(trace_repr, list)
-            assert [_norm(s) for s in trace_repr] == [
-                "<PromisingContext id=999>",
-                "<PromisingContext id=999>",
-            ]
-
-
-async def test_get_promising_trace_repr_nested_promising_functions() -> None:
-    """Nested @promising.function and @promising.context calls with auto-derived
-    namespaces produce a correct trace repr from outermost to innermost."""
-    innermost_promise = None
-
-    @promising.function
-    async def outer() -> str:
-        return await middle_ctx()
-
-    @promising.context
-    async def middle_ctx() -> str:
-        return await middle_fn()
-
-    @promising.function
-    async def middle_fn() -> str:
-        return await inner()
-
-    @promising.function
-    async def inner() -> str:
-        nonlocal innermost_promise
-        innermost_promise = promising.get_active_context()
-        return "done"
-
-    outer_promise = outer()
-    assert await outer_promise == "done"
-
-    # outer is the root — one entry
-    outer_trace_repr = outer_promise.get_promising_trace_repr()
-    assert isinstance(outer_trace_repr, list)
-    assert [_norm(s) for s in outer_trace_repr] == [
-        "<'test_namespaces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer' Promise id=999>",
-    ]
-
-    # inner is at the bottom — four entries
-    assert innermost_promise is not None
-    inner_trace_repr = innermost_promise.get_promising_trace_repr()
-    assert isinstance(inner_trace_repr, list)
-    assert [_norm(s) for s in inner_trace_repr] == [
-        "<'test_namespaces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer' Promise id=999>",
-        "<'test_namespaces::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_ctx'"
-        " PromisingContext id=999>",
-        "<'test_namespaces::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_fn'"
-        " Promise id=999>",
-        "<'test_namespaces::test_get_promising_trace_repr_nested_promising_functions.<locals>.inner' Promise id=999>",
-    ]

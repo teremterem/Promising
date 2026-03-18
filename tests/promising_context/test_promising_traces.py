@@ -1,17 +1,5 @@
-"""
-Tests for namespace resolution and its effect on __repr__ and __str__ across
-Promises, PromisingFunctions, and promising.context instances.
-"""
-
-import re
-
 import promising
-
-
-def _norm(s: str) -> str:
-    """Replace hex addresses and digit sequences with X for stable comparisons."""
-    s = re.sub(r"\d+", "999", s)
-    return re.sub(r"999x[(999)a-f]+", "0xfff", s)
+from tests.utils_for_tests import normalize_object_repr
 
 
 async def test_get_promising_trace_single_context() -> None:
@@ -42,7 +30,7 @@ async def test_get_promising_trace_repr_nested_contexts() -> None:
             with promising.context(namespace="Handler") as handler:
                 trace_repr = handler.get_promising_trace_repr()
                 assert isinstance(trace_repr, list)
-                assert [_norm(s) for s in trace_repr] == [
+                assert [normalize_object_repr(s) for s in trace_repr] == [
                     "<'App' PromisingContext id=999>",
                     "<'Service' PromisingContext id=999>",
                     "<'Handler' PromisingContext id=999>",
@@ -55,7 +43,7 @@ async def test_get_promising_trace_repr_no_namespace() -> None:
         with promising.context() as child:
             trace_repr = child.get_promising_trace_repr()
             assert isinstance(trace_repr, list)
-            assert [_norm(s) for s in trace_repr] == [
+            assert [normalize_object_repr(s) for s in trace_repr] == [
                 "<PromisingContext id=999>",
                 "<PromisingContext id=999>",
             ]
@@ -90,7 +78,7 @@ async def test_get_promising_trace_repr_nested_promising_functions() -> None:
     # outer is the root — one entry
     outer_trace_repr = outer_promise.get_promising_trace_repr()
     assert isinstance(outer_trace_repr, list)
-    assert [_norm(s) for s in outer_trace_repr] == [
+    assert [normalize_object_repr(s) for s in outer_trace_repr] == [
         "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
         " Promise id=999>",
     ]
@@ -99,7 +87,7 @@ async def test_get_promising_trace_repr_nested_promising_functions() -> None:
     assert innermost_promise is not None
     inner_trace_repr = innermost_promise.get_promising_trace_repr()
     assert isinstance(inner_trace_repr, list)
-    assert [_norm(s) for s in inner_trace_repr] == [
+    assert [normalize_object_repr(s) for s in inner_trace_repr] == [
         "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
         " Promise id=999>",
         "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_ctx'"

@@ -13,15 +13,15 @@ async def test_get_promising_trace_single_context() -> None:
         assert trace[0] is ctx
 
 
-@pytest.mark.parametrize("top_to_bottom", [True, False], ids=["top_to_bottom", "bottom_to_top"])
-async def test_get_promising_trace_with_promise(top_to_bottom: bool) -> None:
+@pytest.mark.parametrize("parents_first", [True, False], ids=["parents_first", "children_first"])
+async def test_get_promising_trace_with_promise(parents_first: bool) -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
     with promising.context(namespace="Outer") as outer:
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
-        trace = promise.get_promising_trace(top_to_bottom=top_to_bottom)
+        trace = promise.get_promising_trace(parents_first=parents_first)
         assert isinstance(trace, list)
         assert len(trace) == 2
-        if top_to_bottom:
+        if parents_first:
             assert trace[0] is outer
             assert trace[1] is promise
         else:
@@ -31,7 +31,7 @@ async def test_get_promising_trace_with_promise(top_to_bottom: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("top_to_bottom", "expected"),
+    ("parents_first", "expected"),
     [
         (
             True,
@@ -50,14 +50,14 @@ async def test_get_promising_trace_with_promise(top_to_bottom: bool) -> None:
             ],
         ),
     ],
-    ids=["top_to_bottom", "bottom_to_top"],
+    ids=["parents_first", "children_first"],
 )
-async def test_get_promising_trace_repr_nested_contexts(top_to_bottom: bool, expected: list[str]) -> None:
+async def test_get_promising_trace_repr_nested_contexts(parents_first: bool, expected: list[str]) -> None:
     """get_promising_trace_repr returns string representations in the requested order."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
-                trace_repr = handler.get_promising_trace_repr(top_to_bottom=top_to_bottom)
+                trace_repr = handler.get_promising_trace_repr(parents_first=parents_first)
                 assert isinstance(trace_repr, list)
                 assert [normalize_object_repr(s) for s in trace_repr] == expected
 

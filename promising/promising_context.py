@@ -366,11 +366,11 @@ class PromisingContext:
             raise PromiseNotFoundError("No parent Promise found")
         return parent
 
-    def get_promising_trace(self, *, top_to_bottom: bool = True) -> "list[PromisingContext]":
+    def get_promising_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
         """
-        Return a list of PromisingContext objects from this context up to the
-        topmost parent. If *top_to_bottom* is True (the default), the list is
-        reversed so the topmost parent comes first.
+        Return a list of PromisingContext objects in the trace. If
+        *parents_first* is True (the default), the list is ordered from the
+        topmost parent down to this context; otherwise from this context up.
         """
         trace = []
         current = self
@@ -379,16 +379,18 @@ class PromisingContext:
             trace.append(current)
             current = current._parent
 
-        if top_to_bottom:
+        if parents_first:
             trace.reverse()
         return trace
 
-    def get_promising_trace_repr(self, *, top_to_bottom: bool = True) -> "list[str]":
+    def get_promising_trace_repr(self, *, parents_first: bool = True) -> "list[str]":
         """
         Return a list of string representations (repr) of each
-        PromisingContext in the trace.
+        PromisingContext in the trace. If *parents_first* is True (the
+        default), the list is ordered from the topmost parent down to this
+        context; otherwise from this context up.
         """
-        return [repr(ctx) for ctx in self.get_promising_trace(top_to_bottom=top_to_bottom)]
+        return [repr(ctx) for ctx in self.get_promising_trace(parents_first=parents_first)]
 
     async def await_children(self, *, recursively: bool = True) -> None:
         """

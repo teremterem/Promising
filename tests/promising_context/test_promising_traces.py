@@ -52,31 +52,31 @@ async def test_get_promising_trace_with_promise(parents_first: bool) -> None:
     ],
     ids=["parents_first", "children_first"],
 )
-async def test_get_promising_trace_repr_nested_contexts(parents_first: bool, expected: list[str]) -> None:
-    """get_promising_trace_repr returns string representations in the requested order."""
+async def test_format_promising_trace_nested_contexts(parents_first: bool, expected: list[str]) -> None:
+    """format_promising_trace returns string representations in the requested order."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
-                trace_repr = handler.get_promising_trace_repr(parents_first=parents_first)
-                assert isinstance(trace_repr, list)
-                assert [normalize_object_repr(s) for s in trace_repr] == expected
+                trace_strs = handler.format_promising_trace(parents_first=parents_first)
+                assert isinstance(trace_strs, list)
+                assert [normalize_object_repr(s) for s in trace_strs] == expected
 
 
-async def test_get_promising_trace_repr_no_namespace() -> None:
-    """Contexts without namespaces still appear in the trace repr."""
+async def test_format_promising_trace_no_namespace() -> None:
+    """Contexts without namespaces still appear in the trace."""
     with promising.context():
         with promising.context() as child:
-            trace_repr = child.get_promising_trace_repr()
-            assert isinstance(trace_repr, list)
-            assert [normalize_object_repr(s) for s in trace_repr] == [
+            trace_strs = child.format_promising_trace()
+            assert isinstance(trace_strs, list)
+            assert [normalize_object_repr(s) for s in trace_strs] == [
                 "<PromisingContext id=999>",
                 "<PromisingContext id=999>",
             ]
 
 
-async def test_get_promising_trace_repr_nested_promising_functions() -> None:
+async def test_format_promising_trace_nested_promising_functions() -> None:
     """Nested @promising.function and @promising.context calls with auto-derived
-    namespaces produce a correct trace repr from outermost to innermost."""
+    namespaces produce a correct trace from outermost to innermost."""
     innermost_promise = None
 
     @promising.function
@@ -101,24 +101,24 @@ async def test_get_promising_trace_repr_nested_promising_functions() -> None:
     assert await outer_promise == "done"
 
     # outer is the root — one entry
-    outer_trace_repr = outer_promise.get_promising_trace_repr()
-    assert isinstance(outer_trace_repr, list)
-    assert [normalize_object_repr(s) for s in outer_trace_repr] == [
-        "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
+    outer_trace_strs = outer_promise.format_promising_trace()
+    assert isinstance(outer_trace_strs, list)
+    assert [normalize_object_repr(s) for s in outer_trace_strs] == [
+        "<'test_promising_traces::test_format_promising_trace_nested_promising_functions.<locals>.outer'"
         " Promise id=999>",
     ]
 
     # inner is at the bottom — four entries
     assert innermost_promise is not None
-    inner_trace_repr = innermost_promise.get_promising_trace_repr()
-    assert isinstance(inner_trace_repr, list)
-    assert [normalize_object_repr(s) for s in inner_trace_repr] == [
-        "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
+    inner_trace_strs = innermost_promise.format_promising_trace()
+    assert isinstance(inner_trace_strs, list)
+    assert [normalize_object_repr(s) for s in inner_trace_strs] == [
+        "<'test_promising_traces::test_format_promising_trace_nested_promising_functions.<locals>.outer'"
         " Promise id=999>",
-        "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_ctx'"
+        "<'test_promising_traces::test_format_promising_trace_nested_promising_functions.<locals>.middle_ctx'"
         " PromisingContext id=999>",
-        "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_fn'"
+        "<'test_promising_traces::test_format_promising_trace_nested_promising_functions.<locals>.middle_fn'"
         " Promise id=999>",
-        "<'test_promising_traces::test_get_promising_trace_repr_nested_promising_functions.<locals>.inner'"
+        "<'test_promising_traces::test_format_promising_trace_nested_promising_functions.<locals>.inner'"
         " Promise id=999>",
     ]

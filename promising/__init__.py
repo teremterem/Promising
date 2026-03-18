@@ -16,7 +16,10 @@ from promising.promising_context import (
     await_children,
     await_children_sync,
     context,
+    format_promising_trace,
     get_active_context,
+    get_promising_trace,
+    print_promising_trace,
 )
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
@@ -66,4 +69,7 @@ __all__ = [
     "function",
     "get_active_context",
     "get_active_promise",
+    "get_promising_trace",
+    "format_promising_trace",
+    "print_promising_trace",
 ]

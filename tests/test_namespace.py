@@ -12,6 +12,13 @@ import promising
 from promising import UNCHANGED
 from promising.utils import resolve_namespace
 
+
+def _norm(s: str) -> str:
+    """Replace hex addresses and digit sequences with X for stable comparisons."""
+    s = re.sub(r"\d+", "999", s)
+    return re.sub(r"999x[(999)a-f]+", "0xfff", s)
+
+
 # ── resolve_namespace (unit) ────────────────────────────────────
 
 
@@ -141,7 +148,7 @@ async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'MyOp' Promise id=\d+>", result)
+    assert _norm(result) == "<'MyOp' Promise id=999>"
     await promise
 
 
@@ -151,7 +158,7 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x")
 
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<Promise id=\d+>", result)
+    assert _norm(result) == "<Promise id=999>"
     await promise
 
 
@@ -169,10 +176,8 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
     promise = promising.Promise(do_work())
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(
-        r"<'tests\.test_namespace::test_promise_repr_auto_resolves_from_coroutine"
-        r"\.<locals>\.do_work' Promise id=\d+>",
-        result,
+    assert _norm(result) == (
+        "<'tests.test_namespace::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work' Promise id=999>"
     )
     await promise
 
@@ -186,7 +191,7 @@ async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) ->
 
     promise = promising.Promise(do_work(), namespace="Override")
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'Override' Promise id=\d+>", result)
+    assert _norm(result) == "<'Override' Promise id=999>"
     await promise
 
 
@@ -223,7 +228,7 @@ async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> 
 
     promise = fetch()
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'FetchOp' Promise id=\d+>", result)
+    assert _norm(result) == "<'FetchOp' Promise id=999>"
     await promise
 
 
@@ -237,10 +242,9 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
 
     promise = compute()
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(
-        r"<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
-        r"\.<locals>\.compute' Promise id=\d+>",
-        result,
+    assert _norm(result) == (
+        "<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
+        ".<locals>.compute' Promise id=999>"
     )
     await promise
 
@@ -255,7 +259,7 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
     promise = work(namespace="PerCall")
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'PerCall' Promise id=\d+>", result)
+    assert _norm(result) == "<'PerCall' Promise id=999>"
     await promise
 
 
@@ -271,7 +275,7 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use
 
     promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", result)
+    assert _norm(result) == "<'FromDecorator' Promise id=999>"
     await promise
 
 
@@ -284,7 +288,7 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
         result = repr(ctx) if use_repr else str(ctx)
-        assert re.fullmatch(r"<'BatchCtx' PromisingContext id=\d+>", result)
+        assert _norm(result) == "<'BatchCtx' PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -293,7 +297,7 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
     with promising.context() as ctx:
         assert ctx.namespace is None
         result = repr(ctx) if use_repr else str(ctx)
-        assert re.fullmatch(r"<PromisingContext id=\d+>", result)
+        assert _norm(result) == "<PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -313,10 +317,8 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
     assert captured_ctx is not None
     assert captured_ctx.namespace == "tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert re.fullmatch(
-        r"<'tests.test_namespace::test_context_decorator_auto_namespace"
-        r"\.<locals>\.pipeline' PromisingContext id=\d+>",
-        result,
+    assert _norm(result) == (
+        "<'tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline' PromisingContext id=999>"
     )
 
 
@@ -335,10 +337,7 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
     assert captured_ctx is not None
     assert captured_ctx.namespace == "MyPipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert re.fullmatch(
-        r"<'MyPipeline' PromisingContext id=\d+>",
-        result,
-    )
+    assert _norm(result) == "<'MyPipeline' PromisingContext id=999>"
 
 
 # ── Method decorators and qualname ──────────────────────────────
@@ -363,10 +362,9 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_instance_method_qualname\."
-            r"<locals>\.Service\.process' Promise id=\d+>",
-            result,
+        assert _norm(result) == (
+            "<'tests.test_namespace::test_promising_function_on_instance_method_qualname."
+            "<locals>.Service.process' Promise id=999>"
         )
     assert await promise == "processed"
 
@@ -390,10 +388,9 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_static_method_qualname"
-            r"\.<locals>\.Service\.helper' Promise id=\d+>",
-            result,
+        assert _norm(result) == (
+            "<'tests.test_namespace::test_promising_function_on_static_method_qualname"
+            ".<locals>.Service.helper' Promise id=999>"
         )
     assert await promise == "helped"
 
@@ -417,10 +414,9 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_class_method_qualname"
-            r"\.<locals>\.Service\.create' Promise id=\d+>",
-            result,
+        assert _norm(result) == (
+            "<'tests.test_namespace::test_promising_function_on_class_method_qualname"
+            ".<locals>.Service.create' Promise id=999>"
         )
     assert await promise == "created"
 
@@ -455,10 +451,9 @@ def test_plain_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert re.fullmatch(
-        r"tests\.test_namespace::<tests\.test_namespace\."
-        r"test_plain_instance_inherits_module_from_class\.<locals>\.SomeObject object at 0x[0-9a-f]+>",
-        result,
+    assert _norm(result) == (
+        "tests.test_namespace::<tests.test_namespace."
+        "test_plain_instance_inherits_module_from_class.<locals>.SomeObject object at 0xfff>"
     )
 
 
@@ -520,10 +515,9 @@ def test_callable_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert re.fullmatch(
-        r"tests\.test_namespace::<tests\.test_namespace\."
-        r"test_callable_instance_inherits_module_from_class\.<locals>\.Handler object at 0x[0-9a-f]+>",
-        result,
+    assert _norm(result) == (
+        "tests.test_namespace::<tests.test_namespace."
+        "test_callable_instance_inherits_module_from_class.<locals>.Handler object at 0xfff>"
     )
 
 
@@ -573,11 +567,10 @@ async def test_get_promising_trace_join_output() -> None:
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
-                assert re.fullmatch(
-                    r"<'App' PromisingContext id=\d+>\n"
-                    r"<'Service' PromisingContext id=\d+>\n"
-                    r"<'Handler' PromisingContext id=\d+>",
-                    "\n".join(handler.get_promising_trace()),
+                assert _norm("\n".join(handler.get_promising_trace())) == (
+                    "<'App' PromisingContext id=999>\n"
+                    "<'Service' PromisingContext id=999>\n"
+                    "<'Handler' PromisingContext id=999>"
                 )
 
 
@@ -587,8 +580,8 @@ async def test_get_promising_trace_no_namespace() -> None:
         with promising.context() as child:
             trace = child.get_promising_trace()
             assert len(trace) == 2
-            assert re.fullmatch(r"<PromisingContext id=\d+>", trace[0])
-            assert re.fullmatch(r"<PromisingContext id=\d+>", trace[1])
+            assert _norm(trace[0]) == "<PromisingContext id=999>"
+            assert _norm(trace[1]) == "<PromisingContext id=999>"
 
 
 async def test_get_promising_trace_nested_promising_functions() -> None:
@@ -618,20 +611,17 @@ async def test_get_promising_trace_nested_promising_functions() -> None:
     assert await outer_promise == "done"
 
     # outer is the root — one entry
-    assert re.fullmatch(
-        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions"
-        r"\.<locals>\.outer' Promise id=\d+>",
-        "\n".join(outer_promise.get_promising_trace()),
+    assert _norm("\n".join(outer_promise.get_promising_trace())) == (
+        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.outer' Promise id=999>"
     )
 
     # inner is at the bottom — four entries
     assert innermost_promise is not None
-    assert re.fullmatch(
-        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions\.<locals>\.outer' Promise id=\d+>\n"
-        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions\.<locals>\.middle_ctx' PromisingContext id=\d+>\n"
-        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions\.<locals>\.middle_fn' Promise id=\d+>\n"
-        r"<'tests\.test_namespace::test_get_promising_trace_nested_promising_functions\.<locals>\.inner' Promise id=\d+>",
-        "\n".join(innermost_promise.get_promising_trace()),
+    assert _norm("\n".join(innermost_promise.get_promising_trace())) == (
+        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.outer' Promise id=999>\n"
+        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.middle_ctx' PromisingContext id=999>\n"
+        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.middle_fn' Promise id=999>\n"
+        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.inner' Promise id=999>"
     )
 
 
@@ -647,9 +637,8 @@ async def test_get_promising_trace_mixed_context_and_function() -> None:
         promise = do_work()
         assert await promise == "result"
 
-    assert re.fullmatch(
-        r"<'AppCtx' PromisingContext id=\d+>\n"
-        r"<'tests\.test_namespace::test_get_promising_trace_mixed_context_and_function"
-        r"\.<locals>\.do_work' Promise id=\d+>",
-        "\n".join(promise.get_promising_trace()),
+    assert _norm("\n".join(promise.get_promising_trace())) == (
+        "<'AppCtx' PromisingContext id=999>\n"
+        "<'tests.test_namespace::test_get_promising_trace_mixed_context_and_function"
+        ".<locals>.do_work' Promise id=999>"
     )

@@ -1,3 +1,5 @@
+import pytest
+
 import promising
 from tests.utils_for_tests import normalize_object_repr
 
@@ -11,30 +13,53 @@ async def test_get_promising_trace_single_context() -> None:
         assert trace[0] is ctx
 
 
-async def test_get_promising_trace_with_promise() -> None:
+@pytest.mark.parametrize("top_to_bottom", [True, False], ids=["top_to_bottom", "bottom_to_top"])
+async def test_get_promising_trace_with_promise(top_to_bottom: bool) -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
     with promising.context(namespace="Outer") as outer:
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
-        trace = promise.get_promising_trace()
+        trace = promise.get_promising_trace(top_to_bottom=top_to_bottom)
         assert isinstance(trace, list)
         assert len(trace) == 2
-        assert trace[0] is outer
-        assert trace[1] is promise
+        if top_to_bottom:
+            assert trace[0] is outer
+            assert trace[1] is promise
+        else:
+            assert trace[0] is promise
+            assert trace[1] is outer
         await promise
 
 
-async def test_get_promising_trace_repr_nested_contexts() -> None:
-    """get_promising_trace_repr returns string representations top-to-bottom."""
+@pytest.mark.parametrize(
+    ("top_to_bottom", "expected"),
+    [
+        (
+            True,
+            [
+                "<'App' PromisingContext id=999>",
+                "<'Service' PromisingContext id=999>",
+                "<'Handler' PromisingContext id=999>",
+            ],
+        ),
+        (
+            False,
+            [
+                "<'Handler' PromisingContext id=999>",
+                "<'Service' PromisingContext id=999>",
+                "<'App' PromisingContext id=999>",
+            ],
+        ),
+    ],
+    ids=["top_to_bottom", "bottom_to_top"],
+)
+async def test_get_promising_trace_repr_nested_contexts(top_to_bottom: bool, expected: list[str]) -> None:
+    """get_promising_trace_repr returns string representations in the requested order."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
-                trace_repr = handler.get_promising_trace_repr()
+                trace_repr = handler.get_promising_trace_repr(top_to_bottom=top_to_bottom)
                 assert isinstance(trace_repr, list)
-                assert [normalize_object_repr(s) for s in trace_repr] == [
-                    "<'App' PromisingContext id=999>",
-                    "<'Service' PromisingContext id=999>",
-                    "<'Handler' PromisingContext id=999>",
-                ]
+                assert [normalize_object_repr(s) for s in trace_repr] == expected
 
 
 async def test_get_promising_trace_repr_no_namespace() -> None:

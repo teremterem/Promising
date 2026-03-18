@@ -166,6 +166,36 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         # The function or method was already decorated and the decorator is now
         # being called with arguments - let's pass this call through to the
         # underlying function or method
+
+        if self._is_wrapped_async:
+            # Wrapped function or method is async
+            # We resolve the parent at call-site (now) so that the parent
+            # hierarchy reflects where the function was *called*, not where
+            # it was *awaited*.  But we defer PromisingContext creation into
+            # the coroutine body so the event loop is resolved when the
+            # coroutine actually runs.  This matters for ``asyncio.run(f())``
+            # where ``f()`` is evaluated *before* asyncio.run creates its
+            # loop.
+            parent = self.parent
+            if parent is INHERIT:
+                parent = PromisingContext.get_active_context(raise_if_none=False)
+
+            @functools.wraps(self.__wrapped__)
+            async def _async_wrapper() -> Any:
+                ctx = PromisingContext(
+                    namespace=self.namespace,
+                    loop=self.ctx_loop,
+                    parent=parent,
+                    thread_pool=self.thread_pool,
+                    children_start_soon=self.children_start_soon,
+                    start_soon_default=self.start_soon_default,
+                )
+                with ctx:
+                    return await self._wrapped_as_callable(*args, **kwargs)
+
+            return _async_wrapper()
+
+        # Wrapped function or method is sync
         ctx = PromisingContext(
             namespace=self.namespace,
             loop=self.ctx_loop,
@@ -174,18 +204,6 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             children_start_soon=self.children_start_soon,
             start_soon_default=self.start_soon_default,
         )
-
-        if self._is_wrapped_async:
-            # Wrapped function or method is async
-
-            @functools.wraps(self.__wrapped__)
-            async def _async_wrapper() -> Any:
-                with ctx:
-                    return await self._wrapped_as_callable(*args, **kwargs)
-
-            return _async_wrapper()
-
-        # Wrapped function or method is sync
         with ctx:
             return self._wrapped_as_callable(*args, **kwargs)
 

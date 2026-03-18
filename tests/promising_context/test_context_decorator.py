@@ -1,8 +1,55 @@
+import asyncio
+
 import pytest
 
 import promising
 
 # ── Async Function Decorator ─────────────────────────────────────
+
+
+def test_async_context_decorator_with_asyncio_run() -> None:
+    """
+    @promising.context on an async function used with asyncio.run(f()).
+
+    asyncio.run(f()) evaluates f() — and therefore the decorator's
+    __call__ — *before* asyncio.run creates and starts its own event
+    loop.  The PromisingContext must resolve the event loop lazily
+    (when the coroutine body runs) rather than eagerly (when the
+    coroutine object is constructed), otherwise it captures a stale
+    loop and child Promises will fail with SyncUsageError because
+    the captured loop is not running.
+    """
+    captured_ctx = None
+
+    @promising.context
+    async def work() -> str:
+        nonlocal captured_ctx
+        captured_ctx = promising.get_active_context()
+        return "done"
+
+    result = asyncio.run(work())
+    assert result == "done"
+    assert captured_ctx is not None
+    assert isinstance(captured_ctx, promising.PromisingContext)
+
+
+def test_async_context_decorator_with_asyncio_run_and_child_promise() -> None:
+    """
+    Same as above but also creates a child Promise inside the context,
+    which is the scenario that originally surfaced the bug: the Promise
+    calls _call_soon_threadsafe, which checks that _ctx_loop.is_running().
+    """
+
+    @promising.function
+    async def child_work(x: int) -> int:
+        return x * 2
+
+    @promising.context
+    async def work() -> int:
+        result = await child_work(21)
+        return result
+
+    assert asyncio.run(work()) == 42
 
 
 async def test_async_function_decorator_activates_context() -> None:

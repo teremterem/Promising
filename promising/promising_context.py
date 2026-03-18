@@ -66,13 +66,11 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     Args:
         namespace: Human-readable label for the underlying
-            ``PromisingContext``. Shows up in ``__repr__`` output and (planned)
-            error breadcrumbs. When used as a decorator and not provided,
-            defaults to the wrapped function's ``__qualname__``.
-            TODO Remove the word "planned" from above when ready.
-        loop: Event loop to use. None (default) inherits from the
-            parent context, or falls back to ``asyncio.get_event_loop()`` at
-            the root.
+            ``PromisingContext``. Shows up in ``__repr__`` output (and,
+            consequently, in promising traces). When used as a decorator and
+            not provided, defaults to the wrapped function's ``__qualname__``.
+        loop: Event loop to use. None (default) inherits from the parent
+            context, or falls back to ``asyncio.get_event_loop()`` at the root.
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
@@ -548,18 +546,21 @@ class PromisingContext:
 
         return False  # Let's not suppress any exceptions
 
-    def get_promising_trace(self) -> list[str]:
+    def get_promising_trace(self, top_to_bottom: bool = True) -> "list[PromisingContext]":
         """
-        Return a list of repr strings from the topmost parent context down to
-        this context.
+        Return a list of PromisingContext objects from this context up to the
+        topmost parent. If *top_to_bottom* is True (the default), the list is
+        reversed so the topmost parent comes first.
         """
-        trace: list[str] = []
-        current: PromisingContext | None = self
+        trace = []
+        current = self
+
         while current is not None:
-            trace.append(repr(current))
+            trace.append(current)
             current = current._parent
-        # TODO Introduce `top_to_bottom` method parameter (True by default)
-        trace.reverse()
+
+        if top_to_bottom:
+            trace.reverse()
         return trace
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:

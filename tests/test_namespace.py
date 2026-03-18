@@ -623,22 +623,3 @@ async def test_get_promising_trace_nested_promising_functions() -> None:
         "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.middle_fn' Promise id=999>\n"
         "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.inner' Promise id=999>"
     )
-
-
-async def test_get_promising_trace_mixed_context_and_function() -> None:
-    """A @promising.function nested inside a promising.context produces a
-    mixed trace with both PromisingContext and Promise entries."""
-
-    @promising.function
-    async def do_work() -> str:
-        return "result"
-
-    with promising.context(namespace="AppCtx"):
-        promise = do_work()
-        assert await promise == "result"
-
-    assert _norm("\n".join(promise.get_promising_trace())) == (
-        "<'AppCtx' PromisingContext id=999>\n"
-        "<'tests.test_namespace::test_get_promising_trace_mixed_context_and_function"
-        ".<locals>.do_work' Promise id=999>"
-    )

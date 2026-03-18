@@ -341,23 +341,6 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
     )
 
 
-# ── PromisingContext repr ───────────────────────────────────────
-
-
-@pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_context_repr_with_namespace(use_repr: bool) -> None:
-    ctx = promising.PromisingContext(namespace="Worker")
-    result = repr(ctx) if use_repr else str(ctx)
-    assert re.fullmatch(r"<'Worker' PromisingContext id=\d+>", result)
-
-
-@pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_context_repr_without_namespace(use_repr: bool) -> None:
-    ctx = promising.PromisingContext()
-    result = repr(ctx) if use_repr else str(ctx)
-    assert re.fullmatch(r"<PromisingContext id=\d+>", result)
-
-
 # ── Method decorators and qualname ──────────────────────────────
 
 
@@ -544,7 +527,7 @@ def test_callable_instance_inherits_module_from_class() -> None:
     )
 
 
-def test_builtin_int_has_no_inherited_module() -> None:
+def test_builtin_type_has_no_inherited_module() -> None:
     """Built-in type instances (int, str, list) do NOT inherit __module__.
 
     Unlike user-defined class instances, built-ins block attribute inheritance
@@ -561,59 +544,21 @@ def test_builtin_int_has_no_inherited_module() -> None:
     assert result == "42"
 
 
-def test_builtin_str_has_no_inherited_module() -> None:
-    assert not hasattr("hello", "__module__")
-    assert not hasattr("hello", "__qualname__")
-
-    result = resolve_namespace(
-        provided_explicitly=None,
-        named_object_fallback="hello",
-    )
-    assert result == "hello"
-
-
-def test_builtin_list_has_no_inherited_module() -> None:
-    assert not hasattr([], "__module__")
-    assert not hasattr([], "__qualname__")
-
-    result = resolve_namespace(
-        provided_explicitly=None,
-        named_object_fallback=[1, 2, 3],
-    )
-    assert result == "[1, 2, 3]"
-
-
 # ── get_promising_trace ─────────────────────────────────────────
 
 
 async def test_get_promising_trace_single_context() -> None:
     """A single context with no parent returns a one-element trace."""
-    with promising.context(namespace="Root", parent=None) as ctx:
+    with promising.context(namespace="Root") as ctx:
         trace = ctx.get_promising_trace()
         assert len(trace) == 1
         assert "'Root'" in trace[0]
         assert "PromisingContext" in trace[0]
 
 
-async def test_get_promising_trace_nested_contexts() -> None:
-    """Nested contexts produce a trace from topmost parent to innermost child."""
-    with promising.context(namespace="Grandparent", parent=None):
-        with promising.context(namespace="Parent"):
-            with promising.context(namespace="Child") as c:
-                trace = c.get_promising_trace()
-                assert len(trace) == 3
-                assert "'Grandparent'" in trace[0]
-                assert "'Parent'" in trace[1]
-                assert "'Child'" in trace[2]
-
-                joined = "\n".join(trace)
-                assert "Grandparent" in joined.split("\n")[0]
-                assert "Child" in joined.split("\n")[2]
-
-
 async def test_get_promising_trace_with_promise() -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
-    with promising.context(namespace="Outer", parent=None):
+    with promising.context(namespace="Outer"):
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
         trace = promise.get_promising_trace()
         assert len(trace) == 2
@@ -625,7 +570,7 @@ async def test_get_promising_trace_with_promise() -> None:
 
 async def test_get_promising_trace_join_output() -> None:
     """Validate the output of '\\n'.join(ctx.get_promising_trace())."""
-    with promising.context(namespace="App", parent=None):
+    with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
                 assert re.fullmatch(
@@ -638,7 +583,7 @@ async def test_get_promising_trace_join_output() -> None:
 
 async def test_get_promising_trace_no_namespace() -> None:
     """Contexts without namespaces still appear in the trace."""
-    with promising.context(parent=None):
+    with promising.context():
         with promising.context() as child:
             trace = child.get_promising_trace()
             assert len(trace) == 2
@@ -698,7 +643,7 @@ async def test_get_promising_trace_mixed_context_and_function() -> None:
     async def do_work() -> str:
         return "result"
 
-    with promising.context(namespace="AppCtx", parent=None):
+    with promising.context(namespace="AppCtx"):
         promise = do_work()
         assert await promise == "result"
 

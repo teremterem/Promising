@@ -366,7 +366,7 @@ class PromisingContext:
             raise PromiseNotFoundError("No parent Promise found")
         return parent
 
-    def get_promising_trace(self, top_to_bottom: bool = True) -> "list[PromisingContext]":
+    def get_promising_trace(self, *, top_to_bottom: bool = True) -> "list[PromisingContext]":
         """
         Return a list of PromisingContext objects from this context up to the
         topmost parent. If *top_to_bottom* is True (the default), the list is
@@ -382,6 +382,13 @@ class PromisingContext:
         if top_to_bottom:
             trace.reverse()
         return trace
+
+    def get_promising_trace_repr(self, *, top_to_bottom: bool = True) -> "list[str]":
+        """
+        Return a list of string representations (repr) of each
+        PromisingContext in the trace.
+        """
+        return [repr(ctx) for ctx in self.get_promising_trace(top_to_bottom=top_to_bottom)]
 
     async def await_children(self, *, recursively: bool = True) -> None:
         """

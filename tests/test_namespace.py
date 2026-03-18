@@ -243,8 +243,8 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
     promise = compute()
     result = repr(promise) if use_repr else str(promise)
     assert _norm(result) == (
-        "<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
-        ".<locals>.compute' Promise id=999>"
+        "<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute'"
+        " Promise id=999>"
     )
     await promise
 
@@ -363,8 +363,8 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert _norm(result) == (
-            "<'tests.test_namespace::test_promising_function_on_instance_method_qualname."
-            "<locals>.Service.process' Promise id=999>"
+            "<'tests.test_namespace::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
+            " Promise id=999>"
         )
     assert await promise == "processed"
 
@@ -389,8 +389,8 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert _norm(result) == (
-            "<'tests.test_namespace::test_promising_function_on_static_method_qualname"
-            ".<locals>.Service.helper' Promise id=999>"
+            "<'tests.test_namespace::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
+            " Promise id=999>"
         )
     assert await promise == "helped"
 
@@ -415,8 +415,8 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert _norm(result) == (
-            "<'tests.test_namespace::test_promising_function_on_class_method_qualname"
-            ".<locals>.Service.create' Promise id=999>"
+            "<'tests.test_namespace::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
+            " Promise id=999>"
         )
     assert await promise == "created"
 
@@ -538,55 +538,59 @@ def test_builtin_type_has_no_inherited_module() -> None:
     assert result == "42"
 
 
-# ── get_promising_trace ─────────────────────────────────────────
+# ── get_promising_trace / get_promising_trace_repr ───────────────
 
 
 async def test_get_promising_trace_single_context() -> None:
     """A single context with no parent returns a one-element trace."""
     with promising.context(namespace="Root") as ctx:
         trace = ctx.get_promising_trace()
+        assert isinstance(trace, list)
         assert len(trace) == 1
-        assert "'Root'" in trace[0]
-        assert "PromisingContext" in trace[0]
+        assert trace[0] is ctx
 
 
 async def test_get_promising_trace_with_promise() -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
-    with promising.context(namespace="Outer"):
+    with promising.context(namespace="Outer") as outer:
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
         trace = promise.get_promising_trace()
+        assert isinstance(trace, list)
         assert len(trace) == 2
-        assert "'Outer'" in trace[0]
-        assert "'MyPromise'" in trace[1]
-        assert "Promise" in trace[1]
+        assert trace[0] is outer
+        assert trace[1] is promise
         await promise
 
 
-async def test_get_promising_trace_join_output() -> None:
-    """Validate the output of '\\n'.join(ctx.get_promising_trace())."""
+async def test_get_promising_trace_repr_nested_contexts() -> None:
+    """get_promising_trace_repr returns string representations top-to-bottom."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler") as handler:
-                assert _norm("\n".join(handler.get_promising_trace())) == (
-                    "<'App' PromisingContext id=999>\n"
-                    "<'Service' PromisingContext id=999>\n"
-                    "<'Handler' PromisingContext id=999>"
-                )
+                trace_repr = handler.get_promising_trace_repr()
+                assert isinstance(trace_repr, list)
+                assert [_norm(s) for s in trace_repr] == [
+                    "<'App' PromisingContext id=999>",
+                    "<'Service' PromisingContext id=999>",
+                    "<'Handler' PromisingContext id=999>",
+                ]
 
 
-async def test_get_promising_trace_no_namespace() -> None:
-    """Contexts without namespaces still appear in the trace."""
+async def test_get_promising_trace_repr_no_namespace() -> None:
+    """Contexts without namespaces still appear in the trace repr."""
     with promising.context():
         with promising.context() as child:
-            trace = child.get_promising_trace()
-            assert len(trace) == 2
-            assert _norm(trace[0]) == "<PromisingContext id=999>"
-            assert _norm(trace[1]) == "<PromisingContext id=999>"
+            trace_repr = child.get_promising_trace_repr()
+            assert isinstance(trace_repr, list)
+            assert [_norm(s) for s in trace_repr] == [
+                "<PromisingContext id=999>",
+                "<PromisingContext id=999>",
+            ]
 
 
-async def test_get_promising_trace_nested_promising_functions() -> None:
+async def test_get_promising_trace_repr_nested_promising_functions() -> None:
     """Nested @promising.function and @promising.context calls with auto-derived
-    namespaces produce a correct trace from outermost to innermost."""
+    namespaces produce a correct trace repr from outermost to innermost."""
     innermost_promise = None
 
     @promising.function
@@ -611,15 +615,24 @@ async def test_get_promising_trace_nested_promising_functions() -> None:
     assert await outer_promise == "done"
 
     # outer is the root — one entry
-    assert _norm("\n".join(outer_promise.get_promising_trace())) == (
-        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.outer' Promise id=999>"
-    )
+    outer_trace_repr = outer_promise.get_promising_trace_repr()
+    assert isinstance(outer_trace_repr, list)
+    assert [_norm(s) for s in outer_trace_repr] == [
+        "<'tests.test_namespace::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
+        " Promise id=999>",
+    ]
 
     # inner is at the bottom — four entries
     assert innermost_promise is not None
-    assert _norm("\n".join(innermost_promise.get_promising_trace())) == (
-        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.outer' Promise id=999>\n"
-        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.middle_ctx' PromisingContext id=999>\n"
-        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.middle_fn' Promise id=999>\n"
-        "<'tests.test_namespace::test_get_promising_trace_nested_promising_functions.<locals>.inner' Promise id=999>"
-    )
+    inner_trace_repr = innermost_promise.get_promising_trace_repr()
+    assert isinstance(inner_trace_repr, list)
+    assert [_norm(s) for s in inner_trace_repr] == [
+        "<'tests.test_namespace::test_get_promising_trace_repr_nested_promising_functions.<locals>.outer'"
+        " Promise id=999>",
+        "<'tests.test_namespace::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_ctx'"
+        " PromisingContext id=999>",
+        "<'tests.test_namespace::test_get_promising_trace_repr_nested_promising_functions.<locals>.middle_fn'"
+        " Promise id=999>",
+        "<'tests.test_namespace::test_get_promising_trace_repr_nested_promising_functions.<locals>.inner'"
+        " Promise id=999>",
+    ]

@@ -19,7 +19,14 @@ async def test_await_children(*, await_children: bool) -> None:
     child_promise = None
 
     @promising.function
+    async def grandchild_func() -> str:
+        await asyncio.sleep(0.2)
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
     async def child_func() -> str:
+        grandchild_func()
         await asyncio.sleep(0.1)
         execution_order.append("child_done")
         return "child"
@@ -33,16 +40,20 @@ async def test_await_children(*, await_children: bool) -> None:
             await promising.await_children()
         return "parent"
 
-    await parent_func()
+    promise = parent_func()
+    await promise
 
     if await_children:
-        assert execution_order == ["parent_coro_done", "child_done"]
+        assert execution_order == [
+            "parent_coro_done",
+            "child_done",
+            "grandchild_done",
+        ]
     else:
         assert execution_order == ["parent_coro_done"]
-        # Let's await for the child promise to complete, so that we don't get any
-        # asyncio warnings about the child promise being not awaited (or being
-        # cancelled).
-        await child_promise
+        # Let's await for all the children to complete, so that we don't
+        # get any asyncio warnings about coroutines never being awaited
+        await promise.await_children()
 
 
 @pytest.mark.parametrize("recursively", [True, False])

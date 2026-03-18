@@ -73,7 +73,7 @@ await promise
 
 ### Waiting for Children
 
-By default, a parent resolves as soon as its own coroutine finishes — children may still be running. Use `await_children()` to wait for all children before the parent resolves:
+By default, a parent resolves as soon as its own coroutine finishes — children may still be running. Use `await_children()` to wait for the entire subtree (children, grandchildren, etc.) before the parent resolves:
 
 ```python
 @promising.function
@@ -81,15 +81,15 @@ async def parent_task() -> str:
     child_task("a")
     child_task("b")
 
-    # Wait for all children to complete before returning
+    # Wait for all descendants to complete before returning
     await promising.await_children()
     return "all done"
 ```
 
-Use `recursively=True` to wait for the entire subtree (children, grandchildren, etc.):
+To wait only for direct children (not grandchildren), pass `recursively=False`:
 
 ```python
-await promising.await_children(recursively=True)
+await promising.await_children(recursively=False)
 ```
 
 > **Note:** `await_children()` and `await_children_sync()` are purely for
@@ -501,8 +501,8 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `ctx.namespace` | Optional human-readable namespace string. Used in `__repr__` output. Set via the `namespace` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
-| `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
-| `ctx.await_children_sync(recursively=False, timeout=None)` | Sync — block until child contexts finish. |
+| `ctx.await_children(recursively=True)` | Async — wait for child contexts to finish. |
+| `ctx.await_children_sync(recursively=True, timeout=None)` | Sync — block until child contexts finish. |
 | `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
 
@@ -512,8 +512,8 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
-| `promising.await_children(recursively=False)` | Wait for all children of the current context. |
-| `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
+| `promising.await_children(recursively=True)` | Wait for all children of the current context. |
+| `promising.await_children_sync(recursively=True, timeout=None)` | Sync counterpart — block until children finish. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 

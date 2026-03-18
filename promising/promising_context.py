@@ -211,15 +211,13 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = False) -> None:
+async def await_children(*, recursively: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
     Args:
-        recursively: If True, wait for all descendants, not just direct
-            children.
-            # TODO Why is it False by default, and not True ? Either change
-            #  or explain in the docstring.
+        recursively: If True (the default), wait for all descendants,
+            not just direct children.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
@@ -229,7 +227,7 @@ async def await_children(*, recursively: bool = False) -> None:
     return await get_active_context().await_children(recursively=recursively)
 
 
-def await_children_sync(*, recursively: bool = False, timeout: float | None = None) -> None:
+def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -239,10 +237,8 @@ def await_children_sync(*, recursively: bool = False, timeout: float | None = No
     executor, where ``await`` is not available.
 
     Args:
-        recursively: If True, wait for all descendants, not just direct
-            children.
-            # TODO Why is it False by default, and not True ? Either change
-            #  or explain in the docstring.
+        recursively: If True (the default), wait for all descendants,
+            not just direct children.
         timeout: Maximum time to wait in seconds.
     """
     # TODO We need unit tests that ensure this function works correctly even
@@ -372,7 +368,7 @@ class PromisingContext:
             raise PromiseNotFoundError("No parent Promise found")
         return parent
 
-    async def await_children(self, *, recursively: bool = False) -> None:
+    async def await_children(self, *, recursively: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -380,10 +376,8 @@ class PromisingContext:
         children may spawn new children while being awaited.
 
         Args:
-            recursively: If True, wait for all descendants, not just direct
-                children.
-                # TODO Why is it False by default, and not True ? Either change
-                #  or explain in the docstring.
+            recursively: If True (the default), wait for all descendants,
+                not just direct children.
         """
         while children := self.collect_remaining_children(
             recursively=recursively,
@@ -402,7 +396,7 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = False, timeout: float | None = None) -> None:
+    def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -412,10 +406,8 @@ class PromisingContext:
         executor, where ``await`` is not available.
 
         Args:
-            recursively: If True, wait for all descendants, not just direct
-                children.
-                # TODO Why is it False by default, and not True ? Either change
-                #  or explain in the docstring.
+            recursively: If True (the default), wait for all descendants,
+                not just direct children.
             timeout: Maximum time to wait in seconds.
 
         Raises:

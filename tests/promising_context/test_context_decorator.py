@@ -523,6 +523,37 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> Non
         add()  # no await — the error should happen at call-time
 
 
+async def test_plain_async_raises_arg_error_at_call_time() -> None:
+    """
+    Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    a plain async function with required arguments raises TypeError
+    immediately at call-time when called with wrong arguments.
+    This is standard Python behavior — no decorators involved.
+    """
+
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error happens at call-time
+
+
+async def test_context_alone_raises_arg_error_at_call_time() -> None:
+    """
+    Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    @promising.context alone on an async function that requires arguments
+    should raise TypeError immediately at call-time when called with
+    wrong arguments (not defer it to await-time).
+    """
+
+    @promising.context
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
+
+
 async def test_context_bare_on_top_of_staticmethod() -> None:
     """
     @promising.context (bare, no parens) above @staticmethod.

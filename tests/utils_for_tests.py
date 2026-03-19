@@ -13,8 +13,10 @@ def normalize_object_repr(s: str) -> str:
     # After the previous sub, hex addresses like "0x7f3a" have become
     # "999x999f999a". This pattern matches that mangled form and normalizes
     # it to "0xfff".
-    s = re.sub(r"999x[(999)a-f]+", "0xfff", s)
-    return s
+    # After the previous sub, hex addresses like "0x7f3a" have become
+    # "999x999f999a". This pattern matches "999x" followed by any mix of
+    # digits-turned-999 and hex letters, normalizing to "0xfff".
+    return re.sub(r"999x[9a-f]+", "0xfff", s)
 
 
 def collect_parent_contexts(ctx: promising.PromisingContext) -> list[promising.PromisingContext]:

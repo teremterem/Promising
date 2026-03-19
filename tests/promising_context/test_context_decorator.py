@@ -25,7 +25,7 @@ def test_async_context_decorator_with_asyncio_run() -> None:
     """
     error = None
 
-    def _run_in_thread():
+    def _run_in_thread() -> None:
         nonlocal error
         try:
             captured_ctx = None
@@ -61,7 +61,7 @@ def test_async_context_decorator_with_asyncio_run_and_child_promise() -> None:
     """
     error = None
 
-    def _run_in_thread():
+    def _run_in_thread() -> None:
         nonlocal error
         try:
 

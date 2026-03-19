@@ -78,6 +78,4 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 pass
 
-        await promising.await_children()
-
     asyncio.run(main())

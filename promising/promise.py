@@ -106,8 +106,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If awaitable does not have __await__ when provided.
     """
 
-    # TODO [P1] Figure out how to support async generator interface as
-    #  well (together with its "sync" counterpart)
+    # TODO [P1] Figure out how to support async generator interface as well
+    #  (together with its "sync" counterpart)
+    # TODO [P1] Make sure there is a clear mechanism of avoiding memory leaks,
+    #  though, when sequences are enormously long and are not meant to be
+    #  revisited by the user (e.g. a stream of events etc.)
 
     def __init__(
         self,

@@ -262,6 +262,39 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
     return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
 
 
+def collect_remaining_children(
+    *,
+    recursively: bool = True,
+    exclude_non_awaitable: bool = True,
+    exclude_done: bool = True,
+) -> set["PromisingContext"]:
+    """
+    Collect child contexts of the active context that haven't been garbage
+    collected.
+
+    This is the module-level counterpart of
+    ``PromisingContext.collect_remaining_children()``.
+
+    Args:
+        recursively: If True (default), include descendants at all levels,
+            not just direct children.
+        exclude_non_awaitable: If True (default), exclude children that
+            are not awaitable (i.e. plain PromisingContexts that are not
+            Futures).
+        exclude_done: If True (default), exclude children that weren't
+            garbage collected yet, but are done nonetheless (i.e. Futures
+            with a result or exception already set).
+
+    Returns:
+        Set of child PromisingContexts matching the filter criteria.
+    """
+    return get_active_context().collect_remaining_children(
+        recursively=recursively,
+        exclude_non_awaitable=exclude_non_awaitable,
+        exclude_done=exclude_done,
+    )
+
+
 def get_trace(*, parents_first: bool = True) -> "list[PromisingContext]":
     """
     Return a list of PromisingContext objects in the trace of the active

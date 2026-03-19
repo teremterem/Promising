@@ -593,6 +593,8 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
     def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
         running_loop = asyncio.get_running_loop()
         if running_loop is not self._promise._ctx_loop:
+            # TODO What to do about this message if either of the sides of the
+            #  expression is None ? Can each of them be None ?
             raise RuntimeError(
                 f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
             )

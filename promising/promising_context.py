@@ -526,7 +526,7 @@ class PromisingContext:
     def collect_remaining_children(
         self,
         *,
-        recursively: bool = False,
+        recursively: bool = True,
         exclude_non_awaitable: bool = True,
         exclude_done: bool = True,
     ) -> set["PromisingContext"]:
@@ -543,8 +543,8 @@ class PromisingContext:
         returns True.
 
         Args:
-            recursively: If True, include descendants at all levels, not
-                just direct children.
+            recursively: If True (default), include descendants at all levels,
+                not just direct children.
             exclude_non_awaitable: If True (default), exclude children that
                 are not awaitable (i.e. plain PromisingContexts that are not
                 Futures).

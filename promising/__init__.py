@@ -68,10 +68,10 @@ __all__ = [
     "await_children_sync",
     "collect_remaining_children",
     "context",
+    "format_trace",
     "function",
     "get_active_context",
     "get_active_promise",
     "get_trace",
-    "format_trace",
     "print_trace",
 ]

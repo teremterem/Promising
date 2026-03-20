@@ -537,9 +537,11 @@ async def test_decorator_with_explicit_parent(parent) -> None:
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
-@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+@pytest.mark.parametrize("function_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time(
-    with_parens: bool,
+    function_with_parens: bool,
+    context_with_parens: bool,
     use_thread_pool: bool,
 ) -> None:
     """
@@ -555,10 +557,11 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
 
     See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
     """
-    context_decorator = promising.context() if with_parens else promising.context
+    context_decorator = promising.context() if context_with_parens else promising.context
+    function_decorator = promising.function() if function_with_parens else promising.function
 
     @context_decorator
-    @promising.function
+    @function_decorator
     async def add(a: int, b: int) -> int:
         return a + b
 
@@ -567,9 +570,11 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
         add(1, 2, use_thread_pool=use_thread_pool)  # no await — the error should happen at call-time
 
 
-@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+@pytest.mark.parametrize("function_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 async def test_context_on_top_of_function_raises_arg_error_at_call_time(
-    with_parens: bool,
+    function_with_parens: bool,
+    context_with_parens: bool,
 ) -> None:
     """
     When @promising.context is stacked on top of @promising.function,
@@ -583,10 +588,11 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
 
     See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
     """
-    context_decorator = promising.context() if with_parens else promising.context
+    context_decorator = promising.context() if context_with_parens else promising.context
+    function_decorator = promising.function() if function_with_parens else promising.function
 
     @context_decorator
-    @promising.function
+    @function_decorator
     async def add(a: int, b: int) -> int:
         return a + b
 

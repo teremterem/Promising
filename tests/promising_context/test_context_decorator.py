@@ -565,6 +565,10 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
     async def add(a: int, b: int) -> int:
         return a + b
 
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
     # Passing use_thread_pool at call time on an async function should raise immediately
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
         add(1, 2, use_thread_pool=use_thread_pool)  # no await — the error should happen at call-time
@@ -596,6 +600,10 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
     async def add(a: int, b: int) -> int:
         return a + b
 
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
     # Calling with missing required arguments should raise immediately
     with pytest.raises(TypeError):
         add()  # no await — the error should happen at call-time
@@ -617,6 +625,8 @@ async def test_context_alone_raises_arg_error_at_call_time(
     async def add(a: int, b: int) -> int:
         return a + b
 
+    assert await add(1, 2) == 3
+
     with pytest.raises(TypeError):
         add()  # no await — the error should happen at call-time
 
@@ -631,6 +641,8 @@ async def test_plain_async_raises_arg_error_at_call_time() -> None:
 
     async def add(a: int, b: int) -> int:
         return a + b
+
+    assert await add(1, 2) == 3
 
     with pytest.raises(TypeError):
         add()  # no await — the error happens at call-time
@@ -689,6 +701,10 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_call_time(
     def add(a: int, b: int) -> int:
         return a + b
 
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
     # Calling with missing required arguments should raise immediately
     with pytest.raises(TypeError):
         add()  # the error should happen at call-time
@@ -699,8 +715,7 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
     with_parens: bool,
 ) -> None:
     """
-    Sync counterpart of test_context_alone_raises_arg_error_at_call_time.
-
+    Baseline for test_context_on_top_of_sync_function_raises_arg_error_at_call_time:
     @promising.context alone on a sync function that requires arguments should
     raise TypeError immediately at call-time when called with wrong arguments.
 

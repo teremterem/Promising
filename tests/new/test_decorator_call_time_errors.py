@@ -518,9 +518,7 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_call_time(
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
-@pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_function_on_top_of_function_on_sync_raises_use_thread_pool_error_at_call_time(
-    inner_with_parens: bool,
     outer_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -532,12 +530,9 @@ async def test_function_on_top_of_function_on_sync_raises_use_thread_pool_error_
     DecorationError immediately at call-time.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
-    inner_decorator = (
-        promising.function(use_thread_pool=decorator_use_thread_pool) if inner_with_parens else promising.function
-    )
 
     @outer_decorator
-    @inner_decorator
+    @promising.function(use_thread_pool=decorator_use_thread_pool)
     def add(a: int, b: int) -> int:
         return a + b
 
@@ -551,9 +546,7 @@ async def test_function_on_top_of_function_on_sync_raises_use_thread_pool_error_
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
-@pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time(
-    inner_with_parens: bool,
     outer_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -565,12 +558,9 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time
     immediately at call-time.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
-    inner_decorator = (
-        promising.function(use_thread_pool=decorator_use_thread_pool) if inner_with_parens else promising.function
-    )
 
     @outer_decorator
-    @inner_decorator
+    @promising.function(use_thread_pool=decorator_use_thread_pool)
     def add(a: int, b: int) -> int:
         return a + b
 
@@ -582,11 +572,11 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time
         add()  # the error should happen at call-time
 
 
-@pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
+@pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_at_call_time(
     ctx_with_parens: bool,
-    func_with_parens: bool,
+    decorator_use_thread_pool: bool,
 ) -> None:
     """
     Sync counterpart of test_function_on_top_of_context_raises_use_thread_pool_error_at_call_time.
@@ -595,10 +585,9 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
     function, passing use_thread_pool=None at call-time should raise
     DecorationError immediately at call-time.
     """
-    func_decorator = promising.function() if func_with_parens else promising.function
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
 
-    @func_decorator
+    @promising.function(use_thread_pool=decorator_use_thread_pool)
     @ctx_decorator
     def add(a: int, b: int) -> int:
         return a + b
@@ -611,11 +600,11 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
         add(1, 2, use_thread_pool=None)
 
 
-@pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
+@pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     ctx_with_parens: bool,
-    func_with_parens: bool,
+    decorator_use_thread_pool: bool,
 ) -> None:
     """
     Sync counterpart of test_function_on_top_of_context_raises_arg_error_at_call_time.
@@ -624,10 +613,9 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     function, calling with wrong arguments should raise TypeError immediately
     at call-time.
     """
-    func_decorator = promising.function() if func_with_parens else promising.function
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
 
-    @func_decorator
+    @promising.function(use_thread_pool=decorator_use_thread_pool)
     @ctx_decorator
     def add(a: int, b: int) -> int:
         return a + b

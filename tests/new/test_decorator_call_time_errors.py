@@ -1,8 +1,27 @@
+"""
+Tests that errors from incorrect call-time arguments (missing args, wrong types,
+invalid ``use_thread_pool`` on async functions) are raised immediately at call-time
+rather than being deferred to await-time.
+
+Covers three categories:
+
+1. **Baselines** — plain async functions and ``@promising.context``-only decorations
+   to confirm standard Python call-time TypeError behavior is preserved.
+2. **Unusual decorator stacking** — unconventional combinations like
+   ``@promising.context`` on top of ``@promising.function``, double
+   ``@promising.function``, and ``@promising.function`` on top of
+   ``@promising.context``. These stress-test that call-time error semantics
+   survive even under non-standard stacking.
+3. **Sync counterparts** — the same stacking scenarios applied to sync functions,
+   verifying that ``use_thread_pool`` validation and argument errors surface at
+   call-time when ``@promising.context`` wraps a sync Promising Function.
+"""
+
 import pytest
 
 import promising
 
-# ── Argument Errors at Call-Time ─────────────────────────────────
+# ── Baselines (no decorator stacking) ────────────────────────────
 
 
 async def test_plain_async_raises_arg_error_at_call_time() -> None:
@@ -89,7 +108,8 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
     use_thread_pool: bool,
 ) -> None:
     """
-    When @promising.context is stacked on top of @promising.function,
+    When @promising.context is stacked on top of @promising.function —
+    an unusual combination that is not a realistic usage pattern —
     passing use_thread_pool at call time on an async function should
     raise DecorationError immediately at call-time, not defer it to
     await-time.
@@ -125,7 +145,8 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
     context_with_parens: bool,
 ) -> None:
     """
-    When @promising.context is stacked on top of @promising.function,
+    When @promising.context is stacked on top of @promising.function —
+    an unusual combination that is not a realistic usage pattern —
     calling the decorated function with wrong arguments should raise
     TypeError immediately at call-time, not defer it to await-time.
 

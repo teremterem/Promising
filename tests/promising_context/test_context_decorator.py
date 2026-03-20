@@ -536,13 +536,15 @@ async def test_decorator_with_explicit_parent(parent) -> None:
 # ── Argument Errors at Call-Time ─────────────────────────────────
 
 
+@pytest.mark.parametrize("use_thread_pool", [True, False])
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
 async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time(
     with_parens: bool,
+    use_thread_pool: bool,
 ) -> None:
     """
     When @promising.context is stacked on top of @promising.function,
-    passing use_thread_pool=True at call time on an async function should
+    passing use_thread_pool at call time on an async function should
     raise DecorationError immediately at call-time, not defer it to
     await-time.
 
@@ -562,7 +564,7 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
 
     # Passing use_thread_pool at call time on an async function should raise immediately
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
-        add(1, 2, use_thread_pool=True)  # no await — the error should happen at call-time
+        add(1, 2, use_thread_pool=use_thread_pool)  # no await — the error should happen at call-time
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])

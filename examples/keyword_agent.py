@@ -63,7 +63,8 @@ if __name__ == "__main__":
     async def main():
         # TODO Support arbitrary attributes in PromisingContext to put things
         #  like litellm_session in there. Child contexts should inherit those
-        #  attributes from their parents.
+        #  attributes from their parents. (Should probably be copied to
+        #  children to avoid race conditions.)
         async with ClientSession() as litellm_session:
             try:
                 while True:

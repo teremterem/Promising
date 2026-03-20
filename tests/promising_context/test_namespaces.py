@@ -295,7 +295,7 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
 @pytest.mark.parametrize("use_repr", [True, False])
 @pytest.mark.parametrize("parametrized_decorator", [True, False])
 async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_decorator: bool) -> None:
-    """@promising.context() as decorator auto-resolves to module::qualname."""
+    """@promising.context as decorator auto-resolves to module::qualname."""
     captured_ctx = None
     ctx_decorator = promising.context() if parametrized_decorator else promising.context
 

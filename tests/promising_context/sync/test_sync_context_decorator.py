@@ -7,12 +7,12 @@ import promising
 
 def test_sync_function_decorator_activates_context() -> None:
     """
-    @promising.context() on a sync function: the context is
+    @promising.context on a sync function: the context is
     active inside the function body.
     """
     captured_ctx = None
 
-    @promising.context()
+    @promising.context
     def work() -> str:
         nonlocal captured_ctx
         captured_ctx = promising.get_active_context()
@@ -29,7 +29,7 @@ def test_sync_function_decorator_deactivates_after() -> None:
     no longer active.
     """
 
-    @promising.context()
+    @promising.context
     def work() -> str:
         return "done"
 
@@ -44,7 +44,7 @@ def test_sync_function_decorator_forwards_args() -> None:
     decorated sync function.
     """
 
-    @promising.context()
+    @promising.context
     def add(a: int, b: int, *, multiplier: int = 1) -> int:
         return (a + b) * multiplier
 
@@ -58,7 +58,7 @@ def test_sync_function_decorator_exception_propagates() -> None:
     propagates to the caller.
     """
 
-    @promising.context()
+    @promising.context
     def failing() -> None:
         raise ValueError("sync func error")
 
@@ -72,7 +72,7 @@ def test_sync_function_decorator_deactivates_on_exception() -> None:
     raises.
     """
 
-    @promising.context()
+    @promising.context
     def failing() -> None:
         raise RuntimeError("boom")
 
@@ -82,17 +82,12 @@ def test_sync_function_decorator_deactivates_on_exception() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-def test_sync_function_decorator_without_parens() -> None:
-    """
-    @promising.context (bare, no parens) also works as a decorator
-    for sync functions.
-    """
-
-    @promising.context
+def test_sync_function_decorator_with_parens() -> None:
+    @promising.context()
     def work() -> str:
-        return "bare-sync"
+        return "parens-sync"
 
-    assert work() == "bare-sync"
+    assert work() == "parens-sync"
 
 
 # ── Sync Instance Methods ────────────────────────────────────────
@@ -100,12 +95,12 @@ def test_sync_function_decorator_without_parens() -> None:
 
 def test_sync_instance_method_activates_context() -> None:
     """
-    @promising.context() on a sync instance method: the context
+    @promising.context on a sync instance method: the context
     is active inside the method body and `self` is received.
     """
 
     class Greeter:
-        @promising.context()
+        @promising.context
         def greet(self) -> str:
             assert promising.get_active_context() is not None
             return "hello-sync"
@@ -122,7 +117,7 @@ def test_sync_instance_method_receives_self() -> None:
         def __init__(self, value: int) -> None:
             self.value = value
 
-        @promising.context()
+        @promising.context
         def get_value(self) -> int:
             return self.value
 
@@ -147,7 +142,7 @@ def test_sync_instance_method_forwards_args() -> None:
         def __init__(self, base: int) -> None:
             self.base = base
 
-        @promising.context()
+        @promising.context
         def add(self, x: int, *, multiplier: int = 2) -> int:
             return (self.base + x) * multiplier
 
@@ -163,7 +158,7 @@ def test_sync_instance_method_exception_propagates() -> None:
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         def failing(self) -> None:
             raise ValueError("sync instance method error")
 
@@ -176,12 +171,12 @@ def test_sync_instance_method_exception_propagates() -> None:
 
 def test_sync_static_method_decorator() -> None:
     """
-    @promising.context() below @staticmethod for sync functions.
+    @promising.context below @staticmethod for sync functions.
     """
 
     class MathUtils:
         @staticmethod
-        @promising.context()
+        @promising.context
         def double(x: int) -> int:
             assert promising.get_active_context() is not None
             return x * 2
@@ -195,12 +190,12 @@ def test_sync_static_method_decorator() -> None:
 
 def test_sync_class_method_decorator() -> None:
     """
-    @promising.context() below @classmethod for sync methods.
+    @promising.context below @classmethod for sync methods.
     """
 
     class Factory:
         @classmethod
-        @promising.context()
+        @promising.context
         def create_name(cls) -> str:
             assert promising.get_active_context() is not None
             return cls.__name__
@@ -216,7 +211,7 @@ def test_sync_class_method_receives_cls_via_inheritance() -> None:
 
     class Base:
         @classmethod
-        @promising.context()
+        @promising.context
         def get_class_name(cls) -> str:
             return cls.__name__
 
@@ -236,11 +231,11 @@ def test_sync_class_method_receives_cls_via_inheritance() -> None:
 
 def test_sync_context_on_top_of_staticmethod() -> None:
     """
-    @promising.context() on top of @staticmethod for sync functions.
+    @promising.context on top of @staticmethod for sync functions.
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         @staticmethod
         def my_method() -> str:
             return "ok"
@@ -251,11 +246,11 @@ def test_sync_context_on_top_of_staticmethod() -> None:
 
 def test_sync_context_on_top_of_classmethod() -> None:
     """
-    @promising.context() on top of @classmethod for sync functions.
+    @promising.context on top of @classmethod for sync functions.
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         @classmethod
         def my_method(cls) -> type:
             return cls

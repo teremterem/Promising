@@ -533,7 +533,13 @@ async def test_decorator_with_explicit_parent(parent) -> None:
             assert returned_parent_ctx is parent_ctx
 
 
-async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> None:
+# ── Argument Errors at Call-Time ─────────────────────────────────
+
+
+@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+async def test_context_on_top_of_function_raises_arg_error_at_call_time(
+    with_parens: bool,
+) -> None:
     """
     When @promising.context is stacked on top of @promising.function,
     calling the decorated function with wrong arguments should raise
@@ -546,8 +552,9 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> Non
 
     See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
     """
+    context_decorator = promising.context() if with_parens else promising.context
 
-    @promising.context
+    @context_decorator
     @promising.function
     async def add(a: int, b: int) -> int:
         return a + b
@@ -557,15 +564,19 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> Non
         add()  # no await — the error should happen at call-time
 
 
-async def test_context_alone_raises_arg_error_at_call_time() -> None:
+@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+async def test_context_alone_raises_arg_error_at_call_time(
+    with_parens: bool,
+) -> None:
     """
     Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
     @promising.context alone on an async function that requires arguments
     should raise TypeError immediately at call-time when called with
     wrong arguments (not defer it to await-time).
     """
+    context_decorator = promising.context() if with_parens else promising.context
 
-    @promising.context
+    @context_decorator
     async def add(a: int, b: int) -> int:
         return a + b
 

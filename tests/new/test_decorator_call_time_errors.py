@@ -5,6 +5,81 @@ import promising
 # ── Argument Errors at Call-Time ─────────────────────────────────
 
 
+async def test_plain_async_raises_arg_error_at_call_time() -> None:
+    """
+    Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    a plain async function with required arguments raises TypeError
+    immediately at call-time when called with wrong arguments.
+    This is standard Python behavior — no decorators involved.
+    """
+
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    assert await add(1, 2) == 3
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error happens at call-time
+
+
+@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+async def test_context_alone_raises_arg_error_at_call_time(
+    with_parens: bool,
+) -> None:
+    """
+    Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    @promising.context alone on an async function that requires arguments
+    should raise TypeError immediately at call-time when called with
+    wrong arguments (not defer it to await-time).
+    """
+    context_decorator = promising.context() if with_parens else promising.context
+
+    @context_decorator
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    assert await add(1, 2) == 3
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
+
+
+@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
+    with_parens: bool,
+) -> None:
+    """
+    Baseline for test_context_on_top_of_sync_function_raises_arg_error_at_call_time:
+    @promising.context alone on a sync function that requires arguments should
+    raise TypeError immediately at call-time when called with wrong arguments.
+
+    Unlike test_context_on_top_of_sync_function_raises_arg_error_at_call_time,
+    there is no @promising.function here, so the function remains truly
+    synchronous — no deferral concern.
+    """
+    context_decorator = promising.context() if with_parens else promising.context
+
+    @context_decorator
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    # Unlike `@promising.function`, `@promising.context` does not convert
+    # functions (either sync or async) into Promising Functions, it only wraps
+    # the code in a PromisingContext manager, which in this case means the
+    # function remains synchronous
+    assert add(1, 2) == 3
+
+    with pytest.raises(TypeError):
+        add()  # the error should happen at call-time
+
+
+# ── Unusual Decorator Stacking ──────────────────────────────────
+#
+# The combinations below are not realistic usage patterns, but they
+# stress-test the framework's robustness by verifying that call-time
+# error semantics are preserved even under unconventional stacking.
+
+
 @pytest.mark.parametrize("use_thread_pool", [True, False])
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 @pytest.mark.parametrize("function_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
@@ -76,143 +151,6 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
     # Calling with missing required arguments should raise immediately
     with pytest.raises(TypeError):
         add()  # no await — the error should happen at call-time
-
-
-@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_context_alone_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
-    """
-    Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
-    @promising.context alone on an async function that requires arguments
-    should raise TypeError immediately at call-time when called with
-    wrong arguments (not defer it to await-time).
-    """
-    context_decorator = promising.context() if with_parens else promising.context
-
-    @context_decorator
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    assert await add(1, 2) == 3
-
-    with pytest.raises(TypeError):
-        add()  # no await — the error should happen at call-time
-
-
-async def test_plain_async_raises_arg_error_at_call_time() -> None:
-    """
-    Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
-    a plain async function with required arguments raises TypeError
-    immediately at call-time when called with wrong arguments.
-    This is standard Python behavior — no decorators involved.
-    """
-
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    assert await add(1, 2) == 3
-
-    with pytest.raises(TypeError):
-        add()  # no await — the error happens at call-time
-
-
-# ── Sync Counterparts for Argument-Error-at-Call-Time Tests ──────
-
-
-@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
-async def test_context_on_top_of_sync_function_accepts_use_thread_pool_at_call_time(
-    context_with_parens: bool,
-) -> None:
-    """
-    Sync counterpart of test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time.
-
-    For sync functions, ``use_thread_pool`` is a valid call-time override — unlike
-    async functions, where any ``use_thread_pool`` value raises DecorationError.
-    However, passing ``use_thread_pool=None`` at call-time is still an error
-    because it attempts to unset the required thread-pool setting.
-
-    This test verifies the error is raised immediately at call-time even when
-    @promising.context is stacked on top.
-    """
-    context_decorator = promising.context() if context_with_parens else promising.context
-
-    @context_decorator
-    @promising.function(use_thread_pool=True)
-    def add(a: int, b: int) -> int:
-        return a + b
-
-    ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
-    assert await ground_truth == 3
-
-    # use_thread_pool=None tries to unset the thread-pool setting, which is not allowed
-    with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
-        add(1, 2, use_thread_pool=None)
-
-
-@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
-async def test_context_on_top_of_sync_function_raises_arg_error_at_call_time(
-    context_with_parens: bool,
-) -> None:
-    """
-    Sync counterpart of test_context_on_top_of_function_raises_arg_error_at_call_time.
-
-    When @promising.context is stacked on top of @promising.function on a sync
-    function, calling with wrong arguments should raise TypeError immediately at
-    call-time — even though @promising.function turns the sync function into a
-    Promise-returning one.
-    """
-    context_decorator = promising.context() if context_with_parens else promising.context
-
-    @context_decorator
-    @promising.function(use_thread_pool=True)
-    def add(a: int, b: int) -> int:
-        return a + b
-
-    ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
-    assert await ground_truth == 3
-
-    # Calling with missing required arguments should raise immediately
-    with pytest.raises(TypeError):
-        add()  # the error should happen at call-time
-
-
-@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
-    """
-    Baseline for test_context_on_top_of_sync_function_raises_arg_error_at_call_time:
-    @promising.context alone on a sync function that requires arguments should
-    raise TypeError immediately at call-time when called with wrong arguments.
-
-    Unlike test_context_on_top_of_sync_function_raises_arg_error_at_call_time,
-    there is no @promising.function here, so the function remains truly
-    synchronous — no deferral concern.
-    """
-    context_decorator = promising.context() if with_parens else promising.context
-
-    @context_decorator
-    def add(a: int, b: int) -> int:
-        return a + b
-
-    # Unlike `@promising.function`, `@promising.context` does not convert
-    # functions (either sync or async) into Promising Functions, it only wraps
-    # the code in a PromisingContext manager, which in this case means the
-    # function remains synchronous
-    assert add(1, 2) == 3
-
-    with pytest.raises(TypeError):
-        add()  # the error should happen at call-time
-
-
-# ── Unusual Decorator Stacking ──────────────────────────────────
-#
-# The combinations below are not realistic usage patterns, but they
-# stress-test the framework's robustness by verifying that call-time
-# error semantics are preserved even under unconventional stacking.
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
@@ -341,3 +279,65 @@ async def test_function_on_top_of_context_raises_arg_error_at_call_time(
 
     with pytest.raises(TypeError):
         add()  # no await — the error should happen at call-time
+
+
+# ── Sync Counterparts for Argument-Error-at-Call-Time Tests ──────
+
+
+@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+async def test_context_on_top_of_sync_function_accepts_use_thread_pool_at_call_time(
+    context_with_parens: bool,
+) -> None:
+    """
+    Sync counterpart of test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time.
+
+    For sync functions, ``use_thread_pool`` is a valid call-time override — unlike
+    async functions, where any ``use_thread_pool`` value raises DecorationError.
+    However, passing ``use_thread_pool=None`` at call-time is still an error
+    because it attempts to unset the required thread-pool setting.
+
+    This test verifies the error is raised immediately at call-time even when
+    @promising.context is stacked on top.
+    """
+    context_decorator = promising.context() if context_with_parens else promising.context
+
+    @context_decorator
+    @promising.function(use_thread_pool=True)
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    # use_thread_pool=None tries to unset the thread-pool setting, which is not allowed
+    with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
+        add(1, 2, use_thread_pool=None)
+
+
+@pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+async def test_context_on_top_of_sync_function_raises_arg_error_at_call_time(
+    context_with_parens: bool,
+) -> None:
+    """
+    Sync counterpart of test_context_on_top_of_function_raises_arg_error_at_call_time.
+
+    When @promising.context is stacked on top of @promising.function on a sync
+    function, calling with wrong arguments should raise TypeError immediately at
+    call-time — even though @promising.function turns the sync function into a
+    Promise-returning one.
+    """
+    context_decorator = promising.context() if context_with_parens else promising.context
+
+    @context_decorator
+    @promising.function(use_thread_pool=True)
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    # Calling with missing required arguments should raise immediately
+    with pytest.raises(TypeError):
+        add()  # the error should happen at call-time

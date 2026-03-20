@@ -537,34 +537,6 @@ async def test_decorator_with_explicit_parent(parent) -> None:
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_context_on_top_of_function_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
-    """
-    When @promising.context is stacked on top of @promising.function,
-    calling the decorated function with wrong arguments should raise
-    TypeError immediately at call-time, not defer it to await-time.
-
-    Currently, @promising.context defers the inner call into the coroutine
-    body (_async_wrapper), which delays argument validation errors until
-    the coroutine is awaited.  This test is expected to fail until the
-    bug is fixed.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
-    """
-    context_decorator = promising.context() if with_parens else promising.context
-
-    @context_decorator
-    @promising.function
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    # Calling with missing required arguments should raise immediately
-    with pytest.raises(TypeError):
-        add()  # no await — the error should happen at call-time
-
-
-@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
 async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time(
     with_parens: bool,
 ) -> None:
@@ -591,6 +563,34 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
     # Passing use_thread_pool at call time on an async function should raise immediately
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
         add(1, 2, use_thread_pool=True)  # no await — the error should happen at call-time
+
+
+@pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
+async def test_context_on_top_of_function_raises_arg_error_at_call_time(
+    with_parens: bool,
+) -> None:
+    """
+    When @promising.context is stacked on top of @promising.function,
+    calling the decorated function with wrong arguments should raise
+    TypeError immediately at call-time, not defer it to await-time.
+
+    Currently, @promising.context defers the inner call into the coroutine
+    body (_async_wrapper), which delays argument validation errors until
+    the coroutine is awaited.  This test is expected to fail until the
+    bug is fixed.
+
+    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
+    """
+    context_decorator = promising.context() if with_parens else promising.context
+
+    @context_decorator
+    @promising.function
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    # Calling with missing required arguments should raise immediately
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])

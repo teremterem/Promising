@@ -646,13 +646,13 @@ async def test_context_on_top_of_sync_function_accepts_use_thread_pool_at_call_t
     """
     Sync counterpart of test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time.
 
-    For sync functions, ``use_thread_pool`` is valid at call-time (it overrides
-    the decoration-time setting). When @promising.context is stacked on top of
-    @promising.function on a sync function, passing use_thread_pool at call-time
-    should NOT raise — unlike the async case which raises DecorationError.
+    For sync functions, ``use_thread_pool`` is a valid call-time override — unlike
+    async functions, where any ``use_thread_pool`` value raises DecorationError.
+    However, passing ``use_thread_pool=None`` at call-time is still an error
+    because it attempts to unset the required thread-pool setting.
 
-    The sync path in @promising.context calls the inner function directly (not
-    deferred into a coroutine body), so no deferral issue exists.
+    This test verifies the error is raised immediately at call-time even when
+    @promising.context is stacked on top.
     """
     context_decorator = promising.context() if context_with_parens else promising.context
 
@@ -665,7 +665,7 @@ async def test_context_on_top_of_sync_function_accepts_use_thread_pool_at_call_t
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
-    # For sync functions, use_thread_pool CAN be passed at call-time — no error
+    # use_thread_pool=None tries to unset the thread-pool setting, which is not allowed
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
         add(1, 2, use_thread_pool=None)
 
@@ -678,12 +678,9 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_call_time(
     Sync counterpart of test_context_on_top_of_function_raises_arg_error_at_call_time.
 
     When @promising.context is stacked on top of @promising.function on a sync
-    function, calling with wrong arguments raises TypeError immediately at
-    call-time.
-
-    The sync path in @promising.context calls the inner function directly (not
-    deferred into a coroutine body), so argument validation happens at call-time
-    rather than being deferred.
+    function, calling with wrong arguments should raise TypeError immediately at
+    call-time — even though @promising.function turns the sync function into a
+    Promise-returning one.
     """
     context_decorator = promising.context() if context_with_parens else promising.context
 
@@ -707,8 +704,9 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
     @promising.context alone on a sync function that requires arguments should
     raise TypeError immediately at call-time when called with wrong arguments.
 
-    The sync path in @promising.context calls the inner function directly, so
-    argument validation happens immediately — no deferral.
+    Unlike test_context_on_top_of_sync_function_raises_arg_error_at_call_time,
+    there is no @promising.function here, so the function remains truly
+    synchronous — no deferral concern.
     """
     context_decorator = promising.context() if with_parens else promising.context
 
@@ -717,9 +715,9 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
         return a + b
 
     # Unlike `@promising.function`, `@promising.context` does not convert
-    # functions (either sync or async) into PromiseFunctions, it only wraps the
-    # code in a PromisingContext manager. The contract of the function remains
-    # the same - which, in this case, means synchronous.
+    # functions (either sync or async) into Promising Functions, it only wraps
+    # the code in a PromisingContext manager, which in this case means the
+    # function remains synchronous
     assert add(1, 2) == 3
 
     with pytest.raises(TypeError):

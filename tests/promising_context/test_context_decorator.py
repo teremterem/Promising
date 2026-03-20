@@ -489,61 +489,6 @@ async def test_context_on_top_of_classmethod_with_args() -> None:
     assert await MyClass().my_method(7, prefix=">>") == ">>MyClass:7"
 
 
-async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> None:
-    """
-    When @promising.context is stacked on top of @promising.function,
-    calling the decorated function with wrong arguments should raise
-    TypeError immediately at call-time, not defer it to await-time.
-
-    Currently, @promising.context defers the inner call into the coroutine
-    body (_async_wrapper), which delays argument validation errors until
-    the coroutine is awaited.  This test is expected to fail until the
-    bug is fixed.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
-    """
-
-    @promising.context
-    @promising.function
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    # Calling with missing required arguments should raise immediately
-    with pytest.raises(TypeError):
-        add()  # no await — the error should happen at call-time
-
-
-async def test_plain_async_raises_arg_error_at_call_time() -> None:
-    """
-    Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
-    a plain async function with required arguments raises TypeError
-    immediately at call-time when called with wrong arguments.
-    This is standard Python behavior — no decorators involved.
-    """
-
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    with pytest.raises(TypeError):
-        add()  # no await — the error happens at call-time
-
-
-async def test_context_alone_raises_arg_error_at_call_time() -> None:
-    """
-    Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
-    @promising.context alone on an async function that requires arguments
-    should raise TypeError immediately at call-time when called with
-    wrong arguments (not defer it to await-time).
-    """
-
-    @promising.context
-    async def add(a: int, b: int) -> int:
-        return a + b
-
-    with pytest.raises(TypeError):
-        add()  # no await — the error should happen at call-time
-
-
 async def test_context_with_parens_on_top_of_staticmethod() -> None:
     class MyClass:
         @promising.context()
@@ -586,3 +531,58 @@ async def test_decorator_with_explicit_parent(parent) -> None:
             assert returned_parent_ctx is None
         else:
             assert returned_parent_ctx is parent_ctx
+
+
+async def test_context_on_top_of_function_raises_arg_error_at_call_time() -> None:
+    """
+    When @promising.context is stacked on top of @promising.function,
+    calling the decorated function with wrong arguments should raise
+    TypeError immediately at call-time, not defer it to await-time.
+
+    Currently, @promising.context defers the inner call into the coroutine
+    body (_async_wrapper), which delays argument validation errors until
+    the coroutine is awaited.  This test is expected to fail until the
+    bug is fixed.
+
+    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
+    """
+
+    @promising.context
+    @promising.function
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    # Calling with missing required arguments should raise immediately
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
+
+
+async def test_context_alone_raises_arg_error_at_call_time() -> None:
+    """
+    Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    @promising.context alone on an async function that requires arguments
+    should raise TypeError immediately at call-time when called with
+    wrong arguments (not defer it to await-time).
+    """
+
+    @promising.context
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
+
+
+async def test_plain_async_raises_arg_error_at_call_time() -> None:
+    """
+    Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
+    a plain async function with required arguments raises TypeError
+    immediately at call-time when called with wrong arguments.
+    This is standard Python behavior — no decorators involved.
+    """
+
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error happens at call-time

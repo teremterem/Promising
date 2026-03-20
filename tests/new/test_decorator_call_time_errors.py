@@ -206,3 +206,138 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
 
     with pytest.raises(TypeError):
         add()  # the error should happen at call-time
+
+
+# ── Unusual Decorator Stacking ──────────────────────────────────
+#
+# The combinations below are not realistic usage patterns, but they
+# stress-test the framework's robustness by verifying that call-time
+# error semantics are preserved even under unconventional stacking.
+
+
+@pytest.mark.parametrize("use_thread_pool", [True, False])
+@pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
+@pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
+async def test_function_on_top_of_function_raises_use_thread_pool_error_at_call_time(
+    inner_with_parens: bool,
+    outer_with_parens: bool,
+    use_thread_pool: bool,
+) -> None:
+    """
+    When @promising.function is stacked directly on top of another
+    @promising.function — an unusual combination that is not a realistic
+    usage pattern — passing use_thread_pool at call time on an async
+    function should still raise DecorationError immediately at call-time.
+
+    This tests the robustness of call-time validation even under
+    unconventional decorator stacking.
+    """
+    outer_decorator = promising.function() if outer_with_parens else promising.function
+    inner_decorator = promising.function() if inner_with_parens else promising.function
+
+    @outer_decorator
+    @inner_decorator
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
+        add(1, 2, use_thread_pool=use_thread_pool)
+
+
+@pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
+@pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
+async def test_function_on_top_of_function_raises_arg_error_at_call_time(
+    inner_with_parens: bool,
+    outer_with_parens: bool,
+) -> None:
+    """
+    When @promising.function is stacked directly on top of another
+    @promising.function — an unusual combination that is not a realistic
+    usage pattern — calling with wrong arguments should still raise
+    TypeError immediately at call-time.
+
+    This tests the robustness of call-time argument validation even
+    under unconventional decorator stacking.
+    """
+    outer_decorator = promising.function() if outer_with_parens else promising.function
+    inner_decorator = promising.function() if inner_with_parens else promising.function
+
+    @outer_decorator
+    @inner_decorator
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time
+
+
+@pytest.mark.parametrize("use_thread_pool", [True, False])
+@pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
+@pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+async def test_function_on_top_of_context_raises_use_thread_pool_error_at_call_time(
+    ctx_with_parens: bool,
+    func_with_parens: bool,
+    use_thread_pool: bool,
+) -> None:
+    """
+    When @promising.function is stacked on top of @promising.context —
+    an unusual combination that is not a realistic usage pattern —
+    passing use_thread_pool at call time on an async function should
+    still raise DecorationError immediately at call-time.
+
+    This tests the robustness of call-time validation even under
+    unconventional decorator stacking.
+    """
+    func_decorator = promising.function() if func_with_parens else promising.function
+    ctx_decorator = promising.context() if ctx_with_parens else promising.context
+
+    @func_decorator
+    @ctx_decorator
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
+        add(1, 2, use_thread_pool=use_thread_pool)
+
+
+@pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
+@pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
+async def test_function_on_top_of_context_raises_arg_error_at_call_time(
+    ctx_with_parens: bool,
+    func_with_parens: bool,
+) -> None:
+    """
+    When @promising.function is stacked on top of @promising.context —
+    an unusual combination that is not a realistic usage pattern —
+    calling with wrong arguments should still raise TypeError immediately
+    at call-time.
+
+    This tests the robustness of call-time argument validation even
+    under unconventional decorator stacking.
+    """
+    func_decorator = promising.function() if func_with_parens else promising.function
+    ctx_decorator = promising.context() if ctx_with_parens else promising.context
+
+    @func_decorator
+    @ctx_decorator
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    ground_truth = add(1, 2)
+    assert isinstance(ground_truth, promising.Promise)
+    assert await ground_truth == 3
+
+    with pytest.raises(TypeError):
+        add()  # no await — the error should happen at call-time

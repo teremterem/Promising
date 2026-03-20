@@ -93,10 +93,6 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
 
 
 # ── Unusual Decorator Stacking ──────────────────────────────────
-#
-# The combinations below are not realistic usage patterns, but they
-# stress-test the framework's robustness by verifying that call-time
-# error semantics are preserved even under unconventional stacking.
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
@@ -187,9 +183,6 @@ async def test_function_on_top_of_function_raises_use_thread_pool_error_at_call_
     @promising.function — an unusual combination that is not a realistic
     usage pattern — passing use_thread_pool at call time on an async
     function should still raise DecorationError immediately at call-time.
-
-    This tests the robustness of call-time validation even under
-    unconventional decorator stacking.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
     inner_decorator = promising.function() if inner_with_parens else promising.function
@@ -218,9 +211,6 @@ async def test_function_on_top_of_function_raises_arg_error_at_call_time(
     @promising.function — an unusual combination that is not a realistic
     usage pattern — calling with wrong arguments should still raise
     TypeError immediately at call-time.
-
-    This tests the robustness of call-time argument validation even
-    under unconventional decorator stacking.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
     inner_decorator = promising.function() if inner_with_parens else promising.function
@@ -251,9 +241,6 @@ async def test_function_on_top_of_context_raises_use_thread_pool_error_at_call_t
     an unusual combination that is not a realistic usage pattern —
     passing use_thread_pool at call time on an async function should
     still raise DecorationError immediately at call-time.
-
-    This tests the robustness of call-time validation even under
-    unconventional decorator stacking.
     """
     func_decorator = promising.function() if func_with_parens else promising.function
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
@@ -282,9 +269,6 @@ async def test_function_on_top_of_context_raises_arg_error_at_call_time(
     an unusual combination that is not a realistic usage pattern —
     calling with wrong arguments should still raise TypeError immediately
     at call-time.
-
-    This tests the robustness of call-time argument validation even
-    under unconventional decorator stacking.
     """
     func_decorator = promising.function() if func_with_parens else promising.function
     ctx_decorator = promising.context() if ctx_with_parens else promising.context

@@ -10,6 +10,10 @@ potentially far from the actual mistake — making debugging significantly harde
 even despite the availability of the ``exc.__promising_context__.print_trace()``
 feature.
 
+Many of the scenarios here (unusual decorator stacking, double-decoration, etc.)
+are **not realistic usage patterns** — they exist solely to stress-test the
+robustness of the framework under extreme edge cases.
+
 Covers three categories:
 
 1. **Baselines** — plain functions, ``@promising.context``-only, and

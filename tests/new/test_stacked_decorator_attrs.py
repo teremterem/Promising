@@ -67,13 +67,13 @@ async def test_double_function_decorator_attrs_stay_independent() -> None:
     #    original function through both layers --------------------------------
 
     assert add.__name__ == "add"
-    assert add.__qualname__.endswith("test_double_function_decorator_attrs_stay_independent.<locals>.add")
+    assert add.__qualname__ == "test_double_function_decorator_attrs_stay_independent.<locals>.add"
     assert add.__doc__ == "Add two numbers."
     assert add.__module__ == __name__
     assert add.__annotations__ == {"a": int, "b": int, "return": int}
 
     assert inner.__name__ == "add"
-    assert inner.__qualname__.endswith("test_double_function_decorator_attrs_stay_independent.<locals>.add")
+    assert inner.__qualname__ == "test_double_function_decorator_attrs_stay_independent.<locals>.add"
     assert inner.__doc__ == "Add two numbers."
     assert inner.__module__ == __name__
     assert inner.__annotations__ == {"a": int, "b": int, "return": int}
@@ -132,13 +132,13 @@ async def test_double_context_decorator_attrs_stay_independent() -> None:
     #    original function through both layers --------------------------------
 
     assert add.__name__ == "add"
-    assert add.__qualname__.endswith("test_double_context_decorator_attrs_stay_independent.<locals>.add")
+    assert add.__qualname__ == "test_double_context_decorator_attrs_stay_independent.<locals>.add"
     assert add.__doc__ == "Add two numbers."
     assert add.__module__ == __name__
     assert add.__annotations__ == {"a": int, "b": int, "return": int}
 
     assert inner.__name__ == "add"
-    assert inner.__qualname__.endswith("test_double_context_decorator_attrs_stay_independent.<locals>.add")
+    assert inner.__qualname__ == "test_double_context_decorator_attrs_stay_independent.<locals>.add"
     assert inner.__doc__ == "Add two numbers."
     assert inner.__module__ == __name__
     assert inner.__annotations__ == {"a": int, "b": int, "return": int}

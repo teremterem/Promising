@@ -109,26 +109,22 @@ class DecoratorSupport:
                 f"classmethod, but `{type(func_or_method)}` was given instead"
             )
 
-        # Backup `namespace` value just in case before calling
-        # `functools.update_wrapper()`
-        namespace_backup = self.namespace
-
-        # Set `self.__wrapped__` to equal `func_or_method` as well as other
-        # implicit attributes using `functools`.
-        # NOTE: `functools.update_wrapper()` copies `func_or_method.__dict__`
-        # onto `self.__dict__`, so all the other attribute assignments for this
-        # instance must come *after* `update_wrapper()` to guarantee the
-        # correct value.
-        functools.update_wrapper(self, func_or_method)
-        self._is_wrapped_async = is_func_or_method_async(func_or_method)
-
-        # Update `namespace` to the fully-qualified name of `func_or_method`
-        # (provided it was not already set via the `namespace` decorator
-        # parameter)
         self.namespace = resolve_namespace(
-            provided_explicitly=namespace_backup,
+            provided_explicitly=self.namespace,
             named_object_fallback=func_or_method,
         )
+        self._is_wrapped_async = is_func_or_method_async(func_or_method)
+
+        # Copy standard wrapper attributes (`__module__`, `__name__`,
+        # `__qualname__`, `__doc__`, `__annotations__`) from
+        # `func_or_method` onto `self` and set `self.__wrapped__` to
+        # `func_or_method`, using `functools.update_wrapper`.
+        # NOTE: We pass `updated=()` to skip the default
+        # `self.__dict__.update(func_or_method.__dict__)` step. Without
+        # this, any matching attribute names in `func_or_method.__dict__`
+        # would silently overwrite instance attributes that were already
+        # set on `self` (e.g. `namespace`, `children_start_soon`, etc.).
+        functools.update_wrapper(self, func_or_method, updated=())
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:
         """

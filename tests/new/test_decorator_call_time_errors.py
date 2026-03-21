@@ -1,18 +1,23 @@
 """
-Tests that errors from incorrect call-time arguments (missing args, wrong types,
-invalid ``use_thread_pool`` on async functions) are raised immediately at call-time
+Tests for decorator stacking edge cases: call-time error semantics and
+attribute independence under unusual decorator combinations.
+
+Many of the scenarios here (double-decoration, unconventional stacking order,
+etc.) are **not realistic usage patterns** — they exist solely to stress-test
+the robustness of the framework under extreme edge cases.
+
+**Part 1 — Call-time errors**
+
+Errors from incorrect call-time arguments (missing args, wrong types, invalid
+``use_thread_pool`` on async functions) must be raised immediately at call-time
 rather than being deferred to await-time.
 
-**Why this matters:** an error surfaced at the call site points the developer
+*Why this matters:* an error surfaced at the call site points the developer
 straight to the offending line.  If the same error is deferred to await-time,
 the traceback originates from wherever the coroutine happens to be awaited —
 potentially far from the actual mistake — making debugging significantly harder,
 even despite the availability of the ``exc.__promising_context__.print_trace()``
 feature.
-
-Many of the scenarios here (unusual decorator stacking, double-decoration, etc.)
-are **not realistic usage patterns** — they exist solely to stress-test the
-robustness of the framework under extreme edge cases.
 
 Covers three categories:
 
@@ -22,11 +27,22 @@ Covers three categories:
 2. **Unusual decorator stacking** — unconventional combinations like
    ``@promising.context`` on top of ``@promising.function``, double
    ``@promising.function``, ``@promising.function`` on top of
-   ``@promising.context``, and double ``@promising.context``. These stress-test
-   that call-time error semantics survive even under non-standard stacking.
+   ``@promising.context``, and double ``@promising.context``.
 3. **Sync counterparts** — the same stacking scenarios applied to sync functions,
    verifying that ``use_thread_pool`` validation and argument errors surface at
    call-time.
+
+**Part 2 — Attribute independence under double-decoration**
+
+Stacking two identical decorators (``@promising.function`` on top of
+``@promising.function``, or ``@promising.context`` on top of
+``@promising.context``) must preserve each layer's attributes independently,
+while still propagating standard ``functools.update_wrapper`` attributes
+(``__name__``, ``__qualname__``, ``__doc__``, ``__module__``,
+``__annotations__``) from the original function through both layers.
+
+Reproduces the clobbering bug described in
+https://github.com/teremterem/Promising/issues/77.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -635,23 +651,7 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
         add()  # the error should happen at call-time
 
 
-"""
-Tests that stacking two identical decorators (``@promising.function`` on top of
-``@promising.function``, or ``@promising.context`` on top of
-``@promising.context``) preserves each layer's attributes independently, while
-still propagating standard ``functools.update_wrapper`` attributes
-(``__name__``, ``__qualname__``, ``__doc__``, ``__module__``,
-``__annotations__``) from the original function through both layers.
-
-Reproduces the clobbering bug described in
-https://github.com/teremterem/Promising/issues/77 — ``functools.update_wrapper``
-copies ``func_or_method.__dict__`` onto the outer decorator instance, silently
-overwriting attributes that were already set during ``__init__``.
-"""
-
-# ---------------------------------------------------------------------------
-# @promising.function stacked twice
-# ---------------------------------------------------------------------------
+# ── Attribute Independence Under Double-Decoration ─────────────
 
 
 async def test_double_function_decorator_attrs_stay_independent() -> None:
@@ -712,11 +712,6 @@ async def test_double_function_decorator_attrs_stay_independent() -> None:
     result = add(1, 2)
     assert isinstance(result, promising.Promise)
     assert await result == 3
-
-
-# ---------------------------------------------------------------------------
-# @promising.context stacked twice
-# ---------------------------------------------------------------------------
 
 
 async def test_double_context_decorator_attrs_stay_independent() -> None:

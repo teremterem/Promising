@@ -14,8 +14,6 @@ overwriting attributes that were already set during ``__init__``.
 
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 import promising
 from promising.sentinels import INHERIT
 
@@ -24,7 +22,6 @@ from promising.sentinels import INHERIT
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
 async def test_double_function_decorator_attrs_stay_independent() -> None:
     """Outer @promising.function attributes must not be clobbered by inner."""
     outer_pool = ThreadPoolExecutor(max_workers=1)
@@ -90,7 +87,6 @@ async def test_double_function_decorator_attrs_stay_independent() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
 async def test_double_context_decorator_attrs_stay_independent() -> None:
     """Outer @promising.context attributes must not be clobbered by inner."""
     outer_pool = ThreadPoolExecutor(max_workers=1)

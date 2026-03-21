@@ -40,9 +40,6 @@ Stacking two identical decorators (``@promising.function`` on top of
 while still propagating standard ``functools.update_wrapper`` attributes
 (``__name__``, ``__qualname__``, ``__doc__``, ``__module__``,
 ``__annotations__``) from the original function through both layers.
-
-Reproduces the clobbering bug described in
-https://github.com/teremterem/Promising/issues/77.
 """
 
 from concurrent.futures import ThreadPoolExecutor

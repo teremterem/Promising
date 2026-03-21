@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import contextvars
 import functools
@@ -157,6 +158,10 @@ def function(
 class PromisingFunction(DecoratorSupport, Generic[T_co]):
     """Callable wrapper created by ``@promising.function``. See
     :func:`promising.function` for usage details."""
+
+    # A magic marker for `asyncio.iscoroutinefunction()` to recognize objects
+    # of this class as coroutine functions
+    _is_coroutine = asyncio.coroutines._is_coroutine
 
     def __init__(
         self,

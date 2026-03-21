@@ -11,9 +11,13 @@ from promising.types import CallableType, DecoratableFunctionType
 
 
 def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
+    # We use `iscoroutinefunction()` from `asyncio` rather than `inspect`
+    # because asyncio's version also checks for the `_is_coroutine` marker,
+    # which allows it to recognize objects like `PromisingFunction` as
+    # coroutine functions
     if isinstance(func_or_method, (classmethod, staticmethod)):
-        return inspect.iscoroutinefunction(func_or_method.__func__)
-    return inspect.iscoroutinefunction(func_or_method)
+        return asyncio.iscoroutinefunction(func_or_method.__func__)
+    return asyncio.iscoroutinefunction(func_or_method)
 
 
 def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:

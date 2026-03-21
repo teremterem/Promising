@@ -180,6 +180,8 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             if parent is INHERIT:
                 parent = PromisingContext.get_active_context(raise_if_none=False)
 
+            wrapped_coro = self._wrapped_as_callable(*args, **kwargs)
+
             @functools.wraps(self.__wrapped__)
             async def _async_wrapper() -> Any:
                 ctx = PromisingContext(
@@ -191,7 +193,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
                     start_soon_default=self.start_soon_default,
                 )
                 with ctx:
-                    return await self._wrapped_as_callable(*args, **kwargs)
+                    return await wrapped_coro
 
             return _async_wrapper()
 

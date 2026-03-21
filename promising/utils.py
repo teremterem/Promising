@@ -118,6 +118,10 @@ class DecoratorSupport:
             named_object_fallback=func_or_method,
         )
         self._is_wrapped_async = is_func_or_method_async(func_or_method)
+        if self._is_wrapped_async:
+            # A magic marker for `asyncio.iscoroutinefunction()` to recognize
+            # the decorator instance itself as a coroutine function too
+            self._is_coroutine = asyncio.coroutines._is_coroutine
 
         # Copy standard wrapper attributes (`__module__`, `__name__`,
         # `__qualname__`, `__doc__`, `__annotations__`) from

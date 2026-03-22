@@ -503,8 +503,11 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
 | `ctx.await_children(recursively=True)` | Async — wait for child contexts to finish. |
 | `ctx.await_children_sync(recursively=True, timeout=None)` | Sync — block until child contexts finish. |
-| `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
+| `ctx.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
+| `ctx.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from this context up to the root (or, rather, root down to this context when `parents_first=True`). |
+| `ctx.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
+| `ctx.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 
 ### Top-Level Convenience Functions
 
@@ -514,6 +517,10 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
 | `promising.await_children(recursively=True)` | Wait for all children of the current context. |
 | `promising.await_children_sync(recursively=True, timeout=None)` | Sync counterpart — block until children finish. |
+| `promising.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts of the active context that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
+| `promising.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from the active context up to the root (or, rather, root down to the active context when `parents_first=True`). |
+| `promising.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
+| `promising.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 

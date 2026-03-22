@@ -49,7 +49,7 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 ### PromisingContext (`promising/promising_context.py`)
 
-The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `thread_pool`), and child-waiting (`await_children` / `await_children_sync`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `thread_pool`), child-waiting (`await_children` / `await_children_sync`), child inspection (`collect_remaining_children`), and trace/debugging (`get_trace`, `format_trace`, `print_trace`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
 
 This file also contains the `context` class — a context manager / decorator that creates a `PromisingContext` without producing a `Promise`. It implements the descriptor protocol (via `DecoratorSupport`) for use as a method decorator.
 

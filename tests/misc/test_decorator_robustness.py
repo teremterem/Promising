@@ -124,23 +124,6 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
         add()
 
 
-def test_plain_sync_raises_arg_error_at_call_time() -> None:
-    """
-    Baseline: a plain sync function with required arguments raises TypeError
-    immediately at call-time when called with wrong arguments. This is standard
-    Python behavior — no decorators involved. This test exists purely for
-    demonstration purposes.
-    """
-
-    def add(a: int, b: int) -> int:
-        return a + b
-
-    assert add(1, 2) == 3
-
-    with pytest.raises(TypeError, match="required positional argument"):
-        add()
-
-
 @pytest.mark.parametrize("use_thread_pool", [True, False])
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
 async def test_function_alone_raises_use_thread_pool_error_at_call_time(

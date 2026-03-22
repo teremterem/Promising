@@ -622,7 +622,7 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
-async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
+async def test_function_on_top_of_context_on_sync_raises_arg_error_at_await_time(
     ctx_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -630,8 +630,9 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     Sync counterpart of test_function_on_top_of_context_raises_arg_error_at_call_time.
 
     When @promising.function is stacked on top of @promising.context on a sync
-    function, calling with wrong arguments should raise TypeError immediately
-    at call-time.
+    function, argument errors behave differently than with async functions:
+    there is no separation between coroutine creation and awaiting — everything
+    runs in the thread pool at once, so errors surface only at await-time.
     """
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
 
@@ -644,10 +645,6 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
-    # Unlike async functions, a decorated sync function has no separation
-    # between coroutine creation and awaiting — everything runs in the thread
-    # pool at once, so argument errors surface only when the promise is
-    # awaited, not at call-time
     add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
         await add_promise

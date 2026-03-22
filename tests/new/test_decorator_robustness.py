@@ -564,9 +564,12 @@ async def test_function_on_top_of_function_on_sync_raises_use_thread_pool_error_
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
-    add_promise = add(1, 2, use_thread_pool=None)
-    with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
-        await add_promise
+    # This will not raise DecorationError at all because `use_thread_pool=None`
+    # is consumed at call-time by the outer `@promising.function` decorator. As
+    # far as the outer decorator is concerned, the function being wrapped is
+    # async - the inner promising function decorator turns the sync function
+    # into an async function.
+    await add(1, 2, use_thread_pool=None)
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
@@ -626,9 +629,8 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
-    add_promise = add(1, 2, use_thread_pool=None)
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
-        await add_promise
+        add(1, 2, use_thread_pool=None)
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])

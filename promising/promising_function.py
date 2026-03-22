@@ -58,19 +58,17 @@ def function(
 
     - **Consuming other promises from sync functions:** sync decorated
       functions run in a thread pool and can call ``.sync()`` on other
-      ``Promise`` objects to block until their result is available.
-      Async decorated functions simply ``await`` other promises as usual.
-    - **Waiting for child promises:** call
-      ``await promising.await_children()`` (or
-      ``promising.await_children_sync()`` from sync functions) to wait
-      for all child promises spawned during the current function's
-      execution. The same methods are available directly on the
-      ``Promise`` object as well.
-    - **Grouping children:** use ``promising.context`` (as a context
-      manager or decorator) to create lightweight grouping nodes in
-      the promise hierarchy without creating a full ``Promise``. This
-      is useful for overriding settings for a block of code or for
-      selectively awaiting a subset of children.
+      ``Promise`` objects to block until their result is available. Async
+      decorated functions simply ``await`` other promises as usual.
+    - **Waiting for child promises:** call ``await promising.await_children()``
+      (or ``promising.await_children_sync()`` from sync functions) to wait for
+      all child promises spawned during the current function's execution. The
+      same methods are available directly on the ``Promise`` object as well.
+    - **Grouping children:** use ``promising.context`` (as a context manager or
+      decorator) to create lightweight grouping nodes in the promise hierarchy
+      without creating a full ``Promise``. This is useful for overriding
+      settings for a block of code or for selectively awaiting a subset of
+      children.
 
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
@@ -100,25 +98,22 @@ def function(
             setting, falling back to ``Defaults.STRICT_EVENT_LOOP_CHECK`` (the
             global default) at the root. ``PROMISING_DEFAULT`` reads the global
             default directly.
-        thread_pool: Thread pool executor used to run sync
-            promising functions. ``INHERIT`` (default) inherits from
-            the parent context, falling back to ``PROMISING_DEFAULT``
-            at the root. ``PROMISING_DEFAULT`` uses
-            ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT``
-            passes ``None`` to ``run_in_executor``, letting the
-            event loop use its own default executor. A concrete
-            ``ThreadPoolExecutor`` instance can also be provided.
-            Only relevant for sync functions — async functions
-            always run on the event loop regardless.
+        thread_pool: Thread pool executor used to run sync promising functions.
+            ``INHERIT`` (default) inherits from the parent context, falling
+            back to ``PROMISING_DEFAULT`` at the root. ``PROMISING_DEFAULT``
+            uses ``Defaults.PROMISING_THREAD_POOL``. ``ASYNCIO_DEFAULT`` passes
+            ``None`` to ``run_in_executor``, letting the event loop use its own
+            default executor. A concrete ``ThreadPoolExecutor`` instance can
+            also be provided. Only relevant for sync functions — async
+            functions always run on the event loop regardless.
         use_thread_pool: Whether to run the sync function in a thread pool
-            executor. ``True`` (recommended for most cases) runs the
-            function in a thread pool so CPU-heavy workloads don't block
-            the event loop thread. ``False`` runs the sync function
-            directly on the event loop thread. **Warning:** when
-            ``use_thread_pool=False``, calling ``sync()`` or
-            ``await_children_sync()`` from within the function will raise
-            ``SyncUsageError`` because those calls would deadlock the
-            event loop.
+            executor. ``True`` (recommended for most cases) runs the function
+            in a thread pool so CPU-heavy workloads don't block the event loop
+            thread. ``False`` runs the sync function directly on the event loop
+            thread. **Warning:** when ``use_thread_pool=False``, calling
+            ``sync()`` or ``await_children_sync()`` from within the function
+            will raise ``SyncUsageError`` because those calls would deadlock
+            the event loop.
 
             This parameter is **required** for sync functions — omitting
             it will raise ``DecorationError``. This is by design: the

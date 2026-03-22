@@ -2,27 +2,7 @@ class BasePromisingError(Exception):
     pass
 
 
-class ContextAlreadyActiveError(BasePromisingError):
-    pass
-
-
-class ContextNotActiveError(BasePromisingError):
-    pass
-
-
-class ContextNotFoundError(BasePromisingError):
-    pass
-
-
-class ContextUsageError(BasePromisingError):
-    pass
-
-
 class DecorationError(BasePromisingError):
-    pass
-
-
-class EventLoopMismatchError(BasePromisingError):
     pass
 
 
@@ -35,4 +15,38 @@ class SentinelUsageError(BasePromisingError):
 
 
 class SyncUsageError(BasePromisingError):
+    pass
+
+
+# Context errors
+
+
+class BaseContextError(BasePromisingError):
+    pass
+
+
+class ContextAlreadyActiveError(BaseContextError):
+    pass
+
+
+class ContextNotActiveError(BaseContextError):
+    pass
+
+
+class ContextNotFoundError(BaseContextError):
+    pass
+
+
+# Event loop errors
+
+
+class BaseEventLoopError(BasePromisingError):
+    pass
+
+
+class EventLoopMismatchError(BaseEventLoopError):
+    pass
+
+
+class NoEventLoopError(BaseEventLoopError):
     pass

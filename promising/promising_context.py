@@ -14,7 +14,7 @@ from promising.errors import (
     ContextAlreadyActiveError,
     ContextNotActiveError,
     ContextNotFoundError,
-    ContextUsageError,
+    DecorationError,
     PromiseNotFoundError,
     SyncUsageError,
 )
@@ -134,7 +134,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         PromisingContext instance and activate it.
         """
         if self.__wrapped__ is not None:
-            raise ContextUsageError(
+            raise DecorationError(
                 "The same instance of `promising.context` cannot serve both "
                 "as a context manager and as a decorator simultaneously"
             )
@@ -170,7 +170,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             # (because this decorator was used with parameters) - let's finish
             # the decoration process
             if len(args) != 1 or kwargs:
-                raise ContextUsageError(
+                raise DecorationError(
                     "The decorator must be called with exactly one positional "
                     "argument after its parameters were already provided, and "
                     "it should be a strictly positional argument: a function "

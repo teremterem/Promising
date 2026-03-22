@@ -480,7 +480,7 @@ def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
-async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_await_time(
+async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_call_time(
     context_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -489,10 +489,8 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_a
 
     When @promising.context is stacked on top of @promising.function on a sync
     function, passing ``use_thread_pool=None`` at call-time tries to unset the
-    required thread-pool setting, which is not allowed. Unlike async functions,
-    a decorated sync function has no separation between coroutine creation and
-    awaiting — everything runs in the thread pool at once, so the error surfaces
-    only at await-time.
+    required thread-pool setting, which raises DecorationError immediately at
+    call-time.
     """
     context_decorator = promising.context() if context_with_parens else promising.context
 
@@ -509,8 +507,8 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_a
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
-        # DecorationError surfaces at await-time for decorated sync functions
-        await add(1, 2, use_thread_pool=None)
+        # no await — `promising.DecorationError` should happen at call-time
+        add(1, 2, use_thread_pool=None)
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])

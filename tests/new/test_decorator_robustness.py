@@ -205,12 +205,14 @@ async def test_function_alone_on_sync_raises_use_thread_pool_error_at_call_time(
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
-async def test_function_alone_on_sync_raises_arg_error_at_call_time(
+async def test_function_alone_on_sync_raises_arg_error_at_await_time(
     decorator_use_thread_pool: bool,
 ) -> None:
     """
-    Baseline: @promising.function on a sync function should raise TypeError
-    immediately at call-time when called with wrong arguments.
+    Baseline: @promising.function on a sync function. Unlike async functions,
+    a decorated sync function has no separation between coroutine creation and
+    awaiting — everything runs in the thread pool at once, so argument errors
+    surface only at await-time.
     """
 
     @promising.function(use_thread_pool=decorator_use_thread_pool)
@@ -221,8 +223,9 @@ async def test_function_alone_on_sync_raises_arg_error_at_call_time(
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
+    add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
-        add()  # the error should happen at call-time
+        await add_promise
 
 
 # ── Unusual Decorator Stacking ──────────────────────────────────
@@ -566,7 +569,7 @@ async def test_function_on_top_of_function_on_sync_raises_use_thread_pool_error_
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
-async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time(
+async def test_function_on_top_of_function_on_sync_raises_arg_error_at_await_time(
     outer_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -574,8 +577,10 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time
     Sync counterpart of test_function_on_top_of_function_raises_arg_error_at_call_time.
 
     When @promising.function is stacked on top of another @promising.function
-    on a sync function, calling with wrong arguments should raise TypeError
-    immediately at call-time.
+    on a sync function, argument errors behave differently than with async
+    functions: there is no separation between coroutine creation and awaiting —
+    everything runs in the thread pool at once, so errors surface only at
+    await-time.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
 
@@ -588,8 +593,9 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_call_time
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
+    add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
-        add()  # the error should happen at call-time
+        await add_promise
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])

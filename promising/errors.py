@@ -30,5 +30,9 @@ class PromiseNotFoundError(BasePromisingError):
     pass
 
 
+class SentinelUsageError(BasePromisingError):
+    pass
+
+
 class SyncUsageError(BasePromisingError):
     pass

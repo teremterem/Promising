@@ -9,6 +9,7 @@ from promising.errors import (
     DecorationError,
     EventLoopMismatchError,
     PromiseNotFoundError,
+    SentinelUsageError,
     SyncUsageError,
 )
 from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise
@@ -65,6 +66,7 @@ __all__ = [
     "PromisingContext",
     "PromisingFunction",
     "Sentinel",
+    "SentinelUsageError",
     "SyncUsageError",
     "UNCHANGED",
     "await_children",

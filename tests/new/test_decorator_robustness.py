@@ -644,8 +644,13 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     assert isinstance(ground_truth, promising.Promise)
     assert await ground_truth == 3
 
+    # Unlike async functions, a decorated sync function has no separation
+    # between coroutine creation and awaiting — everything runs in the thread
+    # pool at once, so argument errors surface only when the promise is
+    # awaited, not at call-time
+    add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
-        add()  # the error should happen at call-time
+        await add_promise
 
 
 # ── Attribute Independence Under Double-Decoration ─────────────

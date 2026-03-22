@@ -56,9 +56,10 @@ from promising import INHERIT
 async def test_plain_async_raises_arg_error_at_call_time() -> None:
     """
     Baseline 1 for test_context_on_top_of_function_raises_arg_error_at_call_time:
-    a plain async function with required arguments raises TypeError
-    immediately at call-time when called with wrong arguments.
-    This is standard Python behavior — no decorators involved.
+    a plain async function with required arguments raises TypeError immediately
+    at call-time when called with wrong arguments. This is standard Python
+    behavior — no decorators involved. This test exists purely for
+    demonstration purposes.
     """
 
     async def add(a: int, b: int) -> int:

@@ -115,23 +115,22 @@ def function(
             will raise ``SyncUsageError`` because those calls would deadlock
             the event loop.
 
-            This parameter is **required** for sync functions — omitting
-            it will raise ``DecorationError``. This is by design: the
-            user should make a conscious decision about thread pool usage
-            for each specific sync function.
+            This parameter is **required** for sync functions — omitting it
+            will raise ``DecorationError``. This is by design: the user should
+            make a conscious decision about thread pool usage for each specific
+            sync function.
 
-            This parameter is **disallowed** for async functions — passing
-            it will raise ``DecorationError``. Async functions always run
-            on the event loop regardless of this setting.
+            This parameter is **disallowed** for async functions — passing it
+            will raise ``DecorationError``. Async functions always run on the
+            event loop regardless of this setting.
 
             Unlike ``thread_pool``, this parameter is intentionally not
             inheritable through the context hierarchy — it must be set
-            per-function at decoration time. This is by design:
-            running sync functions on the event loop thread is
-            problematic for CPU-bound workloads (it blocks the loop),
-            so the user should make a conscious decision for each
-            specific case rather than blanket-disabling thread pools
-            for an entire subtree.
+            per-function at decoration time. This is by design: running sync
+            functions on the event loop thread is problematic for CPU-bound
+            workloads (it blocks the loop), so the user should make a conscious
+            decision for each specific case rather than blanket-disabling
+            thread pools for an entire subtree.
     """
     if func_or_method is None:
         # The decorator was used with arguments

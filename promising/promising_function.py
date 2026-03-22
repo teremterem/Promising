@@ -27,35 +27,34 @@ def function(
     A decorator that turns a function into one that returns a ``Promise``
     instead of a plain result.
 
-    When called, a decorated function creates and returns a ``Promise``
-    that encapsulates the function's execution. The ``Promise`` can be
-    awaited multiple times without re-executing the underlying function.
+    When called, a decorated function creates and returns a ``Promise`` that
+    encapsulates the function's execution. The ``Promise`` can be awaited
+    multiple times without re-executing the underlying function.
 
     Promises automatically form parent-child hierarchies: if a decorated
     function is called during another ``Promise``'s execution, the newly
     created ``Promise`` becomes a child of the active one.
 
     Both sync and async functions are supported. Sync functions are
-    transparently executed in a thread pool so they can participate in
-    the async promise machinery.
+    transparently executed in a thread pool so they can participate in the
+    async promise machinery.
 
-    Works as a method decorator for instance methods, ``@classmethod``,
-    and ``@staticmethod``.
+    Works as a method decorator for instance methods, ``@classmethod``, and
+    ``@staticmethod``.
 
     Decorated functions may return other awaitables or ``Promise`` objects
-    (e.g. by calling other decorated functions) instead of concrete values.
-    If the return value is an awaitable that is not already a ``Promise``,
-    it is automatically wrapped in a child ``Promise`` of the current one,
-    inheriting settings (``thread_pool``, ``start_soon_default``, etc.)
-    through the standard ``Promise`` inheritance mechanism. When the
-    resulting ``Promise`` is awaited (or resolved via ``.sync()``), nested
-    awaitables (non-Promise awaitables are auto-wrapped into Promises
-    by ``set_result``) are automatically unpacked recursively until a
-    concrete, non-awaitable value is reached. To unpack only one level, use
-    ``unpack_once()`` or ``unpack_once_sync()`` instead.
+    (e.g. by calling other decorated functions) instead of concrete values. If
+    the return value is an awaitable that is not already a ``Promise``, it is
+    automatically wrapped in a child ``Promise`` of the current one, inheriting
+    settings (``thread_pool``, ``start_soon_default``, etc.) through the
+    standard ``Promise`` inheritance mechanism. When the resulting ``Promise``
+    is awaited (or resolved via ``.sync()``), nested awaitables (non-Promise
+    awaitables are auto-wrapped into Promises by ``set_result``) are
+    automatically unpacked recursively until a concrete, non-awaitable value is
+    reached. To unpack only one level, use ``unpack_once()`` or
+    ``unpack_once_sync()`` instead.
 
-    Inside a decorated function body, the following utilities are
-    available:
+    Inside a decorated function body, the following utilities are available:
 
     - **Consuming other promises from sync functions:** sync decorated
       functions run in a thread pool and can call ``.sync()`` on other
@@ -88,20 +87,19 @@ def function(
         start_soon_default: Default ``start_soon`` value propagated to child
             promises. Defaults to ``INHERIT``, meaning the value is inherited
             from the parent ``Promise``.
-        strict_event_loop_check: Controls whether the event loop identity
-            check is always performed when awaiting the ``Promise``
-            (``True``), or only when the ``Promise`` is not yet done
-            (``False``). The global default is ``True``. Setting this to
-            ``False`` is not recommended: in systems that mix multiple
-            event loops, a "wrong loop" mistake on an already-done
-            ``Promise`` would silently succeed instead of raising
-            ``EventLoopMismatchError``, turning a reliable, deterministic error
-            into a race condition that only manifests when the ``Promise``
-            happens to still be in progress — making it much harder to track
-            down. ``INHERIT`` (default) copies the parent's setting, falling
-            back to ``Defaults.STRICT_EVENT_LOOP_CHECK`` (the global default)
-            at the root. ``PROMISING_DEFAULT`` reads the global default
-            directly.
+        strict_event_loop_check: Controls whether the event loop identity check
+            is always performed when awaiting the ``Promise`` (``True``), or
+            only when the ``Promise`` is not yet done (``False``). The global
+            default is ``True``. Setting this to ``False`` is not recommended:
+            in systems that mix multiple event loops, a "wrong loop" mistake on
+            an already-done ``Promise`` would silently succeed instead of
+            raising ``EventLoopMismatchError``, turning a reliable,
+            deterministic error into a race condition that only manifests when
+            the ``Promise`` happens to still be in progress — making it much
+            harder to track down. ``INHERIT`` (default) copies the parent's
+            setting, falling back to ``Defaults.STRICT_EVENT_LOOP_CHECK`` (the
+            global default) at the root. ``PROMISING_DEFAULT`` reads the global
+            default directly.
         thread_pool: Thread pool executor used to run sync
             promising functions. ``INHERIT`` (default) inherits from
             the parent context, falling back to ``PROMISING_DEFAULT``

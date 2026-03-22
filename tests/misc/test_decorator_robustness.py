@@ -247,13 +247,6 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
     passing use_thread_pool at call time on an async function should
     raise DecorationError immediately at call-time, not defer it to
     await-time.
-
-    Currently, @promising.context defers the inner call into the coroutine
-    body (_async_wrapper), which delays the use_thread_pool validation
-    error until the coroutine is awaited.  This test is expected to fail
-    until the bug is fixed.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
     """
     context_decorator = promising.context() if context_with_parens else promising.context
     function_decorator = promising.function() if function_with_parens else promising.function
@@ -283,13 +276,6 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
     an unusual combination that is not a realistic usage pattern —
     calling the decorated function with wrong arguments should raise
     TypeError immediately at call-time, not defer it to await-time.
-
-    Currently, @promising.context defers the inner call into the coroutine
-    body (_async_wrapper), which delays argument validation errors until
-    the coroutine is awaited.  This test is expected to fail until the
-    bug is fixed.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2959328724
     """
     context_decorator = promising.context() if context_with_parens else promising.context
     function_decorator = promising.function() if function_with_parens else promising.function

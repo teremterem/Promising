@@ -76,20 +76,18 @@ def function(
     Args:
         namespace: Optional namespace string for the resulting ``Promise``.
             Defaults to the wrapped function's ``__qualname__``.
-        start_soon: Whether the ``Promise`` should start executing
-            immediately upon creation. Defaults to ``None``,
-            which defers to the parent's
-            ``children_start_soon`` if enforced, otherwise
-            falls back to ``start_soon_default``. ``INHERIT``
-            copies the parent's ``start_soon`` directly.
-        children_start_soon: Whether child promises created
-            during this ``Promise``'s execution should start
-            executing immediately. Defaults to ``None`` (no
-            enforcement). ``INHERIT`` copies the parent's
-            ``children_start_soon`` setting.
-        start_soon_default: Default ``start_soon`` value propagated to
-            child promises. Defaults to ``INHERIT``, meaning the value
-            is inherited from the parent ``Promise``.
+        start_soon: Whether the ``Promise`` should start executing immediately
+            upon creation. Defaults to ``None``, which defers to the parent's
+            ``children_start_soon`` if enforced, otherwise falls back to
+            ``start_soon_default``. ``INHERIT`` copies the parent's
+            ``start_soon`` directly.
+        children_start_soon: Whether child promises created during this
+            ``Promise``'s execution should start executing immediately.
+            Defaults to ``None`` (no enforcement). ``INHERIT`` copies the
+            parent's ``children_start_soon`` setting.
+        start_soon_default: Default ``start_soon`` value propagated to child
+            promises. Defaults to ``INHERIT``, meaning the value is inherited
+            from the parent ``Promise``.
         strict_event_loop_check: Controls whether the event loop identity
             check is always performed when awaiting the ``Promise``
             (``True``), or only when the ``Promise`` is not yet done

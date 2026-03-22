@@ -100,8 +100,8 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             only manifests when the ``Promise`` happens to still be in progress
             — making it much harder to track down.
             ``INHERIT`` (default) copies the parent's setting, falling back
-            to ``Defaults.STRICT_EVENT_LOOP_CHECK`` at the root.
-            ``PROMISING_DEFAULT`` reads the global default directly.
+            to ``Defaults.STRICT_EVENT_LOOP_CHECK`` (the global default) at the
+            root. ``PROMISING_DEFAULT`` reads the global default directly.
     """
 
     def __init__(

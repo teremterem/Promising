@@ -106,8 +106,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             error into a race condition that only manifests when the Promise
             happens to still be in progress — making it much harder to
             track down. INHERIT (default) copies the parent's setting,
-            falling back to Defaults.STRICT_EVENT_LOOP_CHECK at the root.
-            PROMISING_DEFAULT reads the global default directly.
+            falling back to Defaults.STRICT_EVENT_LOOP_CHECK (the global
+            default) at the root. PROMISING_DEFAULT reads the global default
+            directly.
         prefilled_result: Pre-set result value. Cannot be combined with awaitable
             or prefilled_exception.
         prefilled_exception: Pre-set exception. Cannot be combined with awaitable

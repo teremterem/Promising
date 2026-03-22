@@ -43,13 +43,13 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 ## Architecture
 
-**Settings are frozen at creation time.** All configuration (`start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc.) is fully resolved when a `Promise` or `PromisingContext` is constructed. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately — no deferred resolution happens at execution time. This is a core design principle: because a promise may run eagerly or be deferred, the user cannot predict *when* execution will happen, so settings must reflect the state of the world at the moment the promise was created.
+**Settings are frozen at creation time.** All configuration (`start_soon`, `children_start_soon`, `start_soon_default`, `strict_event_loop_check`, `thread_pool`, etc.) is fully resolved when a `Promise` or `PromisingContext` is constructed. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately — no deferred resolution happens at execution time. This is a core design principle: because a promise may run eagerly or be deferred, the user cannot predict *when* execution will happen, so settings must reflect the state of the world at the moment the promise was created.
 
 **Core hierarchy flow:** `PromisingFunction` wraps an async or sync function → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises created during that execution become its children via `WeakSet`.
 
 ### PromisingContext (`promising/promising_context.py`)
 
-The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `thread_pool`), child-waiting (`await_children` / `await_children_sync`), child inspection (`collect_remaining_children`), and trace/debugging (`get_trace`, `format_trace`, `print_trace`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
+The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `strict_event_loop_check`, `thread_pool`), child-waiting (`await_children` / `await_children_sync`), child inspection (`collect_remaining_children`), and trace/debugging (`get_trace`, `format_trace`, `print_trace`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context. Children are tracked via `WeakSet`.
 
 This file also contains the `context` class — a context manager / decorator that creates a `PromisingContext` without producing a `Promise`. It implements the descriptor protocol (via `DecoratorSupport`) for use as a method decorator.
 
@@ -73,7 +73,7 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 
 ### Sentinel Pattern (`promising/sentinels.py`)
 
-`UNCHANGED`, `INHERIT`, `PROMISING_DEFAULT`, and `ASYNCIO_DEFAULT` raise on boolean coercion to prevent misuse. `UNCHANGED` means "no call-time override — use the decorator-level value", `INHERIT` means "inherit from parent", `PROMISING_DEFAULT` means "read the current global setting directly", `ASYNCIO_DEFAULT` means "let the event loop use its own default executor".
+`UNCHANGED`, `INHERIT`, `PROMISING_DEFAULT`, and `ASYNCIO_DEFAULT` raise `SentinelUsageError` on boolean coercion to prevent misuse. `UNCHANGED` means "no call-time override — use the decorator-level value", `INHERIT` means "inherit from parent", `PROMISING_DEFAULT` means "read the current global setting directly", `ASYNCIO_DEFAULT` means "let the event loop use its own default executor".
 
 ### Error Classes (`promising/errors.py`)
 
@@ -83,7 +83,9 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 - `ContextNotFoundError` — no active `PromisingContext` found
 - `ContextUsageError` — misuse of `promising.context` (e.g. using the same instance as both context manager and decorator)
 - `DecorationError` — invalid decorator usage
+- `EventLoopMismatchError` — awaiting a `Promise` from a different event loop than the one it belongs to
 - `PromiseNotFoundError` — no active `Promise` found (the active context is not a `Promise`)
+- `SentinelUsageError` — a `Sentinel` was used in a boolean context (e.g. `if INHERIT:`)
 - `SyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread
 
 ### Public API

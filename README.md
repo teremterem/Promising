@@ -311,11 +311,12 @@ result = await promise                        # Now it starts
 
 ### Configuration Inheritance
 
-Promises inherit configuration from their parents through three parameters:
+Promises inherit configuration from their parents through these parameters:
 
 - **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `None` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
 - **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `None`. `None` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `None` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
 - **`start_soon_default`** — a per-Promise local override for the global default. `INHERIT` (default) propagates from the parent. `PROMISING_DEFAULT` reads the current global setting directly, ignoring the parent chain.
+- **`strict_event_loop_check`** — whether the event loop identity check is always performed when awaiting a Promise (`True`), or only when the Promise is not yet done (`False`). The global default is `True`. Setting this to `False` is not recommended: in systems that mix multiple event loops, a "wrong loop" mistake on an already-done Promise would silently succeed instead of raising `EventLoopMismatchError`, turning a reliable, deterministic error into a race condition that only manifests when the Promise happens to still be in progress. `INHERIT` (default) copies the parent's setting. `PROMISING_DEFAULT` reads the global default directly.
 
 These can be set on the decorator or overridden at call time by passing them as keyword arguments. Call-time values always take precedence over decorator-level defaults — even passing `None` explicitly at call time overrides the decorator value:
 
@@ -449,7 +450,7 @@ uv sync --extra examples
 
 ## Design Note: Settings Are Frozen at Creation Time
 
-All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
+All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `strict_event_loop_check`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
 
 This is intentional: because a `Promise` may execute eagerly (the default) or be deferred, the user cannot predict *when* the underlying coroutine will run. Freezing settings at creation time guarantees that the behavior a promise was *created with* is the behavior it *runs with*, regardless of scheduling.
 
@@ -464,7 +465,7 @@ Wrapping every async (or sync) operation in a `Promise` gives you:
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
 - **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value, a coroutine, or another Promise. `await` and `.sync()` always return a concrete value. Non-Promise awaitables are auto-wrapped into child Promises, so every layer in the chain is a `Promise` with the same uniform interface.
-- **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
+- **Configurable execution.** `start_soon`, `children_start_soon`, `strict_event_loop_check`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution, event loop checking, and thread pool usage at any level.
 
 In short, a `Promise` turns a fire-and-forget coroutine into a first-class object you can pass around, await from anywhere (async or sync), and organize into a tree.
 
@@ -474,9 +475,9 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 
 | Symbol | Description |
 |---|---|
-| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
+| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, `strict_event_loop_check`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, `start_soon_default`, and `strict_event_loop_check`. |
 
 ### Promise
 
@@ -522,6 +523,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promising.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
 | `promising.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
+| `promising.Defaults.STRICT_EVENT_LOOP_CHECK` | Class attribute holding the global default for event loop identity checking (`True` by default). When `True`, awaiting a `Promise` from a different event loop always raises `EventLoopMismatchError`. When `False`, the check is skipped for already-done Promises. Changing this to `False` is not recommended — see [Configuration Inheritance](#configuration-inheritance) for details. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 
 ### Sentinels
@@ -534,7 +536,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
 | `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 
-All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
+All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 
 ### Errors
 
@@ -545,7 +547,9 @@ All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
 | `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. |
 | `promising.ContextUsageError` | Misuse of `promising.context` (e.g. using the same instance as both context manager and decorator, or incorrect argument usage). |
 | `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, or setting `use_thread_pool` on an async function). |
+| `promising.EventLoopMismatchError` | Awaiting a `Promise` from a different event loop than the one it belongs to. |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
+| `promising.SentinelUsageError` | A `Sentinel` was used in a boolean context (e.g. `if INHERIT:`). Use `is` / `is not` identity comparisons instead. |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 
 All inherit from `promising.BasePromisingError`.

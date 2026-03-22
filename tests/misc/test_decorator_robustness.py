@@ -119,14 +119,15 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
     assert add(1, 2) == 3
 
     with pytest.raises(TypeError, match="required positional argument"):
-        add()  # the error should happen at call-time
+        add()
 
 
 def test_plain_sync_raises_arg_error_at_call_time() -> None:
     """
     Baseline: a plain sync function with required arguments raises TypeError
-    immediately at call-time when called with wrong arguments.
-    This is standard Python behavior — no decorators involved.
+    immediately at call-time when called with wrong arguments. This is standard
+    Python behavior — no decorators involved. This test exists purely for
+    demonstration purposes.
     """
 
     def add(a: int, b: int) -> int:
@@ -159,6 +160,7 @@ async def test_function_alone_raises_use_thread_pool_error_at_call_time(
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
+        # no await — `promising.DecorationError` should happen at call-time
         add(1, 2, use_thread_pool=use_thread_pool)
 
 
@@ -203,6 +205,7 @@ async def test_function_alone_on_sync_raises_use_thread_pool_error_at_call_time(
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
+        # no await — `promising.DecorationError` should happen at call-time
         add(1, 2, use_thread_pool=None)
 
 
@@ -227,6 +230,8 @@ async def test_function_alone_on_sync_raises_arg_error_at_await_time(
 
     add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
+        # Argument errors of the underlying sync function only surface at
+        # await-time
         await add_promise
 
 
@@ -263,9 +268,9 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
     assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
-    # Passing use_thread_pool at call time on an async function should raise immediately
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
-        add(1, 2, use_thread_pool=use_thread_pool)  # no await — the error should happen at call-time
+        # no await — `promising.DecorationError` should happen at call-time
+        add(1, 2, use_thread_pool=use_thread_pool)
 
 
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
@@ -295,7 +300,6 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
     assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
-    # Calling with missing required arguments should raise immediately
     with pytest.raises(TypeError, match="required positional argument"):
         add()  # no await — the error should happen at call-time
 
@@ -327,6 +331,7 @@ async def test_function_on_top_of_function_raises_use_thread_pool_error_at_call_
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
+        # no await — `promising.DecorationError` should happen at call-time
         add(1, 2, use_thread_pool=use_thread_pool)
 
 
@@ -385,6 +390,7 @@ async def test_function_on_top_of_context_raises_use_thread_pool_error_at_call_t
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="cannot be set for async function"):
+        # no await — `promising.DecorationError` should happen at call-time
         add(1, 2, use_thread_pool=use_thread_pool)
 
 
@@ -464,7 +470,7 @@ def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     assert add(1, 2) == 3
 
     with pytest.raises(TypeError, match="required positional argument"):
-        add()  # the error should happen at call-time
+        add()
 
 
 # ── Sync Counterparts for Argument-Error-at-Call-Time Tests ──────
@@ -501,6 +507,7 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_a
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
+        # no await — `promising.DecorationError` should happen at call-time
         await add(1, 2, use_thread_pool=None)
 
 
@@ -534,6 +541,8 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
 
     add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
+        # Argument errors of the underlying sync function only surface at
+        # await-time
         await add_promise
 
 
@@ -599,6 +608,8 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_await_tim
 
     add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
+        # Argument errors of the underlying sync function only surface at
+        # await-time
         await add_promise
 
 
@@ -629,6 +640,7 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
     assert await ground_truth == 3
 
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
+        # no await — `promising.DecorationError` should happen at call-time
         add(1, 2, use_thread_pool=None)
 
 
@@ -659,6 +671,8 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_await_time
 
     add_promise = add()
     with pytest.raises(TypeError, match="required positional argument"):
+        # Argument errors of the underlying sync function only surface at
+        # await-time
         await add_promise
 
 

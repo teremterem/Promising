@@ -19,6 +19,7 @@ def function(
     start_soon: bool | None | Sentinel = None,
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
+    strict_event_loop_check: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool | None = None,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
@@ -89,6 +90,20 @@ def function(
         start_soon_default: Default ``start_soon`` value propagated to
             child promises. Defaults to ``INHERIT``, meaning the value
             is inherited from the parent ``Promise``.
+        strict_event_loop_check: Controls whether the event loop identity
+            check is always performed when awaiting the ``Promise``
+            (``True``), or only when the ``Promise`` is not yet done
+            (``False``). The global default is ``True``. Setting this to
+            ``False`` is not recommended: in systems that mix multiple
+            event loops, a "wrong loop" mistake on an already-done
+            ``Promise`` would silently succeed instead of raising
+            ``EventLoopMismatchError``, turning a reliable, deterministic error
+            into a race condition that only manifests when the ``Promise``
+            happens to still be in progress — making it much harder to
+            track down. ``INHERIT`` (default) copies the parent's
+            setting, falling back to
+            ``Defaults.STRICT_EVENT_LOOP_CHECK`` at the root.
+            ``PROMISING_DEFAULT`` reads the global default directly.
         thread_pool: Thread pool executor used to run sync
             promising functions. ``INHERIT`` (default) inherits from
             the parent context, falling back to ``PROMISING_DEFAULT``
@@ -136,6 +151,7 @@ def function(
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
+                strict_event_loop_check=strict_event_loop_check,
                 thread_pool=thread_pool,
                 use_thread_pool=use_thread_pool,
             )
@@ -150,6 +166,7 @@ def function(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        strict_event_loop_check=strict_event_loop_check,
         thread_pool=thread_pool,
         use_thread_pool=use_thread_pool,
     )
@@ -174,6 +191,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
+        strict_event_loop_check: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool | None = None,
     ) -> None:
@@ -181,6 +199,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         self.start_soon = start_soon
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
+        self.strict_event_loop_check = strict_event_loop_check
         self.thread_pool = thread_pool
         self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
@@ -199,6 +218,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         start_soon: bool | None | Sentinel = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
         **kwargs: Any,
@@ -210,7 +230,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         sync functions in a thread pool automatically).
 
         The ``namespace``, ``start_soon``, ``children_start_soon``,
-        ``start_soon_default``, and ``thread_pool``
+        ``start_soon_default``, ``strict_event_loop_check``, and ``thread_pool``
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
@@ -237,6 +257,10 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                   this ``Promise``'s execution.
                 - **start_soon_default** — Local override for the global
                   ``START_SOON_DEFAULT``.
+                - **strict_event_loop_check** — Whether the event loop
+                  identity check is always performed (``True``, the
+                  recommended default) or only when the ``Promise`` is
+                  not yet done (``False``).
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
                 - **use_thread_pool** — Whether to run a sync function
@@ -255,6 +279,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             children_start_soon = self.children_start_soon
         if start_soon_default is UNCHANGED:
             start_soon_default = self.start_soon_default
+        if strict_event_loop_check is UNCHANGED:
+            strict_event_loop_check = self.strict_event_loop_check
         if thread_pool is UNCHANGED:
             thread_pool = self.thread_pool
 
@@ -305,6 +331,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             start_soon=start_soon,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
             thread_pool=thread_pool,
         )
 

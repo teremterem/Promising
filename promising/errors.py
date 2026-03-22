@@ -22,6 +22,10 @@ class DecorationError(BasePromisingError):
     pass
 
 
+class EventLoopMismatchError(BasePromisingError):
+    pass
+
+
 class PromiseNotFoundError(BasePromisingError):
     pass
 

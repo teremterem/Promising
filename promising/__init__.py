@@ -7,6 +7,7 @@ from promising.errors import (
     ContextNotFoundError,
     ContextUsageError,
     DecorationError,
+    EventLoopMismatchError,
     PromiseNotFoundError,
     SyncUsageError,
 )
@@ -36,6 +37,7 @@ class Defaults:
     """
 
     START_SOON = True
+    STRICT_EVENT_LOOP_CHECK = True
     PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
     # TODO Raise a disableable error when synchronous function call depth
     #  reaches the maximum number of workers in the thread pool, to prevent
@@ -54,6 +56,7 @@ __all__ = [
     "ContextUsageError",
     "DecorationError",
     "Defaults",
+    "EventLoopMismatchError",
     "INHERIT",
     "PROMISING_DEFAULT",
     "Promise",

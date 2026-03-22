@@ -286,7 +286,10 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
         return a + b
 
     ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
+    # `@promising.context` decorator obscures the underlying Promise away from
+    # us in this stacking scenario
+    assert not isinstance(ground_truth, promising.Promise)
+    assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
     # Calling with missing required arguments should raise immediately

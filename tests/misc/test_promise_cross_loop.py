@@ -54,7 +54,7 @@ async def test_done_promise_awaited_from_different_loop() -> None:
     """
 
     async def compute() -> int:
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
         return 42
 
     promise = Promise(compute(), start_soon=True)

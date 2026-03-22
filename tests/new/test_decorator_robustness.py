@@ -42,6 +42,7 @@ while still propagating standard ``functools.update_wrapper`` attributes
 ``__annotations__``) from the original function through both layers.
 """
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -530,7 +531,10 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
         return a + b
 
     ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
+    # `@promising.context` decorator obscures the underlying Promise away in
+    # this decorator stacking scenario
+    assert not isinstance(ground_truth, promising.Promise)
+    assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
     add_promise = add()

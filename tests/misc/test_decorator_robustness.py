@@ -487,10 +487,11 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_c
     """
     Sync counterpart of test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time.
 
-    When @promising.context is stacked on top of @promising.function on a sync
-    function, passing ``use_thread_pool=None`` at call-time tries to unset the
-    required thread-pool setting, which raises DecorationError immediately at
-    call-time.
+    Passing ``use_thread_pool=None`` at call-time tries to unset the required
+    thread-pool setting, which is not allowed. Even though the inner
+    @promising.function turns the sync function into a thread-pool-executed one,
+    ``use_thread_pool`` validation happens before execution begins, so the
+    DecorationError is raised immediately at call-time.
     """
     context_decorator = promising.context() if context_with_parens else promising.context
 
@@ -520,10 +521,10 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
     """
     Sync counterpart of test_context_on_top_of_function_raises_arg_error_at_call_time.
 
-    When @promising.context is stacked on top of @promising.function on a sync
-    function, argument errors behave differently than with async functions:
-    there is no separation between coroutine creation and awaiting — everything
-    runs in the thread pool at once, so errors surface only at await-time.
+    The inner @promising.function turns the sync function into a
+    thread-pool-executed one, where there is no separation between coroutine
+    creation and awaiting — everything runs at once. The outer @promising.context
+    does not change this, so argument errors surface only at await-time.
     """
     context_decorator = promising.context() if context_with_parens else promising.context
 
@@ -555,10 +556,10 @@ async def test_function_on_top_of_function_on_sync_accepts_use_thread_pool_none(
     """
     Sync counterpart of test_function_on_top_of_function_raises_use_thread_pool_error_at_call_time.
 
-    When @promising.function is stacked on top of another @promising.function
-    on a sync function, passing ``use_thread_pool=None`` does NOT raise an error
-    because the outer decorator sees the inner-decorated function as async and
-    consumes the ``use_thread_pool=None`` override itself.
+    Passing ``use_thread_pool=None`` does NOT raise an error here. The inner
+    @promising.function turns the sync function into an async one, so the outer
+    @promising.function sees an async function and consumes the
+    ``use_thread_pool=None`` override itself — no validation error occurs.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
 
@@ -588,11 +589,10 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_await_tim
     """
     Sync counterpart of test_function_on_top_of_function_raises_arg_error_at_call_time.
 
-    When @promising.function is stacked on top of another @promising.function
-    on a sync function, argument errors behave differently than with async
-    functions: there is no separation between coroutine creation and awaiting —
-    everything runs in the thread pool at once, so errors surface only at
-    await-time.
+    The inner @promising.function turns the sync function into a
+    thread-pool-executed one, where there is no separation between coroutine
+    creation and awaiting — everything runs at once. The outer @promising.function
+    does not change this, so argument errors surface only at await-time.
     """
     outer_decorator = promising.function() if outer_with_parens else promising.function
 
@@ -621,10 +621,10 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
     """
     Sync counterpart of test_function_on_top_of_context_raises_use_thread_pool_error_at_call_time.
 
-    When @promising.function is stacked on top of @promising.context on a sync
-    function, passing ``use_thread_pool=None`` at call-time tries to unset the
-    required thread-pool setting, which raises DecorationError immediately at
-    call-time.
+    Passing ``use_thread_pool=None`` at call-time tries to unset the required
+    thread-pool setting, which is not allowed. Here @promising.function is the
+    outermost decorator and validates ``use_thread_pool`` before execution begins,
+    so the DecorationError is raised immediately at call-time.
     """
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
 
@@ -651,10 +651,10 @@ async def test_function_on_top_of_context_on_sync_raises_arg_error_at_await_time
     """
     Sync counterpart of test_function_on_top_of_context_raises_arg_error_at_call_time.
 
-    When @promising.function is stacked on top of @promising.context on a sync
-    function, argument errors behave differently than with async functions:
-    there is no separation between coroutine creation and awaiting — everything
-    runs in the thread pool at once, so errors surface only at await-time.
+    @promising.function turns the sync function into a thread-pool-executed one,
+    where there is no separation between coroutine creation and awaiting —
+    everything runs at once. The inner @promising.context does not change this,
+    so argument errors surface only at await-time.
     """
     ctx_decorator = promising.context() if ctx_with_parens else promising.context
 

@@ -257,7 +257,10 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
         return a + b
 
     ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
+    # `@promising.context` decorator obscures the underlying Promise away from
+    # us in this stacking scenario
+    assert not isinstance(ground_truth, promising.Promise)
+    assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
     # Passing use_thread_pool at call time on an async function should raise immediately

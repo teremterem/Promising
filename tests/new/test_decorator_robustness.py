@@ -501,12 +501,14 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_a
         return a + b
 
     ground_truth = add(1, 2)
-    assert isinstance(ground_truth, promising.Promise)
+    # `@promising.context` decorator obscures the underlying Promise away from
+    # us in this stacking scenario
+    assert not isinstance(ground_truth, promising.Promise)
+    assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3
 
-    add_promise = add(1, 2, use_thread_pool=None)
     with pytest.raises(promising.DecorationError, match="requires an explicit `use_thread_pool` setting"):
-        await add_promise
+        await add(1, 2, use_thread_pool=None)
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
@@ -531,8 +533,8 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
         return a + b
 
     ground_truth = add(1, 2)
-    # `@promising.context` decorator obscures the underlying Promise away in
-    # this decorator stacking scenario
+    # `@promising.context` decorator obscures the underlying Promise away from
+    # us in this stacking scenario
     assert not isinstance(ground_truth, promising.Promise)
     assert asyncio.iscoroutine(ground_truth)
     assert await ground_truth == 3

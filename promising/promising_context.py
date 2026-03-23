@@ -165,6 +165,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         return result
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
+        # TODO [P1] Support overriding settings at call time
         if self.__wrapped__ is None:
             # We are still in the process of decorating a function or method
             # (because this decorator was used with parameters) - let's finish

@@ -258,8 +258,8 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
                   ``promising.function`` for details.
 
         Returns:
-            A ``Promise`` that will resolve to the wrapped function's
-            return value.
+            A ``Promise`` that will resolve to the wrapped function's return
+            value.
         """
         if namespace is UNCHANGED:
             namespace = self.namespace

@@ -77,7 +77,7 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 
 ### Error Classes (`promising/errors.py`)
 
-- `BasePromisingError` — base class
+- `PromisingError` — base class
 - `ContextAlreadyActiveError` — attempting to enter a `PromisingContext` that is already active
 - `ContextNotActiveError` — attempting to exit a `PromisingContext` that is not active
 - `ContextNotFoundError` — no active `PromisingContext` found

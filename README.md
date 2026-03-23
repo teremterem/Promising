@@ -552,7 +552,7 @@ All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 | `promising.SentinelUsageError` | A `Sentinel` was used in a boolean context (e.g. `if INHERIT:`). Use `is` / `is not` identity comparisons instead. |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 
-All inherit from `promising.BasePromisingError`.
+All inherit from `promising.PromisingError`.
 
 ## License
 

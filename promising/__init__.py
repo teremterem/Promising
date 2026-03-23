@@ -1,16 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
 
 from promising.errors import (
-    BaseContextError,
-    BaseEventLoopError,
-    BasePromisingError,
     ContextAlreadyActiveError,
+    ContextError,
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
+    EventLoopError,
     EventLoopMismatchError,
     NoEventLoopError,
     PromiseNotFoundError,
+    PromisingError,
     SentinelUsageError,
     SyncUsageError,
 )
@@ -52,14 +52,13 @@ class Defaults:
 
 __all__ = [
     "ASYNCIO_DEFAULT",
-    "BaseContextError",
-    "BaseEventLoopError",
-    "BasePromisingError",
     "ContextAlreadyActiveError",
+    "ContextError",
     "ContextNotActiveError",
     "ContextNotFoundError",
     "DecorationError",
     "Defaults",
+    "EventLoopError",
     "EventLoopMismatchError",
     "INHERIT",
     "NoEventLoopError",
@@ -68,6 +67,7 @@ __all__ = [
     "PromiseNotFoundError",
     "PromiseBackedConcurrentFuture",
     "PromisingContext",
+    "PromisingError",
     "PromisingFunction",
     "Sentinel",
     "SentinelUsageError",

@@ -1,10 +1,12 @@
 import asyncio
+import concurrent.futures
 import functools
+from abc import ABC, abstractmethod
 from types import FunctionType, MethodType
 from typing import Any
 
 from promising.errors import DecorationError
-from promising.sentinels import UNCHANGED
+from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 from promising.utils import is_func_or_method_async, resolve_namespace
 
@@ -104,3 +106,97 @@ class DecoratorSupport:
         if isinstance(self.__wrapped__, classmethod):
             return self.__wrapped__.__func__
         return self.__wrapped__
+
+
+class ContextDecorator(DecoratorSupport, ABC):
+    def __init__(
+        self,
+        func_or_method: DecoratableFunctionType | None = None,
+        *,
+        namespace: str | None = None,
+        children_start_soon: bool | None | Sentinel = INHERIT,
+        start_soon_default: bool | Sentinel = INHERIT,
+        strict_event_loop_check: bool | Sentinel = INHERIT,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
+    ) -> None:
+        super().__init__(func_or_method, namespace=namespace)
+        self.children_start_soon = children_start_soon
+        self.start_soon_default = start_soon_default
+        self.strict_event_loop_check = strict_event_loop_check
+        self.thread_pool = thread_pool
+
+    def __call__(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        **kwargs: Any,
+    ) -> Any | DecoratableFunctionType:
+        exactly_one_arg = len(args) == 1 and not kwargs
+
+        if namespace is UNCHANGED:
+            namespace = self.namespace
+        else:
+            exactly_one_arg = False
+
+        if children_start_soon is UNCHANGED:
+            children_start_soon = self.children_start_soon
+        else:
+            exactly_one_arg = False
+
+        if start_soon_default is UNCHANGED:
+            start_soon_default = self.start_soon_default
+        else:
+            exactly_one_arg = False
+
+        if strict_event_loop_check is UNCHANGED:
+            strict_event_loop_check = self.strict_event_loop_check
+        else:
+            exactly_one_arg = False
+
+        if thread_pool is UNCHANGED:
+            thread_pool = self.thread_pool
+        else:
+            exactly_one_arg = False
+
+        if self.__wrapped__ is None:
+            # We are still in the process of decorating a function or method
+            # (because this decorator was used with parameters) - let's finish
+            # the decoration process
+            if not exactly_one_arg:
+                raise DecorationError(
+                    "The decorator must be called with exactly one positional "
+                    "argument after its parameters were already provided, and "
+                    "it should be a strictly positional argument: a function "
+                    "or method to decorate."
+                )
+            self._update_wrapper(args[0])
+            return self
+
+        # The function or method was already decorated and the decorator is now
+        # being called with arguments - let's pass this call through to the
+        # underlying function or method
+        return self._call_wrapped(
+            *args,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+            **kwargs,
+        )
+
+    @abstractmethod
+    def _call_wrapped(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        **kwargs: Any,
+    ) -> Any: ...

@@ -112,19 +112,19 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
-        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
         strict_event_loop_check: bool | Sentinel = INHERIT,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
 
         self.ctx_loop = loop
         self.parent = parent
-        self.thread_pool = thread_pool
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
         self.strict_event_loop_check = strict_event_loop_check
+        self.thread_pool = thread_pool
 
         self._promising_context = None
 

@@ -79,4 +79,6 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 pass
 
-    asyncio.run(main())
+    main.run()
+
+    asyncio.run(main.start())

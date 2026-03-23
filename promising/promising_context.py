@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 from weakref import WeakSet
 
+from promising.decorator_support import DecoratorSupport
 from promising.errors import (
     ContextAlreadyActiveError,
     ContextNotActiveError,
@@ -20,7 +21,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock
+from promising.utils import assert_no_sync_usage_deadlock
 
 if TYPE_CHECKING:
     from promising.promise import Promise

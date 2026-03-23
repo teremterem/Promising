@@ -5,11 +5,11 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
+from promising.decorator_support import DecoratorSupport
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import DecoratorSupport
 
 
 def function(

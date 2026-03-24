@@ -5,7 +5,7 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.decorator_support import DecoratorSupport
+from promising.decorator_support import PromisingDecorator
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
@@ -162,7 +162,7 @@ def function(
     )
 
 
-class PromisingFunction(DecoratorSupport, Generic[T_co]):
+class PromisingFunction(PromisingDecorator, Generic[T_co]):
     """Callable wrapper created by ``@promising.function``. See
     :func:`promising.function` for usage details."""
 
@@ -185,12 +185,15 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool | None = None,
     ) -> None:
-        super().__init__(func_or_method, namespace=namespace)
+        super().__init__(
+            func_or_method,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+        )
         self.start_soon = start_soon
-        self.children_start_soon = children_start_soon
-        self.start_soon_default = start_soon_default
-        self.strict_event_loop_check = strict_event_loop_check
-        self.thread_pool = thread_pool
         self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
         # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
@@ -261,24 +264,22 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's return
             value.
         """
-        if namespace is UNCHANGED:
-            namespace = self.namespace
-        if start_soon is UNCHANGED:
-            start_soon = self.start_soon
-        if children_start_soon is UNCHANGED:
-            children_start_soon = self.children_start_soon
-        if start_soon_default is UNCHANGED:
-            start_soon_default = self.start_soon_default
-        if strict_event_loop_check is UNCHANGED:
-            strict_event_loop_check = self.strict_event_loop_check
-        if thread_pool is UNCHANGED:
-            thread_pool = self.thread_pool
+        if start_soon is not UNCHANGED:
+            kwargs["start_soon"] = start_soon
+        if use_thread_pool is not UNCHANGED:
+            kwargs["use_thread_pool"] = self._validate_use_thread_pool(use_thread_pool)
 
-        if use_thread_pool is UNCHANGED:
-            use_thread_pool = self.use_thread_pool
-        else:
-            use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
+        return super().__call__(
+            *args,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+            **kwargs,
+        )
 
+    def _call_wrapped(self, *args: Any, **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
@@ -288,7 +289,7 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             # directly
             coro = self._wrapped_as_callable(*args, **kwargs)
 
-        elif use_thread_pool:
+        elif kwargs.get("use_thread_pool", self.use_thread_pool):
             # Run the sync function in a thread pool executor
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
@@ -316,13 +317,13 @@ class PromisingFunction(DecoratorSupport, Generic[T_co]):
             coro = _sync_inline()
 
         return Promise[T_co](
-            namespace=namespace,
+            namespace=kwargs.get("namespace", self.namespace),
             awaitable=coro,
-            start_soon=start_soon,
-            children_start_soon=children_start_soon,
-            start_soon_default=start_soon_default,
-            strict_event_loop_check=strict_event_loop_check,
-            thread_pool=thread_pool,
+            start_soon=kwargs.get("start_soon", self.start_soon),
+            children_start_soon=kwargs.get("children_start_soon", self.children_start_soon),
+            start_soon_default=kwargs.get("start_soon_default", self.start_soon_default),
+            strict_event_loop_check=kwargs.get("strict_event_loop_check", self.strict_event_loop_check),
+            thread_pool=kwargs.get("thread_pool", self.thread_pool),
         )
 
     def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:

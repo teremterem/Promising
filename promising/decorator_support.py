@@ -108,7 +108,7 @@ class DecoratorSupport:
         return self.__wrapped__
 
 
-class ContextDecorator(DecoratorSupport, ABC):
+class PromisingDecorator(DecoratorSupport, ABC):
     def __init__(
         self,
         func_or_method: DecoratableFunctionType | None = None,
@@ -135,38 +135,22 @@ class ContextDecorator(DecoratorSupport, ABC):
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
-        exactly_one_arg = len(args) == 1 and not kwargs
-
-        if namespace is UNCHANGED:
-            namespace = self.namespace
-        else:
-            exactly_one_arg = False
-
-        if children_start_soon is UNCHANGED:
-            children_start_soon = self.children_start_soon
-        else:
-            exactly_one_arg = False
-
-        if start_soon_default is UNCHANGED:
-            start_soon_default = self.start_soon_default
-        else:
-            exactly_one_arg = False
-
-        if strict_event_loop_check is UNCHANGED:
-            strict_event_loop_check = self.strict_event_loop_check
-        else:
-            exactly_one_arg = False
-
-        if thread_pool is UNCHANGED:
-            thread_pool = self.thread_pool
-        else:
-            exactly_one_arg = False
+        if namespace is not UNCHANGED:
+            kwargs["namespace"] = namespace
+        if children_start_soon is not UNCHANGED:
+            kwargs["children_start_soon"] = children_start_soon
+        if start_soon_default is not UNCHANGED:
+            kwargs["start_soon_default"] = start_soon_default
+        if strict_event_loop_check is not UNCHANGED:
+            kwargs["strict_event_loop_check"] = strict_event_loop_check
+        if thread_pool is not UNCHANGED:
+            kwargs["thread_pool"] = thread_pool
 
         if self.__wrapped__ is None:
             # We are still in the process of decorating a function or method
             # (because this decorator was used with parameters) - let's finish
             # the decoration process
-            if not exactly_one_arg:
+            if len(args) != 1 or kwargs:
                 raise DecorationError(
                     "The decorator must be called with exactly one positional "
                     "argument after its parameters were already provided, and "
@@ -179,24 +163,7 @@ class ContextDecorator(DecoratorSupport, ABC):
         # The function or method was already decorated and the decorator is now
         # being called with arguments - let's pass this call through to the
         # underlying function or method
-        return self._call_wrapped(
-            *args,
-            namespace=namespace,
-            children_start_soon=children_start_soon,
-            start_soon_default=start_soon_default,
-            strict_event_loop_check=strict_event_loop_check,
-            thread_pool=thread_pool,
-            **kwargs,
-        )
+        return self._call_wrapped(*args, **kwargs)
 
     @abstractmethod
-    def _call_wrapped(
-        self,
-        *args: Any,
-        namespace: str | None | Sentinel = UNCHANGED,
-        children_start_soon: bool | None | Sentinel = UNCHANGED,
-        start_soon_default: bool | Sentinel = UNCHANGED,
-        strict_event_loop_check: bool | Sentinel = UNCHANGED,
-        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
-        **kwargs: Any,
-    ) -> Any: ...
+    def _call_wrapped(self, *args: Any, **kwargs: Any) -> Any: ...

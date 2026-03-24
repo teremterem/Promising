@@ -57,7 +57,6 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
 
 
 if __name__ == "__main__":
-    import asyncio
 
     @promising.context
     async def main():
@@ -80,5 +79,3 @@ if __name__ == "__main__":
                 pass
 
     main.run()
-
-    asyncio.run(main.start())

@@ -21,7 +21,7 @@ from promising.errors import (
 )
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import assert_no_sync_usage_deadlock
+from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -373,7 +373,7 @@ class PromisingContext:
 
         if loop is None:
             if self._parent is None:
-                self._ctx_loop = asyncio.get_event_loop()
+                self._ctx_loop = get_running_asyncio_loop(raise_if_none=True)
             else:
                 self._ctx_loop = self._parent._ctx_loop
         else:

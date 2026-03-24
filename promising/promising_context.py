@@ -87,6 +87,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             they start executing immediately (i.e. as soon as the event loop
             allows), or defer until awaited one way or another. ``INHERIT``
             (default) copies the parent's setting.
+            TODO Are we sure about INHERIT being the default for
+             children_start_soon in promising contexts, while being None by
+             default in promising functions ?
+            TODO Mention this difference here in the docstring
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.

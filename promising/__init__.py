@@ -27,7 +27,7 @@ from promising.promising_context import (
     print_trace,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, RECURSIVELY, UNCHANGED, Sentinel
 
 
 class Defaults:
@@ -72,6 +72,7 @@ __all__ = [
     "Sentinel",
     "SentinelUsageError",
     "SyncUsageError",
+    "RECURSIVELY",
     "UNCHANGED",
     "await_children",
     "await_children_sync",

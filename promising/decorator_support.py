@@ -5,8 +5,9 @@ from abc import ABC, abstractmethod
 from types import FunctionType, MethodType
 from typing import Any
 
+from promising import RECURSIVELY
 from promising.errors import DecorationError
-from promising.sentinels import INHERIT, UNCHANGED, Sentinel
+from promising.sentinels import UNCHANGED, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 from promising.utils import is_func_or_method_async, resolve_namespace
 
@@ -113,17 +114,31 @@ class PromisingDecorator(DecoratorSupport, ABC):
         self,
         func_or_method: DecoratableFunctionType | None = None,
         *,
-        namespace: str | None = None,
-        children_start_soon: bool | None | Sentinel = INHERIT,
-        start_soon_default: bool | Sentinel = INHERIT,
-        strict_event_loop_check: bool | Sentinel = INHERIT,
-        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
+        namespace: str | None,
+        children_start_soon: bool | None | Sentinel,
+        start_soon_default: bool | Sentinel,
+        strict_event_loop_check: bool | Sentinel,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
         self.strict_event_loop_check = strict_event_loop_check
         self.thread_pool = thread_pool
+
+    def run(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        settings_as_dict: dict[str, Any] | None = None,
+        await_children: bool | Sentinel = RECURSIVELY,
+        **kwargs: Any,
+    ) -> Any:
+        pass
 
     def __call__(
         self,

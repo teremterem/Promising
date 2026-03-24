@@ -5,9 +5,8 @@ from abc import ABC, abstractmethod
 from types import FunctionType, MethodType
 from typing import Any
 
-from promising import RECURSIVELY
 from promising.errors import DecorationError
-from promising.sentinels import UNCHANGED, Sentinel
+from promising.sentinels import RECURSIVELY, UNCHANGED, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 from promising.utils import is_func_or_method_async, resolve_namespace
 
@@ -138,7 +137,50 @@ class PromisingDecorator(DecoratorSupport, ABC):
         await_children: bool | Sentinel = RECURSIVELY,
         **kwargs: Any,
     ) -> Any:
-        pass
+        return asyncio.run(
+            self.protected_run(
+                *args,
+                namespace=namespace,
+                children_start_soon=children_start_soon,
+                start_soon_default=start_soon_default,
+                strict_event_loop_check=strict_event_loop_check,
+                thread_pool=thread_pool,
+                settings_as_dict=settings_as_dict,
+                await_children=await_children,
+                **kwargs,
+            )
+        )
+
+    async def protected_run(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        settings_as_dict: dict[str, Any] | None = None,
+        await_children: bool | Sentinel = RECURSIVELY,
+        **kwargs: Any,
+    ) -> Any:
+        context = self(
+            *args,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+            settings_as_dict=settings_as_dict,
+            **kwargs,
+        )
+        result = await context
+
+        if await_children is RECURSIVELY:
+            await context.await_children(recursively=True)
+        elif await_children:
+            await context.await_children(recursively=False)
+
+        return result
 
     def __call__(
         self,

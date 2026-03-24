@@ -44,9 +44,9 @@ class EventLoopError(PromisingError):
     """A base class for all event loop-related errors."""
 
 
-class EventLoopMismatchError(EventLoopError):
+class EventLoopMismatchError(EventLoopError, ValueError):
     pass
 
 
-class NoEventLoopError(EventLoopError):
+class NoEventLoopError(EventLoopError, RuntimeError):
     pass

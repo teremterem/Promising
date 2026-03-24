@@ -214,6 +214,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
+        settings_as_dict: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
@@ -264,10 +265,12 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's return
             value.
         """
+        settings_as_dict = dict(settings_as_dict) if settings_as_dict else {}
+
         if start_soon is not UNCHANGED:
-            kwargs["start_soon"] = start_soon
+            settings_as_dict["start_soon"] = start_soon
         if use_thread_pool is not UNCHANGED:
-            kwargs["use_thread_pool"] = self._validate_use_thread_pool(use_thread_pool)
+            settings_as_dict["use_thread_pool"] = self._validate_use_thread_pool(use_thread_pool)
 
         return super().__call__(
             *args,
@@ -276,10 +279,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             start_soon_default=start_soon_default,
             strict_event_loop_check=strict_event_loop_check,
             thread_pool=thread_pool,
+            settings_as_dict=settings_as_dict,
             **kwargs,
         )
 
-    def _call_wrapped(self, *args: Any, **kwargs: Any) -> Any:
+    def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
@@ -289,7 +293,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             # directly
             coro = self._wrapped_as_callable(*args, **kwargs)
 
-        elif kwargs.get("use_thread_pool", self.use_thread_pool):
+        elif settings_as_dict.get("use_thread_pool", self.use_thread_pool):
             # Run the sync function in a thread pool executor
             @functools.wraps(self.__wrapped__)
             async def _sync_to_async() -> T_co:
@@ -317,13 +321,13 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             coro = _sync_inline()
 
         return Promise[T_co](
-            namespace=kwargs.get("namespace", self.namespace),
+            namespace=settings_as_dict.get("namespace", self.namespace),
             awaitable=coro,
-            start_soon=kwargs.get("start_soon", self.start_soon),
-            children_start_soon=kwargs.get("children_start_soon", self.children_start_soon),
-            start_soon_default=kwargs.get("start_soon_default", self.start_soon_default),
-            strict_event_loop_check=kwargs.get("strict_event_loop_check", self.strict_event_loop_check),
-            thread_pool=kwargs.get("thread_pool", self.thread_pool),
+            start_soon=settings_as_dict.get("start_soon", self.start_soon),
+            children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
+            start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
+            strict_event_loop_check=settings_as_dict.get("strict_event_loop_check", self.strict_event_loop_check),
+            thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
         )
 
     def _validate_use_thread_pool(self, use_thread_pool: bool | None) -> bool | None:

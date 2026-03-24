@@ -133,18 +133,21 @@ class PromisingDecorator(DecoratorSupport, ABC):
         start_soon_default: bool | Sentinel = UNCHANGED,
         strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        settings_as_dict: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
+        settings_as_dict = dict(settings_as_dict) if settings_as_dict else {}
+
         if namespace is not UNCHANGED:
-            kwargs["namespace"] = namespace
+            settings_as_dict["namespace"] = namespace
         if children_start_soon is not UNCHANGED:
-            kwargs["children_start_soon"] = children_start_soon
+            settings_as_dict["children_start_soon"] = children_start_soon
         if start_soon_default is not UNCHANGED:
-            kwargs["start_soon_default"] = start_soon_default
+            settings_as_dict["start_soon_default"] = start_soon_default
         if strict_event_loop_check is not UNCHANGED:
-            kwargs["strict_event_loop_check"] = strict_event_loop_check
+            settings_as_dict["strict_event_loop_check"] = strict_event_loop_check
         if thread_pool is not UNCHANGED:
-            kwargs["thread_pool"] = thread_pool
+            settings_as_dict["thread_pool"] = thread_pool
 
         if self.__wrapped__ is None:
             # We are still in the process of decorating a function or method
@@ -163,7 +166,7 @@ class PromisingDecorator(DecoratorSupport, ABC):
         # The function or method was already decorated and the decorator is now
         # being called with arguments - let's pass this call through to the
         # underlying function or method
-        return self._call_wrapped(*args, **kwargs)
+        return self._call_wrapped(*args, settings_as_dict=settings_as_dict, **kwargs)
 
     @abstractmethod
-    def _call_wrapped(self, *args: Any, **kwargs: Any) -> Any: ...
+    def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any: ...

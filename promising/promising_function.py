@@ -8,7 +8,7 @@ from typing import Any, Generic
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
-from promising.sentinels import INHERIT, UNCHANGED, Sentinel
+from promising.sentinels import INHERIT, RECURSIVELY, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
 
@@ -216,7 +216,6 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
-        settings_as_dict: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Promise[T_co]:
         """
@@ -284,6 +283,66 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             **kwargs,
             **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
         )
+
+    def run(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        start_soon: bool | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        use_thread_pool: bool | Sentinel = UNCHANGED,
+        await_children: bool | Sentinel = RECURSIVELY,
+        **kwargs: Any,
+    ) -> T_co:
+        return asyncio.run(
+            self.protected_run(
+                *args,
+                namespace=namespace,
+                start_soon=start_soon,
+                children_start_soon=children_start_soon,
+                start_soon_default=start_soon_default,
+                strict_event_loop_check=strict_event_loop_check,
+                thread_pool=thread_pool,
+                use_thread_pool=use_thread_pool,
+                await_children=await_children,
+                **kwargs,
+            )
+        )
+
+    async def protected_run(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        start_soon: bool | None | Sentinel = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        use_thread_pool: bool | Sentinel = UNCHANGED,
+        await_children: bool | Sentinel = RECURSIVELY,
+        **kwargs: Any,
+    ) -> T_co:
+        promise = self(
+            *args,
+            namespace=namespace,
+            start_soon=start_soon,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+            use_thread_pool=use_thread_pool,
+            **kwargs,
+        )
+        try:
+            return await promise
+        finally:
+            if await_children is RECURSIVELY:
+                await promise.await_children(recursively=True)
+            elif await_children:
+                await promise.await_children(recursively=False)
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would

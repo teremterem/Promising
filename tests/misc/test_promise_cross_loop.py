@@ -13,8 +13,6 @@ def test_prefilled_promise_created_outside_async_context() -> None:
 
     Runs in a separate thread to avoid interfering with the pytest-asyncio
     event loop.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2955728362
     """
     error = None
 
@@ -49,8 +47,6 @@ async def test_done_promise_awaited_from_different_loop() -> None:
     pytest-asyncio event loop), then awaited in a separate thread with a
     different event loop. Since the Promise is already done, no event loop
     interaction should be needed and the await should succeed.
-
-    See: https://github.com/teremterem/Promising/pull/79#discussion_r2955728362
     """
 
     async def compute() -> int:

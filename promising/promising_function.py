@@ -5,7 +5,7 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic
 
-from promising.decorator_support import PromisingDecorator
+from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
@@ -267,7 +267,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             A ``Promise`` that will resolve to the wrapped function's return
             value.
         """
-        settings_as_dict = dict(settings_as_dict) if settings_as_dict else {}
+        settings_as_dict = kwargs.pop(_SETTINGS_AS_DICT_KEY, {})
 
         if start_soon is not UNCHANGED:
             settings_as_dict["start_soon"] = start_soon
@@ -281,8 +281,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             start_soon_default=start_soon_default,
             strict_event_loop_check=strict_event_loop_check,
             thread_pool=thread_pool,
-            settings_as_dict=settings_as_dict,
             **kwargs,
+            **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
         )
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:

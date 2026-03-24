@@ -10,7 +10,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 from weakref import WeakSet
 
-from promising.decorator_support import DecoratorSupport
+from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
     ContextNotActiveError,
@@ -19,7 +19,7 @@ from promising.errors import (
     PromiseNotFoundError,
     SyncUsageError,
 )
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from promising.promise import Promise
 
 
-class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
+class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
     """
     Decorator and context manager that creates a hierarchical context node
     tracking parent-child relationships between promises and groups of
@@ -121,14 +121,16 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         strict_event_loop_check: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
-        super().__init__(func_or_method, namespace=namespace)
-
+        super().__init__(
+            func_or_method,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+        )
         self.ctx_loop = loop
         self.parent = parent
-        self.children_start_soon = children_start_soon
-        self.start_soon_default = start_soon_default
-        self.strict_event_loop_check = strict_event_loop_check
-        self.thread_pool = thread_pool
 
         self._promising_context = None
 
@@ -169,33 +171,45 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self._promising_context = None
         return result
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
-        # TODO [P1] Support overriding settings at call time
-        if self.__wrapped__ is None:
-            # We are still in the process of decorating a function or method
-            # (because this decorator was used with parameters) - let's finish
-            # the decoration process
-            if len(args) != 1 or kwargs:
-                raise DecorationError(
-                    "The decorator must be called with exactly one positional "
-                    "argument after its parameters were already provided, and "
-                    "it should be a strictly positional argument: a function "
-                    "or method to decorate."
-                )
-            self._update_wrapper(args[0])
-            return self
+    def __call__(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        loop: AbstractEventLoop | None | Sentinel = UNCHANGED,
+        parent: "PromisingContext | None | Sentinel" = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        strict_event_loop_check: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        **kwargs: Any,
+    ) -> Any | DecoratableFunctionType:
+        settings_as_dict = kwargs.pop(_SETTINGS_AS_DICT_KEY, {})
 
-        # The function or method was already decorated and the decorator is now
-        # being called with arguments - let's pass this call through to the
-        # underlying function or method
+        if loop is not UNCHANGED:
+            settings_as_dict["loop"] = loop
+        if parent is not UNCHANGED:
+            settings_as_dict["parent"] = parent
+
+        return super().__call__(
+            *args,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            strict_event_loop_check=strict_event_loop_check,
+            thread_pool=thread_pool,
+            **kwargs,
+            **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
+        )
+
+    def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         ctx = PromisingContext(
-            namespace=self.namespace,
-            loop=self.ctx_loop,
-            parent=self.parent,
-            thread_pool=self.thread_pool,
-            children_start_soon=self.children_start_soon,
-            start_soon_default=self.start_soon_default,
-            strict_event_loop_check=self.strict_event_loop_check,
+            namespace=settings_as_dict.get("namespace", self.namespace),
+            loop=settings_as_dict.get("loop", self.ctx_loop),
+            parent=settings_as_dict.get("parent", self.parent),
+            thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
+            children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
+            start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
+            strict_event_loop_check=settings_as_dict.get("strict_event_loop_check", self.strict_event_loop_check),
         )
 
         if self._is_wrapped_async:

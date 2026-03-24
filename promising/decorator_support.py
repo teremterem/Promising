@@ -10,6 +10,8 @@ from promising.sentinels import RECURSIVELY, UNCHANGED, Sentinel
 from promising.types import CallableType, DecoratableFunctionType
 from promising.utils import is_func_or_method_async, resolve_namespace
 
+_SETTINGS_AS_DICT_KEY = "_settings_as_dict"
+
 
 class DecoratorSupport:
     """
@@ -193,7 +195,7 @@ class PromisingDecorator(DecoratorSupport, ABC):
         settings_as_dict: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
-        settings_as_dict = dict(settings_as_dict) if settings_as_dict else {}
+        settings_as_dict = kwargs.pop(_SETTINGS_AS_DICT_KEY, {})
 
         if namespace is not UNCHANGED:
             settings_as_dict["namespace"] = namespace
@@ -210,7 +212,7 @@ class PromisingDecorator(DecoratorSupport, ABC):
             # We are still in the process of decorating a function or method
             # (because this decorator was used with parameters) - let's finish
             # the decoration process
-            if len(args) != 1 or kwargs:
+            if len(args) != 1 or kwargs or settings_as_dict:
                 raise DecorationError(
                     "The decorator must be called with exactly one positional "
                     "argument after its parameters were already provided, and "

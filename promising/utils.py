@@ -72,8 +72,7 @@ def resolve_module_name(obj: Any) -> str | None:
 
 def get_running_asyncio_loop(*, raise_if_none: bool = True) -> AbstractEventLoop | None:
     try:
-        # TODO [P1] Switch to `asyncio.get_running_loop()` ?
-        return asyncio.get_event_loop()
+        return asyncio.get_running_loop()
     except RuntimeError as e:
         if raise_if_none:
             raise NoEventLoopError(e) from e

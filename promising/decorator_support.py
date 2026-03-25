@@ -118,13 +118,11 @@ class PromisingDecorator(DecoratorSupport, ABC):
         namespace: str | None,
         children_start_soon: bool | None | Sentinel,
         start_soon_default: bool | Sentinel,
-        strict_event_loop_check: bool | Sentinel,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel,
     ) -> None:
         super().__init__(func_or_method, namespace=namespace)
         self.children_start_soon = children_start_soon
         self.start_soon_default = start_soon_default
-        self.strict_event_loop_check = strict_event_loop_check
         self.thread_pool = thread_pool
 
     def __call__(
@@ -133,7 +131,6 @@ class PromisingDecorator(DecoratorSupport, ABC):
         namespace: str | None | Sentinel = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
-        strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
@@ -145,8 +142,6 @@ class PromisingDecorator(DecoratorSupport, ABC):
             settings_as_dict["children_start_soon"] = children_start_soon
         if start_soon_default is not UNCHANGED:
             settings_as_dict["start_soon_default"] = start_soon_default
-        if strict_event_loop_check is not UNCHANGED:
-            settings_as_dict["strict_event_loop_check"] = strict_event_loop_check
         if thread_pool is not UNCHANGED:
             settings_as_dict["thread_pool"] = thread_pool
 

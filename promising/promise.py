@@ -96,19 +96,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
-        strict_event_loop_check: Controls whether the event loop identity
-            check is always performed when awaiting this Promise (True), or
-            only when the Promise is not yet done (False). The global
-            default is True. Setting this to False is not recommended: in
-            systems that mix multiple event loops, a "wrong loop" mistake
-            on an already-done Promise would silently succeed instead of
-            raising EventLoopMismatchError, turning a reliable, deterministic
-            error into a race condition that only manifests when the Promise
-            happens to still be in progress — making it much harder to
-            track down. INHERIT (default) copies the parent's setting,
-            falling back to Defaults.STRICT_EVENT_LOOP_CHECK (the global
-            default) at the root. PROMISING_DEFAULT reads the global default
-            directly.
         prefilled_result: Pre-set result value. Cannot be combined with awaitable
             or prefilled_exception.
         prefilled_exception: Pre-set exception. Cannot be combined with awaitable
@@ -136,7 +123,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
-        strict_event_loop_check: bool | Sentinel = INHERIT,
         prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
@@ -153,7 +139,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
-            strict_event_loop_check=strict_event_loop_check,
         )
         Future.__init__(
             self,
@@ -605,14 +590,13 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._unpack_all = unpack_all
 
     def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
-        if self._promise._strict_event_loop_check or not self._promise.done():
-            running_loop = asyncio.get_running_loop()
-            if running_loop is not self._promise._ctx_loop:
-                # TODO What to do about this message if either of the sides of the
-                #  expression is None ? Can each of them be None ?
-                raise EventLoopMismatchError(
-                    f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
-                )
+        running_loop = asyncio.get_running_loop()
+        if running_loop is not self._promise._ctx_loop:
+            # TODO What to do about this message if either of the sides of the
+            #  expression is None ? Can each of them be None ?
+            raise EventLoopMismatchError(
+                f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
+            )
 
         if self._promise.done():
             result = self._promise.result()

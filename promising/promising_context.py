@@ -94,19 +94,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
-        strict_event_loop_check: Controls whether the event loop identity
-            check is always performed when awaiting a ``Promise`` (``True``),
-            or only when the ``Promise`` is not yet done (``False``). The
-            global default is ``True``. Setting this to ``False`` is not
-            recommended: in systems that mix multiple event loops, a
-            "wrong loop" mistake on an already-done ``Promise`` would
-            silently succeed instead of raising ``EventLoopMismatchError``,
-            turning a reliable, deterministic error into a race condition that
-            only manifests when the ``Promise`` happens to still be in progress
-            — making it much harder to track down.
-            ``INHERIT`` (default) copies the parent's setting, falling back
-            to ``Defaults.STRICT_EVENT_LOOP_CHECK`` (the global default) at the
-            root. ``PROMISING_DEFAULT`` reads the global default directly.
     """
 
     def __init__(
@@ -118,7 +105,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
-        strict_event_loop_check: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
         super().__init__(
@@ -126,7 +112,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
-            strict_event_loop_check=strict_event_loop_check,
             thread_pool=thread_pool,
         )
         self.ctx_loop = loop
@@ -154,7 +139,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
                 thread_pool=self.thread_pool,
                 children_start_soon=self.children_start_soon,
                 start_soon_default=self.start_soon_default,
-                strict_event_loop_check=self.strict_event_loop_check,
             )
         return self._promising_context.__enter__()
 
@@ -179,7 +163,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
-        strict_event_loop_check: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
@@ -195,7 +178,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
-            strict_event_loop_check=strict_event_loop_check,
             thread_pool=thread_pool,
             **kwargs,
             **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
@@ -209,7 +191,6 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
             start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
-            strict_event_loop_check=settings_as_dict.get("strict_event_loop_check", self.strict_event_loop_check),
         )
 
         if self._is_wrapped_async:
@@ -369,7 +350,6 @@ class PromisingContext:
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
-        strict_event_loop_check: bool | Sentinel = INHERIT,
     ) -> None:
         self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
@@ -387,7 +367,6 @@ class PromisingContext:
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
-        self._strict_event_loop_check = self._resolve_strict_event_loop_check(strict_event_loop_check)
 
         if loop is None:
             if self._parent is None:
@@ -758,30 +737,6 @@ class PromisingContext:
         raise ValueError(
             "`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given instead"
-        )
-
-    def _resolve_strict_event_loop_check(self, strict_event_loop_check: bool | Sentinel) -> bool:
-        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
-
-        if isinstance(strict_event_loop_check, bool):
-            # Concrete value was provided
-            return strict_event_loop_check
-
-        if strict_event_loop_check is PROMISING_DEFAULT:
-            # Use the global default
-            return Defaults.STRICT_EVENT_LOOP_CHECK
-
-        if strict_event_loop_check is INHERIT:
-            if self._parent is None:
-                # Use the global default
-                return Defaults.STRICT_EVENT_LOOP_CHECK
-
-            # Inherit from the parent
-            return self._parent._strict_event_loop_check
-
-        raise ValueError(
-            "`strict_event_loop_check` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
-            f"but `{type(strict_event_loop_check)}` was given instead"
         )
 
     def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:

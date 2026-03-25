@@ -272,6 +272,43 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         await_children: bool | Sentinel = RECURSIVELY,
         **kwargs: Any,
     ) -> T_co:
+        """
+        Top-level entrypoint for running a decorated function
+        from non-async code — analogous to ``asyncio.run()``.
+        Calls ``asyncio.run()`` on ``protected_run()``, which
+        means it creates its own event loop, awaits the result,
+        and by default awaits all children recursively.
+
+        This is **not** the same as ``promise.sync()``:
+        ``.sync()`` is for consuming a promise's result from
+        within a sync promising function that already runs
+        inside an event loop (in a thread pool), whereas
+        ``.run()`` is for starting the whole promise tree from
+        scratch.
+
+        Args:
+            *args: Positional arguments forwarded to the
+                wrapped function.
+            **kwargs: Keyword arguments forwarded to the
+                wrapped function.
+            namespace: Override for the ``Promise`` namespace.
+            start_soon: Override for eager/deferred execution.
+            children_start_soon: Override for child execution
+                policy.
+            start_soon_default: Override for the global
+                ``start_soon`` default.
+            thread_pool: Override for the thread pool executor.
+            use_thread_pool: Override for thread pool usage
+                (sync functions only).
+            await_children: Whether to await children after the
+                promise completes. ``RECURSIVELY`` (default)
+                awaits the entire subtree, ``True`` awaits
+                direct children only, ``False`` skips child
+                awaiting.
+
+        Returns:
+            The fully unpacked result of the ``Promise``.
+        """
         return asyncio.run(
             self.protected_run(
                 *args,
@@ -298,6 +335,41 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         await_children: bool | Sentinel = RECURSIVELY,
         **kwargs: Any,
     ) -> T_co:
+        """
+        Returns a **coroutine** (not a ``Promise``), making it
+        safe to pass to ``asyncio.run()`` — unlike calling the
+        decorated function directly, which would construct a
+        ``Promise`` (an ``asyncio.Future`` subclass) before the
+        event loop exists and fail.
+
+        Inside, the coroutine calls the decorated function,
+        awaits the resulting ``Promise``, and then — in a
+        ``finally`` block, so regardless of success or failure
+        — awaits its children. Used by ``run()`` internally.
+
+        Args:
+            *args: Positional arguments forwarded to the
+                wrapped function.
+            **kwargs: Keyword arguments forwarded to the
+                wrapped function.
+            namespace: Override for the ``Promise`` namespace.
+            start_soon: Override for eager/deferred execution.
+            children_start_soon: Override for child execution
+                policy.
+            start_soon_default: Override for the global
+                ``start_soon`` default.
+            thread_pool: Override for the thread pool executor.
+            use_thread_pool: Override for thread pool usage
+                (sync functions only).
+            await_children: Whether to await children after the
+                promise completes. ``RECURSIVELY`` (default)
+                awaits the entire subtree, ``True`` awaits
+                direct children only, ``False`` skips child
+                awaiting.
+
+        Returns:
+            The fully unpacked result of the ``Promise``.
+        """
         promise = self(
             *args,
             namespace=namespace,

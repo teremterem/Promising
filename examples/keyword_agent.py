@@ -59,7 +59,7 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
 if __name__ == "__main__":
 
     @promising.function
-    async def main():
+    async def main() -> None:
         # TODO Support arbitrary attributes in PromisingContext to put things
         #  like litellm_session in there. Child contexts should inherit those
         #  attributes from their parents. (Should probably be copied to

@@ -1,4 +1,5 @@
 import re
+import threading
 from typing import Any
 
 import promising
@@ -15,6 +16,28 @@ def normalize_object_repr(s: str) -> str:
     # digits-turned-999 and hex letters, normalizing to "0xfff".
     s = re.sub(r"999x[9a-f]+", "0xfff", s)
     return s
+
+
+def run_in_thread(fn):
+    """Run *fn* in a dedicated thread, re-raising any error.
+
+    Useful for tests that call .run() (which needs asyncio.run()) without
+    interfering with the pytest-asyncio event loop.
+    """
+    error = None
+
+    def _target():
+        nonlocal error
+        try:
+            fn()
+        except BaseException as exc:
+            error = exc
+
+    t = threading.Thread(target=_target)
+    t.start()
+    t.join()
+    if error is not None:
+        raise error
 
 
 def collect_parent_contexts(ctx: promising.PromisingContext) -> list[promising.PromisingContext]:

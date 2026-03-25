@@ -1,6 +1,5 @@
-import threading
-
 import promising
+from tests.utils_for_tests import run_in_thread
 
 
 def test_async_function_decorator_with_run() -> None:
@@ -15,31 +14,22 @@ def test_async_function_decorator_with_run() -> None:
     Runs in a separate thread to avoid interfering with the pytest-asyncio
     event loop.
     """
-    error = None
 
-    def _run_in_thread() -> None:
-        nonlocal error
-        try:
-            captured_ctx = None
+    def _test() -> None:
+        captured_ctx = None
 
-            @promising.function
-            async def work() -> str:
-                nonlocal captured_ctx
-                captured_ctx = promising.get_active_context()
-                return "done"
+        @promising.function
+        async def work() -> str:
+            nonlocal captured_ctx
+            captured_ctx = promising.get_active_context()
+            return "done"
 
-            result = work.run()
-            assert result == "done"
-            assert captured_ctx is not None
-            assert isinstance(captured_ctx, promising.Promise)
-        except BaseException as exc:
-            error = exc
+        result = work.run()
+        assert result == "done"
+        assert captured_ctx is not None
+        assert isinstance(captured_ctx, promising.Promise)
 
-    t = threading.Thread(target=_run_in_thread)
-    t.start()
-    t.join()
-    if error is not None:
-        raise error
+    run_in_thread(_test)
 
 
 def test_async_function_decorator_with_run_and_child_promise() -> None:
@@ -51,30 +41,21 @@ def test_async_function_decorator_with_run_and_child_promise() -> None:
     Runs in a separate thread to avoid interfering with the pytest-asyncio
     event loop.
     """
-    error = None
 
-    def _run_in_thread() -> None:
-        nonlocal error
-        try:
+    def _test() -> None:
 
-            @promising.function
-            async def child_work(x: int) -> int:
-                return x * 2
+        @promising.function
+        async def child_work(x: int) -> int:
+            return x * 2
 
-            @promising.function
-            async def parent_work() -> int:
-                result = await child_work(21)
-                return result
+        @promising.function
+        async def parent_work() -> int:
+            result = await child_work(21)
+            return result
 
-            assert parent_work.run() == 42
-        except BaseException as exc:
-            error = exc
+        assert parent_work.run() == 42
 
-    t = threading.Thread(target=_run_in_thread)
-    t.start()
-    t.join()
-    if error is not None:
-        raise error
+    run_in_thread(_test)
 
 
 async def test_async_context_decorator_resolves_parent_at_call_site() -> None:

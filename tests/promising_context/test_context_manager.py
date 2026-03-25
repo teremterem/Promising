@@ -1,8 +1,7 @@
-import threading
-
 import pytest
 
 import promising
+from tests.utils_for_tests import run_in_thread
 
 
 async def test_context_manager_activates_context() -> None:
@@ -86,24 +85,6 @@ async def test_context_manager_with_explicit_parent_none() -> None:
 # ── Context manager inside a sync promising function (.run()) ────
 
 
-def _run_in_thread(fn):
-    """Helper: run *fn* in a dedicated thread, re-raising any error."""
-    error = None
-
-    def _target():
-        nonlocal error
-        try:
-            fn()
-        except BaseException as exc:
-            error = exc
-
-    t = threading.Thread(target=_target)
-    t.start()
-    t.join()
-    if error is not None:
-        raise error
-
-
 @pytest.mark.parametrize("use_thread_pool", [True, False])
 def test_context_manager_inside_sync_promising_function_run(use_thread_pool: bool) -> None:
     """
@@ -139,7 +120,7 @@ def test_context_manager_inside_sync_promising_function_run(use_thread_pool: boo
         # promising function body.
         assert before_ctx is after_ctx
 
-    _run_in_thread(_test)
+    run_in_thread(_test)
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
@@ -177,7 +158,7 @@ def test_nested_context_managers_inside_sync_promising_function_run(use_thread_p
         assert results["inner_parent_is_outer"]
         assert results["outer_restored"]
 
-    _run_in_thread(_test)
+    run_in_thread(_test)
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
@@ -207,7 +188,7 @@ def test_context_manager_parent_is_promise_inside_sync_promising_function_run(us
         assert work.run() == "done"
         assert ctx_parent is not None
 
-    _run_in_thread(_test)
+    run_in_thread(_test)
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
@@ -242,4 +223,4 @@ def test_context_manager_deactivates_on_exception_inside_sync_promising_function
         assert work.run() == "done"
         assert promise_ctx_after is not None
 
-    _run_in_thread(_test)
+    run_in_thread(_test)

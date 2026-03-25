@@ -286,6 +286,12 @@ async def do_work() -> str:
 await do_work()
 ```
 
+Settings specified on the decorator can be overridden at call time by passing them as keyword arguments:
+
+```python
+await do_work(children_start_soon=True)  # overrides decorator default for this call
+```
+
 Like `@promising.function`, it works with `@classmethod`, `@staticmethod`, and instance methods in either decorator order.
 
 ### `promising.context` vs `promising.function`

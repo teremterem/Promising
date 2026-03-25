@@ -31,7 +31,7 @@ ruff check
 pre-commit run --all-files
 ```
 
-Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_context/`, `tests/promising_function/`), each with a `sync/` subdirectory for sync-related tests.
+Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). A global 10-second timeout per test is enforced via pytest-timeout. Tests are organized into subdirectories by component (e.g., `tests/promise/`, `tests/promising_context/`, `tests/promising_function/`), each with a `sync/` subdirectory for sync-related tests. `tests/misc/` contains cross-cutting tests (decorator robustness, `asyncio.run()` integration, traces).
 
 ## Code Style
 
@@ -69,7 +69,7 @@ Extends both `PromisingContext` and `asyncio.Future`. Adds coroutine execution l
 
 ### PromisingFunction (`promising/promising_function.py`)
 
-Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`. Extends `PromisingDecorator` (from `decorator_support.py`) for decorator and descriptor support.
+Decorator/wrapper that turns async **or sync** functions into Promise-producing callables. Calling a `PromisingFunction` returns a `Promise[T]`. Extends `PromisingDecorator` (from `decorator_support.py`) for decorator and descriptor support. Sets a class-level `_is_coroutine` marker so that `asyncio.iscoroutinefunction()` recognizes all promising functions as coroutine functions — even those wrapping sync functions — since they always return awaitable `Promise` objects.
 
 - **Async functions** produce coroutines directly.
 - **Sync functions** are detected via `asyncio.iscoroutinefunction()` (cached at decoration time as `_is_wrapped_async` on `DecoratorSupport`) and require an explicit `use_thread_pool` setting. With `use_thread_pool=True` (recommended), they run in a `ThreadPoolExecutor` (configurable via the `thread_pool` parameter, defaulting to `Defaults.PROMISING_THREAD_POOL`) via `loop.run_in_executor()` with `contextvars.copy_context()` to propagate the active context to the executor thread. With `use_thread_pool=False`, the sync function runs directly on the event loop thread instead (useful for lightweight transforms, but blocks the loop). Omitting `use_thread_pool` on a sync function raises `DecorationError`. Conversely, setting `use_thread_pool` on an async function also raises `DecorationError` — async functions always run on the event loop regardless. An alternative to `use_thread_pool=False` is to simply mark the function as `async` without using `await` inside, which avoids the thread pool naturally (same caveat: CPU-heavy work will block the event loop). Unlike `thread_pool`, `use_thread_pool` is intentionally not inheritable — it must be set per-function at decoration time (and can be overridden at call time for sync functions).

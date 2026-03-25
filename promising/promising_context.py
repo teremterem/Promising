@@ -71,7 +71,8 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             consequently, in promising traces). When used as a decorator and
             not provided, defaults to the wrapped function's ``__qualname__``.
         loop: Event loop to use. None (default) inherits from the parent
-            context, or falls back to ``asyncio.get_event_loop()`` at the root.
+            context, or uses the currently running event loop at the root
+            (raises ``NoEventLoopError`` if no loop is running).
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.

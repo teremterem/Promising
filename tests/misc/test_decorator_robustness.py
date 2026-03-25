@@ -434,7 +434,7 @@ async def test_context_on_top_of_context_raises_arg_error_at_call_time(
 
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 @pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
-def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
+async def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
     inner_with_parens: bool,
     outer_with_parens: bool,
 ) -> None:

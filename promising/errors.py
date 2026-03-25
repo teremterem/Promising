@@ -48,5 +48,5 @@ class EventLoopMismatchError(EventLoopError, ValueError):
     pass
 
 
-class NoEventLoopError(EventLoopError, RuntimeError):
+class NoRunningEventLoopError(EventLoopError, RuntimeError):
     pass

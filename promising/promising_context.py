@@ -16,8 +16,8 @@ from promising.errors import (
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
+    NoRunningEventLoopError,
     PromiseNotFoundError,
-    SyncUsageError,
 )
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
@@ -72,7 +72,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             not provided, defaults to the wrapped function's ``__qualname__``.
         loop: Event loop to use. None (default) inherits from the parent
             context, or uses the currently running event loop at the root
-            (raises ``NoEventLoopError`` if no loop is running).
+            (raises ``NoRunningEventLoopError`` if no loop is running).
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
@@ -752,12 +752,6 @@ class PromisingContext:
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():
-            # TODO This message and this error class are not correct anymore -
-            #  this exception does not happen only with sync operations, async
-            #  operations can also raise it
-            raise SyncUsageError(
-                "The event loop that would monitor a synchronous operation "
-                f"in this {self.__class__.__name__} is not running"
-            )
+            raise NoRunningEventLoopError(f"The event loop of {self} is not running")
 
         self._ctx_loop.call_soon_threadsafe(callback)

@@ -61,7 +61,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             be prefilled with a result or exception.
         loop: Event loop to use. None (default) inherits from the parent
             context, or uses the currently running event loop at the root
-            (raises ``NoEventLoopError`` if no loop is running).
+            (raises ``NoRunningEventLoopError`` if no loop is running).
         namespace: Human-readable label for this Promise. Shows up in
             ``__repr__`` output (and, consequently, in promising traces). When
             created via ``@promising.function`` and not provided, defaults to

@@ -557,7 +557,7 @@ All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 | `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, setting `use_thread_pool` on an async function, or using the same `promising.context` instance as both context manager and decorator). |
 | `promising.EventLoopError` | Base class for event loop-related errors. Inherits from `PromisingError`. |
 | `promising.EventLoopMismatchError` | Awaiting a `Promise` from a different event loop than the one it belongs to. Inherits from both `EventLoopError` and `ValueError`. |
-| `promising.NoEventLoopError` | No running event loop found when one is required (e.g. creating a root `PromisingContext` outside an async context, or awaiting a `Promise` without a running event loop). Inherits from both `EventLoopError` and `RuntimeError`. |
+| `promising.NoRunningEventLoopError` | No running event loop found when one is required (e.g. creating a root `PromisingContext` outside an async context, awaiting a `Promise` without a running event loop, or scheduling work on a context whose event loop has stopped). Inherits from both `EventLoopError` and `RuntimeError`. |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
 | `promising.SentinelUsageError` | A `Sentinel` was used in a boolean context (e.g. `if INHERIT:`). Use `is` / `is not` identity comparisons instead. |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |

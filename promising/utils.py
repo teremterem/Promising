@@ -3,7 +3,7 @@ import inspect
 from asyncio import AbstractEventLoop
 from typing import Any
 
-from promising.errors import NoEventLoopError, SyncUsageError
+from promising.errors import NoRunningEventLoopError, SyncUsageError
 from promising.types import DecoratableFunctionType
 
 
@@ -75,5 +75,5 @@ def get_running_asyncio_loop(*, raise_if_none: bool = True) -> AbstractEventLoop
         return asyncio.get_running_loop()
     except RuntimeError as e:
         if raise_if_none:
-            raise NoEventLoopError(e) from e
+            raise NoRunningEventLoopError(e) from e
         return None

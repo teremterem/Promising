@@ -90,7 +90,7 @@ Decorator/wrapper that turns async **or sync** functions into Promise-producing 
 - `DecorationError` — invalid decorator usage (also covers misuse of `promising.context`, e.g. using the same instance as both context manager and decorator)
 - `EventLoopError(PromisingError)` — base class for event loop-related errors
   - `EventLoopMismatchError(EventLoopError, ValueError)` — awaiting a `Promise` from a different event loop than the one it belongs to
-  - `NoEventLoopError(EventLoopError, RuntimeError)` — no running event loop found when one is required
+  - `NoRunningEventLoopError(EventLoopError, RuntimeError)` — no running event loop found when one is required
 - `PromiseNotFoundError` — no active `Promise` found (the active context is not a `Promise`)
 - `SentinelUsageError` — a `Sentinel` was used in a boolean context (e.g. `if INHERIT:`)
 - `SyncUsageError` — raised when `sync()` or `await_children_sync()` are called from the event loop thread

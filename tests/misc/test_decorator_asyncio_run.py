@@ -28,7 +28,7 @@ def test_async_function_decorator_with_asyncio_run() -> None:
             async def work() -> str:
                 return "done"
 
-            result = asyncio.run(work())
+            result = work.run()
             assert result == "done"
         except BaseException as exc:
             error = exc
@@ -64,7 +64,7 @@ def test_async_function_decorator_with_asyncio_run_and_child_promise() -> None:
                 result = await child_work(21)
                 return result
 
-            assert asyncio.run(parent_work()) == 42
+            assert parent_work.run() == 42
         except BaseException as exc:
             error = exc
 

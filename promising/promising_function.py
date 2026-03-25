@@ -308,6 +308,10 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
 
         Returns:
             The fully unpacked result of the ``Promise``.
+
+        Raises:
+            RuntimeError: If called from within an already-running event
+                loop (e.g., inside another async function).
         """
         return asyncio.run(
             self.protected_run(

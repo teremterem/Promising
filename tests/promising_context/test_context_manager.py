@@ -98,35 +98,29 @@ def test_context_manager_inside_promising_function_run(use_thread_pool: bool | N
         before_ctx = None
         after_ctx = None
 
+        def actual_work() -> str:
+            nonlocal captured_ctx, before_ctx, after_ctx
+            before_ctx = promising.get_active_context()
+
+            with promising.context() as ctx:
+                captured_ctx = ctx
+                assert promising.get_active_context() is ctx
+                assert isinstance(ctx, promising.PromisingContext)
+
+            after_ctx = promising.get_active_context()
+            return "done"
+
         if use_thread_pool is not None:
 
             @promising.function(use_thread_pool=use_thread_pool)
             def work() -> str:
-                nonlocal captured_ctx, before_ctx, after_ctx
-                before_ctx = promising.get_active_context()
-
-                with promising.context() as ctx:
-                    captured_ctx = ctx
-                    assert promising.get_active_context() is ctx
-                    assert isinstance(ctx, promising.PromisingContext)
-
-                after_ctx = promising.get_active_context()
-                return "done"
+                return actual_work()
 
         else:
 
             @promising.function
             async def work() -> str:
-                nonlocal captured_ctx, before_ctx, after_ctx
-                before_ctx = promising.get_active_context()
-
-                with promising.context() as ctx:
-                    captured_ctx = ctx
-                    assert promising.get_active_context() is ctx
-                    assert isinstance(ctx, promising.PromisingContext)
-
-                after_ctx = promising.get_active_context()
-                return "done"
+                return actual_work()
 
         assert work.run() == "done"
 

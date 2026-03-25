@@ -3,16 +3,15 @@ import threading
 import promising
 
 
-def test_async_function_decorator_with_asyncio_run() -> None:
+def test_async_function_decorator_with_run() -> None:
     """
-    @promising.function on an async function used with asyncio.run().
+    @promising.function on an async function used with PromisingFunction.run().
 
-    asyncio.run() evaluates f() — and therefore the decorator's
-    __call__ — *before* asyncio.run creates and starts its own event
-    loop.  The PromisingFunction must resolve the event loop lazily
-    (when the coroutine body runs) rather than eagerly (when the
-    Promise object is constructed), otherwise it captures a stale
-    loop and fails.
+    run() delegates to asyncio.run(), which creates a new event loop.
+    The PromisingFunction must resolve the event loop lazily (when the
+    coroutine body runs) rather than eagerly (when the Promise object
+    is constructed), because no running loop exists yet at construction
+    time.
 
     Runs in a separate thread to avoid interfering with the
     pytest-asyncio event loop.
@@ -44,7 +43,7 @@ def test_async_function_decorator_with_asyncio_run() -> None:
         raise error
 
 
-def test_async_function_decorator_with_asyncio_run_and_child_promise() -> None:
+def test_async_function_decorator_with_run_and_child_promise() -> None:
     """
     Same as above but also creates a child Promise inside the function,
     which exercises _call_soon_threadsafe and verifies the event loop

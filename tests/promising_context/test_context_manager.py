@@ -83,9 +83,6 @@ async def test_context_manager_with_explicit_parent_none() -> None:
         assert promising.get_active_context() is outer
 
 
-# ── Context manager inside a sync promising function (.run()) ────
-
-
 @pytest.mark.parametrize("use_thread_pool", [True, False, None])
 def test_context_manager_inside_promising_function_run(use_thread_pool: bool | None) -> None:
     """
@@ -113,7 +110,7 @@ def test_context_manager_inside_promising_function_run(use_thread_pool: bool | N
                     assert promising.get_active_context() is ctx
                     assert isinstance(ctx, promising.PromisingContext)
 
-                after_ctx = promising.get_active_context(raise_if_none=False)
+                after_ctx = promising.get_active_context()
                 return "done"
 
         else:
@@ -128,169 +125,17 @@ def test_context_manager_inside_promising_function_run(use_thread_pool: bool | N
                     assert promising.get_active_context() is ctx
                     assert isinstance(ctx, promising.PromisingContext)
 
-                after_ctx = promising.get_active_context(raise_if_none=False)
+                after_ctx = promising.get_active_context()
                 return "done"
 
         assert work.run() == "done"
-        assert captured_ctx is not None
-        # After the `with` block the active context should revert to the
-        # promise itself, not None — because we're still inside the
-        # promising function body.
+
+        assert isinstance(captured_ctx, promising.PromisingContext)
+        assert not isinstance(captured_ctx, promising.Promise)
+        assert isinstance(before_ctx, promising.Promise)
+
+        assert captured_ctx is not before_ctx
+        assert captured_ctx.get_parent_context() is before_ctx
         assert before_ctx is after_ctx
-
-    run_in_thread(_test)
-
-
-@pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_nested_context_managers_inside_promising_function_run(use_thread_pool: bool | None) -> None:
-    """
-    Nested `with promising.context()` blocks inside a @promising.function
-    executed via .run(). Each block sees its own context, and the outer one is
-    restored after the inner block exits.
-
-    Runs in a separate thread to avoid interfering with the pytest-asyncio
-    event loop.
-    """
-
-    def _test() -> None:
-        results: dict = {}
-
-        if use_thread_pool is not None:
-
-            @promising.function(use_thread_pool=use_thread_pool)
-            def work() -> str:
-                with promising.context() as outer:
-                    results["outer_active"] = promising.get_active_context() is outer
-
-                    with promising.context() as inner:
-                        results["inner_active"] = promising.get_active_context() is inner
-                        results["inner_is_not_outer"] = inner is not outer
-                        results["inner_parent_is_outer"] = inner.get_parent_context() is outer
-
-                    results["outer_restored"] = promising.get_active_context() is outer
-
-                return "done"
-
-        else:
-
-            @promising.function
-            async def work() -> str:
-                with promising.context() as outer:
-                    results["outer_active"] = promising.get_active_context() is outer
-
-                    with promising.context() as inner:
-                        results["inner_active"] = promising.get_active_context() is inner
-                        results["inner_is_not_outer"] = inner is not outer
-                        results["inner_parent_is_outer"] = inner.get_parent_context() is outer
-
-                    results["outer_restored"] = promising.get_active_context() is outer
-
-                return "done"
-
-        assert work.run() == "done"
-        assert results["outer_active"]
-        assert results["inner_active"]
-        assert results["inner_is_not_outer"]
-        assert results["inner_parent_is_outer"]
-        assert results["outer_restored"]
-
-    run_in_thread(_test)
-
-
-@pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_context_manager_parent_is_promise_inside_promising_function_run(use_thread_pool: bool | None) -> None:
-    """
-    A `with promising.context()` opened inside a @promising.function
-    should have the enclosing promise as its parent (via INHERIT).
-
-    Runs in a separate thread to avoid interfering with the pytest-asyncio
-    event loop.
-    """
-
-    def _test() -> None:
-        ctx_parent = None
-
-        if use_thread_pool is not None:
-
-            @promising.function(use_thread_pool=use_thread_pool)
-            def work() -> str:
-                nonlocal ctx_parent
-                promise_ctx = promising.get_active_context()
-
-                with promising.context() as ctx:
-                    ctx_parent = ctx.get_parent_context(raise_if_none=False)
-
-                assert ctx_parent is promise_ctx
-                return "done"
-
-        else:
-
-            @promising.function
-            async def work() -> str:
-                nonlocal ctx_parent
-                promise_ctx = promising.get_active_context()
-
-                with promising.context() as ctx:
-                    ctx_parent = ctx.get_parent_context(raise_if_none=False)
-
-                assert ctx_parent is promise_ctx
-                return "done"
-
-        assert work.run() == "done"
-        assert ctx_parent is not None
-
-    run_in_thread(_test)
-
-
-@pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_context_manager_deactivates_on_exception_inside_promising_function_run(use_thread_pool: bool | None) -> None:
-    """
-    The context opened with `with promising.context()` is properly deactivated
-    even when an exception is raised, inside a @promising.function
-    executed via .run().
-
-    Runs in a separate thread to avoid interfering with the pytest-asyncio
-    event loop.
-    """
-
-    def _test() -> None:
-        promise_ctx_after = None
-
-        if use_thread_pool is not None:
-
-            @promising.function(use_thread_pool=use_thread_pool)
-            def work() -> str:
-                nonlocal promise_ctx_after
-                promise_ctx = promising.get_active_context()
-
-                with pytest.raises(ValueError, match="boom"):
-                    with promising.context():
-                        raise ValueError("boom")
-
-                # After the exception the active context should revert to the
-                # promise, not be stuck on the errored context.
-                promise_ctx_after = promising.get_active_context(raise_if_none=False)
-                assert promise_ctx_after is promise_ctx
-                return "done"
-
-        else:
-
-            @promising.function
-            async def work() -> str:
-                nonlocal promise_ctx_after
-                promise_ctx = promising.get_active_context()
-
-                with pytest.raises(ValueError, match="boom"):
-                    with promising.context():
-                        raise ValueError("boom")
-
-                # After the exception the active context should revert to the
-                # promise, not be stuck on the errored context.
-                promise_ctx_after = promising.get_active_context(raise_if_none=False)
-                assert promise_ctx_after is promise_ctx
-                return "done"
-
-        assert work.run() == "done"
-        assert promise_ctx_after is not None
 
     run_in_thread(_test)

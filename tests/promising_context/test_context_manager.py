@@ -66,7 +66,8 @@ async def test_context_manager_reuse_raises() -> None:
     ctx = promising.context()
     with ctx:
         with pytest.raises(promising.ContextAlreadyActiveError):
-            ctx.__enter__()
+            with ctx:
+                pass
 
 
 async def test_context_manager_with_explicit_parent_none() -> None:

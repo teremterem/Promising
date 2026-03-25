@@ -1,4 +1,3 @@
-import asyncio
 import concurrent.futures
 import time
 from asyncio import AbstractEventLoop, Future, Task
@@ -9,7 +8,7 @@ from promising.errors import EventLoopMismatchError, PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
-from promising.utils import assert_no_sync_usage_deadlock, resolve_namespace
+from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop, resolve_namespace
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -590,10 +589,8 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._unpack_all = unpack_all
 
     def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
-        running_loop = asyncio.get_running_loop()
+        running_loop = get_running_asyncio_loop(raise_if_none=True)
         if running_loop is not self._promise._ctx_loop:
-            # TODO What to do about this message if either of the sides of the
-            #  expression is None ? Can each of them be None ?
             raise EventLoopMismatchError(
                 f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
             )

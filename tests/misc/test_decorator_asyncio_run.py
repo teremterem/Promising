@@ -1,10 +1,13 @@
+import pytest
+
 import promising
 from tests.utils_for_tests import run_in_thread
 
 
-def test_async_function_decorator_with_run() -> None:
+@pytest.mark.parametrize("use_thread_pool", [True, False, None])
+def test_async_function_decorator_with_run(use_thread_pool: bool | None) -> None:
     """
-    @promising.function on an async function used with PromisingFunction.run().
+    @promising.function used with PromisingFunction.run().
 
     run() delegates to asyncio.run(), which creates a new event loop. The
     PromisingFunction must resolve the event loop lazily (when the coroutine
@@ -18,11 +21,21 @@ def test_async_function_decorator_with_run() -> None:
     def _test() -> None:
         captured_ctx = None
 
-        @promising.function
-        async def work() -> str:
-            nonlocal captured_ctx
-            captured_ctx = promising.get_active_context()
-            return "done"
+        if use_thread_pool is not None:
+
+            @promising.function(use_thread_pool=use_thread_pool)
+            def work() -> str:
+                nonlocal captured_ctx
+                captured_ctx = promising.get_active_context()
+                return "done"
+
+        else:
+
+            @promising.function
+            async def work() -> str:
+                nonlocal captured_ctx
+                captured_ctx = promising.get_active_context()
+                return "done"
 
         result = work.run()
         assert result == "done"
@@ -32,7 +45,8 @@ def test_async_function_decorator_with_run() -> None:
     run_in_thread(_test)
 
 
-def test_async_function_decorator_with_run_and_child_promise() -> None:
+@pytest.mark.parametrize("use_thread_pool", [True, False, None])
+def test_async_function_decorator_with_run_and_child_promise(use_thread_pool: bool | None) -> None:
     """
     Same as above but also creates a child Promise inside the function, which
     exercises _call_soon_threadsafe and verifies the event loop is correctly
@@ -43,15 +57,26 @@ def test_async_function_decorator_with_run_and_child_promise() -> None:
     """
 
     def _test() -> None:
+        if use_thread_pool is not None:
 
-        @promising.function
-        async def child_work(x: int) -> int:
-            return x * 2
+            @promising.function(use_thread_pool=use_thread_pool)
+            def child_work(x: int) -> int:
+                return x * 2
 
-        @promising.function
-        async def parent_work() -> int:
-            result = await child_work(21)
-            return result
+            @promising.function(use_thread_pool=use_thread_pool)
+            def parent_work() -> int:
+                return child_work(21)
+
+        else:
+
+            @promising.function
+            async def child_work(x: int) -> int:
+                return x * 2
+
+            @promising.function
+            async def parent_work() -> int:
+                result = await child_work(21)
+                return result
 
         assert parent_work.run() == 42
 

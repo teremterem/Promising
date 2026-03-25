@@ -343,9 +343,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         event loop exists and fail.
 
         Inside, the coroutine calls the decorated function,
-        awaits the resulting ``Promise``, and then — in a
-        ``finally`` block, so regardless of success or failure
-        — awaits its children. Used by ``run()`` internally.
+        awaits the resulting ``Promise``, and by default recursively
+        awaits its children. Used by ``run()`` internally.
 
         Args:
             *args: Positional arguments forwarded to the

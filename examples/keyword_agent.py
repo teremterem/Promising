@@ -26,6 +26,8 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
     temperature = 0
     reasoning_effort = "low"
 
+    promising.print_trace()
+
     response = await acompletion(
         model=model,
         messages=[
@@ -55,9 +57,13 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
 
 
 if __name__ == "__main__":
-    import asyncio
 
-    async def main():
+    @promising.function
+    async def main() -> None:
+        # TODO Support arbitrary attributes in PromisingContext to put things
+        #  like litellm_session in there. Child contexts should inherit those
+        #  attributes from their parents. (Should probably be copied to
+        #  children to avoid race conditions.)
         async with ClientSession() as litellm_session:
             try:
                 while True:
@@ -72,4 +78,4 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 pass
 
-    asyncio.run(main())
+    main.run()

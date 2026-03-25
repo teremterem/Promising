@@ -7,12 +7,12 @@ import promising
 
 async def test_async_function_decorator_activates_context() -> None:
     """
-    @promising.context() on an async function: the context is
+    @promising.context on an async function: the context is
     active inside the function body.
     """
     captured_ctx = None
 
-    @promising.context()
+    @promising.context
     async def work() -> str:
         nonlocal captured_ctx
         captured_ctx = promising.get_active_context()
@@ -29,7 +29,7 @@ async def test_async_function_decorator_deactivates_after() -> None:
     no longer active.
     """
 
-    @promising.context()
+    @promising.context
     async def work() -> str:
         return "done"
 
@@ -44,7 +44,7 @@ async def test_async_function_decorator_forwards_args() -> None:
     decorated async function.
     """
 
-    @promising.context()
+    @promising.context
     async def add(a: int, b: int, *, multiplier: int = 1) -> int:
         return (a + b) * multiplier
 
@@ -58,7 +58,7 @@ async def test_async_function_decorator_exception_propagates() -> None:
     propagates to the caller.
     """
 
-    @promising.context()
+    @promising.context
     async def failing() -> None:
         raise ValueError("async func error")
 
@@ -72,7 +72,7 @@ async def test_async_function_decorator_deactivates_on_exception() -> None:
     raises.
     """
 
-    @promising.context()
+    @promising.context
     async def failing() -> None:
         raise RuntimeError("boom")
 
@@ -82,17 +82,12 @@ async def test_async_function_decorator_deactivates_on_exception() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-async def test_async_function_decorator_without_parens() -> None:
-    """
-    @promising.context (bare, no parens, passing the function
-    directly) also works as a decorator.
-    """
-
-    @promising.context
+async def test_async_function_decorator_with_parens() -> None:
+    @promising.context()
     async def work() -> str:
-        return "bare"
+        return "parens"
 
-    assert await work() == "bare"
+    assert await work() == "parens"
 
 
 async def test_async_function_decorator_each_call_gets_fresh_context() -> None:
@@ -102,7 +97,7 @@ async def test_async_function_decorator_each_call_gets_fresh_context() -> None:
     """
     contexts: list[promising.PromisingContext] = []
 
-    @promising.context()
+    @promising.context
     async def capture() -> None:
         contexts.append(promising.get_active_context())
 
@@ -117,12 +112,12 @@ async def test_async_function_decorator_each_call_gets_fresh_context() -> None:
 
 async def test_instance_method_activates_context() -> None:
     """
-    @promising.context() on an async instance method: the context
+    @promising.context on an async instance method: the context
     is active inside the method body and `self` is received.
     """
 
     class Greeter:
-        @promising.context()
+        @promising.context
         async def greet(self) -> str:
             assert promising.get_active_context() is not None
             return "hello"
@@ -139,7 +134,7 @@ async def test_instance_method_receives_self() -> None:
         def __init__(self, value: int) -> None:
             self.value = value
 
-        @promising.context()
+        @promising.context
         async def get_value(self) -> int:
             return self.value
 
@@ -164,7 +159,7 @@ async def test_instance_method_forwards_args() -> None:
         def __init__(self, base: int) -> None:
             self.base = base
 
-        @promising.context()
+        @promising.context
         async def add(self, x: int, *, multiplier: int = 2) -> int:
             return (self.base + x) * multiplier
 
@@ -180,7 +175,7 @@ async def test_instance_method_exception_propagates() -> None:
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         async def failing(self) -> None:
             raise ValueError("instance method error")
 
@@ -188,18 +183,13 @@ async def test_instance_method_exception_propagates() -> None:
         await MyClass().failing()
 
 
-async def test_instance_method_without_parens() -> None:
-    """
-    @promising.context (bare, no parens) works as an instance
-    method decorator.
-    """
-
+async def test_instance_method_with_parens() -> None:
     class MyClass:
-        @promising.context
+        @promising.context()
         async def greet(self) -> str:
-            return "bare-method"
+            return "parens-method"
 
-    assert await MyClass().greet() == "bare-method"
+    assert await MyClass().greet() == "parens-method"
 
 
 # ── Static Methods ───────────────────────────────────────────────
@@ -207,13 +197,13 @@ async def test_instance_method_without_parens() -> None:
 
 async def test_static_method_decorator() -> None:
     """
-    @promising.context() below @staticmethod: the context is
+    @promising.context below @staticmethod: the context is
     active and the function works via class and instance access.
     """
 
     class MathUtils:
         @staticmethod
-        @promising.context()
+        @promising.context
         async def double(x: int) -> int:
             assert promising.get_active_context() is not None
             return x * 2
@@ -225,12 +215,12 @@ async def test_static_method_decorator() -> None:
 async def test_static_method_exception_propagates() -> None:
     """
     An exception raised inside a static method decorated with
-    @promising.context() propagates when awaited.
+    @promising.context propagates when awaited.
     """
 
     class MyClass:
         @staticmethod
-        @promising.context()
+        @promising.context
         async def failing() -> None:
             raise RuntimeError("static method error")
 
@@ -246,13 +236,13 @@ async def test_static_method_exception_propagates() -> None:
 
 async def test_class_method_decorator() -> None:
     """
-    @promising.context() below @classmethod: the context is
+    @promising.context below @classmethod: the context is
     active and `cls` is received correctly.
     """
 
     class Factory:
         @classmethod
-        @promising.context()
+        @promising.context
         async def create_name(cls) -> str:
             assert promising.get_active_context() is not None
             return cls.__name__
@@ -268,7 +258,7 @@ async def test_class_method_receives_cls_via_inheritance() -> None:
 
     class Base:
         @classmethod
-        @promising.context()
+        @promising.context
         async def get_class_name(cls) -> str:
             return cls.__name__
 
@@ -291,7 +281,7 @@ async def test_class_method_forwards_args() -> None:
 
     class Formatter:
         @classmethod
-        @promising.context()
+        @promising.context
         async def format_value(cls, value: int, *, prefix: str = "") -> str:
             return f"{prefix}{cls.__name__}:{value}"
 
@@ -302,12 +292,12 @@ async def test_class_method_forwards_args() -> None:
 async def test_class_method_exception_propagates() -> None:
     """
     An exception raised inside a classmethod decorated with
-    @promising.context() propagates when awaited.
+    @promising.context propagates when awaited.
     """
 
     class MyClass:
         @classmethod
-        @promising.context()
+        @promising.context
         async def failing(cls) -> None:
             raise TypeError("class method error")
 
@@ -323,12 +313,12 @@ async def test_class_method_exception_propagates() -> None:
 
 async def test_context_on_top_of_staticmethod() -> None:
     """
-    Applying @promising.context() on top of @staticmethod still
+    Applying @promising.context on top of @staticmethod still
     works, both when called via the class and via an instance.
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         @staticmethod
         async def my_method() -> str:
             return "ok"
@@ -339,13 +329,13 @@ async def test_context_on_top_of_staticmethod() -> None:
 
 async def test_context_on_top_of_classmethod() -> None:
     """
-    Applying @promising.context() on top of @classmethod still
+    Applying @promising.context on top of @classmethod still
     works, both when called via the class and via an instance,
     and `cls` is correctly received in both cases.
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         @classmethod
         async def my_method(cls) -> type:
             return cls
@@ -356,12 +346,12 @@ async def test_context_on_top_of_classmethod() -> None:
 
 async def test_context_on_top_of_classmethod_with_args() -> None:
     """
-    @promising.context() above @classmethod with extra arguments:
+    @promising.context above @classmethod with extra arguments:
     cls and all user-supplied args are forwarded correctly.
     """
 
     class MyClass:
-        @promising.context()
+        @promising.context
         @classmethod
         async def my_method(cls, value: int, *, prefix: str = "") -> str:
             return f"{prefix}{cls.__name__}:{value}"
@@ -372,13 +362,9 @@ async def test_context_on_top_of_classmethod_with_args() -> None:
     assert await MyClass().my_method(7, prefix=">>") == ">>MyClass:7"
 
 
-async def test_context_bare_on_top_of_staticmethod() -> None:
-    """
-    @promising.context (bare, no parens) above @staticmethod.
-    """
-
+async def test_context_with_parens_on_top_of_staticmethod() -> None:
     class MyClass:
-        @promising.context
+        @promising.context()
         @staticmethod
         async def my_method() -> None: ...
 
@@ -386,13 +372,9 @@ async def test_context_bare_on_top_of_staticmethod() -> None:
     assert await MyClass().my_method() is None
 
 
-async def test_context_bare_on_top_of_classmethod() -> None:
-    """
-    @promising.context (bare, no parens) above @classmethod.
-    """
-
+async def test_context_with_parens_on_top_of_classmethod() -> None:
     class MyClass:
-        @promising.context
+        @promising.context()
         @classmethod
         async def my_method(cls) -> type:
             return cls

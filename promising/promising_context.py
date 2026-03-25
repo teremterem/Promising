@@ -10,23 +10,24 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 from weakref import WeakSet
 
+from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
     ContextNotActiveError,
     ContextNotFoundError,
-    ContextUsageError,
+    DecorationError,
+    NoRunningEventLoopError,
     PromiseNotFoundError,
-    SyncUsageError,
 )
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import DecoratorSupport, assert_no_sync_usage_deadlock
+from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
 
 
-class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
+class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
     """
     Decorator and context manager that creates a hierarchical context node
     tracking parent-child relationships between promises and groups of
@@ -66,15 +67,12 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
 
     Args:
         namespace: Human-readable label for the underlying
-            ``PromisingContext``. Shows up in ``__repr__`` output and (planned)
-            error breadcrumbs. When used as a decorator and not provided,
-            defaults to the wrapped function's ``__qualname__``.
-            # TODO Planned feature: Namespaces will show up in the form of
-            #  breadcrumbs in error logs to help trace the source of errors.
-            # TODO Anything else we could do with namespaces ?
-        loop: Event loop to use. None (default) inherits from the
-            parent context, or falls back to ``asyncio.get_event_loop()`` at
-            the root.
+            ``PromisingContext``. Shows up in ``__repr__`` output (and,
+            consequently, in promising traces). When used as a decorator and
+            not provided, defaults to the wrapped function's ``__qualname__``.
+        loop: Event loop to use. None (default) inherits from the parent
+            context, or uses the currently running event loop at the root
+            (raises ``NoRunningEventLoopError`` if no loop is running).
         parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
@@ -90,6 +88,10 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
             they start executing immediately (i.e. as soon as the event loop
             allows), or defer until awaited one way or another. ``INHERIT``
             (default) copies the parent's setting.
+            TODO Are we sure about INHERIT being the default for
+             children_start_soon in promising contexts, while being None by
+             default in promising functions ?
+            TODO Mention this difference here in the docstring
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
@@ -102,17 +104,19 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
         parent: "PromisingContext | None | Sentinel" = INHERIT,
-        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
-        super().__init__(func_or_method, namespace=namespace)
-
+        super().__init__(
+            func_or_method,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            thread_pool=thread_pool,
+        )
         self.ctx_loop = loop
         self.parent = parent
-        self.thread_pool = thread_pool
-        self.children_start_soon = children_start_soon
-        self.start_soon_default = start_soon_default
 
         self._promising_context = None
 
@@ -123,7 +127,7 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         PromisingContext instance and activate it.
         """
         if self.__wrapped__ is not None:
-            raise ContextUsageError(
+            raise DecorationError(
                 "The same instance of `promising.context` cannot serve both "
                 "as a context manager and as a decorator simultaneously"
             )
@@ -152,40 +156,54 @@ class context(DecoratorSupport):  # noqa: N801 (invalid-class-name)
         self._promising_context = None
         return result
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any | DecoratableFunctionType:
-        if self.__wrapped__ is None:
-            # We are still in the process of decorating a function or method
-            # (because this decorator was used with parameters) - let's finish
-            # the decoration process
-            if len(args) != 1 or kwargs:
-                raise ContextUsageError(
-                    "The decorator must be called with exactly one positional "
-                    "argument after its parameters were already provided, and "
-                    "it should be a strictly positional argument: a function "
-                    "or method to decorate."
-                )
-            self._update_wrapper(args[0])
-            return self
+    def __call__(
+        self,
+        *args: Any,
+        namespace: str | None | Sentinel = UNCHANGED,
+        loop: AbstractEventLoop | None | Sentinel = UNCHANGED,
+        parent: "PromisingContext | None | Sentinel" = UNCHANGED,
+        children_start_soon: bool | None | Sentinel = UNCHANGED,
+        start_soon_default: bool | Sentinel = UNCHANGED,
+        thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
+        **kwargs: Any,
+    ) -> Any | DecoratableFunctionType:
+        settings_as_dict = kwargs.pop(_SETTINGS_AS_DICT_KEY, {})
 
-        # The function or method was already decorated and the decorator is now
-        # being called with arguments - let's pass this call through to the
-        # underlying function or method
+        if loop is not UNCHANGED:
+            settings_as_dict["loop"] = loop
+        if parent is not UNCHANGED:
+            settings_as_dict["parent"] = parent
+
+        return super().__call__(
+            *args,
+            namespace=namespace,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            thread_pool=thread_pool,
+            **kwargs,
+            **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
+        )
+
+    def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         ctx = PromisingContext(
-            namespace=self.namespace,
-            loop=self.ctx_loop,
-            parent=self.parent,
-            thread_pool=self.thread_pool,
-            children_start_soon=self.children_start_soon,
-            start_soon_default=self.start_soon_default,
+            namespace=settings_as_dict.get("namespace", self.namespace),
+            loop=settings_as_dict.get("loop", self.ctx_loop),
+            parent=settings_as_dict.get("parent", self.parent),
+            thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
+            children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
+            start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
         )
 
         if self._is_wrapped_async:
-            # Wrapped function or method is async
+            # If there is an argument mismatch, we want to raise an error as
+            # early as possible, so we create the coroutine here and not in the
+            # `_async_wrapper`
+            wrapped_coro = self._wrapped_as_callable(*args, **kwargs)
 
             @functools.wraps(self.__wrapped__)
             async def _async_wrapper() -> Any:
                 with ctx:
-                    return await self._wrapped_as_callable(*args, **kwargs)
+                    return await wrapped_coro
 
             return _async_wrapper()
 
@@ -213,15 +231,13 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = False) -> None:
+async def await_children(*, recursively: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
     Args:
-        recursively: If True, wait for all descendants, not just direct
-            children.
-            # TODO Why is it False by default, and not True ? Either change
-            #  or explain in the docstring.
+        recursively: If True (the default), wait for all descendants,
+            not just direct children.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
@@ -231,7 +247,7 @@ async def await_children(*, recursively: bool = False) -> None:
     return await get_active_context().await_children(recursively=recursively)
 
 
-def await_children_sync(*, recursively: bool = False, timeout: float | None = None) -> None:
+def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -241,15 +257,76 @@ def await_children_sync(*, recursively: bool = False, timeout: float | None = No
     executor, where ``await`` is not available.
 
     Args:
-        recursively: If True, wait for all descendants, not just direct
-            children.
-            # TODO Why is it False by default, and not True ? Either change
-            #  or explain in the docstring.
+        recursively: If True (the default), wait for all descendants,
+            not just direct children.
         timeout: Maximum time to wait in seconds.
     """
     # TODO We need unit tests that ensure this function works correctly even
     #  when called on a bare PromisingContext, and not on a Promise.
     return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
+
+
+def collect_remaining_children(
+    *,
+    recursively: bool = True,
+    exclude_non_awaitable: bool = True,
+    exclude_done: bool = True,
+) -> set["PromisingContext"]:
+    """
+    Collect child contexts of the active context that haven't been garbage
+    collected.
+
+    This is the module-level counterpart of
+    ``PromisingContext.collect_remaining_children()``.
+
+    Args:
+        recursively: If True (default), include descendants at all levels,
+            not just direct children.
+        exclude_non_awaitable: If True (default), exclude children that
+            are not awaitable (i.e. plain PromisingContexts that are not
+            Futures).
+        exclude_done: If True (default), exclude children that weren't
+            garbage collected yet, but are done nonetheless (i.e. Futures
+            with a result or exception already set).
+
+    Returns:
+        Set of child PromisingContexts matching the filter criteria.
+    """
+    return get_active_context().collect_remaining_children(
+        recursively=recursively,
+        exclude_non_awaitable=exclude_non_awaitable,
+        exclude_done=exclude_done,
+    )
+
+
+def get_trace(*, parents_first: bool = True) -> "list[PromisingContext]":
+    """
+    Return a list of PromisingContext objects in the trace of the active
+    context. If *parents_first* is True (the default), the list is ordered
+    from the topmost parent down to the active context; otherwise from the
+    active context up.
+    """
+    return get_active_context().get_trace(parents_first=parents_first)
+
+
+def format_trace(*, parents_first: bool = True) -> "list[str]":
+    """
+    Return a list of string representations of each PromisingContext
+    in the trace of the active context. If *parents_first* is True (the
+    default), the list is ordered from the topmost parent down to the active
+    context; otherwise from the active context up.
+    """
+    return get_active_context().format_trace(parents_first=parents_first)
+
+
+def print_trace(*, parents_first: bool = True) -> None:
+    """
+    Print each PromisingContext in the trace of the active context on a
+    separate line. If *parents_first* is True (the default), the list is
+    ordered from the topmost parent down to the active context; otherwise
+    from the active context up.
+    """
+    get_active_context().print_trace(parents_first=parents_first)
 
 
 class PromisingContext:
@@ -294,7 +371,7 @@ class PromisingContext:
 
         if loop is None:
             if self._parent is None:
-                self._ctx_loop = asyncio.get_event_loop()
+                self._ctx_loop = get_running_asyncio_loop(raise_if_none=True)
             else:
                 self._ctx_loop = self._parent._ctx_loop
         else:
@@ -374,7 +451,42 @@ class PromisingContext:
             raise PromiseNotFoundError("No parent Promise found")
         return parent
 
-    async def await_children(self, *, recursively: bool = False) -> None:
+    def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
+        """
+        Return a list of PromisingContext objects in the trace. If
+        *parents_first* is True (the default), the list is ordered from the
+        topmost parent down to this context; otherwise from this context up.
+        """
+        trace = []
+        current = self
+
+        while current is not None:
+            trace.append(current)
+            current = current._parent
+
+        if parents_first:
+            trace.reverse()
+        return trace
+
+    def format_trace(self, *, parents_first: bool = True) -> "list[str]":
+        """
+        Return a list of string representations of each
+        PromisingContext in the trace. If *parents_first* is True (the
+        default), the list is ordered from the topmost parent down to this
+        context; otherwise from this context up.
+        """
+        return [str(ctx) for ctx in self.get_trace(parents_first=parents_first)]
+
+    def print_trace(self, *, parents_first: bool = True) -> None:
+        """
+        Print each PromisingContext in the trace on a separate line. If
+        *parents_first* is True (the default), the list is ordered from the
+        topmost parent down to this context; otherwise from this context up.
+        """
+        for line in self.format_trace(parents_first=parents_first):
+            print(line)
+
+    async def await_children(self, *, recursively: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -382,10 +494,8 @@ class PromisingContext:
         children may spawn new children while being awaited.
 
         Args:
-            recursively: If True, wait for all descendants, not just direct
-                children.
-                # TODO Why is it False by default, and not True ? Either change
-                #  or explain in the docstring.
+            recursively: If True (the default), wait for all descendants,
+                not just direct children.
         """
         while children := self.collect_remaining_children(
             recursively=recursively,
@@ -404,7 +514,7 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = False, timeout: float | None = None) -> None:
+    def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -414,10 +524,8 @@ class PromisingContext:
         executor, where ``await`` is not available.
 
         Args:
-            recursively: If True, wait for all descendants, not just direct
-                children.
-                # TODO Why is it False by default, and not True ? Either change
-                #  or explain in the docstring.
+            recursively: If True (the default), wait for all descendants,
+                not just direct children.
             timeout: Maximum time to wait in seconds.
 
         Raises:
@@ -455,7 +563,7 @@ class PromisingContext:
     def collect_remaining_children(
         self,
         *,
-        recursively: bool = False,
+        recursively: bool = True,
         exclude_non_awaitable: bool = True,
         exclude_done: bool = True,
     ) -> set["PromisingContext"]:
@@ -472,8 +580,8 @@ class PromisingContext:
         returns True.
 
         Args:
-            recursively: If True, include descendants at all levels, not
-                just direct children.
+            recursively: If True (default), include descendants at all levels,
+                not just direct children.
             exclude_non_awaitable: If True (default), exclude children that
                 are not awaitable (i.e. plain PromisingContexts that are not
                 Futures).
@@ -557,9 +665,6 @@ class PromisingContext:
                 raise exc from exc_value
 
         return False  # Let's not suppress any exceptions
-
-    # TODO Implement `get_promising_trace(only_with_namespaces: bool = True)`
-    #  method
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
@@ -647,9 +752,6 @@ class PromisingContext:
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():
-            raise SyncUsageError(
-                "The event loop that would monitor a synchronous operation "
-                f"in this {self.__class__.__name__} is not running"
-            )
+            raise NoRunningEventLoopError(f"The event loop of {self} is not running")
 
         self._ctx_loop.call_soon_threadsafe(callback)

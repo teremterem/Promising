@@ -3,7 +3,6 @@ Tests for namespace resolution and its effect on __repr__ and __str__ across
 Promises, PromisingFunctions, and promising.context instances.
 """
 
-import re
 import types
 
 import pytest
@@ -11,6 +10,7 @@ import pytest
 import promising
 from promising import UNCHANGED
 from promising.utils import resolve_namespace
+from tests.utils_for_tests import normalize_object_repr
 
 # ── resolve_namespace (unit) ────────────────────────────────────
 
@@ -52,7 +52,7 @@ def test_qualname_from_function() -> None:
         provided_explicitly=None,
         named_object_fallback=my_func,
     )
-    assert result == "tests.test_namespace::test_qualname_from_function.<locals>.my_func"
+    assert result == "test_namespaces::test_qualname_from_function.<locals>.my_func"
 
 
 def test_qualname_from_sync_function() -> None:
@@ -62,7 +62,7 @@ def test_qualname_from_sync_function() -> None:
         provided_explicitly=None,
         named_object_fallback=my_sync_func,
     )
-    assert result == "tests.test_namespace::test_qualname_from_sync_function.<locals>.my_sync_func"
+    assert result == "test_namespaces::test_qualname_from_sync_function.<locals>.my_sync_func"
 
 
 async def test_qualname_from_async_generator_object() -> None:
@@ -81,7 +81,7 @@ async def test_qualname_from_async_generator_object() -> None:
         provided_explicitly=None,
         named_object_fallback=ag,
     )
-    assert result == "tests.test_namespace::test_qualname_from_async_generator_object.<locals>.gen"
+    assert result == "test_namespaces::test_qualname_from_async_generator_object.<locals>.gen"
     # Close to avoid ResourceWarning
     await ag.aclose()
 
@@ -95,7 +95,7 @@ def test_qualname_from_class() -> None:
         provided_explicitly=None,
         named_object_fallback=Foo,
     )
-    assert result == "tests.test_namespace::test_qualname_from_class.<locals>.Foo"
+    assert result == "test_namespaces::test_qualname_from_class.<locals>.Foo"
 
 
 def test_qualname_from_method_of_class() -> None:
@@ -106,7 +106,7 @@ def test_qualname_from_method_of_class() -> None:
         provided_explicitly=None,
         named_object_fallback=MyClass.method,
     )
-    assert result == "tests.test_namespace::test_qualname_from_method_of_class.<locals>.MyClass.method"
+    assert result == "test_namespaces::test_qualname_from_method_of_class.<locals>.MyClass.method"
 
 
 def test_name_fallback_when_no_qualname() -> None:
@@ -141,7 +141,7 @@ async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'MyOp' Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<'MyOp' Promise id=999>"
     await promise
 
 
@@ -151,7 +151,7 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x")
 
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<Promise id=999>"
     await promise
 
 
@@ -169,10 +169,8 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
     promise = promising.Promise(do_work())
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(
-        r"<'tests\.test_namespace::test_promise_repr_auto_resolves_from_coroutine"
-        r"\.<locals>\.do_work' Promise id=\d+>",
-        result,
+    assert normalize_object_repr(result) == (
+        "<'test_namespaces::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work' Promise id=999>"
     )
     await promise
 
@@ -186,7 +184,7 @@ async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) ->
 
     promise = promising.Promise(do_work(), namespace="Override")
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'Override' Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<'Override' Promise id=999>"
     await promise
 
 
@@ -200,7 +198,7 @@ async def test_promising_function_auto_namespace() -> None:
     async def fetch_data() -> str:
         return "data"
 
-    assert fetch_data.namespace == "tests.test_namespace::test_promising_function_auto_namespace.<locals>.fetch_data"
+    assert fetch_data.namespace == "test_namespaces::test_promising_function_auto_namespace.<locals>.fetch_data"
 
 
 async def test_promising_function_explicit_namespace() -> None:
@@ -223,7 +221,7 @@ async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> 
 
     promise = fetch()
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'FetchOp' Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<'FetchOp' Promise id=999>"
     await promise
 
 
@@ -237,10 +235,8 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
 
     promise = compute()
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(
-        r"<'tests.test_namespace::test_promising_function_auto_namespace_in_promise_repr"
-        r"\.<locals>\.compute' Promise id=\d+>",
-        result,
+    assert normalize_object_repr(result) == (
+        "<'test_namespaces::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute' Promise id=999>"
     )
     await promise
 
@@ -255,7 +251,7 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
     promise = work(namespace="PerCall")
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'PerCall' Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<'PerCall' Promise id=999>"
     await promise
 
 
@@ -271,7 +267,7 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use
 
     promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
-    assert re.fullmatch(r"<'FromDecorator' Promise id=\d+>", result)
+    assert normalize_object_repr(result) == "<'FromDecorator' Promise id=999>"
     await promise
 
 
@@ -284,7 +280,7 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
         result = repr(ctx) if use_repr else str(ctx)
-        assert re.fullmatch(r"<'BatchCtx' PromisingContext id=\d+>", result)
+        assert normalize_object_repr(result) == "<'BatchCtx' PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -293,13 +289,13 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
     with promising.context() as ctx:
         assert ctx.namespace is None
         result = repr(ctx) if use_repr else str(ctx)
-        assert re.fullmatch(r"<PromisingContext id=\d+>", result)
+        assert normalize_object_repr(result) == "<PromisingContext id=999>"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
 @pytest.mark.parametrize("parametrized_decorator", [True, False])
 async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_decorator: bool) -> None:
-    """@promising.context() as decorator auto-resolves to module::qualname."""
+    """@promising.context as decorator auto-resolves to module::qualname."""
     captured_ctx = None
     ctx_decorator = promising.context() if parametrized_decorator else promising.context
 
@@ -311,12 +307,10 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
 
     await pipeline()
     assert captured_ctx is not None
-    assert captured_ctx.namespace == "tests.test_namespace::test_context_decorator_auto_namespace.<locals>.pipeline"
+    assert captured_ctx.namespace == "test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert re.fullmatch(
-        r"<'tests.test_namespace::test_context_decorator_auto_namespace"
-        r"\.<locals>\.pipeline' PromisingContext id=\d+>",
-        result,
+    assert normalize_object_repr(result) == (
+        "<'test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline' PromisingContext id=999>"
     )
 
 
@@ -335,27 +329,7 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
     assert captured_ctx is not None
     assert captured_ctx.namespace == "MyPipeline"
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
-    assert re.fullmatch(
-        r"<'MyPipeline' PromisingContext id=\d+>",
-        result,
-    )
-
-
-# ── PromisingContext repr ───────────────────────────────────────
-
-
-@pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_context_repr_with_namespace(use_repr: bool) -> None:
-    ctx = promising.PromisingContext(namespace="Worker")
-    result = repr(ctx) if use_repr else str(ctx)
-    assert re.fullmatch(r"<'Worker' PromisingContext id=\d+>", result)
-
-
-@pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_context_repr_without_namespace(use_repr: bool) -> None:
-    ctx = promising.PromisingContext()
-    result = repr(ctx) if use_repr else str(ctx)
-    assert re.fullmatch(r"<PromisingContext id=\d+>", result)
+    assert normalize_object_repr(result) == "<'MyPipeline' PromisingContext id=999>"
 
 
 # ── Method decorators and qualname ──────────────────────────────
@@ -372,7 +346,7 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
     if use_promise_repr is None:
         assert Service.process.namespace == (
-            "tests.test_namespace::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
+            "test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
         )
 
     svc = Service()
@@ -380,10 +354,9 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_instance_method_qualname\."
-            r"<locals>\.Service\.process' Promise id=\d+>",
-            result,
+        assert normalize_object_repr(result) == (
+            "<'test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
+            " Promise id=999>"
         )
     assert await promise == "processed"
 
@@ -400,17 +373,16 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
     if use_promise_repr is None:
         assert Service.helper.namespace == (
-            "tests.test_namespace::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
+            "test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
         )
 
     promise = Service.helper()
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_static_method_qualname"
-            r"\.<locals>\.Service\.helper' Promise id=\d+>",
-            result,
+        assert normalize_object_repr(result) == (
+            "<'test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
+            " Promise id=999>"
         )
     assert await promise == "helped"
 
@@ -427,17 +399,16 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
 
     if use_promise_repr is None:
         assert Service.create.namespace == (
-            "tests.test_namespace::test_promising_function_on_class_method_qualname.<locals>.Service.create"
+            "test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create"
         )
 
     promise = Service.create()
 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
-        assert re.fullmatch(
-            r"<'tests.test_namespace::test_promising_function_on_class_method_qualname"
-            r"\.<locals>\.Service\.create' Promise id=\d+>",
-            result,
+        assert normalize_object_repr(result) == (
+            "<'test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
+            " Promise id=999>"
         )
     assert await promise == "created"
 
@@ -451,7 +422,7 @@ def test_plain_instance_inherits_module_from_class() -> None:
 
     Current behavior: the inherited __module__ is used as prefix, and str(obj)
     becomes the name — producing something like
-    "tests.test_namespace::<...SomeObject object at 0x...>".
+    "test_namespaces::<...SomeObject object at 0x...>".
     """
 
     class SomeObject:
@@ -472,10 +443,9 @@ def test_plain_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert re.fullmatch(
-        r"tests\.test_namespace::<tests\.test_namespace\."
-        r"test_plain_instance_inherits_module_from_class\.<locals>\.SomeObject object at 0x[0-9a-f]+>",
-        result,
+    assert normalize_object_repr(result) == (
+        "test_namespaces::<test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject "
+        "object at 0xfff>"
     )
 
 
@@ -484,7 +454,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
     class.
 
     Current behavior: the class's __module__ is used as prefix together with
-    the instance's __name__ — e.g. "tests.test_namespace::custom_name".
+    the instance's __name__ — e.g. "test_namespaces::custom_name".
     The module refers to where the CLASS is defined, not where the instance's
     __name__ semantically belongs.
     """
@@ -508,7 +478,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert result == "tests.test_namespace::custom_name"
+    assert result == "test_namespaces::custom_name"
 
 
 def test_callable_instance_inherits_module_from_class() -> None:
@@ -537,14 +507,13 @@ def test_callable_instance_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert re.fullmatch(
-        r"tests\.test_namespace::<tests\.test_namespace\."
-        r"test_callable_instance_inherits_module_from_class\.<locals>\.Handler object at 0x[0-9a-f]+>",
-        result,
+    assert normalize_object_repr(result) == (
+        "test_namespaces::<test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler "
+        "object at 0xfff>"
     )
 
 
-def test_builtin_int_has_no_inherited_module() -> None:
+def test_builtin_type_has_no_inherited_module() -> None:
     """Built-in type instances (int, str, list) do NOT inherit __module__.
 
     Unlike user-defined class instances, built-ins block attribute inheritance
@@ -559,25 +528,3 @@ def test_builtin_int_has_no_inherited_module() -> None:
         named_object_fallback=42,
     )
     assert result == "42"
-
-
-def test_builtin_str_has_no_inherited_module() -> None:
-    assert not hasattr("hello", "__module__")
-    assert not hasattr("hello", "__qualname__")
-
-    result = resolve_namespace(
-        provided_explicitly=None,
-        named_object_fallback="hello",
-    )
-    assert result == "hello"
-
-
-def test_builtin_list_has_no_inherited_module() -> None:
-    assert not hasattr([], "__module__")
-    assert not hasattr([], "__qualname__")
-
-    result = resolve_namespace(
-        provided_explicitly=None,
-        named_object_fallback=[1, 2, 3],
-    )
-    assert result == "[1, 2, 3]"

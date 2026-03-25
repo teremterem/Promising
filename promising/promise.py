@@ -4,11 +4,11 @@ from asyncio import AbstractEventLoop, Future, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
-from promising.errors import PromiseNotFoundError
+from promising.errors import EventLoopMismatchError, PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
-from promising.utils import assert_no_sync_usage_deadlock, resolve_namespace
+from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop, resolve_namespace
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -57,14 +57,15 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         T_co: The covariant type of the Promise's result.
 
     Args:
-        awaitable: The awaitable to execute. If not provided, the Promise
-            must be prefilled with a result or exception.
-        loop: The event loop to use. Passed to PromisingContext; see
-            PromisingContext.__init__ for inheritance behavior.
-            # TODO Copy the explanation over instead of referencing it ?
-        namespace: Optional human-readable namespace string. Used in
-            ``__repr__`` output. Passed to PromisingContext.
-            # TODO Copy the explanation over instead of referencing it ?
+        awaitable: The awaitable to execute. If not provided, the Promise must
+            be prefilled with a result or exception.
+        loop: Event loop to use. None (default) inherits from the parent
+            context, or uses the currently running event loop at the root
+            (raises ``NoRunningEventLoopError`` if no loop is running).
+        namespace: Human-readable label for this Promise. Shows up in
+            ``__repr__`` output (and, consequently, in promising traces). When
+            created via ``@promising.function`` and not provided, defaults to
+            the wrapped function's ``__qualname__``.
         parent: Parent context. Passed to PromisingContext; see
             PromisingContext.__init__ for inheritance behavior.
         start_soon: Whether associated work should start immediately (True) or
@@ -105,8 +106,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         TypeError: If awaitable does not have __await__ when provided.
     """
 
-    # TODO [P1] Figure out how to support async generator interface as
-    #  well (together with its "sync" counterpart)
+    # TODO [P1] Figure out how to support async generator interface as well
+    #  (together with its "sync" counterpart)
+    # TODO [P1] Make sure there is a clear mechanism of avoiding memory leaks,
+    #  though, when sequences are enormously long and are not meant to be
+    #  revisited by the user (e.g. a stream of events etc.)
 
     def __init__(
         self,
@@ -391,7 +395,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 self.set_result(prefilled_result)
             elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
-
             else:
                 raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
         else:
@@ -587,8 +590,12 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._unpack_all = unpack_all
 
     def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
-        # TODO Ensure we are in the thread where the Promise's event loop is
-        #  running
+        running_loop = get_running_asyncio_loop(raise_if_none=True)
+        if running_loop is not self._promise._ctx_loop:
+            raise EventLoopMismatchError(
+                f"Cannot await {self._promise!r} from a different event loop than the one it belongs to."
+            )
+
         if self._promise.done():
             result = self._promise.result()
         else:

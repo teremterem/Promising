@@ -73,7 +73,7 @@ await promise
 
 ### Waiting for Children
 
-By default, a parent resolves as soon as its own coroutine finishes — children may still be running. Use `await_children()` to wait for all children before the parent resolves:
+By default, a parent resolves as soon as its own coroutine finishes — children may still be running. Use `await_children()` to wait for the entire subtree (children, grandchildren, etc.) before the parent resolves:
 
 ```python
 @promising.function
@@ -81,15 +81,15 @@ async def parent_task() -> str:
     child_task("a")
     child_task("b")
 
-    # Wait for all children to complete before returning
+    # Wait for all descendants to complete before returning
     await promising.await_children()
     return "all done"
 ```
 
-Use `recursively=True` to wait for the entire subtree (children, grandchildren, etc.):
+To wait only for direct children (not grandchildren), pass `recursively=False`:
 
 ```python
-await promising.await_children(recursively=True)
+await promising.await_children(recursively=False)
 ```
 
 > **Note:** `await_children()` and `await_children_sync()` are purely for
@@ -286,6 +286,12 @@ async def do_work() -> str:
 await do_work()
 ```
 
+Settings specified on the decorator can be overridden at call time by passing them as keyword arguments:
+
+```python
+await do_work(children_start_soon=True)  # overrides decorator default for this call
+```
+
 Like `@promising.function`, it works with `@classmethod`, `@staticmethod`, and instance methods in either decorator order.
 
 ### `promising.context` vs `promising.function`
@@ -311,7 +317,7 @@ result = await promise                        # Now it starts
 
 ### Configuration Inheritance
 
-Promises inherit configuration from their parents through three parameters:
+Promises inherit configuration from their parents through these parameters:
 
 - **`start_soon`** — whether the Promise starts executing immediately upon creation. When left as `None` (the default), it defers to its parent's `children_start_soon`, or falls back to `start_soon_default`. `INHERIT` copies the parent's `start_soon` directly.
 - **`children_start_soon`** — enforces a `start_soon` default for child Promises that left their `start_soon` as `None`. `None` means no enforcement. `INHERIT` copies the parent's `children_start_soon` setting. Note: `Promise` defaults to `None` (no enforcement unless explicitly chosen), while `PromisingContext` / `promising.context` defaults to `INHERIT` (transparent pass-through of the parent's policy).
@@ -476,7 +482,9 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context()`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
+| `promising.PromisingFunction.run(*args, **kwargs)` | Top-level entrypoint for running a decorated function from non-async code — analogous to `asyncio.run()`. Calls `asyncio.run()` on `protected_run()`, which means it creates its own event loop, awaits the result, and by default awaits all children recursively (`await_children=RECURSIVELY`). This is **not** the same as `promise.sync()`: `.sync()` is for consuming a promise's result from within a sync promising function that already runs inside an event loop (in a thread pool), whereas `.run()` is for starting the whole promise tree from scratch. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
+| `promising.PromisingFunction.protected_run(*args, **kwargs)` | Returns a **coroutine** (not a `Promise`), making it safe to pass to `asyncio.run()` — unlike calling the decorated function directly, which would construct a `Promise` (an `asyncio.Future` subclass) before the event loop exists and fail. Inside, the coroutine calls the decorated function, awaits the resulting `Promise`, and awaits its children (controlled by `await_children`, which defaults to `RECURSIVELY`). Used by `run()` internally. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 
 ### Promise
 
@@ -501,10 +509,13 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `ctx.namespace` | Optional human-readable namespace string. Used in `__repr__` output. Set via the `namespace` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
-| `ctx.await_children(recursively=False)` | Async — wait for child contexts to finish. |
-| `ctx.await_children_sync(recursively=False, timeout=None)` | Sync — block until child contexts finish. |
-| `ctx.collect_remaining_children(recursively=False, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable and (optionally) still running. |
+| `ctx.await_children(recursively=True)` | Async — wait for child contexts to finish. |
+| `ctx.await_children_sync(recursively=True, timeout=None)` | Sync — block until child contexts finish. |
+| `ctx.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
+| `ctx.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from this context up to the root (or, rather, root down to this context when `parents_first=True`). |
+| `ctx.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
+| `ctx.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 
 ### Top-Level Convenience Functions
 
@@ -512,8 +523,12 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
-| `promising.await_children(recursively=False)` | Wait for all children of the current context. |
-| `promising.await_children_sync(recursively=False, timeout=None)` | Sync counterpart — block until children finish. |
+| `promising.await_children(recursively=True)` | Wait for all children of the current context. |
+| `promising.await_children_sync(recursively=True, timeout=None)` | Sync counterpart — block until children finish. |
+| `promising.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts of the active context that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
+| `promising.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from the active context up to the root (or, rather, root down to the active context when `parents_first=True`). |
+| `promising.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
+| `promising.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 
@@ -525,23 +540,29 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.PROMISING_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
+| `promising.RECURSIVELY` | Used as the default for the `await_children` parameter in `PromisingFunction.run()` and `protected_run()`, indicating that all descendants (not just direct children) should be awaited. |
 | `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 
-All sentinels raise `RuntimeError` on boolean coercion to prevent misuse.
+All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 
 ### Errors
 
-| Error | Raised When |
+| Error | Description |
 |---|---|
-| `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). |
-| `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). |
-| `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. |
-| `promising.ContextUsageError` | Misuse of `promising.context` (e.g. using the same instance as both context manager and decorator, or incorrect argument usage). |
-| `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, or setting `use_thread_pool` on an async function). |
+| `promising.PromisingError` | Base class for all promising errors. |
+| `promising.ContextError` | Base class for context-related errors. Inherits from `PromisingError`. |
+| `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). Inherits from `ContextError`. |
+| `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). Inherits from `ContextError`. |
+| `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. Inherits from `ContextError`. |
+| `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, setting `use_thread_pool` on an async function, or using the same `promising.context` instance as both context manager and decorator). |
+| `promising.EventLoopError` | Base class for event loop-related errors. Inherits from `PromisingError`. |
+| `promising.EventLoopMismatchError` | Awaiting a `Promise` from a different event loop than the one it belongs to. Inherits from both `EventLoopError` and `ValueError`. |
+| `promising.NoRunningEventLoopError` | No running event loop found when one is required (e.g. creating a root `PromisingContext` outside an async context, awaiting a `Promise` without a running event loop, or scheduling work on a context whose event loop has stopped). Inherits from both `EventLoopError` and `RuntimeError`. |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
+| `promising.SentinelUsageError` | A `Sentinel` was used in a boolean context (e.g. `if INHERIT:`). Use `is` / `is not` identity comparisons instead. |
 | `promising.SyncUsageError` | `sync()` or `await_children_sync()` is called from the event loop thread, which would deadlock. |
 
-All inherit from `promising.BasePromisingError`.
+All errors inherit from `promising.PromisingError`. Context-related errors also inherit from `promising.ContextError`, and event loop-related errors also inherit from `promising.EventLoopError`.
 
 ## License
 

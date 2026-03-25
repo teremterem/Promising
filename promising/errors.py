@@ -1,30 +1,52 @@
-class BasePromisingError(Exception):
+class PromisingError(Exception):
+    """A base class for all promising errors."""
+
+
+class DecorationError(PromisingError):
     pass
 
 
-class ContextAlreadyActiveError(BasePromisingError):
+class PromiseNotFoundError(PromisingError):
     pass
 
 
-class ContextNotActiveError(BasePromisingError):
+class SentinelUsageError(PromisingError):
     pass
 
 
-class ContextNotFoundError(BasePromisingError):
+class SyncUsageError(PromisingError):
     pass
 
 
-class ContextUsageError(BasePromisingError):
+# Context errors
+
+
+class ContextError(PromisingError):
+    """A base class for all context-related errors."""
+
+
+class ContextAlreadyActiveError(ContextError):
     pass
 
 
-class DecorationError(BasePromisingError):
+class ContextNotActiveError(ContextError):
     pass
 
 
-class PromiseNotFoundError(BasePromisingError):
+class ContextNotFoundError(ContextError):
     pass
 
 
-class SyncUsageError(BasePromisingError):
+# Event loop errors
+
+
+class EventLoopError(PromisingError):
+    """A base class for all event loop-related errors."""
+
+
+class EventLoopMismatchError(EventLoopError, ValueError):
+    pass
+
+
+class NoRunningEventLoopError(EventLoopError, RuntimeError):
     pass

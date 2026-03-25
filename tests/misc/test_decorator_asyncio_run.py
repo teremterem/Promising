@@ -45,8 +45,14 @@ def test_async_function_decorator_with_run(use_thread_pool: bool | None) -> None
     run_in_thread(_test)
 
 
-@pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_async_function_decorator_with_run_and_child_promise(use_thread_pool: bool | None) -> None:
+@pytest.mark.parametrize("await_in_parent", [True, False])
+@pytest.mark.parametrize("child_use_thread_pool", [True, False, None])
+@pytest.mark.parametrize("parent_use_thread_pool", [True, False, None])
+def test_async_function_decorator_with_run_and_child_promise(
+    parent_use_thread_pool: bool | None,
+    child_use_thread_pool: bool | None,
+    await_in_parent: bool,
+) -> None:
     """
     Same as above but also creates a child Promise inside the function, which
     exercises _call_soon_threadsafe and verifies the event loop is correctly
@@ -57,15 +63,11 @@ def test_async_function_decorator_with_run_and_child_promise(use_thread_pool: bo
     """
 
     def _test() -> None:
-        if use_thread_pool is not None:
+        if child_use_thread_pool is not None:
 
-            @promising.function(use_thread_pool=use_thread_pool)
+            @promising.function(use_thread_pool=child_use_thread_pool)
             def child_work(x: int) -> int:
                 return x * 2
-
-            @promising.function(use_thread_pool=use_thread_pool)
-            def parent_work() -> int:
-                return child_work(21)
 
         else:
 
@@ -73,10 +75,29 @@ def test_async_function_decorator_with_run_and_child_promise(use_thread_pool: bo
             async def child_work(x: int) -> int:
                 return x * 2
 
+        if parent_use_thread_pool is not None:
+
+            @promising.function(use_thread_pool=parent_use_thread_pool)
+            def parent_work() -> int:
+                if await_in_parent:
+                    if parent_use_thread_pool:
+                        return child_work(21).sync()
+                    else:
+                        # When synchronous promising function runs in the same
+                        # thread as the event loop, calling `.sync()` should
+                        # not be allowed (otherwise it would deadlock)
+                        with pytest.raises(promising.SyncUsageError):
+                            return child_work(21).sync()
+                        return 42  # "Appease" the outer scope's assertion
+
+                else:
+                    return child_work(21)
+
+        else:
+
             @promising.function
             async def parent_work() -> int:
-                result = await child_work(21)
-                return result
+                return await child_work(21)
 
         assert parent_work.run() == 42
 

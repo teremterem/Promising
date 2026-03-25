@@ -796,6 +796,9 @@ class PromisingContext:
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():
+            # TODO This message and this error class are not correct anymore -
+            #  this exception does not happen only with sync operations, async
+            #  operations can also raise it
             raise SyncUsageError(
                 "The event loop that would monitor a synchronous operation "
                 f"in this {self.__class__.__name__} is not running"

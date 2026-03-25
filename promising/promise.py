@@ -410,7 +410,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 self.set_result(prefilled_result)
             elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
-
             else:
                 raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
         else:

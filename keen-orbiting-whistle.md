@@ -45,7 +45,6 @@ Each test function listed below with its source → destination.
 ### `decoration/test_function_decorator.py`
 
 **From `promising_function/test_promising_function.py`:**
-- `test_calling_promising_function_returns_promise`
 - `test_forwards_positional_args`
 - `test_forwards_keyword_args`
 - `test_forwards_mixed_args`
@@ -60,7 +59,6 @@ Each test function listed below with its source → destination.
 - `test_multiple_calls_produce_independent_promises`
 
 **From `promising_function/sync/test_sync_functions.py` (decoration-related tests only):**
-- `test_calling_sync_promising_function_returns_promise`
 - `test_forwards_positional_args`
 - `test_forwards_keyword_args`
 - `test_forwards_mixed_args`

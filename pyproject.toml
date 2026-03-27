@@ -68,6 +68,9 @@ ignore = [
 "tests/**/*.py" = [
     "PLR2004",  # magic-value-comparison
 ]
+"tests_old/**/*.py" = [  # TODO [P1] Delete me
+    "PLR2004",  # magic-value-comparison
+]
 
 [tool.ruff.format]
 quote-style = "double"

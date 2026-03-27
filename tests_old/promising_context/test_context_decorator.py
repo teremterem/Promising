@@ -5,7 +5,7 @@ import promising
 # ── Async Function Decorator ─────────────────────────────────────
 
 
-async def test_async_function_decorator_activates_context() -> None:
+async def test_context_decorator_activates_context() -> None:
     """
     @promising.context on an async function: the context is
     active inside the function body.
@@ -23,7 +23,7 @@ async def test_async_function_decorator_activates_context() -> None:
     assert isinstance(captured_ctx, promising.PromisingContext)
 
 
-async def test_async_function_decorator_deactivates_after() -> None:
+async def test_context_decorator_deactivates_after() -> None:
     """
     After the decorated async function returns, the context is
     no longer active.
@@ -38,7 +38,7 @@ async def test_async_function_decorator_deactivates_after() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-async def test_async_function_decorator_forwards_args() -> None:
+async def test_context_decorator_forwards_args() -> None:
     """
     Positional and keyword arguments are forwarded to the
     decorated async function.
@@ -52,7 +52,7 @@ async def test_async_function_decorator_forwards_args() -> None:
     assert await add(3, 4, multiplier=2) == 14
 
 
-async def test_async_function_decorator_exception_propagates() -> None:
+async def test_context_decorator_exception_propagates() -> None:
     """
     An exception raised inside the decorated async function
     propagates to the caller.
@@ -66,7 +66,7 @@ async def test_async_function_decorator_exception_propagates() -> None:
         await failing()
 
 
-async def test_async_function_decorator_deactivates_on_exception() -> None:
+async def test_context_decorator_deactivates_on_exception() -> None:
     """
     The context is deactivated even if the decorated async function
     raises.
@@ -82,7 +82,7 @@ async def test_async_function_decorator_deactivates_on_exception() -> None:
     assert promising.get_active_context(raise_if_none=False) is None
 
 
-async def test_async_function_decorator_with_parens() -> None:
+async def test_context_decorator_with_parens() -> None:
     @promising.context()
     async def work() -> str:
         return "parens"
@@ -90,7 +90,7 @@ async def test_async_function_decorator_with_parens() -> None:
     assert await work() == "parens"
 
 
-async def test_async_function_decorator_each_call_gets_fresh_context() -> None:
+async def test_context_decorator_each_call_gets_fresh_context() -> None:
     """
     Each call to the decorated function gets a fresh
     PromisingContext (not the same instance).

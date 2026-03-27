@@ -88,6 +88,8 @@ async def test_coroutine_executes_once() -> None:
     assert await promise_two == "done"
     assert call_count == 2
 
+    assert promise_one is not promise_two
+
 
 async def test_default_args() -> None:
     """

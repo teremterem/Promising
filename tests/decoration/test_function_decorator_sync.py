@@ -170,7 +170,7 @@ async def test_used_as_direct_call() -> None:
     def my_func() -> str:
         return "direct"
 
-    pf = promising.function(my_func, use_thread_pool=True)
+    pf = promising.function(my_func, start_soon=False, use_thread_pool=True)
     assert isinstance(pf, promising.PromisingFunction)
     assert await pf() == "direct"
 

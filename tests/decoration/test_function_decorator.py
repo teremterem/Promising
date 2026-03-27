@@ -1,3 +1,5 @@
+import pytest
+
 import promising
 
 
@@ -113,3 +115,93 @@ async def test_star_args_and_kwargs() -> None:
 
     result = await variadic(1, 2, 3, key="value")
     assert result == ((1, 2, 3), {"key": "value"})
+
+
+async def test_exception_propagates_through_promise() -> None:
+    """
+    An exception raised inside the async function
+    propagates through the Promise when awaited.
+    """
+
+    @promising.function
+    async def failing() -> None:
+        raise ValueError("test error")
+
+    with pytest.raises(ValueError, match="test error"):
+        await failing()
+
+
+@pytest.mark.parametrize(
+    "exc_type",
+    [ValueError, TypeError, RuntimeError, KeyError],
+)
+async def test_various_exception_types(*, exc_type: type) -> None:
+    """
+    Parametrized: each exception type propagates
+    through the Promise correctly.
+    """
+
+    @promising.function
+    async def failing() -> None:
+        raise exc_type("specific error")
+
+    with pytest.raises(exc_type):
+        await failing()
+
+
+async def test_decorator_with_empty_parens() -> None:
+    """
+    @promising.function() (empty parens) behaves
+    identically to bare @promising.function.
+    """
+
+    @promising.function()
+    async def greet() -> str:
+        return "hello"
+
+    assert isinstance(greet, promising.PromisingFunction)
+    assert await greet() == "hello"
+
+
+async def test_used_as_direct_call() -> None:
+    """
+    promising.function(my_func) used as a direct call
+    (non-decorator) works.
+    """
+
+    async def my_func() -> str:
+        return "direct"
+
+    pf = promising.function(my_func)
+    assert isinstance(pf, promising.PromisingFunction)
+    assert await pf() == "direct"
+
+
+async def test_preserves_original_func() -> None:
+    """
+    decorated.__wrapped__ is the original function passed
+    to the decorator.
+    """
+
+    async def original() -> str:
+        return "preserved"
+
+    decorated = promising.function(original)
+    assert decorated.__wrapped__ is original
+
+
+async def test_multiple_calls_produce_independent_promises() -> None:
+    """
+    Each call produces a distinct Promise with an
+    independent result.
+    """
+
+    @promising.function
+    async def identity(x: int) -> int:
+        return x
+
+    p1 = identity(1)
+    p2 = identity(2)
+    assert p1 is not p2
+    assert await p1 == 1
+    assert await p2 == 2

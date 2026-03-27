@@ -70,22 +70,6 @@ async def test_instance_method_class_access_is_promising_function() -> None:
     assert isinstance(MyClass.my_method, promising.PromisingFunction)
 
 
-async def test_instance_method_with_empty_parens_decorator() -> None:
-    """
-    @promising.function() with empty parens also works as an
-    instance method decorator.
-    """
-
-    class MyClass:
-        @promising.function()
-        async def greet(self) -> str:
-            return "hi"
-
-    obj = MyClass()
-    assert isinstance(MyClass.greet, promising.PromisingFunction)
-    assert await obj.greet() == "hi"
-
-
 async def test_instance_method_executes_once() -> None:
     """
     The coroutine executes exactly once per call regardless of
@@ -172,22 +156,6 @@ async def test_static_method_receives_no_implicit_arg() -> None:
 
     assert await MathUtils.add(3, 4) == 7
     assert await MathUtils().add(3, 4) == 7
-
-
-async def test_static_method_with_empty_parens_decorator() -> None:
-    """
-    @promising.function() with empty parens also works as a
-    static method decorator.
-    """
-
-    class MathUtils:
-        @staticmethod
-        @promising.function()
-        async def triple(x: int) -> int:
-            return x * 3
-
-    assert await MathUtils.triple(5) == 15
-    assert await MathUtils().triple(5) == 15
 
 
 async def test_static_method_exception_propagates() -> None:
@@ -298,22 +266,6 @@ async def test_class_method_forwards_args() -> None:
     assert await Formatter.format_value(42, prefix=">>") == ">>Formatter:42"
 
 
-async def test_class_method_with_empty_parens_decorator() -> None:
-    """
-    @promising.function() with empty parens also works as a
-    class method decorator.
-    """
-
-    class Factory:
-        @classmethod
-        @promising.function()
-        async def create_name(cls) -> str:
-            return cls.__name__
-
-    assert await Factory.create_name() == "Factory"
-    assert await Factory().create_name() == "Factory"
-
-
 async def test_class_method_exception_propagates() -> None:
     """
     An exception raised inside a classmethod coroutine propagates
@@ -411,3 +363,51 @@ async def test_promising_function_called_with_parens_on_static_and_class() -> No
     # classmethod via class and instance
     assert await MyClass.class_name() == "MyClass"
     assert await MyClass().class_name() == "MyClass"
+
+
+async def test_instance_method_with_empty_parens_decorator() -> None:
+    """
+    @promising.function() with empty parens also works as an
+    instance method decorator.
+    """
+
+    class MyClass:
+        @promising.function()
+        async def greet(self) -> str:
+            return "hi"
+
+    obj = MyClass()
+    assert isinstance(MyClass.greet, promising.PromisingFunction)
+    assert await obj.greet() == "hi"
+
+
+async def test_static_method_with_empty_parens_decorator() -> None:
+    """
+    @promising.function() with empty parens also works as a
+    static method decorator.
+    """
+
+    class MathUtils:
+        @staticmethod
+        @promising.function()
+        async def triple(x: int) -> int:
+            return x * 3
+
+    assert await MathUtils.triple(5) == 15
+    assert await MathUtils().triple(5) == 15
+
+
+async def test_class_method_with_empty_parens_decorator() -> None:
+    """
+    @promising.function() with empty parens also works as a
+    class method decorator.
+    """
+
+    class Factory:
+        @classmethod
+        @promising.function()
+        async def create_name(cls) -> str:
+            return cls.__name__
+
+    assert await Factory.create_name() == "Factory"
+    assert await Factory().create_name() == "Factory"

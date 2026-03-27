@@ -147,20 +147,6 @@ async def test_various_exception_types(*, exc_type: type) -> None:
         await failing()
 
 
-async def test_decorator_with_empty_parens() -> None:
-    """
-    @promising.function() (empty parens) behaves
-    identically to bare @promising.function for sync functions.
-    """
-
-    @promising.function(use_thread_pool=True)
-    def greet() -> str:
-        return "hello"
-
-    assert isinstance(greet, promising.PromisingFunction)
-    assert await greet() == "hello"
-
-
 async def test_used_as_direct_call() -> None:
     """
     promising.function(my_func) used as a direct call

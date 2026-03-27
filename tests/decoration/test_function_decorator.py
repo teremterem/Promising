@@ -149,20 +149,6 @@ async def test_various_exception_types(*, exc_type: type) -> None:
         await failing()
 
 
-async def test_decorator_with_empty_parens() -> None:
-    """
-    @promising.function() (empty parens) behaves
-    identically to bare @promising.function.
-    """
-
-    @promising.function()
-    async def greet() -> str:
-        return "hello"
-
-    assert isinstance(greet, promising.PromisingFunction)
-    assert await greet() == "hello"
-
-
 async def test_used_as_direct_call() -> None:
     """
     promising.function(my_func) used as a direct call
@@ -208,3 +194,17 @@ async def test_multiple_calls_produce_independent_promises() -> None:
     assert p1 is not p2
     assert await p1 == 1
     assert await p2 == 2
+
+
+async def test_decorator_with_empty_parens() -> None:
+    """
+    @promising.function() (empty parens) behaves
+    identically to bare @promising.function.
+    """
+
+    @promising.function()
+    async def greet() -> str:
+        return "hello"
+
+    assert isinstance(greet, promising.PromisingFunction)
+    assert await greet() == "hello"

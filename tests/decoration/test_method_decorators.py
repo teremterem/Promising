@@ -244,7 +244,7 @@ async def test_class_method_via_instance_returns_promise() -> None:
     assert await result == "Factory"
 
 
-async def test_class_method_receives_cls_via_class() -> None:
+async def test_class_method_receives_cls() -> None:
     """
     The class method coroutine receives the correct class when
     accessed through the class.

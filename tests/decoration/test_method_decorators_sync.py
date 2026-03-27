@@ -63,7 +63,7 @@ async def test_instance_method_class_access_is_promising_function() -> None:
     """
 
     class MyClass:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def my_method(self) -> str:
             return "ok"
 
@@ -77,7 +77,7 @@ async def test_instance_method_with_empty_parens_decorator() -> None:
     """
 
     class MyClass:
-        @promising.function()
+        @promising.function(use_thread_pool=True)
         def greet(self) -> str:
             return "hi"
 
@@ -94,7 +94,7 @@ async def test_instance_method_executes_once() -> None:
     call_count = 0
 
     class MyClass:
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def counted(self) -> str:
             nonlocal call_count
             call_count += 1
@@ -166,7 +166,7 @@ async def test_static_method_receives_no_implicit_arg() -> None:
 
     class MathUtils:
         @staticmethod
-        @promising.function
+        @promising.function(use_thread_pool=True)
         def add(a: int, b: int) -> int:
             return a + b
 
@@ -182,7 +182,7 @@ async def test_static_method_with_empty_parens_decorator() -> None:
 
     class MathUtils:
         @staticmethod
-        @promising.function()
+        @promising.function(use_thread_pool=True)
         def triple(x: int) -> int:
             return x * 3
 
@@ -246,8 +246,8 @@ async def test_class_method_via_instance_returns_promise() -> None:
 
 async def test_class_method_receives_cls() -> None:
     """
-    The sync classmethod receives the correct class,
-    including through inheritance.
+    The class method coroutine receives the correct class when
+    accessed through the class.
     """
 
     class Base:
@@ -261,6 +261,25 @@ async def test_class_method_receives_cls() -> None:
 
     assert await Base.get_class_name() == "Base"
     assert await Child.get_class_name() == "Child"
+
+
+async def test_class_method_receives_cls_via_instance() -> None:
+    """
+    The class method coroutine receives the correct class when
+    accessed through an instance.
+    """
+
+    class Base:
+        @classmethod
+        @promising.function(use_thread_pool=True)
+        def get_class_name(cls) -> str:
+            return cls.__name__
+
+    class Child(Base):
+        pass
+
+    assert await Base().get_class_name() == "Base"
+    assert await Child().get_class_name() == "Child"
 
 
 async def test_class_method_exception_propagates() -> None:

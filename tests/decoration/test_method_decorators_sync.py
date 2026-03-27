@@ -2,8 +2,6 @@ import pytest
 
 import promising
 
-# ── Instance Methods ─────────────────────────────────────────────
-
 
 async def test_instance_method_returns_promise() -> None:
     """
@@ -58,6 +56,57 @@ async def test_instance_method_forwards_args() -> None:
     assert await obj.add(5, multiplier=3) == 45
 
 
+async def test_instance_method_class_access_is_promising_function() -> None:
+    """
+    Accessing the decorated method on the class itself returns the
+    PromisingFunction (unbound).
+    """
+
+    class MyClass:
+        @promising.function
+        def my_method(self) -> str:
+            return "ok"
+
+    assert isinstance(MyClass.my_method, promising.PromisingFunction)
+
+
+async def test_instance_method_with_empty_parens_decorator() -> None:
+    """
+    @promising.function() with empty parens also works as an
+    instance method decorator.
+    """
+
+    class MyClass:
+        @promising.function()
+        def greet(self) -> str:
+            return "hi"
+
+    obj = MyClass()
+    assert isinstance(MyClass.greet, promising.PromisingFunction)
+    assert await obj.greet() == "hi"
+
+
+async def test_instance_method_executes_once() -> None:
+    """
+    The coroutine executes exactly once per call regardless of
+    how many times the resulting Promise is awaited.
+    """
+    call_count = 0
+
+    class MyClass:
+        @promising.function
+        def counted(self) -> str:
+            nonlocal call_count
+            call_count += 1
+            return "done"
+
+    obj = MyClass()
+    p = obj.counted()
+    assert await p == "done"
+    assert await p == "done"
+    assert call_count == 1
+
+
 async def test_instance_method_exception_propagates() -> None:
     """
     An exception raised inside a sync instance method
@@ -71,9 +120,6 @@ async def test_instance_method_exception_propagates() -> None:
 
     with pytest.raises(ValueError, match="instance method error"):
         await MyClass().failing()
-
-
-# ── Static Methods ───────────────────────────────────────────────
 
 
 async def test_static_method_via_class_returns_promise() -> None:
@@ -129,9 +175,6 @@ async def test_static_method_exception_propagates() -> None:
 
     with pytest.raises(RuntimeError, match="static method error"):
         await MyClass().failing()
-
-
-# ── Class Methods ────────────────────────────────────────────────
 
 
 async def test_class_method_via_class_returns_promise() -> None:
@@ -205,9 +248,6 @@ async def test_class_method_exception_propagates() -> None:
 
     with pytest.raises(TypeError, match="class method error"):
         await MyClass().failing()
-
-
-# ── Alternative Decorator Ordering ───────────────────────────────
 
 
 async def test_promising_function_on_top_of_staticmethod() -> None:

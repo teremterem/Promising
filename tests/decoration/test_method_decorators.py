@@ -2,8 +2,6 @@ import pytest
 
 import promising
 
-# ── Instance Methods ──────────────────────────────────────────────
-
 
 async def test_instance_method_returns_promise() -> None:
     """
@@ -124,9 +122,6 @@ async def test_instance_method_exception_propagates() -> None:
         await MyClass().failing()
 
 
-# ── Static Methods ────────────────────────────────────────────────
-
-
 async def test_static_method_via_class_returns_promise() -> None:
     """
     @promising.function @staticmethod accessed on the class
@@ -212,9 +207,6 @@ async def test_static_method_exception_propagates() -> None:
 
     with pytest.raises(RuntimeError, match="static method error"):
         await MyClass().failing()
-
-
-# ── Class Methods ─────────────────────────────────────────────────
 
 
 async def test_class_method_via_class_returns_promise() -> None:
@@ -339,9 +331,6 @@ async def test_class_method_exception_propagates() -> None:
 
     with pytest.raises(TypeError, match="class method error"):
         await MyClass().failing()
-
-
-# ── Alternative Decorator Ordering ──────────────────────────────────────
 
 
 async def test_promising_function_on_top_of_staticmethod() -> None:

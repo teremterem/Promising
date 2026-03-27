@@ -42,30 +42,6 @@ Each test function listed below with its source → destination.
 
 ---
 
-### `decoration/test_context_decorator.py`
-
-**From `promising_context/test_context_decorator.py` (function sections only):**
-- `test_context_decorator_activates_context`
-- `test_context_decorator_deactivates_after`
-- `test_context_decorator_forwards_args`
-- `test_context_decorator_exception_propagates`
-- `test_context_decorator_deactivates_on_exception`
-- `test_context_decorator_with_parens`
-- `test_context_decorator_each_call_gets_fresh_context`
-
-**From `promising_context/test_context_decorator.py` (config section):**
-- `test_decorator_with_explicit_parent` (parametrized: None, INHERIT)
-
-**From `promising_context/sync/test_sync_context_decorator.py` (function sections only):**
-- `test_context_decorator_activates_context`
-- `test_context_decorator_deactivates_after`
-- `test_context_decorator_forwards_args`
-- `test_context_decorator_exception_propagates`
-- `test_context_decorator_deactivates_on_exception`
-- `test_context_decorator_with_parens`
-
----
-
 ### `decoration/test_method_decorators.py`
 
 **From `promising_function/test_method_decorators.py` (all — async @promising.function on methods):**

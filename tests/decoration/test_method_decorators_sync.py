@@ -158,6 +158,38 @@ async def test_static_method_via_instance_returns_promise() -> None:
     assert await result == 14
 
 
+async def test_static_method_receives_no_implicit_arg() -> None:
+    """
+    The static method coroutine receives only the explicit
+    arguments - no `self` or `cls` is prepended.
+    """
+
+    class MathUtils:
+        @staticmethod
+        @promising.function
+        def add(a: int, b: int) -> int:
+            return a + b
+
+    assert await MathUtils.add(3, 4) == 7
+    assert await MathUtils().add(3, 4) == 7
+
+
+async def test_static_method_with_empty_parens_decorator() -> None:
+    """
+    @promising.function() with empty parens also works as a
+    static method decorator.
+    """
+
+    class MathUtils:
+        @staticmethod
+        @promising.function()
+        def triple(x: int) -> int:
+            return x * 3
+
+    assert await MathUtils.triple(5) == 15
+    assert await MathUtils().triple(5) == 15
+
+
 async def test_static_method_exception_propagates() -> None:
     """
     An exception raised inside a sync static method

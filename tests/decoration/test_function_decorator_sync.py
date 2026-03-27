@@ -56,7 +56,7 @@ async def test_forwards_mixed_args() -> None:
     assert await mixed(3, 4, suffix="?") == "7?"
 
 
-async def test_sync_function_executes_once() -> None:
+async def test_executes_once() -> None:
     """
     A nonlocal counter confirms the sync function runs
     exactly once per call; second call increments to 2.

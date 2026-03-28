@@ -76,9 +76,6 @@ async def test_sync_instance_method_exception_propagates() -> None:
         MyClass().failing()
 
 
-# ── Static Methods ───────────────────────────────────────────────
-
-
 async def test_sync_static_method_decorator() -> None:
     """
     @promising.context below @staticmethod for sync functions.
@@ -93,9 +90,6 @@ async def test_sync_static_method_decorator() -> None:
 
     assert MathUtils.double(7) == 14
     assert MathUtils().double(7) == 14
-
-
-# ── Class Methods ────────────────────────────────────────────────
 
 
 async def test_sync_class_method_decorator() -> None:
@@ -134,9 +128,6 @@ async def test_sync_class_method_receives_cls_via_inheritance() -> None:
     assert Base().get_class_name() == "Base"
     assert Child().get_class_name() == "Child"
     assert Child.get_class_name() == "Child"
-
-
-# ── Alternative Decorator Ordering ───────────────────────────────
 
 
 async def test_sync_context_on_top_of_staticmethod() -> None:

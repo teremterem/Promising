@@ -85,9 +85,6 @@ async def test_instance_method_with_parens() -> None:
     assert await MyClass().greet() == "parens-method"
 
 
-# ── Static Methods ───────────────────────────────────────────────
-
-
 async def test_static_method_decorator() -> None:
     """
     @promising.context below @staticmethod: the context is
@@ -122,9 +119,6 @@ async def test_static_method_exception_propagates() -> None:
 
     with pytest.raises(RuntimeError, match="static method error"):
         await MyClass().failing()
-
-
-# ── Class Methods ────────────────────────────────────────────────
 
 
 async def test_class_method_decorator() -> None:
@@ -199,9 +193,6 @@ async def test_class_method_exception_propagates() -> None:
 
     with pytest.raises(TypeError, match="class method error"):
         await MyClass().failing()
-
-
-# ── Alternative Decorator Ordering ───────────────────────────────
 
 
 async def test_context_on_top_of_staticmethod() -> None:

@@ -42,41 +42,6 @@ Each test function listed below with its source → destination.
 
 ---
 
-### `decoration/test_method_decorators.py`
-
-**From `promising_context/test_context_decorator.py` (method + ordering sections):**
-- `test_instance_method_activates_context`
-- `test_instance_method_receives_self`
-- `test_instance_method_forwards_args`
-- `test_instance_method_exception_propagates`
-- `test_instance_method_with_parens`
-- `test_static_method_decorator`
-- `test_static_method_exception_propagates`
-- `test_class_method_decorator`
-- `test_class_method_receives_cls_via_inheritance`
-- `test_class_method_forwards_args`
-- `test_class_method_exception_propagates`
-- `test_context_on_top_of_staticmethod`
-- `test_context_on_top_of_classmethod`
-- `test_context_on_top_of_classmethod_with_args`
-- `test_context_with_parens_on_top_of_staticmethod`
-- `test_context_with_parens_on_top_of_classmethod`
-
-**From `promising_context/sync/test_sync_context_decorator.py` (method + ordering sections):**
-- `test_sync_instance_method_activates_context`
-- `test_sync_instance_method_receives_self`
-- `test_sync_instance_method_forwards_args`
-- `test_sync_instance_method_exception_propagates`
-- `test_sync_static_method_decorator`
-- `test_sync_class_method_decorator`
-- `test_sync_class_method_receives_cls_via_inheritance`
-- `test_sync_context_on_top_of_staticmethod`
-- `test_sync_context_on_top_of_classmethod`
-
-Note: this is the largest file (~61 test functions). The tests will be organized in sections: `@promising.function` async methods, `@promising.function` sync methods, `@promising.context` async methods, `@promising.context` sync methods.
-
----
-
 ### `decoration/test_decorator_robustness.py`
 
 **From `misc/test_decorator_robustness.py` (all — moved as-is):**

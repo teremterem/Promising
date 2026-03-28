@@ -44,31 +44,6 @@ Each test function listed below with its source → destination.
 
 ### `decoration/test_method_decorators.py`
 
-**From `promising_function/test_method_decorators.py` (all — async @promising.function on methods):**
-- `test_instance_method_returns_promise`
-- `test_instance_method_receives_self`
-- `test_instance_method_forwards_args`
-- `test_instance_method_class_access_is_promising_function`
-- `test_instance_method_with_empty_parens_decorator`
-- `test_instance_method_executes_once`
-- `test_instance_method_exception_propagates`
-- `test_static_method_via_class_returns_promise`
-- `test_static_method_via_instance_returns_promise`
-- `test_static_method_receives_no_implicit_arg`
-- `test_static_method_with_empty_parens_decorator`
-- `test_static_method_exception_propagates` (2 access patterns)
-- `test_class_method_via_class_returns_promise`
-- `test_class_method_via_instance_returns_promise`
-- `test_class_method_receives_cls_via_class`
-- `test_class_method_receives_cls_via_instance`
-- `test_class_method_forwards_args`
-- `test_class_method_with_empty_parens_decorator`
-- `test_class_method_exception_propagates` (2 access patterns)
-- `test_promising_function_on_top_of_staticmethod`
-- `test_promising_function_on_top_of_classmethod`
-- `test_promising_function_on_top_of_classmethod_with_args`
-- `test_promising_function_called_with_parens_on_static_and_class`
-
 **From `promising_context/test_context_decorator.py` (method + ordering sections):**
 - `test_instance_method_activates_context`
 - `test_instance_method_receives_self`

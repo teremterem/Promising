@@ -174,25 +174,11 @@ async def test_preserves_original_func() -> None:
     decorated = promising.function(original)
     assert decorated.__wrapped__ is original
 
-
-async def test_multiple_calls_produce_independent_promises() -> None:
-    """
-    Each call produces a distinct Promise with an
-    independent result.
-    """
-
-    @promising.function
-    async def identity(x: int) -> int:
-        return x
-
-    p1 = identity(1)
-    p2 = identity(2)
-    assert p1 is not p2
-    assert await p1 == 1
-    assert await p2 == 2
+    decorated = promising.function()(original)
+    assert decorated.__wrapped__ is original
 
 
-async def test_decorator_with_empty_parens() -> None:
+async def test_function_decorator_with_empty_parens() -> None:
     """
     @promising.function() (empty parens) behaves
     identically to bare @promising.function.

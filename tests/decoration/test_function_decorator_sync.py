@@ -176,6 +176,9 @@ async def test_preserves_original_func() -> None:
     decorated = promising.function(original, use_thread_pool=True)
     assert decorated.__wrapped__ is original
 
+    decorated = promising.function(use_thread_pool=True)(original)
+    assert decorated.__wrapped__ is original
+
 
 async def test_sync_function_runs_in_different_thread() -> None:
     """

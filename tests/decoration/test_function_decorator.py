@@ -162,7 +162,7 @@ async def test_used_as_direct_call() -> None:
     assert isinstance(pf, promising.PromisingFunction)
 
     promise = pf()
-    isinstance(promise, promising.Promise)
+    assert isinstance(promise, promising.Promise)
     assert await promise == "direct"
 
 

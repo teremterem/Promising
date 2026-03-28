@@ -106,7 +106,7 @@ async def test_context_decorator_each_call_gets_fresh_context() -> None:
 
 
 @pytest.mark.parametrize("parent", [None, promising.INHERIT])
-async def test_decorator_with_explicit_parent(parent) -> None:
+async def test_context_decorator_with_explicit_parent(parent) -> None:
     """
     @promising.context(parent=None) creates a root context even
     when called inside another context.

@@ -316,3 +316,23 @@ async def test_promising_function_on_top_of_classmethod() -> None:
 
     assert await MyClass.my_method() is MyClass
     assert await MyClass().my_method() is MyClass
+
+
+async def test_promising_function_on_top_of_classmethod_with_args() -> None:
+    """
+    @promising.function above @classmethod with extra arguments:
+    cls and all user-supplied args are forwarded correctly through
+    the __func__.__func__ unwrapping path in call(), both when called
+    via the class and via an instance.
+    """
+
+    class MyClass:
+        @promising.function(use_thread_pool=True)
+        @classmethod
+        def my_method(cls, value: int, *, prefix: str = "") -> str:
+            return f"{prefix}{cls.__name__}:{value}"
+
+    assert await MyClass.my_method(7) == "MyClass:7"
+    assert await MyClass.my_method(7, prefix=">>") == ">>MyClass:7"
+    assert await MyClass().my_method(7) == "MyClass:7"
+    assert await MyClass().my_method(7, prefix=">>") == ">>MyClass:7"

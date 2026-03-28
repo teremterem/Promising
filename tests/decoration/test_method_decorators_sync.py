@@ -250,6 +250,22 @@ async def test_class_method_receives_cls_via_instance() -> None:
     assert await Child().get_class_name() == "Child"
 
 
+async def test_class_method_forwards_args() -> None:
+    """
+    Extra arguments are forwarded to the classmethod coroutine
+    alongside cls.
+    """
+
+    class Formatter:
+        @classmethod
+        @promising.function(use_thread_pool=True)
+        def format_value(cls, value: int, *, prefix: str = "") -> str:
+            return f"{prefix}{cls.__name__}:{value}"
+
+    assert await Formatter.format_value(42) == "Formatter:42"
+    assert await Formatter.format_value(42, prefix=">>") == ">>Formatter:42"
+
+
 async def test_class_method_exception_propagates() -> None:
     """
     An exception raised inside a sync classmethod

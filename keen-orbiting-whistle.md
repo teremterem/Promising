@@ -69,21 +69,6 @@ Each test function listed below with its source → destination.
 - `test_promising_function_on_top_of_classmethod_with_args`
 - `test_promising_function_called_with_parens_on_static_and_class`
 
-**From `promising_function/sync/test_sync_method_decorators.py` (all — sync @promising.function on methods):**
-- `test_instance_method_returns_promise`
-- `test_instance_method_receives_self`
-- `test_instance_method_forwards_args`
-- `test_instance_method_exception_propagates`
-- `test_static_method_via_class_returns_promise`
-- `test_static_method_via_instance_returns_promise`
-- `test_static_method_exception_propagates`
-- `test_class_method_via_class_returns_promise`
-- `test_class_method_via_instance_returns_promise`
-- `test_class_method_receives_cls`
-- `test_class_method_exception_propagates`
-- `test_promising_function_on_top_of_staticmethod`
-- `test_promising_function_on_top_of_classmethod`
-
 **From `promising_context/test_context_decorator.py` (method + ordering sections):**
 - `test_instance_method_activates_context`
 - `test_instance_method_receives_self`

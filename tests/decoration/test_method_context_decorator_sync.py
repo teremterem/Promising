@@ -5,7 +5,7 @@ import promising
 
 async def test_instance_method_activates_context() -> None:
     """
-    @promising.context on an async instance method: the context
+    @promising.context on a sync instance method: the context
     is active inside the method body and `self` is received.
     """
 
@@ -20,7 +20,7 @@ async def test_instance_method_activates_context() -> None:
 
 async def test_instance_method_receives_self() -> None:
     """
-    The coroutine receives the correct `self` instance.
+    The sync method receives the correct `self` instance.
     """
 
     class Counter:
@@ -45,7 +45,7 @@ async def test_instance_method_receives_self() -> None:
 async def test_instance_method_forwards_args() -> None:
     """
     Positional and keyword arguments are forwarded to
-    the instance method coroutine correctly.
+    the sync instance method correctly.
     """
 
     class Adder:
@@ -63,8 +63,8 @@ async def test_instance_method_forwards_args() -> None:
 
 async def test_instance_method_exception_propagates() -> None:
     """
-    An exception raised inside an instance method coroutine
-    propagates when awaited.
+    An exception raised inside a sync instance method
+    propagates to the caller.
     """
 
     class MyClass:
@@ -105,7 +105,7 @@ async def test_static_method_decorator() -> None:
 async def test_static_method_exception_propagates() -> None:
     """
     An exception raised inside a static method decorated with
-    @promising.context propagates when awaited.
+    @promising.context propagates to the caller.
     """
 
     class MyClass:
@@ -140,7 +140,7 @@ async def test_class_method_decorator() -> None:
 
 async def test_class_method_receives_cls_via_inheritance() -> None:
     """
-    The classmethod receives the correct class through inheritance.
+    Sync classmethod receives the correct class through inheritance.
     """
 
     class Base:
@@ -162,7 +162,7 @@ async def test_class_method_receives_cls_via_inheritance() -> None:
 
 async def test_class_method_forwards_args() -> None:
     """
-    Extra arguments are forwarded to the classmethod coroutine
+    Extra arguments are forwarded to the sync classmethod
     alongside cls.
     """
 
@@ -179,7 +179,7 @@ async def test_class_method_forwards_args() -> None:
 async def test_class_method_exception_propagates() -> None:
     """
     An exception raised inside a classmethod decorated with
-    @promising.context propagates when awaited.
+    @promising.context propagates to the caller.
     """
 
     class MyClass:

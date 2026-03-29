@@ -95,7 +95,8 @@ async def test_sync_static_method_decorator() -> None:
 
 async def test_sync_class_method_decorator() -> None:
     """
-    @promising.context below @classmethod for sync methods.
+    @promising.context below @classmethod: the context is
+    active and `cls` is received correctly.
     """
 
     class Factory:
@@ -133,7 +134,8 @@ async def test_sync_class_method_receives_cls_via_inheritance() -> None:
 
 async def test_sync_context_on_top_of_staticmethod() -> None:
     """
-    @promising.context on top of @staticmethod for sync functions.
+    Applying @promising.context on top of @staticmethod still
+    works, both when called via the class and via an instance.
     """
 
     class MyClass:

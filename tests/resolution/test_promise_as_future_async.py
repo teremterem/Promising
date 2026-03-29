@@ -106,7 +106,7 @@ async def test_promise_as_future(
 
     assert isinstance(promise, asyncio.Future)
 
-    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
+    if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -226,7 +226,7 @@ async def test_promise_as_future_with_exception(
     # `await_promise=None` in our test means that we don't want to await for
     # anything at all (no task switching)
 
-    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
+    if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -258,7 +258,7 @@ async def test_promise_as_future_with_exception(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_from_concurrent_tasks(
+async def test_concurrent_consumers_with_timeout(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -423,7 +423,7 @@ async def test_from_concurrent_tasks(
 
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
-async def test_parallel_await(*, start_soon: bool | None) -> None:
+async def test_concurrent_consumers(*, start_soon: bool | None) -> None:
     """
     Test that multiple concurrent tasks awaiting the same Promise
     all receive the correct result while the underlying coroutine
@@ -495,7 +495,7 @@ async def test_parallel_await(*, start_soon: bool | None) -> None:
         assert coro_call_count == 1
 
 
-def _promise_expected_incomplete(*, start_soon: bool | None, await_promise: bool | None) -> bool:
+def _promise_not_expected_to_be_done(*, start_soon: bool | None, await_promise: bool | None) -> bool:
     """
     Return True when the promise is NOT expected to be done:
     1. Not prefilled and no task switching occurs (await_promise is None)

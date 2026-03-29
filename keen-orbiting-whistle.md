@@ -42,51 +42,6 @@ Each test function listed below with its source → destination.
 
 ---
 
-### `decoration/test_decorator_robustness.py`
-
-**From `misc/test_decorator_robustness.py` (all — moved as-is):**
-- `test_plain_async_raises_arg_error_at_call_time`
-- `test_context_alone_raises_arg_error_at_call_time`
-- `test_context_alone_on_sync_function_raises_arg_error_at_call_time`
-- `test_function_alone_raises_use_thread_pool_error_at_call_time`
-- `test_function_alone_raises_arg_error_at_call_time`
-- `test_function_alone_on_sync_raises_use_thread_pool_error_at_call_time`
-- `test_function_alone_on_sync_raises_arg_error_at_await_time`
-- `test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time`
-- `test_context_on_top_of_function_raises_arg_error_at_call_time`
-- `test_function_on_top_of_function_raises_use_thread_pool_error_at_call_time`
-- `test_function_on_top_of_function_raises_arg_error_at_call_time`
-- `test_function_on_top_of_context_raises_use_thread_pool_error_at_call_time`
-- `test_function_on_top_of_context_raises_arg_error_at_call_time`
-- `test_context_on_top_of_context_raises_arg_error_at_call_time`
-- `test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time`
-- `test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_call_time`
-- `test_context_on_top_of_sync_function_raises_arg_error_at_await_time`
-- `test_function_on_top_of_function_on_sync_accepts_use_thread_pool_none`
-- `test_function_on_top_of_function_on_sync_raises_arg_error_at_await_time`
-- `test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_at_call_time`
-- `test_function_on_top_of_context_on_sync_raises_arg_error_at_await_time`
-- `test_double_function_decorator_attrs_stay_independent`
-- `test_double_context_decorator_attrs_stay_independent`
-
----
-
-### `decoration/test_call_args_flow.py`
-
-**From `promising_function/test_call_args_flow.py` (all — moved as-is):**
-- `test_instance_method_via_instance`
-- `test_instance_method_via_instance__not_decorated`
-- `test_classmethod_via_class__classmethod_on_top`
-- `test_classmethod_via_class__promising_on_top`
-- `test_classmethod_via_instance__classmethod_on_top`
-- `test_classmethod_via_instance__promising_on_top`
-- `test_staticmethod_via_class__staticmethod_on_top`
-- `test_staticmethod_via_class__promising_on_top`
-- `test_staticmethod_via_instance__staticmethod_on_top`
-- `test_staticmethod_via_instance__promising_on_top`
-
----
-
 ### `resolution/test_async_resolution.py`
 
 **From `promise/test_promise.py` (all):**

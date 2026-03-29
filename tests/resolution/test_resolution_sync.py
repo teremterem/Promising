@@ -7,8 +7,8 @@ import promising
 from promising import Promise
 
 
-@pytest.mark.parametrize("use_unpack_once_sync", [True, False])
-async def test_single_promise_no_nesting(*, use_unpack_once_sync: bool) -> None:
+@pytest.mark.parametrize("unpack_once", [True, False])
+async def test_single_promise_no_nesting(*, unpack_once: bool) -> None:
     """A plain promise with a scalar result behaves the same
     for both `sync` and `unpack_once_sync`."""
 
@@ -18,7 +18,7 @@ async def test_single_promise_no_nesting(*, use_unpack_once_sync: bool) -> None:
     promise: Promise[str] = Promise(coro())
     loop = asyncio.get_running_loop()
 
-    if use_unpack_once_sync:
+    if unpack_once:
         result = await loop.run_in_executor(None, promise.unpack_once_sync)
     else:
         result = await loop.run_in_executor(None, promise.sync)

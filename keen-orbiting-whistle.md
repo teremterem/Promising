@@ -51,29 +51,6 @@ Each test function listed below with its source → destination.
 - `test_parallel_await`
 - `_promise_expected_incomplete` (helper function)
 
-**From `promise/test_unpack.py` (all):**
-- `test_single_promise_no_nesting`
-- `test_prefilled_promise_no_nesting`
-- `test_two_levels_await_unpacks_all`
-- `test_two_levels_unpack_once_stops_at_inner`
-- `test_three_levels_await_unpacks_all`
-- `test_three_levels_unpack_once_returns_second_level`
-- `test_custom_coroutine_await_unpacks`
-- `test_custom_coroutine_unpack_once_stops`
-- `test_mixed_chain_await_unpacks_all`
-- `test_mixed_chain_unpack_once`
-- `test_asyncio_future_await_unpacks`
-- `test_asyncio_future_unpack_once_stops`
-- `test_coroutine_with_sleep_await_unpacks`
-- `test_coroutine_with_sleep_unpack_once_stops`
-- `test_five_levels_await_unpacks_all`
-- `test_five_levels_sequential_unpack_once`
-- `test_nested_with_start_soon`
-- `test_non_awaitable_returned_as_is`
-- `test_exception_in_inner_promise_await`
-- `test_exception_in_inner_promise_unpack_once`
-- `test_coro_exception_at_depth_5_with_promising_context_and_functions`
-
 ---
 
 ### `resolution/test_sync_resolution.py`
@@ -88,29 +65,6 @@ Each test function listed below with its source → destination.
 - `test_sync_raises_on_event_loop_thread_prefilled`
 - `test_sync_inside_sync_promising_function`
 - `test_sync_exception_inside_sync_promising_function`
-
-**From `promise/sync/test_unpack_sync.py` (all):**
-- `test_single_promise_no_nesting`
-- `test_prefilled_promise_no_nesting`
-- `test_two_levels_sync_unpacks_all`
-- `test_two_levels_unpack_once_sync_stops_at_inner`
-- `test_three_levels_sync_unpacks_all`
-- `test_three_levels_unpack_once_sync_returns_second_level`
-- `test_custom_coroutine_sync_unpacks`
-- `test_custom_coroutine_unpack_once_sync_stops`
-- `test_mixed_chain_sync_unpacks_all`
-- `test_mixed_chain_unpack_once_sync`
-- `test_asyncio_future_sync_unpacks`
-- `test_asyncio_future_unpack_once_sync_stops`
-- `test_coroutine_with_sleep_sync_unpacks`
-- `test_coroutine_with_sleep_unpack_once_sync_stops`
-- `test_five_levels_sync_unpacks_all`
-- `test_five_levels_sequential_unpack_once_sync`
-- `test_nested_with_start_soon`
-- `test_non_awaitable_returned_as_is`
-- `test_exception_in_inner_promise_sync`
-- `test_exception_in_inner_promise_unpack_once_sync`
-- `test_coro_exception_at_depth_5_with_promising_context_and_functions`
 
 ---
 

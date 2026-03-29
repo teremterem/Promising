@@ -78,7 +78,8 @@ async def test_sync_instance_method_exception_propagates() -> None:
 
 async def test_sync_static_method_decorator() -> None:
     """
-    @promising.context below @staticmethod for sync functions.
+    @promising.context below @staticmethod: the context is
+    active and the function works via class and instance access.
     """
 
     class MathUtils:

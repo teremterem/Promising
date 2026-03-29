@@ -14,7 +14,7 @@ from promising import Promise
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise(
+async def test_promise_as_future(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -135,7 +135,7 @@ async def test_promise(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_with_exception(
+async def test_promise_as_future_with_exception(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -498,9 +498,7 @@ async def test_parallel_await(*, start_soon: bool | None) -> None:
 def _promise_expected_incomplete(*, start_soon: bool | None, await_promise: bool | None) -> bool:
     """
     Return True when the promise is NOT expected to be done:
-    1. Not prefilled and no task switching occurs
-       (await_promise is None)
-    2. Does not start soon, not prefilled, and not awaited
-       directly
+    1. Not prefilled and no task switching occurs (await_promise is None)
+    2. Does not start soon, not prefilled, and not awaited directly
     """
     return (start_soon is not None and await_promise is None) or (start_soon is False and await_promise is not True)

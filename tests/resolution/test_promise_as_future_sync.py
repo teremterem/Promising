@@ -12,7 +12,7 @@ from promising import Promise
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
-async def test_as_concurrent_future(
+async def test_promise_as_future(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -167,7 +167,7 @@ async def test_as_concurrent_future(
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
-async def test_with_exception(
+async def test_promise_as_future_with_exception(
     *,
     start_soon: bool | None,
     await_promise: bool | None,

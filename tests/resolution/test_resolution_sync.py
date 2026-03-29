@@ -1,14 +1,3 @@
-"""
-Tests for Promise sync unpacking behavior: `promise.sync()` (unpack_all)
-vs `promise.unpack_once_sync()`.
-
-`promise.sync()` should recursively unpack the result until it's no longer
-awaitable, while `unpack_once_sync()` should only unpack a single level.
-
-These are the synchronous counterparts of the tests in
-``tests/promise/test_unpack.py``.
-"""
-
 import asyncio
 from typing import Any
 
@@ -16,10 +5,6 @@ import pytest
 
 import promising
 from promising import Promise
-
-# ---------------------------------------------------------------------------
-# 1 level – no nesting (baseline)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("use_unpack_once_sync", [True, False])
@@ -48,11 +33,6 @@ async def test_prefilled_promise_no_nesting() -> None:
 
     assert await loop.run_in_executor(None, promise.sync) == 42
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == 42
-
-
-# ---------------------------------------------------------------------------
-# 2 levels – Promise returning a Promise
-# ---------------------------------------------------------------------------
 
 
 async def test_two_levels_sync_unpacks_all() -> None:
@@ -95,11 +75,6 @@ async def test_two_levels_unpack_once_sync_stops_at_inner() -> None:
 
     # Awaiting the inner promise should give the scalar
     assert await result == "deep value"
-
-
-# ---------------------------------------------------------------------------
-# 3 levels – Promise → Promise → Promise
-# ---------------------------------------------------------------------------
 
 
 async def test_three_levels_sync_unpacks_all() -> None:
@@ -148,11 +123,6 @@ async def test_three_levels_unpack_once_sync_returns_second_level() -> None:
     assert await loop.run_in_executor(None, level3.unpack_once_sync) == "bottom"
 
 
-# ---------------------------------------------------------------------------
-# Promise returning a coroutine
-# ---------------------------------------------------------------------------
-
-
 async def test_custom_coroutine_sync_unpacks() -> None:
     """`sync()` unpacks through a coroutine to the final
     value."""
@@ -186,11 +156,6 @@ async def test_custom_coroutine_unpack_once_sync_stops() -> None:
 
     # Get rid of the asyncio warning
     assert await result == "custom_value"
-
-
-# ---------------------------------------------------------------------------
-# Promise → coroutine → Promise
-# ---------------------------------------------------------------------------
 
 
 async def test_mixed_chain_sync_unpacks_all() -> None:
@@ -235,11 +200,6 @@ async def test_mixed_chain_unpack_once_sync() -> None:
     assert await inner == "final"
 
 
-# ---------------------------------------------------------------------------
-# Promise returning an asyncio.Future
-# ---------------------------------------------------------------------------
-
-
 async def test_asyncio_future_sync_unpacks() -> None:
     """`sync()` unpacks through an asyncio.Future to the
     final value."""
@@ -270,11 +230,6 @@ async def test_asyncio_future_unpack_once_sync_stops() -> None:
     assert isinstance(result, Promise)
     assert result.get_parent_context() is promise
     assert await result == "from_future"
-
-
-# ---------------------------------------------------------------------------
-# Promise returning a coroutine that yields control
-# ---------------------------------------------------------------------------
 
 
 async def test_coroutine_with_sleep_sync_unpacks() -> None:
@@ -312,11 +267,6 @@ async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
 
     # Get rid of the asyncio warning
     assert await result == "slept_value"
-
-
-# ---------------------------------------------------------------------------
-# Deeply nested – 5 levels of Promises
-# ---------------------------------------------------------------------------
 
 
 async def test_five_levels_sync_unpacks_all() -> None:
@@ -361,11 +311,6 @@ async def test_five_levels_sequential_unpack_once_sync() -> None:
     assert await loop.run_in_executor(None, current.unpack_once_sync) == "5 deep"
 
 
-# ---------------------------------------------------------------------------
-# start_soon variations with nested promises
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("start_soon", [True, False])
 async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     """Unpacking works regardless of start_soon setting."""
@@ -390,11 +335,6 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     result = await loop.run_in_executor(None, outer2.unpack_once_sync)
     assert isinstance(result, Promise)
     assert result is inner2
-
-
-# ---------------------------------------------------------------------------
-# Non-awaitable results are returned as-is
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -426,11 +366,6 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
 
     assert await loop.run_in_executor(None, promise.sync) == value
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == value
-
-
-# ---------------------------------------------------------------------------
-# Exception propagation through nesting
-# ---------------------------------------------------------------------------
 
 
 async def test_exception_in_inner_promise_sync() -> None:

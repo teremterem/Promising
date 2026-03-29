@@ -24,11 +24,12 @@ async def test_config_params_work_with_sync_functions() -> None:
     await promise
 
 
-async def test_call_time_config_overrides_work_with_sync_functions() -> None:
+async def test_call_time_config_overrides() -> None:
     """
     Config params passed at call time override the
-    PromisingFunction-level defaults for sync functions.
+    PromisingFunction-level defaults.
     """
+    # TODO How not to forget to expand the list of params when they are added ?
 
     @promising.function(
         start_soon=False,

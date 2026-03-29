@@ -42,17 +42,6 @@ Each test function listed below with its source → destination.
 
 ---
 
-### `resolution/test_async_resolution.py`
-
-**From `promise/test_promise.py` (all):**
-- `test_promise`
-- `test_promise_with_exception`
-- `test_from_concurrent_tasks`
-- `test_parallel_await`
-- `_promise_expected_incomplete` (helper function)
-
----
-
 ### `resolution/test_sync_resolution.py`
 
 **From `promise/sync/test_promise_sync.py` (all):**
@@ -68,37 +57,7 @@ Each test function listed below with its source → destination.
 
 ---
 
-### `resolution/test_sync_timeout.py`
-
-**From `promise/sync/test_unpack_sync_timeout.py` (all — moved as-is):**
-- `test_unpack_once_sync_times_out_on_slow_promise`
-- `test_unpack_once_sync_succeeds_within_timeout`
-- `test_sync_times_out_on_slow_promise`
-- `test_sync_succeeds_within_timeout`
-- `test_sync_times_out_on_slow_inner_promise`
-- `test_sync_nested_succeeds_within_timeout`
-- `test_sync_timeout_spans_multiple_levels`
-- `test_sync_timeout_spans_multiple_levels_succeeds`
-- `test_sync_times_out_on_slow_coroutine_result`
-- `test_sync_coroutine_result_succeeds_within_timeout`
-- `test_sync_no_timeout_waits_indefinitely`
-- `test_unpack_once_sync_no_timeout_waits_indefinitely`
-- `test_sync_zero_timeout_on_prefilled_promise`
-- `test_unpack_once_sync_zero_timeout_on_prefilled_promise`
-- `test_sync_zero_timeout_on_slow_promise`
-- `test_unpack_once_sync_zero_timeout_on_slow_promise`
-- `test_sync_zero_timeout_nested_prefilled`
-- `test_sync_zero_timeout_nested_slow_inner`
-
----
-
 ### `resolution/test_concurrent_future.py`
-
-**From `promise/sync/test_concurrent_future.py` (all):**
-- `test_as_concurrent_future`
-- `test_with_exception`
-- `test_from_threads`
-- `_promise_expected_incomplete` (helper)
 
 **From `promise/sync/test_concurrent_future_deadlock_safeguard.py` (all):**
 - `test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_result`

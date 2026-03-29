@@ -50,7 +50,7 @@ async def test_call_time_config_overrides_work_with_sync_functions() -> None:
     await promise
 
 
-async def test_config_kwargs_do_not_leak_into_sync_function() -> None:
+async def test_config_kwargs_do_not_leak_into_function() -> None:
     """
     start_soon etc. passed at call time are consumed by
     call() and not forwarded to the wrapped sync function.

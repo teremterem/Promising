@@ -11,7 +11,7 @@ import promising
 from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
-async def test_sync_promise_inside_outer_context() -> None:
+async def test_promise_inside_outer_context() -> None:
     """
     Sync promising function called and awaited inside an outer context.
 
@@ -40,7 +40,7 @@ async def test_sync_promise_inside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_sync_promise_outside_outer_context() -> None:
+async def test_promise_outside_outer_context() -> None:
     """
     Sync promising function called outside any context, awaited inside one.
 
@@ -70,7 +70,7 @@ async def test_sync_promise_outside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_sync_promise_await_outside_outer_context() -> None:
+async def test_promise_await_outside_outer_context() -> None:
     """
     Sync promising function called inside an outer context, awaited outside.
 
@@ -100,7 +100,7 @@ async def test_sync_promise_await_outside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_sync_contexted_function_inside_outer_context() -> None:
+async def test_contexted_function_inside_outer_context() -> None:
     """
     Sync contexted function called inside an outer context.
 

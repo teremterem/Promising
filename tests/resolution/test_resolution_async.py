@@ -147,11 +147,6 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
     assert await result == "custom_value"
 
 
-# ---------------------------------------------------------------------------
-# Promise → coroutine → Promise
-# ---------------------------------------------------------------------------
-
-
 async def test_mixed_chain_await_unpacks_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 

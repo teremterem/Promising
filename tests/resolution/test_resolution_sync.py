@@ -339,24 +339,8 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
 
 @pytest.mark.parametrize(
     "value",
-    [
-        42,
-        "string",
-        [1, 2, 3],
-        {"key": "val"},
-        None,
-        True,
-        3.14,
-    ],
-    ids=[
-        "int",
-        "str",
-        "list",
-        "dict",
-        "None",
-        "bool",
-        "float",
-    ],
+    [42, "string", [1, 2, 3], {"key": "val"}, None, True, 3.14],
+    ids=["int", "str", "list", "dict", "None", "bool", "float"],
 )
 async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     """Both `sync()` and `unpack_once_sync()` return

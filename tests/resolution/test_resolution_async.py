@@ -86,7 +86,7 @@ async def test_three_levels_unpack_all() -> None:
     assert await p1 == "bottom"
 
 
-async def test_three_levels_unpack_once_returns_second_level() -> None:
+async def test_three_levels_unpack_once_return_second_level() -> None:
     """`unpack_once()` on a triply-nested promise returns the
     second-level promise."""
     p2 = None
@@ -115,7 +115,7 @@ async def test_three_levels_unpack_once_returns_second_level() -> None:
     assert await level3.unpack_once() == "bottom"
 
 
-async def test_custom_coroutine_await_unpacks() -> None:
+async def test_custom_coroutine_unpack_all() -> None:
     """`await` unpacks through a coroutine to the final value."""
 
     async def custom_coro() -> str:
@@ -129,7 +129,7 @@ async def test_custom_coroutine_await_unpacks() -> None:
     assert await promise == "custom_value"
 
 
-async def test_custom_coroutine_unpack_once_stops() -> None:
+async def test_custom_coroutine_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def custom_coro() -> str:
@@ -147,7 +147,7 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
     assert await result == "custom_value"
 
 
-async def test_mixed_chain_await_unpacks_all() -> None:
+async def test_mixed_chain_unpack_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 
     async def custom_coro() -> Promise[str]:
@@ -185,7 +185,7 @@ async def test_mixed_chain_unpack_once() -> None:
     assert await inner == "final"
 
 
-async def test_asyncio_future_await_unpacks() -> None:
+async def test_asyncio_future_unpack_all() -> None:
     """`await` unpacks through an asyncio.Future to the final value."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -199,7 +199,7 @@ async def test_asyncio_future_await_unpacks() -> None:
     assert await promise == "from_future"
 
 
-async def test_asyncio_future_unpack_once_stops() -> None:
+async def test_asyncio_future_unpack_once() -> None:
     """`unpack_once()` wraps the returned asyncio.Future in a Promise."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -216,7 +216,7 @@ async def test_asyncio_future_unpack_once_stops() -> None:
     assert await result == "from_future"
 
 
-async def test_coroutine_with_sleep_await_unpacks() -> None:
+async def test_coroutine_with_sleep_unpack_all() -> None:
     """`await` unpacks through a coroutine that yields control."""
 
     async def sleeping_coro() -> str:
@@ -231,7 +231,7 @@ async def test_coroutine_with_sleep_await_unpacks() -> None:
     assert await promise == "slept_value"
 
 
-async def test_coroutine_with_sleep_unpack_once_stops() -> None:
+async def test_coroutine_with_sleep_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def sleeping_coro() -> str:
@@ -250,7 +250,7 @@ async def test_coroutine_with_sleep_unpack_once_stops() -> None:
     assert await result == "slept_value"
 
 
-async def test_five_levels_await_unpacks_all() -> None:
+async def test_five_levels_unpack_all() -> None:
     """`await` flattens 5 levels of promise nesting."""
 
     async def make_chain(depth: int) -> Any:

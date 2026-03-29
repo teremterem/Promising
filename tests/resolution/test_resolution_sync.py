@@ -93,7 +93,7 @@ async def test_three_levels_unpack_all() -> None:
     assert await loop.run_in_executor(None, p1.sync) == "bottom"
 
 
-async def test_three_levels_unpack_once_returns_second_level() -> None:
+async def test_three_levels_unpack_once_return_second_level() -> None:
     """`unpack_once_sync()` on a triply-nested promise
     returns the second-level promise."""
     p2 = None
@@ -123,7 +123,7 @@ async def test_three_levels_unpack_once_returns_second_level() -> None:
     assert await loop.run_in_executor(None, level3.unpack_once_sync) == "bottom"
 
 
-async def test_custom_coroutine_sync_unpacks() -> None:
+async def test_custom_coroutine_unpack_all() -> None:
     """`sync()` unpacks through a coroutine to the final
     value."""
 
@@ -139,7 +139,7 @@ async def test_custom_coroutine_sync_unpacks() -> None:
     assert await loop.run_in_executor(None, promise.sync) == "custom_value"
 
 
-async def test_custom_coroutine_unpack_once_sync_stops() -> None:
+async def test_custom_coroutine_unpack_once() -> None:
     """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
 
     async def custom_coro() -> str:
@@ -158,7 +158,7 @@ async def test_custom_coroutine_unpack_once_sync_stops() -> None:
     assert await result == "custom_value"
 
 
-async def test_mixed_chain_sync_unpacks_all() -> None:
+async def test_mixed_chain_unpack_all() -> None:
     """`sync()` unpacks through
     Promise → coroutine → scalar."""
 
@@ -176,7 +176,7 @@ async def test_mixed_chain_sync_unpacks_all() -> None:
     assert await loop.run_in_executor(None, promise.sync) == "final"
 
 
-async def test_mixed_chain_unpack_once_sync() -> None:
+async def test_mixed_chain_unpack_once() -> None:
     """`unpack_once_sync()` on outer promise returns the
     coroutine wrapped in a Promise."""
 
@@ -200,7 +200,7 @@ async def test_mixed_chain_unpack_once_sync() -> None:
     assert await inner == "final"
 
 
-async def test_asyncio_future_sync_unpacks() -> None:
+async def test_asyncio_future_unpack_all() -> None:
     """`sync()` unpacks through an asyncio.Future to the
     final value."""
     loop = asyncio.get_running_loop()
@@ -215,7 +215,7 @@ async def test_asyncio_future_sync_unpacks() -> None:
     assert await loop.run_in_executor(None, promise.sync) == "from_future"
 
 
-async def test_asyncio_future_unpack_once_sync_stops() -> None:
+async def test_asyncio_future_unpack_once() -> None:
     """`unpack_once_sync()` wraps the returned asyncio.Future in a Promise."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -232,7 +232,7 @@ async def test_asyncio_future_unpack_once_sync_stops() -> None:
     assert await result == "from_future"
 
 
-async def test_coroutine_with_sleep_sync_unpacks() -> None:
+async def test_coroutine_with_sleep_unpack_all() -> None:
     """`sync()` unpacks through a coroutine that yields
     control."""
 
@@ -249,7 +249,7 @@ async def test_coroutine_with_sleep_sync_unpacks() -> None:
     assert await loop.run_in_executor(None, promise.sync) == "slept_value"
 
 
-async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
+async def test_coroutine_with_sleep_unpack_once() -> None:
     """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
 
     async def sleeping_coro() -> str:
@@ -269,7 +269,7 @@ async def test_coroutine_with_sleep_unpack_once_sync_stops() -> None:
     assert await result == "slept_value"
 
 
-async def test_five_levels_sync_unpacks_all() -> None:
+async def test_five_levels_unpack_all() -> None:
     """`sync()` flattens 5 levels of promise nesting."""
 
     async def make_chain(depth: int) -> Any:
@@ -283,7 +283,7 @@ async def test_five_levels_sync_unpacks_all() -> None:
     assert await loop.run_in_executor(None, p.sync) == "5 deep"
 
 
-async def test_five_levels_sequential_unpack_once_sync() -> None:
+async def test_five_levels_sequential_unpack_once() -> None:
     """Sequentially calling `unpack_once_sync()` 5 times
     peels off all layers."""
     p5 = Promise(prefilled_result="5 deep")
@@ -366,7 +366,7 @@ async def test_exception_in_inner_promise_sync() -> None:
         await loop.run_in_executor(None, outer.sync)
 
 
-async def test_exception_in_inner_promise_unpack_once_sync() -> None:
+async def test_exception_in_inner_promise_unpack_once() -> None:
     """`unpack_once_sync()` on outer returns the inner
     promise (doesn't raise)."""
     inner = None

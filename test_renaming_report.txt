@@ -1,0 +1,221 @@
+ ▐▛███▜▌   Claude Code v2.1.87
+▝▜█████▛▘  Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    ~/Desktop/hobby/Promising
+
+❯ /clear
+  ⎿  (no content)
+
+❯ See how I attemted to use the same names for tests that are counterparts to
+each other between sync and async in @tests/? I haven't finished this work yet,
+ I need help with it. Please go through all the test files in @tests/ and apply
+ similar renaming approach to other tests. If renaming of some tests cannot be
+done or is not needed / not applicable (for ex. there is no counterpart) please
+ report those tests to me, so I take a look at them myself.
+  ⎿  Listed directory tests/
+
+⏺ Let me explore the test structure and understand the naming pattern you've
+  been using.
+
+⏺ Explore(Explore test file structure)
+  ⎿  Done (3 tool uses · 16.3k tokens · 15s)
+  (ctrl+o to expand)
+
+⏺ Now let me look at some pairs where renaming has already been done to
+  understand the pattern, and then examine the remaining pairs.
+
+⏺ Explore(Extract test names from paired files)
+  ⎿  Done (16 tool uses · 63.4k tokens · 29s)
+  (ctrl+o to expand)
+
+⏺ 3 pairs already match perfectly. Let me examine the 5 mismatched pairs to
+  determine which tests are counterparts needing renaming vs. genuinely
+  different tests.
+
+  Read 4 files (ctrl+o to expand)
+
+⏺ Now let me read the remaining mismatched pairs.
+
+  Read 6 files (ctrl+o to expand)
+
+⏺ Now I have a clear picture. Let me summarize the analysis and make the renames
+   where counterparts exist.
+
+  Renames needed (2 tests that are clear counterparts with mismatched names):
+
+  1. test_call_overrides_sync.py:
+  test_call_time_config_overrides_work_with_sync_functions →
+  test_call_overrides_all_three (matches async counterpart)
+  2. test_promise_as_future_sync.py: test_concurrent_consumers_with_timeout →
+  test_concurrent_consumers (matches async counterpart)
+
+⏺ Update(tests/configuration/test_call_overrides_sync.py)
+  ⎿  User rejected update to tests/configuration/test_call_overrides_sync.py
+
+⏺ Update(tests/resolution/test_promise_as_future_sync.py)
+  ⎿  User rejected update to tests/resolution/test_promise_as_future_sync.py
+
+❯ Please don't use "all_three". There might be more in future - be more
+generic.
+
+⏺ Good point. Let me look at what the async counterpart actually says to find a
+  better name.
+
+  The async file has test_call_overrides_all_three — but you don't want that
+  pattern. The sync version currently says
+  test_call_time_config_overrides_work_with_sync_functions. The core idea is:
+  config params passed at call time override the decoration-time defaults.
+
+  How about test_call_time_config_overrides? That's generic and matches the
+  concept without encoding a count.
+
+⏺ Update(tests/configuration/test_call_overrides_sync.py)
+  ⎿  Added 2 lines, removed 2 lines
+      24      await promise
+      25
+      26
+      27 -async def test_call_time_config_overrides_work_with_sync_functi
+         -ons() -> None:
+      27 +async def test_call_time_config_overrides() -> None:
+      28      """
+      29      Config params passed at call time override the
+      30 -    PromisingFunction-level defaults for sync functions.
+      30 +    PromisingFunction-level defaults.
+      31      """
+      32
+      33      @promising.function(
+
+⏺ Update(tests/configuration/test_call_overrides_async.py)
+  ⎿  Added 3 lines, removed 3 lines
+      128  # ── All three overridden at once ────────────────────────────
+           ──────────────────
+      129
+      130
+      131 -async def test_call_overrides_all_three() -> None:
+      131 +async def test_call_time_config_overrides() -> None:
+      132      """
+      133 -    All three config params set on PromisingFunction are
+      134 -    overridden when all three are passed at call time.
+      133 +    Config params passed at call time override the
+      134 +    PromisingFunction-level defaults.
+      135      """
+      136
+      137      @promising.function(
+
+⏺ Update(tests/resolution/test_promise_as_future_sync.py)
+  ⎿  User rejected update to tests/resolution/test_promise_as_future_sync.py
+
+❯ This one should not be touched - the subtlety is that it doesn't have a real
+counterpart. What might seem to be its counterpart is actually a slightly
+different test (but different in an important way)
+
+⏺ Understood — test_concurrent_consumers_with_timeout (sync) and
+  test_concurrent_consumers (async) are different tests, not counterparts. I'll
+  leave both untouched.
+
+  So the only renames made were the test_call_time_config_overrides pair. Let me
+   now run the tests to verify, then give you the full report.
+
+⏺ Bash(python -m pytest tests/ -x -q 2>&1 | tail -5)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ Are you sure that is all? Please go through each file pair (test_..._async.py
+ and test_..._sync.py) and inspect each pair individually (one pair, then
+another pair, and so on).
+⏺ You're right, let me be more thorough. I'll inspect each pair individually,
+  including the ones the agent reported as "matching." Let me start with the
+  pairs I haven't read myself yet.
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Pair 2 (context_decorator): All 8 test names match perfectly. Moving on.
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Pair 4 (method_context_decorator): All 16 test names match perfectly. Now the
+  resolution pair.
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Pair 8 (resolution): All 21 test names match perfectly.
+
+  Now I've read every single file in every pair. Here's the complete analysis:
+
+  ---
+  Already renamed (this session):
+  - test_call_overrides_sync.py + test_call_overrides_async.py: Both now have
+  test_call_time_config_overrides
+
+  Already matching perfectly (no action needed):
+  - test_context_decorator pair: 8/8 match
+  - test_method_context_decorator pair: 16/16 match
+  - test_resolution pair: 21/21 match
+  - test_function_decorator pair: 11/11 shared tests match
+  - test_method_function_decorator pair: 19/19 shared tests match
+  - test_await_children pair: 2/2 shared tests match
+  - test_promise_as_future pair: 2/2 shared tests match
+
+  Tests without counterparts (for your review):
+
+  File: test_call_overrides_sync.py
+  Test name: test_config_params_work_with_sync_functions
+  Why no counterpart: Combined smoke test of all config params at decoration
+    time; async tests each param individually instead
+  ────────────────────────────────────────
+  File: test_call_overrides_async.py
+  Test name: 9 individual param tests (test_call_overrides_start_soon,
+    test_call_without_start_soon_uses_constructor_value, etc.)
+  Why no counterpart: No sync counterparts — sync file uses the bulk smoke test
+    above
+  ────────────────────────────────────────
+  File: test_call_overrides_async.py
+  Test name: test_config_kwargs_alongside_function_kwargs
+  Why no counterpart: No sync counterpart
+  ────────────────────────────────────────
+  File: test_call_overrides_async.py
+  Test name: test_call_override_with_inherit
+  Why no counterpart: No sync counterpart
+  ────────────────────────────────────────
+  File: test_call_overrides_async.py
+  Test name: test_call_override_with_global_default
+  Why no counterpart: No sync counterpart
+  ────────────────────────────────────────
+  File: test_function_decorator_sync.py
+  Test name: test_sync_function_runs_in_different_thread
+  Why no counterpart: Inherently sync-only (tests thread pool behavior)
+  ────────────────────────────────────────
+  File: test_function_decorator_async.py
+  Test name: test_function_decorator_with_empty_parens
+  Why no counterpart: Async-only (sync needs explicit use_thread_pool=True so
+    empty parens don't apply)
+  ────────────────────────────────────────
+  File: test_method_function_decorator_async.py
+  Test name: test_promising_function_called_with_parens_on_static_and_class,
+    test_instance_method_with_empty_parens_decorator,
+    test_static_method_with_empty_parens_decorator,
+    test_class_method_with_empty_parens_decorator
+  Why no counterpart: Same reason — empty parens tests are async-only
+  ────────────────────────────────────────
+  File: test_await_children_sync.py
+  Test name: test_await_children_sync_recursively_all_sync
+  Why no counterpart: Tests all-sync hierarchy (sync root + sync children)
+  ────────────────────────────────────────
+  File: test_await_children_async.py
+  Test name: test_await_children_recursively_sync_children
+  Why no counterpart: Tests async root + sync children
+  ────────────────────────────────────────
+  File: test_await_children_sync.py
+  Test name: test_await_children_sync_raises_on_event_loop_thread
+  Why no counterpart: Deadlock guard, sync-only
+  ────────────────────────────────────────
+  File: test_promise_as_future_sync.py
+  Test name: test_concurrent_consumers_with_timeout
+  Why no counterpart: Tests thread-based concurrent access with timeouts
+  ────────────────────────────────────────
+  File: test_promise_as_future_async.py
+  Test name: test_concurrent_consumers
+  Why no counterpart: Tests asyncio task-based concurrent awaiting
+
+  That's the complete picture. The test_call_time_config_overrides rename was
+  the only applicable one I found.
+
+✻ Cooked for 1m 53s

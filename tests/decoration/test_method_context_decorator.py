@@ -76,6 +76,15 @@ async def test_instance_method_exception_propagates() -> None:
         await MyClass().failing()
 
 
+async def test_instance_method_with_parens() -> None:
+    class MyClass:
+        @promising.context()
+        async def greet(self) -> str:
+            return "parens-method"
+
+    assert await MyClass().greet() == "parens-method"
+
+
 async def test_static_method_decorator() -> None:
     """
     @promising.context below @staticmethod: the context is
@@ -256,12 +265,3 @@ async def test_context_with_parens_on_top_of_classmethod() -> None:
 
     assert await MyClass.my_method() is MyClass
     assert await MyClass().my_method() is MyClass
-
-
-async def test_instance_method_with_parens() -> None:
-    class MyClass:
-        @promising.context()
-        async def greet(self) -> str:
-            return "parens-method"
-
-    assert await MyClass().greet() == "parens-method"

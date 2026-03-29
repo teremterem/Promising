@@ -326,7 +326,7 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     assert await promise.unpack_once() == value
 
 
-async def test_exception_in_inner_promise_await() -> None:
+async def test_exception_in_inner_promise_unpack_all() -> None:
     """`await` on outer propagates exception from inner promise."""
 
     async def outer_coro() -> str:

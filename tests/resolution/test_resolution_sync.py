@@ -352,7 +352,7 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == value
 
 
-async def test_exception_in_inner_promise_sync() -> None:
+async def test_exception_in_inner_promise_unpack_all() -> None:
     """`sync()` on outer propagates exception from inner
     promise."""
 

@@ -3,9 +3,9 @@ import pytest
 import promising
 
 
-async def test_sync_instance_method_activates_context() -> None:
+async def test_instance_method_activates_context() -> None:
     """
-    @promising.context on a sync instance method: the context
+    @promising.context on an async instance method: the context
     is active inside the method body and `self` is received.
     """
 
@@ -13,14 +13,14 @@ async def test_sync_instance_method_activates_context() -> None:
         @promising.context
         def greet(self) -> str:
             assert promising.get_active_context() is not None
-            return "hello-sync"
+            return "hello"
 
-    assert Greeter().greet() == "hello-sync"
+    assert Greeter().greet() == "hello"
 
 
-async def test_sync_instance_method_receives_self() -> None:
+async def test_instance_method_receives_self() -> None:
     """
-    The sync method receives the correct `self` instance.
+    The coroutine receives the correct `self` instance.
     """
 
     class Counter:
@@ -42,10 +42,10 @@ async def test_sync_instance_method_receives_self() -> None:
     assert obj2.get_value() == 100
 
 
-async def test_sync_instance_method_forwards_args() -> None:
+async def test_instance_method_forwards_args() -> None:
     """
     Positional and keyword arguments are forwarded to
-    the sync instance method correctly.
+    the instance method coroutine correctly.
     """
 
     class Adder:
@@ -61,22 +61,31 @@ async def test_sync_instance_method_forwards_args() -> None:
     assert obj.add(5, multiplier=3) == 45
 
 
-async def test_sync_instance_method_exception_propagates() -> None:
+async def test_instance_method_exception_propagates() -> None:
     """
-    An exception raised inside a sync instance method
-    propagates to the caller.
+    An exception raised inside an instance method coroutine
+    propagates when awaited.
     """
 
     class MyClass:
         @promising.context
         def failing(self) -> None:
-            raise ValueError("sync instance method error")
+            raise ValueError("instance method error")
 
-    with pytest.raises(ValueError, match="sync instance method error"):
+    with pytest.raises(ValueError, match="instance method error"):
         MyClass().failing()
 
 
-async def test_sync_static_method_decorator() -> None:
+async def test_instance_method_with_parens() -> None:
+    class MyClass:
+        @promising.context()
+        def greet(self) -> str:
+            return "parens-method"
+
+    assert MyClass().greet() == "parens-method"
+
+
+async def test_static_method_decorator() -> None:
     """
     @promising.context below @staticmethod: the context is
     active and the function works via class and instance access.
@@ -93,7 +102,26 @@ async def test_sync_static_method_decorator() -> None:
     assert MathUtils().double(7) == 14
 
 
-async def test_sync_class_method_decorator() -> None:
+async def test_static_method_exception_propagates() -> None:
+    """
+    An exception raised inside a static method decorated with
+    @promising.context propagates when awaited.
+    """
+
+    class MyClass:
+        @staticmethod
+        @promising.context
+        def failing() -> None:
+            raise RuntimeError("static method error")
+
+    with pytest.raises(RuntimeError, match="static method error"):
+        MyClass.failing()
+
+    with pytest.raises(RuntimeError, match="static method error"):
+        MyClass().failing()
+
+
+async def test_class_method_decorator() -> None:
     """
     @promising.context below @classmethod: the context is
     active and `cls` is received correctly.
@@ -110,9 +138,9 @@ async def test_sync_class_method_decorator() -> None:
     assert Factory().create_name() == "Factory"
 
 
-async def test_sync_class_method_receives_cls_via_inheritance() -> None:
+async def test_class_method_receives_cls_via_inheritance() -> None:
     """
-    Sync classmethod receives the correct class through inheritance.
+    The classmethod receives the correct class through inheritance.
     """
 
     class Base:
@@ -132,7 +160,42 @@ async def test_sync_class_method_receives_cls_via_inheritance() -> None:
     assert Child.get_class_name() == "Child"
 
 
-async def test_sync_context_on_top_of_staticmethod() -> None:
+async def test_class_method_forwards_args() -> None:
+    """
+    Extra arguments are forwarded to the classmethod coroutine
+    alongside cls.
+    """
+
+    class Formatter:
+        @classmethod
+        @promising.context
+        def format_value(cls, value: int, *, prefix: str = "") -> str:
+            return f"{prefix}{cls.__name__}:{value}"
+
+    assert Formatter.format_value(42) == "Formatter:42"
+    assert Formatter.format_value(42, prefix=">>") == ">>Formatter:42"
+
+
+async def test_class_method_exception_propagates() -> None:
+    """
+    An exception raised inside a classmethod decorated with
+    @promising.context propagates when awaited.
+    """
+
+    class MyClass:
+        @classmethod
+        @promising.context
+        def failing(cls) -> None:
+            raise TypeError("class method error")
+
+    with pytest.raises(TypeError, match="class method error"):
+        MyClass.failing()
+
+    with pytest.raises(TypeError, match="class method error"):
+        MyClass().failing()
+
+
+async def test_context_on_top_of_staticmethod() -> None:
     """
     Applying @promising.context on top of @staticmethod still
     works, both when called via the class and via an instance.
@@ -148,13 +211,54 @@ async def test_sync_context_on_top_of_staticmethod() -> None:
     assert MyClass().my_method() == "ok"
 
 
-async def test_sync_context_on_top_of_classmethod() -> None:
+async def test_context_on_top_of_classmethod() -> None:
     """
-    @promising.context on top of @classmethod for sync functions.
+    Applying @promising.context on top of @classmethod still
+    works, both when called via the class and via an instance,
+    and `cls` is correctly received in both cases.
     """
 
     class MyClass:
         @promising.context
+        @classmethod
+        def my_method(cls) -> type:
+            return cls
+
+    assert MyClass.my_method() is MyClass
+    assert MyClass().my_method() is MyClass
+
+
+async def test_context_on_top_of_classmethod_with_args() -> None:
+    """
+    @promising.context above @classmethod with extra arguments:
+    cls and all user-supplied args are forwarded correctly.
+    """
+
+    class MyClass:
+        @promising.context
+        @classmethod
+        def my_method(cls, value: int, *, prefix: str = "") -> str:
+            return f"{prefix}{cls.__name__}:{value}"
+
+    assert MyClass.my_method(7) == "MyClass:7"
+    assert MyClass.my_method(7, prefix=">>") == ">>MyClass:7"
+    assert MyClass().my_method(7) == "MyClass:7"
+    assert MyClass().my_method(7, prefix=">>") == ">>MyClass:7"
+
+
+async def test_context_with_parens_on_top_of_staticmethod() -> None:
+    class MyClass:
+        @promising.context()
+        @staticmethod
+        def my_method() -> None: ...
+
+    assert MyClass.my_method() is None
+    assert MyClass().my_method() is None
+
+
+async def test_context_with_parens_on_top_of_classmethod() -> None:
+    class MyClass:
+        @promising.context()
         @classmethod
         def my_method(cls) -> type:
             return cls

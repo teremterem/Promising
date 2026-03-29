@@ -35,7 +35,7 @@ async def test_prefilled_promise_no_nesting() -> None:
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == 42
 
 
-async def test_two_levels_sync_unpacks_all() -> None:
+async def test_two_levels_unpack_all() -> None:
     """`sync()` should unpack both levels and return the
     final value."""
 
@@ -52,7 +52,7 @@ async def test_two_levels_sync_unpacks_all() -> None:
     assert result == "deep value"
 
 
-async def test_two_levels_unpack_once_sync_stops_at_inner() -> None:
+async def test_two_levels_unpack_once_stop_at_inner() -> None:
     """`unpack_once_sync()` on the outer promise should
     return the inner promise, not the final scalar."""
 
@@ -77,7 +77,7 @@ async def test_two_levels_unpack_once_sync_stops_at_inner() -> None:
     assert await result == "deep value"
 
 
-async def test_three_levels_sync_unpacks_all() -> None:
+async def test_three_levels_unpack_all() -> None:
     """`sync()` on a triply-nested promise returns the
     deepest value."""
 
@@ -93,7 +93,7 @@ async def test_three_levels_sync_unpacks_all() -> None:
     assert await loop.run_in_executor(None, p1.sync) == "bottom"
 
 
-async def test_three_levels_unpack_once_sync_returns_second_level() -> None:
+async def test_three_levels_unpack_once_returns_second_level() -> None:
     """`unpack_once_sync()` on a triply-nested promise
     returns the second-level promise."""
     p2 = None

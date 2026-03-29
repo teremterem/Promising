@@ -33,7 +33,7 @@ async def test_prefilled_promise_no_nesting() -> None:
     assert await promise.unpack_once() == 42
 
 
-async def test_two_levels_await_unpacks_all() -> None:
+async def test_two_levels_unpack_all() -> None:
     """`await outer` should unpack both levels and return the final value."""
 
     async def inner_coro() -> str:
@@ -48,7 +48,7 @@ async def test_two_levels_await_unpacks_all() -> None:
     assert result == "deep value"
 
 
-async def test_two_levels_unpack_once_stops_at_inner() -> None:
+async def test_two_levels_unpack_once_stop_at_inner() -> None:
     """`unpack_once()` on the outer promise should return the inner promise,
     not the final scalar."""
 
@@ -72,7 +72,7 @@ async def test_two_levels_unpack_once_stops_at_inner() -> None:
     assert await result == "deep value"
 
 
-async def test_three_levels_await_unpacks_all() -> None:
+async def test_three_levels_unpack_all() -> None:
     """`await` on a triply-nested promise returns the deepest value."""
 
     async def mid_coro() -> str:

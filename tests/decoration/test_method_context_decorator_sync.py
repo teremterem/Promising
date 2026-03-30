@@ -76,6 +76,9 @@ async def test_instance_method_exception_propagates() -> None:
         MyClass().failing()
 
     # Verify context is properly deactivated after exception
+    # TODO Apply this check to other tests as well ? Make it more elaborate ?
+    #  Get rid of it ?
+    #  https://github.com/teremterem/Promising/pull/89#discussion_r3008493421
     assert promising.get_active_context(raise_if_none=False) is None
 
 

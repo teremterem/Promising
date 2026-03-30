@@ -401,7 +401,9 @@ async def test_static_method_with_empty_parens_decorator() -> None:
 
     assert isinstance(MathUtils.triple, promising.PromisingFunction)
 
-    # TODO Do similar detailed checks in other tests too ?
+    # TODO Apply these elaborate checks to other tests as well, or get rid of
+    #  them ?
+    #  https://github.com/teremterem/Promising/pull/89#discussion_r3008493442
     class_result = MathUtils.triple(5)
     instance_result = MathUtils().triple(5)
     assert isinstance(class_result, promising.Promise)
@@ -424,7 +426,9 @@ async def test_class_method_with_empty_parens_decorator() -> None:
 
     assert isinstance(Factory.create_name.__func__, promising.PromisingFunction)
 
-    # TODO Do similar detailed checks in other tests too ?
+    # TODO Apply these elaborate checks to other tests as well, or get rid of
+    #  them ?
+    #  https://github.com/teremterem/Promising/pull/89#discussion_r3008493442
     class_result = Factory.create_name()
     instance_result = Factory().create_name()
     assert isinstance(class_result, promising.Promise)

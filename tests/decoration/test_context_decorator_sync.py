@@ -85,6 +85,9 @@ async def test_context_decorator_with_parens() -> None:
         captured_ctx = promising.get_active_context()
         return "parens"
 
+    # TODO Apply these elaborate checks to other tests as well, or get rid of
+    #  them ?
+    #  https://github.com/teremterem/Promising/pull/89#discussion_r3008493410
     assert promising.get_active_context(raise_if_none=False) is None
     assert work() == "parens"
     assert isinstance(captured_ctx, promising.PromisingContext)

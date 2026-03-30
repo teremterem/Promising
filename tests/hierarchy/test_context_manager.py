@@ -132,4 +132,4 @@ def test_context_manager_inside_promising_function_run(use_thread_pool: bool | N
         assert captured_ctx.get_parent_context() is before_ctx
         assert before_ctx is after_ctx
 
-    run_in_thread(_test)
+    run_in_thread(_test, timeout=2)

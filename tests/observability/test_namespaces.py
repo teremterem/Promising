@@ -52,7 +52,7 @@ def test_qualname_from_function() -> None:
         provided_explicitly=None,
         named_object_fallback=my_func,
     )
-    assert result == "test_namespaces::test_qualname_from_function.<locals>.my_func"
+    assert result == "tests.observability.test_namespaces::test_qualname_from_function.<locals>.my_func"
 
 
 def test_qualname_from_sync_function() -> None:
@@ -62,7 +62,7 @@ def test_qualname_from_sync_function() -> None:
         provided_explicitly=None,
         named_object_fallback=my_sync_func,
     )
-    assert result == "test_namespaces::test_qualname_from_sync_function.<locals>.my_sync_func"
+    assert result == "tests.observability.test_namespaces::test_qualname_from_sync_function.<locals>.my_sync_func"
 
 
 async def test_qualname_from_async_generator_object() -> None:
@@ -81,7 +81,7 @@ async def test_qualname_from_async_generator_object() -> None:
         provided_explicitly=None,
         named_object_fallback=ag,
     )
-    assert result == "test_namespaces::test_qualname_from_async_generator_object.<locals>.gen"
+    assert result == "tests.observability.test_namespaces::test_qualname_from_async_generator_object.<locals>.gen"
     # Close to avoid ResourceWarning
     await ag.aclose()
 
@@ -95,7 +95,7 @@ def test_qualname_from_class() -> None:
         provided_explicitly=None,
         named_object_fallback=Foo,
     )
-    assert result == "test_namespaces::test_qualname_from_class.<locals>.Foo"
+    assert result == "tests.observability.test_namespaces::test_qualname_from_class.<locals>.Foo"
 
 
 def test_qualname_from_method_of_class() -> None:
@@ -106,7 +106,7 @@ def test_qualname_from_method_of_class() -> None:
         provided_explicitly=None,
         named_object_fallback=MyClass.method,
     )
-    assert result == "test_namespaces::test_qualname_from_method_of_class.<locals>.MyClass.method"
+    assert result == "tests.observability.test_namespaces::test_qualname_from_method_of_class.<locals>.MyClass.method"
 
 
 def test_name_fallback_when_no_qualname() -> None:
@@ -170,7 +170,9 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
     promise = promising.Promise(do_work())
     result = repr(promise) if use_repr else str(promise)
     assert normalize_object_repr(result) == (
-        "<'test_namespaces::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work' Promise id=999>"
+        "<'tests.observability.test_namespaces"
+        "::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work'"
+        " Promise id=999>"
     )
     await promise
 
@@ -198,7 +200,10 @@ async def test_promising_function_auto_namespace() -> None:
     async def fetch_data() -> str:
         return "data"
 
-    assert fetch_data.namespace == "test_namespaces::test_promising_function_auto_namespace.<locals>.fetch_data"
+    assert (
+        fetch_data.namespace
+        == "tests.observability.test_namespaces::test_promising_function_auto_namespace.<locals>.fetch_data"
+    )
 
 
 async def test_promising_function_explicit_namespace() -> None:
@@ -236,7 +241,9 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
     promise = compute()
     result = repr(promise) if use_repr else str(promise)
     assert normalize_object_repr(result) == (
-        "<'test_namespaces::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute' Promise id=999>"
+        "<'tests.observability.test_namespaces"
+        "::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute'"
+        " Promise id=999>"
     )
     await promise
 
@@ -307,10 +314,15 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
 
     await pipeline()
     assert captured_ctx is not None
-    assert captured_ctx.namespace == "test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline"
+    assert (
+        captured_ctx.namespace
+        == "tests.observability.test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline"
+    )
     result = repr(captured_ctx) if use_repr else str(captured_ctx)
     assert normalize_object_repr(result) == (
-        "<'test_namespaces::test_context_decorator_auto_namespace.<locals>.pipeline' PromisingContext id=999>"
+        "<'tests.observability.test_namespaces"
+        "::test_context_decorator_auto_namespace.<locals>.pipeline'"
+        " PromisingContext id=999>"
     )
 
 
@@ -346,7 +358,7 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
     if use_promise_repr is None:
         assert Service.process.namespace == (
-            "test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
+            "tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
         )
 
     svc = Service()
@@ -355,7 +367,7 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
+            "<'tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
             " Promise id=999>"
         )
     assert await promise == "processed"
@@ -373,7 +385,7 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
     if use_promise_repr is None:
         assert Service.helper.namespace == (
-            "test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
+            "tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
         )
 
     promise = Service.helper()
@@ -381,7 +393,7 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
+            "<'tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
             " Promise id=999>"
         )
     assert await promise == "helped"
@@ -399,7 +411,7 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
 
     if use_promise_repr is None:
         assert Service.create.namespace == (
-            "test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create"
+            "tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create"
         )
 
     promise = Service.create()
@@ -407,7 +419,7 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
+            "<'tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
             " Promise id=999>"
         )
     assert await promise == "created"
@@ -422,7 +434,7 @@ def test_plain_instance_inherits_module_from_class() -> None:
 
     Current behavior: the inherited __module__ is used as prefix, and str(obj)
     becomes the name — producing something like
-    "test_namespaces::<...SomeObject object at 0x...>".
+    "tests.observability.test_namespaces::<...SomeObject object at 0x...>".
     """
 
     class SomeObject:
@@ -444,8 +456,9 @@ def test_plain_instance_inherits_module_from_class() -> None:
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
-        "test_namespaces::<test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject "
-        "object at 0xfff>"
+        "tests.observability.test_namespaces"
+        "::<tests.observability.test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject"
+        " object at 0xfff>"
     )
 
 
@@ -454,7 +467,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
     class.
 
     Current behavior: the class's __module__ is used as prefix together with
-    the instance's __name__ — e.g. "test_namespaces::custom_name".
+    the instance's __name__ — e.g. "tests.observability.test_namespaces::custom_name".
     The module refers to where the CLASS is defined, not where the instance's
     __name__ semantically belongs.
     """
@@ -478,7 +491,7 @@ def test_instance_with_name_inherits_module_from_class() -> None:
     # TODO Do we even care about this edge case ?
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
-    assert result == "test_namespaces::custom_name"
+    assert result == "tests.observability.test_namespaces::custom_name"
 
 
 def test_callable_instance_inherits_module_from_class() -> None:
@@ -508,8 +521,9 @@ def test_callable_instance_inherits_module_from_class() -> None:
     #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
     #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
-        "test_namespaces::<test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler "
-        "object at 0xfff>"
+        "tests.observability.test_namespaces"
+        "::<tests.observability.test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler"
+        " object at 0xfff>"
     )
 
 

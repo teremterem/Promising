@@ -2,8 +2,6 @@ import pytest
 
 import promising
 
-# ── Core: Async Function Wrapping & Argument Forwarding ──────────
-
 
 async def test_calling_promising_function_returns_promise() -> None:
     """
@@ -60,7 +58,7 @@ async def test_forwards_mixed_args() -> None:
     assert await mixed(3, 4, suffix="?") == "7?"
 
 
-async def test_coroutine_executes_once() -> None:
+async def test_executes_once() -> None:
     """
     A nonlocal counter confirms the coroutine runs
     exactly once per call; second call increments to 2.
@@ -68,25 +66,23 @@ async def test_coroutine_executes_once() -> None:
     call_count = 0
 
     @promising.function
-    async def counted() -> str:
+    async def double(value: int) -> int:
         nonlocal call_count
         call_count += 1
-        return "done"
+        return value * 2
 
-    promise_one = counted()
-    # Awaiting a promise multiple times should not result in the function being
-    # called multiple times
-    assert await promise_one == "done"
-    assert await promise_one == "done"
+    promise_one = double(2)
+    assert await promise_one == 4
+    assert await promise_one == 4
     assert call_count == 1
 
-    promise_two = counted()
-    # Awaiting a promise multiple times should not result in the function being
-    # called multiple times
-    assert await promise_two == "done"
-    assert await promise_two == "done"
-    assert await promise_two == "done"
+    promise_two = double(3)
+    assert await promise_two == 6
+    assert await promise_two == 6
+    assert await promise_two == 6
     assert call_count == 2
+
+    assert promise_one is not promise_two
 
 
 async def test_default_args() -> None:
@@ -115,9 +111,6 @@ async def test_star_args_and_kwargs() -> None:
 
     result = await variadic(1, 2, 3, key="value")
     assert result == ((1, 2, 3), {"key": "value"})
-
-
-# ── Error Cases ──────────────────────────────────────────────────
 
 
 async def test_exception_propagates_through_promise() -> None:
@@ -152,23 +145,6 @@ async def test_various_exception_types(*, exc_type: type) -> None:
         await failing()
 
 
-# ── function() Decorator Modes ───────────────────────────────────
-
-
-async def test_decorator_with_empty_parens() -> None:
-    """
-    @promising.function() (empty parens) behaves
-    identically to bare @promising.function.
-    """
-
-    @promising.function()
-    async def greet() -> str:
-        return "hello"
-
-    assert isinstance(greet, promising.PromisingFunction)
-    assert await greet() == "hello"
-
-
 async def test_used_as_direct_call() -> None:
     """
     promising.function(my_func) used as a direct call
@@ -178,9 +154,12 @@ async def test_used_as_direct_call() -> None:
     async def my_func() -> str:
         return "direct"
 
-    pf = promising.function(my_func)
+    pf = promising.function(my_func, start_soon=False)
     assert isinstance(pf, promising.PromisingFunction)
-    assert await pf() == "direct"
+
+    promise = pf()
+    assert isinstance(promise, promising.Promise)
+    assert await promise == "direct"
 
 
 async def test_preserves_original_func() -> None:
@@ -195,65 +174,19 @@ async def test_preserves_original_func() -> None:
     decorated = promising.function(original)
     assert decorated.__wrapped__ is original
 
+    decorated = promising.function()(original)
+    assert decorated.__wrapped__ is original
 
-# ── Edge Cases & Integration ─────────────────────────────────────
 
-
-async def test_multiple_calls_produce_independent_promises() -> None:
+async def test_function_decorator_with_empty_parens() -> None:
     """
-    Each call produces a distinct Promise with an
-    independent result.
-    """
-
-    @promising.function
-    async def identity(x: int) -> int:
-        return x
-
-    p1 = identity(1)
-    p2 = identity(2)
-    assert p1 is not p2
-    assert await p1 == 1
-    assert await p2 == 2
-
-
-async def test_promise_has_parent_when_created_in_context() -> None:
-    """
-    A child Promise created inside a parent Promise's
-    execution has get_parent_context() and get_parent_promise() pointing to
-    the parent.
-    """
-    child_promise = None
-
-    @promising.function
-    async def child_func() -> str:
-        return "child"
-
-    @promising.function
-    async def parent_func() -> str:
-        nonlocal child_promise
-        child_promise = child_func()
-        return "parent"
-
-    parent_promise = parent_func()
-    await parent_promise
-
-    assert child_promise is not None
-    await child_promise
-    assert child_promise.get_parent_context(raise_if_none=False) is parent_promise
-    assert child_promise.get_parent_promise(raise_if_none=False) is parent_promise
-
-
-async def test_promise_has_no_parent_outside_context() -> None:
-    """
-    A Promise created at top level (outside any parent
-    context) has no parent.
+    @promising.function() (empty parens) behaves
+    identically to bare @promising.function.
     """
 
-    @promising.function
-    async def noop() -> None:
-        pass
+    @promising.function()
+    async def greet() -> str:
+        return "hello"
 
-    promise = noop()
-    assert promise.get_parent_context(raise_if_none=False) is None
-    assert promise.get_parent_promise(raise_if_none=False) is None
-    await promise
+    assert isinstance(greet, promising.PromisingFunction)
+    assert await greet() == "hello"

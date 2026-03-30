@@ -12,7 +12,7 @@ from promising import Promise
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
-async def test_as_concurrent_future(
+async def test_promise_as_future(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -130,7 +130,7 @@ async def test_as_concurrent_future(
 
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
-    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
+    if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -167,7 +167,7 @@ async def test_as_concurrent_future(
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 @pytest.mark.parametrize("get_future_before_await", [True, False])
-async def test_with_exception(
+async def test_promise_as_future_with_exception(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -179,7 +179,7 @@ async def test_with_exception(
 
     This test verifies that the concurrent.futures.Future returned by
     as_concurrent_future() correctly propagates exceptions from the underlying
-    Promise. It mirrors test_as_concurrent_future but focuses on exception
+    Promise. It mirrors test_promise_as_future but focuses on exception
     scenarios, ensuring that exceptions are properly handled whether the
     Promise is prefilled with an exception or raises during coroutine
     execution.
@@ -293,7 +293,7 @@ async def test_with_exception(
 
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
-    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
+    if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -332,7 +332,7 @@ async def test_with_exception(
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_from_threads(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, await_promise: bool | None) -> None:
     """
     Test thread-safe access to Promise results through the
     concurrent.futures.Future interface.
@@ -444,9 +444,9 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
             results[idx] = e
 
     threads = [
-        threading.Thread(target=thread_function, args=(0, 0.4)),
-        threading.Thread(target=thread_function, args=(1, 0.4)),
-        threading.Thread(target=thread_function, args=(2, 0.1)),
+        threading.Thread(target=thread_function, args=(0, 0.4), daemon=True),
+        threading.Thread(target=thread_function, args=(1, 0.4), daemon=True),
+        threading.Thread(target=thread_function, args=(2, 0.1), daemon=True),
     ]
     for t in threads:
         t.start()
@@ -460,9 +460,10 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
     # anything at all (no task switching)
 
     for t in threads:
-        t.join()
+        t.join(timeout=2)
+        assert not t.is_alive(), "Thread did not finish in time"
 
-    if _promise_expected_incomplete(start_soon=start_soon, await_promise=await_promise):
+    if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
         #    all (no task switching happens)
@@ -497,7 +498,7 @@ async def test_from_threads(*, start_soon: bool | None, await_promise: bool | No
         assert coro_call_count == 1
 
 
-def _promise_expected_incomplete(*, start_soon: bool | None, await_promise: bool | None) -> bool:
+def _promise_not_expected_to_be_done(*, start_soon: bool | None, await_promise: bool | None) -> bool:
     """
     Return True when the promise is NOT expected to be done:
     1. Not prefilled and no task switching occurs (await_promise is None)

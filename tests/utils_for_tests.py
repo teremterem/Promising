@@ -1,5 +1,6 @@
 import re
 import threading
+from collections.abc import Callable
 from typing import Any
 
 import promising
@@ -18,7 +19,7 @@ def normalize_object_repr(s: str) -> str:
     return s
 
 
-def run_in_thread(fn):
+def run_in_thread(fn: Callable[[], None], timeout: float | None = None) -> None:
     """Run *fn* in a dedicated thread, re-raising any error.
 
     Useful for tests that call .run() (which needs asyncio.run()) without
@@ -33,9 +34,12 @@ def run_in_thread(fn):
         except BaseException as exc:
             error = exc
 
-    t = threading.Thread(target=_target)
+    t = threading.Thread(target=_target, daemon=True)
     t.start()
-    t.join()
+    t.join(timeout=timeout)
+    if timeout is not None:
+        assert not t.is_alive(), "Thread did not finish in time"
+
     if error is not None:
         raise error
 

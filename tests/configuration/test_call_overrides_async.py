@@ -128,11 +128,12 @@ async def test_call_without_start_soon_default_uses_constructor_value() -> None:
 # ── All three overridden at once ──────────────────────────────────────────────
 
 
-async def test_call_overrides_all_three() -> None:
+async def test_call_time_config_overrides() -> None:
     """
-    All three config params set on PromisingFunction are
-    overridden when all three are passed at call time.
+    Config params passed at call time override the
+    PromisingFunction-level defaults.
     """
+    # TODO How not to forget to expand the list of params when they are added ?
 
     @promising.function(
         start_soon=False,

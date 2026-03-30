@@ -9,7 +9,7 @@ import promising
 
 
 @pytest.mark.parametrize("await_children", [True, False])
-async def test_await_children_sync(*, await_children: bool) -> None:
+async def test_await_children(*, await_children: bool) -> None:
     """
     Parametrized over await_children={True, False}.
     With True: the sync parent calls
@@ -60,7 +60,7 @@ async def test_await_children_sync(*, await_children: bool) -> None:
 
 
 @pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_sync_recursively(
+async def test_await_children_recursively(
     *,
     recursively: bool,
 ) -> None:

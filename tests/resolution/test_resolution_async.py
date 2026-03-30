@@ -1,11 +1,3 @@
-"""
-Tests for Promise unpacking behavior: `await promise` (unpack_all)
-vs `await promise.unpack_once()`.
-
-`await promise` should recursively unpack the result until it's no longer
-awaitable, while `unpack_once()` should only unpack a single level.
-"""
-
 import asyncio
 from typing import Any
 
@@ -14,13 +6,9 @@ import pytest
 import promising
 from promising import Promise
 
-# ---------------------------------------------------------------------------
-# 1 level – no nesting (baseline)
-# ---------------------------------------------------------------------------
 
-
-@pytest.mark.parametrize("use_unpack_once", [True, False])
-async def test_single_promise_no_nesting(*, use_unpack_once: bool) -> None:
+@pytest.mark.parametrize("unpack_once", [True, False])
+async def test_single_promise_no_nesting(*, unpack_once: bool) -> None:
     """A plain promise with a scalar result behaves the same for both
     `await` and `unpack_once`."""
 
@@ -29,7 +17,7 @@ async def test_single_promise_no_nesting(*, use_unpack_once: bool) -> None:
 
     promise: Promise[str] = Promise(coro())
 
-    if use_unpack_once:
+    if unpack_once:
         result = await promise.unpack_once()
     else:
         result = await promise
@@ -45,12 +33,7 @@ async def test_prefilled_promise_no_nesting() -> None:
     assert await promise.unpack_once() == 42
 
 
-# ---------------------------------------------------------------------------
-# 2 levels – Promise returning a Promise
-# ---------------------------------------------------------------------------
-
-
-async def test_two_levels_await_unpacks_all() -> None:
+async def test_two_levels_unpack_all() -> None:
     """`await outer` should unpack both levels and return the final value."""
 
     async def inner_coro() -> str:
@@ -65,7 +48,7 @@ async def test_two_levels_await_unpacks_all() -> None:
     assert result == "deep value"
 
 
-async def test_two_levels_unpack_once_stops_at_inner() -> None:
+async def test_two_levels_unpack_once_stop_at_inner() -> None:
     """`unpack_once()` on the outer promise should return the inner promise,
     not the final scalar."""
 
@@ -89,12 +72,7 @@ async def test_two_levels_unpack_once_stops_at_inner() -> None:
     assert await result == "deep value"
 
 
-# ---------------------------------------------------------------------------
-# 3 levels – Promise → Promise → Promise
-# ---------------------------------------------------------------------------
-
-
-async def test_three_levels_await_unpacks_all() -> None:
+async def test_three_levels_unpack_all() -> None:
     """`await` on a triply-nested promise returns the deepest value."""
 
     async def mid_coro() -> str:
@@ -108,7 +86,7 @@ async def test_three_levels_await_unpacks_all() -> None:
     assert await p1 == "bottom"
 
 
-async def test_three_levels_unpack_once_returns_second_level() -> None:
+async def test_three_levels_unpack_once_return_second_level() -> None:
     """`unpack_once()` on a triply-nested promise returns the
     second-level promise."""
     p2 = None
@@ -137,12 +115,7 @@ async def test_three_levels_unpack_once_returns_second_level() -> None:
     assert await level3.unpack_once() == "bottom"
 
 
-# ---------------------------------------------------------------------------
-# Promise returning a coroutine
-# ---------------------------------------------------------------------------
-
-
-async def test_custom_coroutine_await_unpacks() -> None:
+async def test_custom_coroutine_unpack_all() -> None:
     """`await` unpacks through a coroutine to the final value."""
 
     async def custom_coro() -> str:
@@ -156,7 +129,7 @@ async def test_custom_coroutine_await_unpacks() -> None:
     assert await promise == "custom_value"
 
 
-async def test_custom_coroutine_unpack_once_stops() -> None:
+async def test_custom_coroutine_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def custom_coro() -> str:
@@ -174,12 +147,7 @@ async def test_custom_coroutine_unpack_once_stops() -> None:
     assert await result == "custom_value"
 
 
-# ---------------------------------------------------------------------------
-# Promise → coroutine → Promise
-# ---------------------------------------------------------------------------
-
-
-async def test_mixed_chain_await_unpacks_all() -> None:
+async def test_mixed_chain_unpack_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 
     async def custom_coro() -> Promise[str]:
@@ -217,12 +185,7 @@ async def test_mixed_chain_unpack_once() -> None:
     assert await inner == "final"
 
 
-# ---------------------------------------------------------------------------
-# Promise returning an asyncio.Future
-# ---------------------------------------------------------------------------
-
-
-async def test_asyncio_future_await_unpacks() -> None:
+async def test_asyncio_future_unpack_all() -> None:
     """`await` unpacks through an asyncio.Future to the final value."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -236,7 +199,7 @@ async def test_asyncio_future_await_unpacks() -> None:
     assert await promise == "from_future"
 
 
-async def test_asyncio_future_unpack_once_stops() -> None:
+async def test_asyncio_future_unpack_once() -> None:
     """`unpack_once()` wraps the returned asyncio.Future in a Promise."""
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -253,12 +216,7 @@ async def test_asyncio_future_unpack_once_stops() -> None:
     assert await result == "from_future"
 
 
-# ---------------------------------------------------------------------------
-# Promise returning a coroutine that yields control
-# ---------------------------------------------------------------------------
-
-
-async def test_coroutine_with_sleep_await_unpacks() -> None:
+async def test_coroutine_with_sleep_unpack_all() -> None:
     """`await` unpacks through a coroutine that yields control."""
 
     async def sleeping_coro() -> str:
@@ -273,7 +231,7 @@ async def test_coroutine_with_sleep_await_unpacks() -> None:
     assert await promise == "slept_value"
 
 
-async def test_coroutine_with_sleep_unpack_once_stops() -> None:
+async def test_coroutine_with_sleep_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
     async def sleeping_coro() -> str:
@@ -292,12 +250,7 @@ async def test_coroutine_with_sleep_unpack_once_stops() -> None:
     assert await result == "slept_value"
 
 
-# ---------------------------------------------------------------------------
-# Deeply nested – 5 levels of Promises
-# ---------------------------------------------------------------------------
-
-
-async def test_five_levels_await_unpacks_all() -> None:
+async def test_five_levels_unpack_all() -> None:
     """`await` flattens 5 levels of promise nesting."""
 
     async def make_chain(depth: int) -> Any:
@@ -335,11 +288,6 @@ async def test_five_levels_sequential_unpack_once() -> None:
     assert await current.unpack_once() == "5 deep"
 
 
-# ---------------------------------------------------------------------------
-# start_soon variations with nested promises
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("start_soon", [True, False])
 async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     """Unpacking works regardless of start_soon setting."""
@@ -365,11 +313,6 @@ async def test_nested_with_start_soon(*, start_soon: bool) -> None:
     assert result is inner2
 
 
-# ---------------------------------------------------------------------------
-# Non-awaitable results are returned as-is
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "value",
     [42, "string", [1, 2, 3], {"key": "val"}, None, True, 3.14],
@@ -383,12 +326,7 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     assert await promise.unpack_once() == value
 
 
-# ---------------------------------------------------------------------------
-# Exception propagation through nesting
-# ---------------------------------------------------------------------------
-
-
-async def test_exception_in_inner_promise_await() -> None:
+async def test_exception_in_inner_promise_unpack_all() -> None:
     """`await` on outer propagates exception from inner promise."""
 
     async def outer_coro() -> str:

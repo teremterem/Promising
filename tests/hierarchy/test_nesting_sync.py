@@ -106,10 +106,9 @@ async def test_promise_await_outside_outer_context() -> None:
 
 async def test_contexted_function_inside_outer_context() -> None:
     """
-    Sync contexted function called inside an outer context.
+    Contexted function called and awaited inside an outer context.
 
-    func_ctx captures `outer` as its parent at call-site. The sync function
-    returns directly (no await).
+    func_ctx captures `outer` as its parent at call-site.
 
     Expected parent chain for inner3:
         inner3 -> inner2 -> inner1 -> func_ctx -> outer

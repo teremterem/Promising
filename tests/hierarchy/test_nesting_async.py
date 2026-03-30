@@ -4,8 +4,9 @@ contexts.
 
 Parent linkage is always determined at *call-site*, never at await-site. Both
 @promising.function (creates a promise) and @promising.context (creates a plain
-context) follow this rule. Each decorator is tested across three scenarios that
-vary where the call and await happen relative to an outer context:
+context) follow this rule. Decorators are tested across three scenarios that
+vary where the call and await happen relative to an outer context (if
+applicable):
 
 1. Called and awaited inside an outer context — outer IS a parent.
 2. Called outside, awaited inside an outer context — outer is NOT a parent.

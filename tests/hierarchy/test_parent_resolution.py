@@ -1,5 +1,9 @@
 import promising
 
+# TODO This test file does not seem to be systematic enough. Expand it into a
+#  fully fledged set of sync and async counterparts that mirror each other
+#  perfectly ?
+
 
 async def test_promise_has_no_parent_outside_context() -> None:
     """

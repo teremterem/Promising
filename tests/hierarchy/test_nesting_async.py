@@ -114,7 +114,9 @@ chain. The decorator's context (func_ctx) becomes the immediate parent of inner
 contexts, and func_ctx itself links to whichever context was active at
 *call-site*.
 
-These tests mirror the three scenarios in test_nested_contexts_and_promises.py,
+These tests mirror the three scenarios in test_nested_contexts_and_promises.py
+(NOTE for AI agent doing the refactoring: these tests are now in this same
+file, above this docstring),
 but with @promising.context instead of @promising.function.
 """
 

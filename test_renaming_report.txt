@@ -11,7 +11,6 @@ each other between sync and async in @tests/? I haven't finished this work yet,
  similar renaming approach to other tests. If renaming of some tests cannot be
 done or is not needed / not applicable (for ex. there is no counterpart) please
  report those tests to me, so I take a look at them myself.
-  ⎿  Listed directory tests/
 
 ⏺ Let me explore the test structure and understand the naming pattern you've
   been using.
@@ -121,12 +120,12 @@ different test (but different in an important way)
 ❯ Are you sure that is all? Please go through each file pair (test_..._async.py
  and test_..._sync.py) and inspect each pair individually (one pair, then
 another pair, and so on).
+
 ⏺ You're right, let me be more thorough. I'll inspect each pair individually,
   including the ones the agent reported as "matching." Let me start with the
   pairs I haven't read myself yet.
 
   Read 2 files (ctrl+o to expand)
-
 ⏺ Pair 2 (context_decorator): All 8 test names match perfectly. Moving on.
 
   Read 2 files (ctrl+o to expand)
@@ -219,3 +218,69 @@ another pair, and so on).
   the only applicable one I found.
 
 ✻ Cooked for 1m 53s
+
+❯ /export
+  ⎿  Conversation exported to:
+     /Users/terem/Desktop/hobby/Promising/test_renaming_report.txt
+
+❯ /theme
+  ⎿  Theme set to light
+
+❯ /model
+  ⎿  Set model to Opus 4.6 with medium effort
+
+❯ I have made some more changes - please take a look at these files too (or
+once again, if you already saw any of them):
+@tests/hierarchy/test_nesting_async.py
+@tests/hierarchy/test_nesting_sync.py
+@tests/hierarchy/test_parent_resolution.py
+@tests/resolution/test_promising_function_run.py
+  ⎿  Read tests/hierarchy/test_nesting_async.py (204 lines)
+  ⎿  Read tests/hierarchy/test_nesting_sync.py (169 lines)
+  ⎿  Read tests/hierarchy/test_parent_resolution.py (62 lines)
+  ⎿  Read tests/resolution/test_promising_function_run.py (105 lines)
+
+⏺ Let me analyze these files.
+
+  test_nesting_sync.py ↔ test_nesting_async.py — a pair I missed earlier!
+
+  The 3 promising_function tests match perfectly:
+  - test_promising_function_called_and_awaited_inside ✓
+  - test_promising_function_called_outside_awaited_inside ✓
+  - test_promising_function_called_inside_awaited_outside ✓
+
+  The promising_context tests differ — and for a real reason. Sync
+  @promising.context executes immediately at the call site, so there's no
+  separation between "call" and "await." This collapses 3 async scenarios into 2
+   sync scenarios:
+
+  ┌──────────────────────────────────────────┬──────────────────────────────┐
+  │                  Async                   │       Sync counterpart       │
+  ├──────────────────────────────────────────┼──────────────────────────────┤
+  │                                          │ test_promising_context_calle │
+  │ test_promising_context_called_and_awaite │ d_inside (counterpart, but   │
+  │ d_inside                                 │ "awaited" doesn't apply to   │
+  │                                          │ sync)                        │
+  ├──────────────────────────────────────────┼──────────────────────────────┤
+  │                                          │ test_promising_context_calle │
+  │ test_promising_context_called_outside_aw │ d_outside (closest match —   │
+  │ aited_inside                             │ both prove no parent when    │
+  │                                          │ called outside)              │
+  ├──────────────────────────────────────────┼──────────────────────────────┤
+  │ test_promising_context_called_inside_awa │ No sync counterpart (can't   │
+  │ ited_outside                             │ separate call-site from      │
+  │                                          │ execution for sync context)  │
+  └──────────────────────────────────────────┴──────────────────────────────┘
+
+  The naming mismatch here reflects a genuine conceptual difference, so I'd flag
+   it for your review rather than force a rename.
+
+  test_parent_resolution.py — standalone file with a TODO you wrote: "This test
+  file does not seem to be systematic enough. Expand it into a fully fledged set
+   of sync and async counterparts?" No pair exists yet.
+
+  test_promising_function_run.py — standalone file, parametrized over
+  use_thread_pool to cover both sync and async paths in single tests. No pair
+  needed since PromisingFunction.run() is inherently a sync-async bridge.
+
+✻ Brewed for 1m 4s

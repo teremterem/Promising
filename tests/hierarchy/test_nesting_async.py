@@ -1,24 +1,25 @@
 """
-Tests for parent-chain resolution when promises (@promising.function) contain
-nested contexts.
+Tests for parent-chain resolution when decorated functions contain nested
+contexts.
 
-A promise acts as both a context and a boundary: inner contexts see the promise
-in their parent chain, and the promise itself links to whichever context was
-active at *call-site* (not at await-site). These tests verify that relationship
-across three scenarios:
+Parent linkage is always determined at *call-site*, never at resolve-site. Both
+@promising.function (creates a promise) and @promising.context (creates a plain
+context) follow this rule. Each decorator is tested across three scenarios that
+vary where the call and resolve happen relative to an outer context:
 
-- Promise created and awaited inside an outer context.
-- Promise created outside, awaited inside an outer context (outer is NOT a
-  parent).
-- Promise created inside, awaited outside an outer context (outer IS still a
-  parent).
+1. Called and resolved inside an outer context — outer IS a parent.
+2. Called outside, resolved inside an outer context — outer is NOT a parent.
+3. Called inside, resolved outside an outer context — outer IS still a parent.
+
+The @promising.function tests assert the promise appears in the parent chain;
+the @promising.context tests assert no promises appear at all.
 """
 
 import promising
 from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
-async def test_promise_inside_outer_context() -> None:
+async def test_promise_called_and_resolved_inside() -> None:
     """
     Promise created and awaited inside an outer context.
 
@@ -46,7 +47,7 @@ async def test_promise_inside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_promise_outside_outer_context() -> None:
+async def test_promise_called_outside_resolved_inside() -> None:
     """
     Promise created outside any context, then awaited inside one.
 
@@ -75,7 +76,7 @@ async def test_promise_outside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_promise_await_outside_outer_context() -> None:
+async def test_promise_called_inside_resolved_outside() -> None:
     """
     Promise created inside an outer context, then awaited outside it.
 
@@ -104,24 +105,7 @@ async def test_promise_await_outside_outer_context() -> None:
     assert inner3_parent_promises == [promise]
 
 
-"""
-Tests for parent-chain resolution when @promising.context-decorated functions
-contain nested contexts.
-
-Unlike @promising.function (which creates a promise), @promising.context used
-as a decorator creates a plain context — so there are no promises in the parent
-chain. The decorator's context (func_ctx) becomes the immediate parent of inner
-contexts, and func_ctx itself links to whichever context was active at
-*call-site*.
-
-These tests mirror the three scenarios in test_nested_contexts_and_promises.py
-(NOTE for AI agent doing the refactoring: these tests are now in this same
-file, above this docstring),
-but with @promising.context instead of @promising.function.
-"""
-
-
-async def test_contexted_function_inside_outer_context() -> None:
+async def test_context_decorated_called_and_resolved_inside() -> None:
     """
     Contexted function called and awaited inside an outer context.
 
@@ -152,7 +136,7 @@ async def test_contexted_function_inside_outer_context() -> None:
     assert inner3_parent_promises == []
 
 
-async def test_contexted_function_outside_outer_context() -> None:
+async def test_context_decorated_called_outside_resolved_inside() -> None:
     """
     Contexted function called outside any context, awaited inside one.
 
@@ -185,7 +169,7 @@ async def test_contexted_function_outside_outer_context() -> None:
     assert inner3_parent_promises == []
 
 
-async def test_contexted_function_await_outside_outer_context() -> None:
+async def test_context_decorated_called_inside_resolved_outside() -> None:
     """
     Contexted function called inside an outer context, awaited outside it.
 

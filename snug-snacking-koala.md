@@ -56,14 +56,12 @@ tests/
 ### Splits (1 file)
 
 **`misc/test_decorator_asyncio_run.py`** -> split into 2 destinations:
-- `test_async_function_decorator_with_run` + `test_async_function_decorator_with_run_and_child_promise` (the `.run()` tests) -> `resolution/test_run.py`
 - `test_async_context_decorator_resolves_parent_at_call_site` + `test_async_context_decorator_no_parent_when_called_outside_context` -> `hierarchy/test_parent_resolution.py`
 
 ### Merges (4 files -> 2 targets)
 
 **`hierarchy/test_nesting_async.py`** = merge of:
 - `promising_context/test_nested_contexts.py` (3 tests - context-only nesting)
-- `promising_context/test_nested_contexts_and_promises.py` (3 tests - promise nesting)
 - Combine docstrings; keep all 6 test functions unchanged
 
 **`hierarchy/test_parent_resolution.py`** = merge of:

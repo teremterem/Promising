@@ -5,7 +5,7 @@ from tests.utils_for_tests import run_in_thread
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_async_function_decorator_with_run(use_thread_pool: bool | None) -> None:
+def test_promising_function_run(use_thread_pool: bool | None) -> None:
     """
     @promising.function used with PromisingFunction.run().
 
@@ -48,7 +48,7 @@ def test_async_function_decorator_with_run(use_thread_pool: bool | None) -> None
 @pytest.mark.parametrize("await_in_parent", [True, False])
 @pytest.mark.parametrize("child_use_thread_pool", [True, False, None])
 @pytest.mark.parametrize("parent_use_thread_pool", [True, False, None])
-def test_async_function_decorator_with_run_and_child_promise(
+def test_promising_function_run_with_child_promise(
     parent_use_thread_pool: bool | None,
     child_use_thread_pool: bool | None,
     await_in_parent: bool,

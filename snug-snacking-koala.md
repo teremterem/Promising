@@ -60,10 +60,6 @@ tests/
 
 ### Merges (4 files -> 2 targets)
 
-**`hierarchy/test_nesting_async.py`** = merge of:
-- `promising_context/test_nested_contexts.py` (3 tests - context-only nesting)
-- Combine docstrings; keep all 6 test functions unchanged
-
 **`hierarchy/test_parent_resolution.py`** = merge of:
 - `promising_function/test_promising_function.py` (2 tests - basic parent/no-parent)
 - `promising_function/sync/test_sync_functions.py` (2 tests - sync parent/active-promise)

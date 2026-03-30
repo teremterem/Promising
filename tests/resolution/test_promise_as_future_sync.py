@@ -444,9 +444,9 @@ async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, awa
             results[idx] = e
 
     threads = [
-        threading.Thread(target=thread_function, args=(0, 0.4)),
-        threading.Thread(target=thread_function, args=(1, 0.4)),
-        threading.Thread(target=thread_function, args=(2, 0.1)),
+        threading.Thread(target=thread_function, args=(0, 0.4), daemon=True),
+        threading.Thread(target=thread_function, args=(1, 0.4), daemon=True),
+        threading.Thread(target=thread_function, args=(2, 0.1), daemon=True),
     ]
     for t in threads:
         t.start()
@@ -460,7 +460,8 @@ async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, awa
     # anything at all (no task switching)
 
     for t in threads:
-        t.join()
+        t.join(timeout=2)
+        assert not t.is_alive(), "Thread did not finish in time"
 
     if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:

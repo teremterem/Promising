@@ -42,7 +42,7 @@ def test_promising_function_run(use_thread_pool: bool | None) -> None:
         assert captured_ctx is not None
         assert isinstance(captured_ctx, promising.Promise)
 
-    run_in_thread(_test)
+    run_in_thread(_test, timeout=2)
 
 
 @pytest.mark.parametrize("await_in_parent", [True, False])
@@ -101,4 +101,4 @@ def test_promising_function_run_with_child_promise(
 
         assert parent_work.run() == 42
 
-    run_in_thread(_test)
+    run_in_thread(_test, timeout=2)

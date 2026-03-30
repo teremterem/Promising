@@ -68,20 +68,20 @@ async def test_executes_once() -> None:
     call_count = 0
 
     @promising.function(use_thread_pool=True)
-    def counted() -> str:
+    def double(value: int) -> int:
         nonlocal call_count
         call_count += 1
-        return "done"
+        return value * 2
 
-    promise_one = counted()
-    assert await promise_one == "done"
-    assert await promise_one == "done"
+    promise_one = double(2)
+    assert await promise_one == 4
+    assert await promise_one == 4
     assert call_count == 1
 
-    promise_two = counted()
-    assert await promise_two == "done"
-    assert await promise_two == "done"
-    assert await promise_two == "done"
+    promise_two = double(3)
+    assert await promise_two == 6
+    assert await promise_two == 6
+    assert await promise_two == 6
     assert call_count == 2
 
     assert promise_one is not promise_two

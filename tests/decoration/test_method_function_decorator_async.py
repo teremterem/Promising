@@ -270,6 +270,8 @@ async def test_class_method_forwards_args() -> None:
 
     assert await Formatter.format_value(42) == "Formatter:42"
     assert await Formatter.format_value(42, prefix=">>") == ">>Formatter:42"
+    assert await Formatter().format_value(42) == "Formatter:42"
+    assert await Formatter().format_value(42, prefix=">>") == ">>Formatter:42"
 
 
 async def test_class_method_exception_propagates() -> None:

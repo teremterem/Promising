@@ -141,14 +141,12 @@ async def test_promise_as_future_with_exception(
     await_promise: bool | None,
 ) -> None:
     """
-    Test Promise's exception handling across various timing
-    conditions.
+    Test Promise's exception handling across various timing conditions.
 
-    This test verifies that Promise correctly propagates
-    exceptions. It mirrors test_promise but focuses on exception
-    scenarios, ensuring that exceptions are properly handled
-    whether the Promise is prefilled with an exception or raises
-    during coroutine execution.
+    This test verifies that Promise correctly propagates exceptions. It mirrors
+    test_promise_as_future but focuses on exception scenarios, ensuring that
+    exceptions are properly handled whether the Promise is prefilled with an
+    exception or raises during coroutine execution.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:

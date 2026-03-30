@@ -108,14 +108,19 @@ async def test_format_trace_nested_promising_functions() -> None:
     outer_trace_strs = outer_promise.format_trace()
     assert isinstance(outer_trace_strs, list)
     assert [normalize_object_repr(s) for s in outer_trace_strs] == [
-        "<'test_traces::test_format_trace_nested_promising_functions.<locals>.outer' Promise id=999>",
+        "<'tests.observability.test_traces::test_format_trace_nested_promising_functions.<locals>.outer'"
+        " Promise id=999>",
     ]
 
     # inner is at the bottom — four entries
     assert isinstance(inner_trace_strs, list)
     assert [normalize_object_repr(s) for s in inner_trace_strs] == [
-        "<'test_traces::test_format_trace_nested_promising_functions.<locals>.outer' Promise id=999>",
-        "<'test_traces::test_format_trace_nested_promising_functions.<locals>.middle_ctx' PromisingContext id=999>",
-        "<'test_traces::test_format_trace_nested_promising_functions.<locals>.middle_fn' Promise id=999>",
-        "<'test_traces::test_format_trace_nested_promising_functions.<locals>.inner' Promise id=999>",
+        "<'tests.observability.test_traces::test_format_trace_nested_promising_functions.<locals>.outer'"
+        " Promise id=999>",
+        "<'tests.observability.test_traces::test_format_trace_nested_promising_functions.<locals>.middle_ctx'"
+        " PromisingContext id=999>",
+        "<'tests.observability.test_traces::test_format_trace_nested_promising_functions.<locals>.middle_fn'"
+        " Promise id=999>",
+        "<'tests.observability.test_traces::test_format_trace_nested_promising_functions.<locals>.inner'"
+        " Promise id=999>",
     ]

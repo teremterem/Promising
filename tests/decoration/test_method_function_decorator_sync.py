@@ -85,10 +85,16 @@ async def test_instance_method_executes_once() -> None:
             return "done"
 
     obj = MyClass()
-    p = obj.counted()
-    assert await p == "done"
-    assert await p == "done"
+    p1 = obj.counted()
+    assert await p1 == "done"
+    assert await p1 == "done"
     assert call_count == 1
+
+    p2 = obj.counted()
+    assert p2 is not p1
+    assert await p2 == "done"
+    assert await p2 == "done"
+    assert call_count == 2
 
 
 async def test_instance_method_exception_propagates() -> None:

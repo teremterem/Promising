@@ -85,10 +85,16 @@ async def test_instance_method_executes_once() -> None:
             return "done"
 
     obj = MyClass()
-    p = obj.counted()
-    assert await p == "done"
-    assert await p == "done"
+    p1 = obj.counted()
+    assert await p1 == "done"
+    assert await p1 == "done"
     assert call_count == 1
+
+    p2 = obj.counted()
+    assert p2 is not p1
+    assert await p2 == "done"
+    assert await p2 == "done"
+    assert call_count == 2
 
 
 async def test_instance_method_exception_propagates() -> None:
@@ -393,8 +399,15 @@ async def test_static_method_with_empty_parens_decorator() -> None:
         async def triple(x: int) -> int:
             return x * 3
 
-    assert await MathUtils.triple(5) == 15
-    assert await MathUtils().triple(5) == 15
+    assert isinstance(MathUtils.triple, promising.PromisingFunction)
+
+    # TODO Do similar detailed checks in other tests too ?
+    class_result = MathUtils.triple(5)
+    instance_result = MathUtils().triple(5)
+    assert isinstance(class_result, promising.Promise)
+    assert isinstance(instance_result, promising.Promise)
+    assert await class_result == 15
+    assert await instance_result == 15
 
 
 async def test_class_method_with_empty_parens_decorator() -> None:
@@ -409,5 +422,12 @@ async def test_class_method_with_empty_parens_decorator() -> None:
         async def create_name(cls) -> str:
             return cls.__name__
 
-    assert await Factory.create_name() == "Factory"
-    assert await Factory().create_name() == "Factory"
+    assert isinstance(Factory.create_name.__func__, promising.PromisingFunction)
+
+    # TODO Do similar detailed checks in other tests too ?
+    class_result = Factory.create_name()
+    instance_result = Factory().create_name()
+    assert isinstance(class_result, promising.Promise)
+    assert isinstance(instance_result, promising.Promise)
+    assert await class_result == "Factory"
+    assert await instance_result == "Factory"

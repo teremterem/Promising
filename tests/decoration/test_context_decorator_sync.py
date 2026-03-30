@@ -5,8 +5,8 @@ import promising
 
 async def test_context_decorator_activates_context() -> None:
     """
-    @promising.context on a sync function: the context is
-    active inside the function body.
+    @promising.context on a function: the context is active inside the function
+    body.
     """
     captured_ctx = None
 
@@ -14,17 +14,16 @@ async def test_context_decorator_activates_context() -> None:
     def work() -> str:
         nonlocal captured_ctx
         captured_ctx = promising.get_active_context()
-        return "sync-done"
+        return "done"
 
-    assert work() == "sync-done"
+    assert work() == "done"
     assert captured_ctx is not None
     assert isinstance(captured_ctx, promising.PromisingContext)
 
 
 async def test_context_decorator_deactivates_after() -> None:
     """
-    After the decorated sync function returns, the context is
-    no longer active.
+    After the decorated function returns, the context is no longer active.
     """
 
     @promising.context
@@ -38,8 +37,7 @@ async def test_context_decorator_deactivates_after() -> None:
 
 async def test_context_decorator_forwards_args() -> None:
     """
-    Positional and keyword arguments are forwarded to the
-    decorated sync function.
+    Positional and keyword arguments are forwarded to the decorated function.
     """
 
     @promising.context
@@ -52,22 +50,20 @@ async def test_context_decorator_forwards_args() -> None:
 
 async def test_context_decorator_exception_propagates() -> None:
     """
-    An exception raised inside the decorated sync function
-    propagates to the caller.
+    An exception raised inside the decorated function propagates to the caller.
     """
 
     @promising.context
     def failing() -> None:
-        raise ValueError("sync func error")
+        raise ValueError("func error")
 
-    with pytest.raises(ValueError, match="sync func error"):
+    with pytest.raises(ValueError, match="func error"):
         failing()
 
 
 async def test_context_decorator_deactivates_on_exception() -> None:
     """
-    The context is deactivated even if the decorated sync function
-    raises.
+    The context is deactivated even if the decorated function raises.
     """
 
     @promising.context
@@ -81,11 +77,18 @@ async def test_context_decorator_deactivates_on_exception() -> None:
 
 
 async def test_context_decorator_with_parens() -> None:
+    captured_ctx = None
+
     @promising.context()
     def work() -> str:
-        return "parens-sync"
+        nonlocal captured_ctx
+        captured_ctx = promising.get_active_context()
+        return "parens"
 
-    assert work() == "parens-sync"
+    assert promising.get_active_context(raise_if_none=False) is None
+    assert work() == "parens"
+    assert isinstance(captured_ctx, promising.PromisingContext)
+    assert promising.get_active_context(raise_if_none=False) is None
 
 
 async def test_context_decorator_each_call_gets_fresh_context() -> None:
@@ -108,8 +111,10 @@ async def test_context_decorator_each_call_gets_fresh_context() -> None:
 @pytest.mark.parametrize("parent", [None, promising.INHERIT])
 async def test_context_decorator_with_explicit_parent(parent) -> None:
     """
-    @promising.context(parent=None) creates a root context even
-    when called inside another context.
+    `@promising.context`(parent=...) with explicit parent parameter:
+    - parent=None creates a root context (no parent) even when called inside
+      another context.
+    - parent=INHERIT (default) captures the outer context as parent.
     """
 
     @promising.context(parent=parent)

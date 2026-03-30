@@ -75,6 +75,9 @@ async def test_instance_method_exception_propagates() -> None:
     with pytest.raises(ValueError, match="instance method error"):
         await MyClass().failing()
 
+    # Verify context is properly deactivated after exception
+    assert promising.get_active_context(raise_if_none=False) is None
+
 
 async def test_instance_method_with_parens() -> None:
     class MyClass:
@@ -153,11 +156,9 @@ async def test_class_method_receives_cls_via_inheritance() -> None:
         pass
 
     assert await Base.get_class_name() == "Base"
-    assert await Child.get_class_name() == "Child"
-    assert await Child().get_class_name() == "Child"
     assert await Base().get_class_name() == "Base"
-    assert await Child().get_class_name() == "Child"
     assert await Child.get_class_name() == "Child"
+    assert await Child().get_class_name() == "Child"
 
 
 async def test_class_method_forwards_args() -> None:

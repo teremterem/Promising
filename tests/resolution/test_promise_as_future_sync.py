@@ -179,7 +179,7 @@ async def test_promise_as_future_with_exception(
 
     This test verifies that the concurrent.futures.Future returned by
     as_concurrent_future() correctly propagates exceptions from the underlying
-    Promise. It mirrors test_as_concurrent_future but focuses on exception
+    Promise. It mirrors test_promise_as_future but focuses on exception
     scenarios, ensuring that exceptions are properly handled whether the
     Promise is prefilled with an exception or raises during coroutine
     execution.

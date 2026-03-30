@@ -1,17 +1,18 @@
 """
-Tests for parent-chain resolution when promises (@promising.function) contain
-nested contexts.
+Tests for parent-chain resolution when decorated functions contain nested
+contexts.
 
-A promise acts as both a context and a boundary: inner contexts see the promise
-in their parent chain, and the promise itself links to whichever context was
-active at *call-site* (not at await-site). These tests verify that relationship
-across three scenarios:
+Parent linkage is always determined at *call-site*, never at resolve-site. Both
+@promising.function (creates a promise) and @promising.context (creates a plain
+context) follow this rule. Each decorator is tested across three scenarios that
+vary where the call and resolve happen relative to an outer context:
 
-- Promise created and awaited inside an outer context.
-- Promise created outside, awaited inside an outer context (outer is NOT a
-  parent).
-- Promise created inside, awaited outside an outer context (outer IS still a
-  parent).
+1. Called and resolved inside an outer context — outer IS a parent.
+2. Called outside, resolved inside an outer context — outer is NOT a parent.
+3. Called inside, resolved outside an outer context — outer IS still a parent.
+
+The @promising.function tests assert the promise appears in the parent chain;
+the @promising.context tests assert no promises appear at all.
 """
 
 import promising

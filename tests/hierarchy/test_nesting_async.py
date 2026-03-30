@@ -2,14 +2,14 @@
 Tests for parent-chain resolution when decorated functions contain nested
 contexts.
 
-Parent linkage is always determined at *call-site*, never at resolve-site. Both
+Parent linkage is always determined at *call-site*, never at await-site. Both
 @promising.function (creates a promise) and @promising.context (creates a plain
 context) follow this rule. Each decorator is tested across three scenarios that
-vary where the call and resolve happen relative to an outer context:
+vary where the call and await happen relative to an outer context:
 
-1. Called and resolved inside an outer context — outer IS a parent.
-2. Called outside, resolved inside an outer context — outer is NOT a parent.
-3. Called inside, resolved outside an outer context — outer IS still a parent.
+1. Called and awaited inside an outer context — outer IS a parent.
+2. Called outside, awaited inside an outer context — outer is NOT a parent.
+3. Called inside, awaited outside an outer context — outer IS still a parent.
 
 The @promising.function tests assert the promise appears in the parent chain;
 the @promising.context tests assert no promises appear at all.
@@ -19,7 +19,7 @@ import promising
 from tests.utils_for_tests import collect_parent_contexts, collect_parent_promises
 
 
-async def test_promise_called_and_resolved_inside() -> None:
+async def test_promising_function_called_and_awaited_inside() -> None:
     """
     Promise created and awaited inside an outer context.
 
@@ -47,7 +47,7 @@ async def test_promise_called_and_resolved_inside() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_promise_called_outside_resolved_inside() -> None:
+async def test_promising_function_called_outside_awaited_inside() -> None:
     """
     Promise created outside any context, then awaited inside one.
 
@@ -76,7 +76,7 @@ async def test_promise_called_outside_resolved_inside() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_promise_called_inside_resolved_outside() -> None:
+async def test_promising_function_called_inside_awaited_outside() -> None:
     """
     Promise created inside an outer context, then awaited outside it.
 
@@ -105,7 +105,7 @@ async def test_promise_called_inside_resolved_outside() -> None:
     assert inner3_parent_promises == [promise]
 
 
-async def test_context_decorated_called_and_resolved_inside() -> None:
+async def test_promising_context_called_and_awaited_inside() -> None:
     """
     Contexted function called and awaited inside an outer context.
 
@@ -136,7 +136,7 @@ async def test_context_decorated_called_and_resolved_inside() -> None:
     assert inner3_parent_promises == []
 
 
-async def test_context_decorated_called_outside_resolved_inside() -> None:
+async def test_promising_context_called_outside_awaited_inside() -> None:
     """
     Contexted function called outside any context, awaited inside one.
 
@@ -169,7 +169,7 @@ async def test_context_decorated_called_outside_resolved_inside() -> None:
     assert inner3_parent_promises == []
 
 
-async def test_context_decorated_called_inside_resolved_outside() -> None:
+async def test_promising_context_called_inside_awaited_outside() -> None:
     """
     Contexted function called inside an outer context, awaited outside it.
 

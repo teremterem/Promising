@@ -1,3 +1,5 @@
+import pytest
+
 import promising
 
 
@@ -74,3 +76,69 @@ async def test_parent_child_relationship_sync_async() -> None:
     assert child_promise.get_parent_context() is parent_promise
     assert child_promise.get_parent_promise() is parent_promise
     assert await child_promise == "child"
+
+
+async def test_get_active_promise_skips_plain_context() -> None:
+    """
+    get_active_promise() walks past a plain context to find the wrapping
+    Promise.
+    """
+
+    @promising.function
+    async def outer() -> promising.Promise | None:
+        with promising.context(namespace="middle"):
+            return promising.get_active_promise(raise_if_none=False)
+
+    promise = outer()
+    result = await promise.unpack_once()
+    assert result is promise
+
+
+async def test_get_active_promise_skips_multiple_plain_contexts() -> None:
+    """
+    get_active_promise() walks past several plain contexts to find the
+    wrapping Promise.
+    """
+
+    @promising.function
+    async def outer() -> promising.Promise | None:
+        with promising.context(namespace="mid1"):
+            with promising.context(namespace="mid2"):
+                return promising.get_active_promise(raise_if_none=False)
+
+    promise = outer()
+    result = await promise.unpack_once()
+    assert result is promise
+
+
+async def test_get_active_promise_finds_nearest_promise() -> None:
+    """
+    With nested promises separated by a plain context,
+    get_active_promise() returns the innermost (nearest) promise.
+    """
+
+    @promising.function
+    async def inner() -> promising.Promise | None:
+        with promising.context(namespace="gap"):
+            return promising.get_active_promise(raise_if_none=False)
+
+    @promising.function
+    async def outer() -> promising.Promise | None:
+        return await inner()
+
+    outer_promise = outer()
+    inner_promise = await outer_promise.unpack_once()
+    active_from_inside = await inner_promise.unpack_once()
+    assert active_from_inside is inner_promise
+
+
+async def test_get_active_promise_none_without_promise() -> None:
+    """
+    get_active_promise() returns None (or raises) when only plain contexts
+    are active and no Promise exists in the hierarchy.
+    """
+    with promising.context():
+        with promising.context():
+            assert promising.get_active_promise(raise_if_none=False) is None
+            with pytest.raises(promising.PromiseNotFoundError):
+                promising.get_active_promise(raise_if_none=True)

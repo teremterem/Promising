@@ -178,11 +178,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             PromiseNotFoundError: If no active Promise exists and
                 raise_if_none is True.
         """
-        # TODO Unit tests are needed for this method: specifically for the
-        #  cases when active context and active promise are at different levels
-        #  (with and without other contexts separating them). Also, we need to
-        #  verify correct behavior when there are more than two promises in the
-        #  hierarchy.
         current = cls.get_active_context(raise_if_none=False)
         while current is not None and not isinstance(current, Promise):
             current = current.get_parent_context(raise_if_none=False)

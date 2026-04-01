@@ -116,20 +116,24 @@ async def test_get_active_promise_finds_nearest_promise() -> None:
     With nested promises separated by a plain context,
     get_active_promise() returns the innermost (nearest) promise.
     """
+    captured_active = None
 
     @promising.function
-    async def inner() -> promising.Promise | None:
+    async def inner() -> str:
+        nonlocal captured_active
         with promising.context(namespace="gap"):
-            return promising.get_active_promise(raise_if_none=False)
+            captured_active = promising.get_active_promise(raise_if_none=False)
+        return "done"
 
     @promising.function
-    async def outer() -> promising.Promise | None:
-        return await inner()
+    async def outer() -> promising.Promise:
+        return inner()
 
     outer_promise = outer()
     inner_promise = await outer_promise.unpack_once()
-    active_from_inside = await inner_promise.unpack_once()
-    assert active_from_inside is inner_promise
+    await inner_promise
+
+    assert captured_active is inner_promise
 
 
 async def test_get_active_promise_none_without_promise() -> None:

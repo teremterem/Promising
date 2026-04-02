@@ -231,8 +231,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         while isinstance(result, Promise):
             remaining = None if deadline is None else deadline - time.monotonic()
-            # TODO Add a test to ensure that unpacking of a chain of awaitables
-            #  goes on [roughly] for the duration of the timeout
             if remaining is not None:
                 # Make sure it does not go below zero
                 remaining = max(remaining, 0)

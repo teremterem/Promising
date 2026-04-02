@@ -4,6 +4,7 @@ import time
 import pytest
 
 import promising
+from promising.promising_context import PromisingContext
 
 
 @pytest.mark.parametrize("await_children", [True, False])
@@ -173,3 +174,92 @@ async def test_await_children_recursively_sync_children(
         # Let's await for all the children to complete anyway, so that we don't
         # get any asyncio warnings about coroutines never being awaited
         await promise.await_children(recursively=True)
+
+
+async def test_await_children_on_bare_context() -> None:
+    """
+    ``await_children`` works when called on a bare PromisingContext
+    (not a Promise) that has Promise children spawned inside it.
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def child_func() -> str:
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    with promising.context() as ctx:
+        assert isinstance(ctx, PromisingContext)
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+        child_func()
+
+        execution_order.append("before_await")
+        await ctx.await_children()
+
+    assert execution_order == ["before_await", "child_done", "child_done"]
+
+
+@pytest.mark.parametrize("recursively", [True, False])
+async def test_await_children_on_bare_context_recursively(
+    *,
+    recursively: bool,
+) -> None:
+    """
+    ``await_children(recursively=...)`` works on a bare PromisingContext
+    with nested Promise children (child -> grandchild).
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def grandchild_func() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
+    async def child_func() -> str:
+        grandchild_func()
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    with promising.context() as ctx:
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+
+        await ctx.await_children(recursively=recursively)
+
+    if recursively:
+        assert execution_order == ["child_done", "grandchild_done"]
+    else:
+        assert execution_order == ["child_done"]
+        # Clean up remaining grandchild
+        await ctx.await_children(recursively=True)
+
+
+async def test_await_children_module_level_on_bare_context() -> None:
+    """
+    The module-level ``promising.await_children()`` works when the active
+    context is a bare PromisingContext (not a Promise).
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def child_func() -> str:
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    with promising.context() as ctx:
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+
+        # Use the module-level function (which finds the active context)
+        await promising.await_children()
+
+    assert execution_order == ["child_done"]

@@ -238,8 +238,6 @@ async def await_children(*, recursively: bool = True) -> None:
         recursively: If True (the default), wait for all descendants,
             not just direct children.
     """
-    # TODO We need unit tests that ensure this function works correctly even
-    #  when called on a bare PromisingContext, and not on a Promise.
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
@@ -260,8 +258,6 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
             not just direct children.
         timeout: Maximum time to wait in seconds.
     """
-    # TODO We need unit tests that ensure this function works correctly even
-    #  when called on a bare PromisingContext, and not on a Promise.
     return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
 
 

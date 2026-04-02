@@ -496,6 +496,8 @@ class PromisingContext:
             recursively: If True (the default), wait for all descendants,
                 not just direct children.
         """
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
         while children := self.collect_remaining_children(
             recursively=recursively,
             exclude_non_awaitable=True,
@@ -504,14 +506,20 @@ class PromisingContext:
             # The loop is needed because, in case of recursive awaiting, new
             # children may be spawned by existing ones while the existing ones
             # are being awaited
+            non_promise_children = {c for c in children if not isinstance(c, Promise)}
             await asyncio.gather(
-                *[child.unpack_once() for child in children],
+                *[child.unpack_once() if isinstance(child, Promise) else child for child in children],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until
                 # the first one, if any, fails)
                 return_exceptions=True,
             )
+            # Non-Promise awaitables don't have .done(), so
+            # collect_remaining_children can't detect they've completed.
+            # Remove them after awaiting to prevent infinite re-collection.
+            for child in non_promise_children:
+                self._children.discard(child)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """

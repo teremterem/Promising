@@ -79,10 +79,9 @@ def function(
             ``start_soon`` directly.
         children_start_soon: Whether child promises created during this
             ``Promise``'s execution should start executing immediately.
-            Defaults to ``None`` (no enforcement). ``INHERIT`` copies the
-            parent's ``children_start_soon`` setting.
-            TODO Mention here in the docstring that this default is different
-             from the default in promising contexts.
+            Defaults to ``None`` (no enforcement), unlike
+            ``PromisingContext`` where it defaults to ``INHERIT``.
+            ``INHERIT`` copies the parent's ``children_start_soon`` setting.
         start_soon_default: Default ``start_soon`` value propagated to child
             promises. Defaults to ``INHERIT``, meaning the value is inherited
             from the parent ``Promise``.

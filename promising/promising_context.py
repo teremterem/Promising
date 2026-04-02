@@ -87,11 +87,10 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             Promises whose own ``start_soon`` is None. Controls whether
             they start executing immediately (i.e. as soon as the event loop
             allows), or defer until awaited one way or another. ``INHERIT``
-            (default) copies the parent's setting.
-            TODO Are we sure about INHERIT being the default for
-             children_start_soon in promising contexts, while being None by
-             default in promising functions ?
-            TODO Mention this difference here in the docstring
+            (default) copies the parent's setting. Note: this defaults to
+            ``INHERIT`` (unlike ``promising`` functions, which default to
+            ``None``), so that a ``PromisingContext`` is transparent by
+            default — settings flow through from the enclosing ``Promise``.
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.

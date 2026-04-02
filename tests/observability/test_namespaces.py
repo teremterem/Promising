@@ -485,9 +485,6 @@ def test_instance_with_name_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # Module prefix comes from Widget's class, not the instance
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert result == "tests.observability.test_namespaces::custom_name"
 
 
@@ -514,9 +511,6 @@ def test_callable_instance_inherits_module_from_class() -> None:
         provided_explicitly=None,
         named_object_fallback=handler,
     )
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
         "tests.observability.test_namespaces"
         "::<tests.observability.test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler"

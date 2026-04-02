@@ -452,9 +452,6 @@ def test_plain_instance_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # The module prefix comes from the CLASS, not from the instance itself
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
         "tests.observability.test_namespaces"
         "::<tests.observability.test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject"

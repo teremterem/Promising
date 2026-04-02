@@ -1,6 +1,8 @@
 """
-Tests that ``await_children`` correctly handles awaitable children that are
-not Promise instances (e.g. custom awaitable PromisingContext subclasses).
+Tests that ``await_children_sync`` correctly handles awaitable children that
+are not Promise instances (e.g. custom awaitable PromisingContext subclasses).
+
+Sync variants — uses ``await_children_sync`` from thread-pool functions.
 """
 
 import asyncio
@@ -8,24 +10,7 @@ import inspect
 
 import promising
 from promising.promise import Promise
-from promising.promising_context import PromisingContext
-
-
-class AwaitableContext(PromisingContext):
-    """
-    A PromisingContext subclass that is awaitable (has ``__await__``) but is
-    NOT a Promise.  Simulates a third-party or user-defined awaitable child.
-    """
-
-    def __init__(self, coro, **kwargs):
-        super().__init__(**kwargs)
-        self._coro = coro
-        self._task: asyncio.Task | None = None
-
-    def __await__(self):
-        if self._task is None:
-            self._task = asyncio.ensure_future(self._coro)
-        return self._task.__await__()
+from tests.utils_for_tests import AwaitableContext
 
 
 async def test_awaitable_context_is_awaitable_but_not_promise() -> None:
@@ -41,7 +26,7 @@ async def test_awaitable_context_is_awaitable_but_not_promise() -> None:
 
 async def test_await_children_with_non_promise_awaitable() -> None:
     """
-    ``await_children`` should await non-Promise awaitable children
+    ``await_children_sync`` should await non-Promise awaitable children
     directly instead of calling ``unpack_once()`` on them.
     """
     execution_order: list[str] = []
@@ -51,8 +36,8 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         execution_order.append("awaitable_child_done")
         return "done"
 
-    @promising.function
-    async def parent_func() -> str:
+    @promising.function(use_thread_pool=True)
+    def parent_func() -> str:
         ctx = promising.get_active_context()
 
         # Spawn a regular Promise child
@@ -69,7 +54,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         _keep_alive = AwaitableContext(slow_work(), parent=ctx, loop=ctx._ctx_loop)  # noqa: F841
 
         execution_order.append("parent_coro_done")
-        await promising.await_children()
+        promising.await_children_sync()
         return "parent"
 
     promise = parent_func()
@@ -84,7 +69,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
 
 async def test_await_children_only_non_promise_awaitables() -> None:
     """
-    ``await_children`` works when ALL children are non-Promise awaitables.
+    ``await_children_sync`` works when ALL children are non-Promise awaitables.
     """
     results: list[str] = []
 
@@ -92,15 +77,15 @@ async def test_await_children_only_non_promise_awaitables() -> None:
         await asyncio.sleep(0.1)
         results.append(label)
 
-    @promising.function
-    async def parent_func() -> str:
+    @promising.function(use_thread_pool=True)
+    def parent_func() -> str:
         ctx = promising.get_active_context()
         # Must keep strong references since _children is a WeakSet.
         _keep = [  # noqa: F841
             AwaitableContext(work("a"), parent=ctx, loop=ctx._ctx_loop),
             AwaitableContext(work("b"), parent=ctx, loop=ctx._ctx_loop),
         ]
-        await promising.await_children()
+        promising.await_children_sync()
         return "parent"
 
     promise = parent_func()

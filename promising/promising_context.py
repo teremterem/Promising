@@ -3,6 +3,7 @@ import concurrent.futures
 import contextvars
 import functools
 import inspect
+import threading
 from asyncio import AbstractEventLoop, Future
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -375,8 +376,11 @@ class PromisingContext:
             self._ctx_loop = loop
 
         self._children = WeakSet[PromisingContext]()
+        self._children_lock = threading.Lock()
+
         if self._parent is not None:
-            self._parent._children.add(self)
+            with self._parent._children_lock:
+                self._parent._children.add(self)
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -514,8 +518,10 @@ class PromisingContext:
             # Non-Promise awaitables don't have .done(), so
             # collect_remaining_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
-            for child in non_promise_children:
-                self._children.discard(child)
+            if non_promise_children:
+                with self._children_lock:
+                    for child in non_promise_children:
+                        self._children.discard(child)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
@@ -595,51 +601,36 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        # # COPIED FROM asyncio.tasks::all_tasks():
-        # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
-        # thread while we do so. Therefore we cast it to list prior to filtering. The list
-        # cast itself requires iteration, so we repeat it several times ignoring
-        # RuntimeErrors (which are not very likely to occur). See issues 34970 and 36607 for
-        # details.
-        i = 0
-        while True:
-            try:
-                # In `asyncio.tasks::all_tasks()` it was `_all_tasks` instead of
-                # `self._children`
-                children = list[PromisingContext](self._children)
-            except RuntimeError:
-                i += 1
-                if i > 1000:  # noqa: PLR2004 (magic-value-comparison)
-                    raise
+        with self._children_lock:
+            children = list[PromisingContext](self._children)
 
-            else:
-                result = {
-                    child
-                    for child in children
-                    if (not exclude_non_awaitable or inspect.isawaitable(child))
-                    and (not exclude_done or not isinstance(child, Future) or not child.done())
-                }
+        result = {
+            child
+            for child in children
+            if (not exclude_non_awaitable or inspect.isawaitable(child))
+            and (not exclude_done or not isinstance(child, Future) or not child.done())
+        }
 
-                if recursively:
-                    # We are iterating over all the children, regardless of
-                    # the exclude_done and exclude_non_awaitable settings,
-                    # because some children that are done or non-awaitable
-                    # might have children of their own which are awaitable and
-                    # are still in progress and so on. (This works because
-                    # those children of children prevent their parents from
-                    # being garbage collected, since they, while themselves
-                    # being active, still hold a strong reference to their
-                    # parents.)
-                    for child in children:
-                        result.update(
-                            child.collect_remaining_children(
-                                recursively=True,
-                                exclude_non_awaitable=exclude_non_awaitable,
-                                exclude_done=exclude_done,
-                            )
-                        )
+        if recursively:
+            # We are iterating over all the children, regardless of
+            # the exclude_done and exclude_non_awaitable settings,
+            # because some children that are done or non-awaitable
+            # might have children of their own which are awaitable and
+            # are still in progress and so on. (This works because
+            # those children of children prevent their parents from
+            # being garbage collected, since they, while themselves
+            # being active, still hold a strong reference to their
+            # parents.)
+            for child in children:
+                result.update(
+                    child.collect_remaining_children(
+                        recursively=True,
+                        exclude_non_awaitable=exclude_non_awaitable,
+                        exclude_done=exclude_done,
+                    )
+                )
 
-                return result
+        return result
 
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:

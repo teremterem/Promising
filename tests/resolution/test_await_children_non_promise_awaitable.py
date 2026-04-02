@@ -47,7 +47,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
     execution_order: list[str] = []
 
     async def slow_work() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("awaitable_child_done")
         return "done"
 
@@ -58,7 +58,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         # Spawn a regular Promise child
         @promising.function
         async def promise_child() -> str:
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.1)
             execution_order.append("promise_child_done")
             return "promise"
 
@@ -89,7 +89,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     results: list[str] = []
 
     async def work(label: str) -> None:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         results.append(label)
 
     @promising.function

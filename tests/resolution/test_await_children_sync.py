@@ -217,7 +217,7 @@ async def test_await_children_sync_on_bare_context() -> None:
 
     @promising.function
     async def child_func() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("child_done")
         return "child"
 
@@ -248,14 +248,14 @@ async def test_await_children_sync_on_bare_context_recursively(
 
     @promising.function
     async def grandchild_func() -> str:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function
     async def child_func() -> str:
         grandchild_func()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("child_done")
         return "child"
 
@@ -287,7 +287,7 @@ async def test_await_children_sync_module_level_on_bare_context() -> None:
 
     @promising.function
     async def child_func() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("child_done")
         return "child"
 

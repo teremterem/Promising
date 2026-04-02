@@ -124,7 +124,7 @@ async def test_await_children_sync_on_bare_context() -> None:
 
     @promising.function
     async def child_func() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "child"
 
     @promising.function(use_thread_pool=True)
@@ -157,13 +157,13 @@ async def test_await_children_sync_on_bare_context_recursively(
 
     @promising.function
     async def grandchild_func() -> str:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
         return "grandchild"
 
     @promising.function
     async def child_func() -> str:
         grandchild_func()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "child"
 
     @promising.function(use_thread_pool=True)
@@ -192,7 +192,7 @@ async def test_await_children_sync_module_level_on_bare_context() -> None:
 
     @promising.function
     async def child_func() -> str:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         return "child"
 
     @promising.function(use_thread_pool=True)

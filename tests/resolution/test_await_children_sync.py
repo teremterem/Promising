@@ -200,3 +200,103 @@ async def test_await_children_sync_raises_on_event_loop_thread() -> None:
             promising.await_children_sync()
 
     await some_async_func()
+
+
+# ── Bare PromisingContext (not a Promise) ──────────────────────
+# These tests call await_children_sync on a bare PromisingContext via
+# loop.run_in_executor (rather than a @promising.function) to avoid
+# creating a child Promise that would cause a cycle/deadlock.
+
+
+async def test_await_children_sync_on_bare_context() -> None:
+    """
+    ``await_children_sync`` works when called on a bare PromisingContext
+    (not a Promise) that has Promise children spawned inside it.
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def child_func() -> str:
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    loop = asyncio.get_running_loop()
+    with promising.context() as ctx:
+        assert isinstance(ctx, promising.PromisingContext)
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+        child_func()
+
+        execution_order.append("before_await")
+        await loop.run_in_executor(None, ctx.await_children_sync)
+
+    assert execution_order == ["before_await", "child_done", "child_done"]
+
+
+@pytest.mark.parametrize("recursively", [True, False])
+async def test_await_children_sync_on_bare_context_recursively(
+    *,
+    recursively: bool,
+) -> None:
+    """
+    ``await_children_sync(recursively=...)`` works on a bare PromisingContext
+    with nested Promise children (child -> grandchild).
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def grandchild_func() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
+    async def child_func() -> str:
+        grandchild_func()
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    loop = asyncio.get_running_loop()
+    with promising.context() as ctx:
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+
+        await loop.run_in_executor(
+            None,
+            lambda: ctx.await_children_sync(recursively=recursively),
+        )
+
+    if recursively:
+        assert execution_order == ["child_done", "grandchild_done"]
+    else:
+        assert execution_order == ["child_done"]
+        # Clean up remaining grandchild
+        await ctx.await_children(recursively=True)
+
+
+async def test_await_children_sync_module_level_on_bare_context() -> None:
+    """
+    The module-level ``promising.await_children_sync()`` works when the active
+    context is a bare PromisingContext (not a Promise).
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def child_func() -> str:
+        await asyncio.sleep(0.05)
+        execution_order.append("child_done")
+        return "child"
+
+    loop = asyncio.get_running_loop()
+    with promising.context() as ctx:
+        assert not isinstance(ctx, promising.Promise)
+
+        child_func()
+
+        await loop.run_in_executor(None, ctx.await_children_sync)
+
+    assert execution_order == ["child_done"]

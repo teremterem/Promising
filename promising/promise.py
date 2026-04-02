@@ -360,6 +360,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             return self._start_soon_default
 
         # TODO Do we even need this kind of inheritance for start_soon ?
+        #  Revisit all the settings after you develop some examples, and think
+        #  again if the settings as they currently are make sense.
         if start_soon is INHERIT:
             parent_promise = self.get_parent_promise(raise_if_none=False)
 

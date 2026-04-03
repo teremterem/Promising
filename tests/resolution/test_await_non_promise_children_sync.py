@@ -52,7 +52,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
 
         # Spawn a non-Promise awaitable child registered in the same context.
         # Must keep a strong reference since _children is a WeakSet.
-        _keep_alive = AwaitableContext(slow_work(), parent=ctx, loop=ctx._ctx_loop)  # noqa: F841
+        _keep_alive = AwaitableContext(slow_work(), parent=ctx, loop=ctx._ctx_loop)
 
         execution_order.append("parent_coro_done")
         promising.await_children_sync()
@@ -82,7 +82,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     def parent_func() -> str:
         ctx = promising.get_active_context()
         # Must keep strong references since _children is a WeakSet.
-        _keep = [  # noqa: F841
+        _keep = [
             AwaitableContext(work("a"), parent=ctx, loop=ctx._ctx_loop),
             AwaitableContext(work("b"), parent=ctx, loop=ctx._ctx_loop),
         ]
@@ -115,9 +115,9 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
         ctx = promising.get_active_context()
-        _keep_alive = AwaitableContext(  # noqa: F841
-            slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop
-        )
+        # Spawn a non-Promise awaitable. Must keep a strong reference since
+        # _children is a WeakSet.
+        _keep_alive = AwaitableContext(slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop)
         execution_order.append("child_done")
         return "child"
 
@@ -154,9 +154,9 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
         ctx = promising.get_active_context()
-        _keep_alive = AwaitableContext(  # noqa: F841
-            deep_work(), parent=ctx, loop=ctx._ctx_loop
-        )
+        # Spawn a non-Promise awaitable. Must keep a strong reference since
+        # _children is a WeakSet.
+        _keep_alive = AwaitableContext(deep_work(), parent=ctx, loop=ctx._ctx_loop)
         execution_order.append("grandchild_done")
         return "grandchild"
 

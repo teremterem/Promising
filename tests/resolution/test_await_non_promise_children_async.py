@@ -125,7 +125,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     @promising.function
     async def root_func() -> str:
         child_func()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
         # This should finish; before the fix it hangs forever.
         await promising.await_children(recursively=True)
@@ -171,7 +171,7 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     @promising.function
     async def root_func() -> str:
         child_func()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
         await promising.await_children(recursively=True)
         return "root"

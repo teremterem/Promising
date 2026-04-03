@@ -7,6 +7,7 @@ Sync variants — uses ``await_children_sync`` from thread-pool functions.
 
 import asyncio
 import inspect
+import time
 
 import promising
 from promising.promise import Promise
@@ -123,6 +124,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     @promising.function(use_thread_pool=True)
     def root_func() -> str:
         child_func()
+        time.sleep(0.1)
         execution_order.append("root_coro_done")
         promising.await_children_sync(recursively=True)
         return "root"
@@ -167,6 +169,7 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     @promising.function(use_thread_pool=True)
     def root_func() -> str:
         child_func()
+        time.sleep(0.1)
         execution_order.append("root_coro_done")
         promising.await_children_sync(recursively=True)
         return "root"

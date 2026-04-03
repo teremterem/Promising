@@ -94,7 +94,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     assert sorted(results) == ["a", "b"]
 
 
-async def test_await_children_sync_recursively_non_promise_grandchildren() -> None:
+async def test_await_children_recursively_non_promise_grandchildren() -> None:
     """
     ``await_children_sync(recursively=True)`` must correctly discard non-Promise
     awaitable *grandchildren* after awaiting them.
@@ -136,7 +136,7 @@ async def test_await_children_sync_recursively_non_promise_grandchildren() -> No
     assert "non_promise_grandchild_done" in execution_order
 
 
-async def test_await_children_sync_recursively_non_promise_great_grandchildren() -> None:
+async def test_await_children_recursively_non_promise_great_grandchildren() -> None:
     """
     Same as above but at the great-grandchild level — three levels deep.
     Ensures the discard logic works for arbitrarily nested non-Promise

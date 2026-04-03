@@ -99,9 +99,10 @@ async def test_await_children_sync_recursively_non_promise_grandchildren() -> No
     ``await_children_sync(recursively=True)`` must correctly discard non-Promise
     awaitable *grandchildren* after awaiting them.
 
-    Sync counterpart of
-    ``test_await_children_recursively_non_promise_grandchildren`` in the async
-    test module.
+    Regression: the code discarded non-Promise awaitables from
+    ``self._children`` (the root), but grandchildren live in their actual
+    parent's ``_children``.  The discard was a no-op, causing
+    ``collect_remaining_children`` to keep finding them → infinite loop.
     """
     execution_order: list[str] = []
 
@@ -138,10 +139,8 @@ async def test_await_children_sync_recursively_non_promise_grandchildren() -> No
 async def test_await_children_sync_recursively_non_promise_great_grandchildren() -> None:
     """
     Same as above but at the great-grandchild level — three levels deep.
-
-    Sync counterpart of
-    ``test_await_children_recursively_non_promise_great_grandchildren`` in the
-    async test module.
+    Ensures the discard logic works for arbitrarily nested non-Promise
+    awaitables.
     """
     execution_order: list[str] = []
 

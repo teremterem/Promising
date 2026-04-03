@@ -92,3 +92,88 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     await promise
 
     assert sorted(results) == ["a", "b"]
+
+
+async def test_await_children_sync_recursively_non_promise_grandchildren() -> None:
+    """
+    ``await_children_sync(recursively=True)`` must correctly discard non-Promise
+    awaitable *grandchildren* after awaiting them.
+
+    Sync counterpart of
+    ``test_await_children_recursively_non_promise_grandchildren`` in the async
+    test module.
+    """
+    execution_order: list[str] = []
+
+    async def slow_grandchild_work() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("non_promise_grandchild_done")
+        return "grandchild_work"
+
+    @promising.function(use_thread_pool=True)
+    def child_func() -> str:
+        ctx = promising.get_active_context()
+        _keep_alive = AwaitableContext(  # noqa: F841
+            slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop
+        )
+        execution_order.append("child_done")
+        return "child"
+
+    @promising.function(use_thread_pool=True)
+    def root_func() -> str:
+        child_func()
+        execution_order.append("root_coro_done")
+        promising.await_children_sync(recursively=True)
+        return "root"
+
+    promise = root_func()
+    result = await asyncio.wait_for(promise, timeout=5.0)
+
+    assert result == "root"
+    assert "root_coro_done" in execution_order
+    assert "child_done" in execution_order
+    assert "non_promise_grandchild_done" in execution_order
+
+
+async def test_await_children_sync_recursively_non_promise_great_grandchildren() -> None:
+    """
+    Same as above but at the great-grandchild level — three levels deep.
+
+    Sync counterpart of
+    ``test_await_children_recursively_non_promise_great_grandchildren`` in the
+    async test module.
+    """
+    execution_order: list[str] = []
+
+    async def deep_work() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("non_promise_great_grandchild_done")
+        return "deep"
+
+    @promising.function(use_thread_pool=True)
+    def grandchild_func() -> str:
+        ctx = promising.get_active_context()
+        _keep_alive = AwaitableContext(  # noqa: F841
+            deep_work(), parent=ctx, loop=ctx._ctx_loop
+        )
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function(use_thread_pool=True)
+    def child_func() -> str:
+        grandchild_func()
+        execution_order.append("child_done")
+        return "child"
+
+    @promising.function(use_thread_pool=True)
+    def root_func() -> str:
+        child_func()
+        execution_order.append("root_coro_done")
+        promising.await_children_sync(recursively=True)
+        return "root"
+
+    promise = root_func()
+    result = await asyncio.wait_for(promise, timeout=5.0)
+
+    assert result == "root"
+    assert "non_promise_great_grandchild_done" in execution_order

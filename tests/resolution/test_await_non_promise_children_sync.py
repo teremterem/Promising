@@ -106,6 +106,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     ``collect_remaining_children`` to keep finding them → infinite loop.
     """
     execution_order: list[str] = []
+    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def slow_grandchild_work() -> str:
         await asyncio.sleep(0.1)
@@ -115,9 +116,9 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
         ctx = promising.get_active_context()
-        # Spawn a non-Promise awaitable. Must keep a strong reference since
-        # _children is a WeakSet.
-        _keep_alive = AwaitableContext(slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop)
+        # Spawn a non-Promise awaitable as a grandchild of the root.
+        # Store in outer list to prevent WeakSet from dropping it.
+        keep_alive.append(AwaitableContext(slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop))
         execution_order.append("child_done")
         return "child"
 
@@ -145,6 +146,7 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     awaitables.
     """
     execution_order: list[str] = []
+    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def deep_work() -> str:
         await asyncio.sleep(0.1)
@@ -154,9 +156,8 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
         ctx = promising.get_active_context()
-        # Spawn a non-Promise awaitable. Must keep a strong reference since
-        # _children is a WeakSet.
-        _keep_alive = AwaitableContext(deep_work(), parent=ctx, loop=ctx._ctx_loop)
+        # Store in outer list to prevent WeakSet from dropping it.
+        keep_alive.append(AwaitableContext(deep_work(), parent=ctx, loop=ctx._ctx_loop))
         execution_order.append("grandchild_done")
         return "grandchild"
 

@@ -205,6 +205,54 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
+        An alias for ``unpack_all_sync()`` — blocks the calling thread until
+        all nested Promises are fully unpacked.
+
+        Args:
+            timeout: Maximum time to wait for the result in seconds.
+
+        Returns:
+            The fully unpacked result of the Promise (no remaining awaitables).
+
+        Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
+            TimeoutError: If timeout expires before completion.
+        """
+        return self.unpack_all_sync(timeout=timeout)
+
+    async def unpack_all(self) -> T_co:
+        """
+        Coroutine that fully unpacks all nested Promises, equivalent to
+        ``await promise``.
+
+        Use this instead of passing the bare promise to asyncio utilities
+        like ``asyncio.wait_for``, ``asyncio.gather``, or ``asyncio.shield``.
+        These utilities detect that ``Promise`` is an ``asyncio.Future`` and
+        wait for it directly, bypassing ``__await__`` and its recursive
+        unpacking logic. As a result, passing a bare promise may return a
+        nested ``Promise`` object instead of the final resolved value.
+
+        Because ``unpack_all()`` is a coroutine (not a Future), asyncio
+        utilities will wrap it in a Task, which invokes ``__await__`` and
+        triggers full recursive unpacking as expected.
+
+        Example::
+
+            # Instead of this (may return a nested Promise):
+            result = await asyncio.wait_for(promise, timeout=5)
+
+            # Do this:
+            result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
+
+        Returns:
+            The fully unpacked result of the Promise (no remaining
+            awaitables).
+        """
+        return await self
+
+    def unpack_all_sync(self, *, timeout: float | None = None) -> T_co:
+        """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Recursively unpacks nested awaitables (non-Promise
         awaitables are auto-wrapped into Promises by ``set_result``) until

@@ -37,22 +37,19 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         execution_order.append("awaitable_child_done")
         return "done"
 
+    @promising.function
+    async def promise_child() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("promise_child_done")
+        return "promise"
+
     @promising.function(use_thread_pool=True)
     def parent_func() -> str:
-        ctx = promising.get_active_context()
-
         # Spawn a regular Promise child
-        @promising.function
-        async def promise_child() -> str:
-            await asyncio.sleep(0.1)
-            execution_order.append("promise_child_done")
-            return "promise"
-
         promise_child()
 
-        # Spawn a non-Promise awaitable child registered in the same context.
-        # Must keep a strong reference since _children is a WeakSet.
-        _keep_alive = AwaitableContext(slow_work(), parent=ctx, loop=ctx._ctx_loop)
+        # Spawn a non-Promise awaitable child registered in the same context
+        AwaitableContext(slow_work())
 
         execution_order.append("parent_coro_done")
         promising.await_children_sync()
@@ -80,12 +77,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
     @promising.function(use_thread_pool=True)
     def parent_func() -> str:
-        ctx = promising.get_active_context()
-        # Must keep strong references since _children is a WeakSet.
-        _keep = [
-            AwaitableContext(work("a"), parent=ctx, loop=ctx._ctx_loop),
-            AwaitableContext(work("b"), parent=ctx, loop=ctx._ctx_loop),
-        ]
+        AwaitableContext(work("a"))
+        AwaitableContext(work("b"))
         promising.await_children_sync()
         return "parent"
 
@@ -106,7 +99,6 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     ``collect_remaining_children`` to keep finding them → infinite loop.
     """
     execution_order: list[str] = []
-    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def slow_grandchild_work() -> str:
         await asyncio.sleep(0.1)
@@ -115,10 +107,8 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
-        ctx = promising.get_active_context()
         # Spawn a non-Promise awaitable as a grandchild of the root.
-        # Store in outer list to prevent WeakSet from dropping it.
-        keep_alive.append(AwaitableContext(slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop))
+        AwaitableContext(slow_grandchild_work())
         execution_order.append("child_done")
         return "child"
 
@@ -146,7 +136,6 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
     awaitables.
     """
     execution_order: list[str] = []
-    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def deep_work() -> str:
         await asyncio.sleep(0.1)
@@ -155,9 +144,7 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
 
     @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
-        ctx = promising.get_active_context()
-        # Store in outer list to prevent WeakSet from dropping it.
-        keep_alive.append(AwaitableContext(deep_work(), parent=ctx, loop=ctx._ctx_loop))
+        AwaitableContext(deep_work())
         execution_order.append("grandchild_done")
         return "grandchild"
 

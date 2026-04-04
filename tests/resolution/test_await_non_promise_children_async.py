@@ -30,6 +30,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
     directly instead of calling ``unpack_once()`` on them.
     """
     execution_order: list[str] = []
+    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def slow_work() -> str:
         await asyncio.sleep(0.1)
@@ -37,21 +38,19 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         return "done"
 
     @promising.function
+    async def promise_child() -> str:
+        await asyncio.sleep(0.1)
+        execution_order.append("promise_child_done")
+        return "promise"
+
+    @promising.function
     async def parent_func() -> str:
-        ctx = promising.get_active_context()
-
         # Spawn a regular Promise child
-        @promising.function
-        async def promise_child() -> str:
-            await asyncio.sleep(0.1)
-            execution_order.append("promise_child_done")
-            return "promise"
-
         promise_child()
 
         # Spawn a non-Promise awaitable child registered in the same context.
         # Must keep a strong reference since _children is a WeakSet.
-        _keep_alive = AwaitableContext(slow_work(), parent=ctx, loop=ctx._ctx_loop)
+        keep_alive.append(AwaitableContext(slow_work()))
 
         execution_order.append("parent_coro_done")
         await promising.await_children()
@@ -72,6 +71,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     ``await_children`` works when ALL children are non-Promise awaitables.
     """
     results: list[str] = []
+    keep_alive: list = []  # prevent GC of the AwaitableContext
 
     async def work(label: str) -> None:
         await asyncio.sleep(0.1)
@@ -79,12 +79,9 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
     @promising.function
     async def parent_func() -> str:
-        ctx = promising.get_active_context()
         # Must keep strong references since _children is a WeakSet.
-        _keep = [
-            AwaitableContext(work("a"), parent=ctx, loop=ctx._ctx_loop),
-            AwaitableContext(work("b"), parent=ctx, loop=ctx._ctx_loop),
-        ]
+        keep_alive.append(AwaitableContext(work("a")))
+        keep_alive.append(AwaitableContext(work("b")))
         await promising.await_children()
         return "parent"
 
@@ -114,10 +111,9 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     @promising.function
     async def child_func() -> str:
-        ctx = promising.get_active_context()
         # Spawn a non-Promise awaitable as a grandchild of the root.
         # Store in outer list to prevent WeakSet from dropping it.
-        keep_alive.append(AwaitableContext(slow_grandchild_work(), parent=ctx, loop=ctx._ctx_loop))
+        keep_alive.append(AwaitableContext(slow_grandchild_work()))
         execution_order.append("child_done")
         return "child"
 
@@ -155,28 +151,27 @@ async def test_await_children_recursively_non_promise_great_grandchildren() -> N
 
     @promising.function
     async def grandchild_func() -> str:
-        ctx = promising.get_active_context()
         # Store in outer list to prevent WeakSet from dropping it.
-        keep_alive.append(AwaitableContext(deep_work(), parent=ctx, loop=ctx._ctx_loop))
+        # NOTE: AwaitableContext does not "start soon"
+        keep_alive.append(AwaitableContext(deep_work()))
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function
     async def child_func() -> str:
-        grandchild_func()
         execution_order.append("child_done")
-        return "child"
+        return grandchild_func()
 
     @promising.function
     async def root_func() -> str:
-        child_func()
-        await asyncio.sleep(0.1)
+        result = child_func()
+        await asyncio.sleep(0.2)
         execution_order.append("root_coro_done")
         await promising.await_children(recursively=True)
-        return "root"
+        return result
 
     promise = root_func()
-    result = await asyncio.wait_for(promise, timeout=5.0)
+    result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
 
-    assert result == "root"
-    assert "non_promise_great_grandchild_done" in execution_order
+    assert result == "grandchild"
+    assert execution_order == ["child_done", "grandchild_done", "root_coro_done", "non_promise_great_grandchild_done"]

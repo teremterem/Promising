@@ -9,7 +9,6 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
-from weakref import WeakSet
 
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
@@ -375,7 +374,7 @@ class PromisingContext:
                 raise ValueError("Parent and child PromisingContexts must share the same event loop")
             self._ctx_loop = loop
 
-        self._children = WeakSet[PromisingContext]()
+        self._children = set[PromisingContext]()
         self._children_lock = threading.Lock()
 
         if self._parent is not None:
@@ -498,17 +497,25 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
+        # The loop is needed because, in case of recursive awaiting, new
+        # children may be spawned by existing ones while the existing ones
+        # are being awaited
         while children := self.collect_remaining_children(
-            recursively=recursively,
-            exclude_non_awaitable=True,
-            exclude_done=True,
+            recursively=False,
+            exclude_non_awaitable=True,  # TODO TODO TODO
+            exclude_done=True,  # TODO TODO TODO
         ):
-            # The loop is needed because, in case of recursive awaiting, new
-            # children may be spawned by existing ones while the existing ones
-            # are being awaited
-            non_promise_children = {c for c in children if not isinstance(c, Promise)}
+            to_be_gathered = [child.unpack_once() if isinstance(child, Promise) else child for child in children]
+            if recursively:
+                to_be_gathered.extend(
+                    child.await_children(recursively=True)
+                    for child in children
+                    # TODO TODO TODO We should disallow non-PromisingContext children
+                    if isinstance(child, PromisingContext)
+                )
+
             await asyncio.gather(
-                *[child.unpack_once() if isinstance(child, Promise) else child for child in children],
+                *to_be_gathered,
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until
@@ -518,10 +525,13 @@ class PromisingContext:
             # Non-Promise awaitables don't have .done(), so
             # collect_remaining_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
-            if non_promise_children:
-                with self._children_lock:
-                    for child in non_promise_children:
-                        self._children.discard(child)
+            with self._children_lock:
+                for child in children:
+                    # TODO TODO TODO Discard only fully-awaited subtrees (not
+                    #  all of them might be fully awaited if recursively=False)
+                    # TODO TODO TODO Use "unregister_from_parent" method
+                    #  instead of the child ? What about the lock ?
+                    self._children.discard(child)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """

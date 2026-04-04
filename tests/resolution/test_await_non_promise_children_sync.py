@@ -90,8 +90,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
 async def test_await_children_recursively_non_promise_grandchildren() -> None:
     """
-    ``await_children_sync(recursively=True)`` must correctly discard non-Promise
-    awaitable *grandchildren* after awaiting them.
+    ``await_children_sync(recursively=True)`` must correctly discard
+    non-Promise awaitable *grandchildren* after awaiting them.
 
     Regression: the code discarded non-Promise awaitables from
     ``self._children`` (the root), but grandchildren live in their actual
@@ -100,70 +100,52 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     """
     execution_order: list[str] = []
 
-    async def slow_grandchild_work() -> str:
+    async def great_grandchild_1_non_promise() -> str:
+        execution_order.append("non_promise_great_grandchild_1_done")
+        return "great_grandchild_work"
+
+    async def great_grandchild_2_non_promise() -> str:
+        execution_order.append("non_promise_great_grandchild_2_done")
+        return "great_grandchild_work"
+
+    async def grandchild_non_promise() -> str:
         await asyncio.sleep(0.1)
+        AwaitableContext(great_grandchild_2_non_promise())
         execution_order.append("non_promise_grandchild_done")
         return "grandchild_work"
 
     @promising.function(use_thread_pool=True)
-    def child_func() -> str:
-        # Spawn a non-Promise awaitable as a grandchild of the root.
-        AwaitableContext(slow_grandchild_work())
-        execution_order.append("child_done")
-        return "child"
-
-    @promising.function(use_thread_pool=True)
-    def root_func() -> str:
-        child_func()
-        time.sleep(0.1)
-        execution_order.append("root_coro_done")
-        promising.await_children_sync(recursively=True)
-        return "root"
-
-    promise = root_func()
-    result = await asyncio.wait_for(promise, timeout=5.0)
-
-    assert result == "root"
-    assert "root_coro_done" in execution_order
-    assert "child_done" in execution_order
-    assert "non_promise_grandchild_done" in execution_order
-
-
-async def test_await_children_recursively_non_promise_great_grandchildren() -> None:
-    """
-    Same as above but at the great-grandchild level — three levels deep.
-    Ensures the discard logic works for arbitrarily nested non-Promise
-    awaitables.
-    """
-    execution_order: list[str] = []
-
-    async def deep_work() -> str:
-        await asyncio.sleep(0.1)
-        execution_order.append("non_promise_great_grandchild_done")
-        return "deep"
-
-    @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
-        AwaitableContext(deep_work())
+        AwaitableContext(great_grandchild_1_non_promise())
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
-        grandchild_func()
+        with promising.context() as ctx:
+            awaitable_ctx = AwaitableContext(grandchild_non_promise())
+            assert awaitable_ctx.get_parent_context() is ctx
+
         execution_order.append("child_done")
-        return "child"
+        return grandchild_func()
 
     @promising.function(use_thread_pool=True)
     def root_func() -> str:
-        child_func()
+        result = child_func()
         time.sleep(0.1)
         execution_order.append("root_coro_done")
         promising.await_children_sync(recursively=True)
-        return "root"
+        return result
 
     promise = root_func()
-    result = await asyncio.wait_for(promise, timeout=5.0)
+    result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
 
-    assert result == "root"
-    assert "non_promise_great_grandchild_done" in execution_order
+    assert result == "grandchild"
+    assert execution_order == [
+        "child_done",
+        "grandchild_done",
+        "root_coro_done",
+        "non_promise_great_grandchild_1_done",
+        "non_promise_grandchild_done",
+        "non_promise_great_grandchild_2_done",
+    ]

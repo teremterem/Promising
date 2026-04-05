@@ -375,7 +375,7 @@ class PromisingContext:
                 raise ValueError("Parent and child PromisingContexts must share the same event loop")
             self._ctx_loop = loop
 
-        self._used = False
+        self._exited = False
         self._active_children = set[PromisingContext]()
         self._active_children_lock = threading.Lock()
 
@@ -579,8 +579,8 @@ class PromisingContext:
         self,
         *,
         recursively: bool = True,
-        exclude_non_awaitable: bool = True,
-        exclude_done: bool = True,
+        promises_only: bool = True,
+        pending_only: bool = True,
     ) -> set["PromisingContext"]:
         """
         Collect child contexts that haven't been garbage collected.
@@ -641,7 +641,7 @@ class PromisingContext:
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
             raise ContextAlreadyActiveError("This PromisingContext is already active")
-        if self._used:
+        if self._exited:
             raise ContextAlreadyUsedError("This PromisingContext has already been used and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
@@ -668,7 +668,7 @@ class PromisingContext:
 
         finally:
             with self._active_children_lock:
-                self._used = True
+                self._exited = True
             self._unregister_from_parent_if_time()
 
         return False  # Let's not suppress any exceptions
@@ -769,7 +769,7 @@ class PromisingContext:
                 raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
 
         with self._active_children_lock:
-            if self._used:
+            if self._exited:
                 raise ContextAlreadyUsedError(
                     "Cannot register children to a PromisingContext that has already been exited"
                 )
@@ -785,5 +785,5 @@ class PromisingContext:
         self._unregister_from_parent_if_time()
 
     def _unregister_from_parent_if_time(self) -> None:
-        if self._used and self._parent is not None and not self._active_children:
+        if self._exited and self._parent is not None and not self._active_children:
             self._parent._unregister_children_threadsafe(self)

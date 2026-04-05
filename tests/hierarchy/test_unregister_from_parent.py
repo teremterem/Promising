@@ -2,7 +2,7 @@
 Tests for the automatic unregistration of a PromisingContext from its parent.
 
 A context unregisters itself from its parent when both conditions are met:
-1. The context has been exited (``_used`` is True).
+1. The context has been exited (``_exited`` is True).
 2. The context has no active children left.
 
 This means unregistration can be triggered by two different events:
@@ -99,5 +99,5 @@ async def test_does_not_unregister_from_parent_while_still_active() -> None:
         assert child in parent._active_children
 
         # child was never entered/exited — it's not "used"
-        assert not child._used
+        assert not child._exited
         assert child in parent._active_children

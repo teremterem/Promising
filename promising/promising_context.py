@@ -378,8 +378,7 @@ class PromisingContext:
         self._active_children_lock = threading.Lock()
 
         if self._parent is not None:
-            with self._parent._active_children_lock:
-                self._parent._active_children.add(self)
+            self._parent._register_children_threadsafe(self)
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -525,13 +524,9 @@ class PromisingContext:
             # Non-Promise awaitables don't have .done(), so
             # collect_active_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
-            with self._active_children_lock:
-                for child in children:
-                    # TODO TODO TODO Discard only fully-awaited subtrees (not
-                    #  all of them might be fully awaited if recursively=False)
-                    # TODO TODO TODO Use "unregister_from_parent" method
-                    #  instead of the child ? What about the lock ?
-                    self._active_children.discard(child)
+            # TODO TODO TODO Discard only fully-awaited subtrees (not
+            #  all of them might be fully awaited if recursively=False)
+            self._unregister_children_threadsafe(*children)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
@@ -759,3 +754,11 @@ class PromisingContext:
             raise NoRunningEventLoopError(f"The event loop of {self} is not running")
 
         self._ctx_loop.call_soon_threadsafe(callback)
+
+    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+        with self._active_children_lock:
+            self._active_children.update(children)
+
+    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+        with self._active_children_lock:
+            self._active_children.difference_update(children)

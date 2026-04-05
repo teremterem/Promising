@@ -96,7 +96,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     Regression: the code discarded non-Promise awaitables from
     ``self._active_children`` (the root), but grandchildren live in their
     actual parent's ``_active_children``.  The discard was a no-op, causing
-    ``collect_remaining_children`` to keep finding them → infinite loop.
+    ``collect_active_children`` to keep finding them → infinite loop.
     """
     execution_order: list[str] = []
 

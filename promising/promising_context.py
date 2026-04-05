@@ -261,7 +261,7 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
     return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
 
 
-def collect_remaining_children(
+def collect_active_children(
     *,
     recursively: bool = True,
     exclude_non_awaitable: bool = True,
@@ -272,7 +272,7 @@ def collect_remaining_children(
     collected.
 
     This is the module-level counterpart of
-    ``PromisingContext.collect_remaining_children()``.
+    ``PromisingContext.collect_active_children()``.
 
     Args:
         recursively: If True (default), include descendants at all levels,
@@ -287,7 +287,7 @@ def collect_remaining_children(
     Returns:
         Set of child PromisingContexts matching the filter criteria.
     """
-    return get_active_context().collect_remaining_children(
+    return get_active_context().collect_active_children(
         recursively=recursively,
         exclude_non_awaitable=exclude_non_awaitable,
         exclude_done=exclude_done,
@@ -500,7 +500,7 @@ class PromisingContext:
         # The loop is needed because, in case of recursive awaiting, new
         # children may be spawned by existing ones while the existing ones
         # are being awaited
-        while children := self.collect_remaining_children(
+        while children := self.collect_active_children(
             recursively=False,
             exclude_non_awaitable=True,  # TODO TODO TODO
             exclude_done=True,  # TODO TODO TODO
@@ -523,7 +523,7 @@ class PromisingContext:
                 return_exceptions=True,
             )
             # Non-Promise awaitables don't have .done(), so
-            # collect_remaining_children can't detect they've completed.
+            # collect_active_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
             with self._active_children_lock:
                 for child in children:
@@ -579,7 +579,7 @@ class PromisingContext:
         self._call_soon_threadsafe(schedule_await_children)
         concurrent_future.result(timeout=timeout)
 
-    def collect_remaining_children(
+    def collect_active_children(
         self,
         *,
         recursively: bool = True,
@@ -633,7 +633,7 @@ class PromisingContext:
             # parents.)
             for child in children:
                 result.update(
-                    child.collect_remaining_children(
+                    child.collect_active_children(
                         recursively=True,
                         exclude_non_awaitable=exclude_non_awaitable,
                         exclude_done=exclude_done,

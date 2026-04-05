@@ -756,9 +756,15 @@ class PromisingContext:
         self._ctx_loop.call_soon_threadsafe(callback)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+        for child in children:
+            if not isinstance(child, PromisingContext):
+                raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
         with self._active_children_lock:
             self._active_children.update(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+        for child in children:
+            if not isinstance(child, PromisingContext):
+                raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
         with self._active_children_lock:
             self._active_children.difference_update(children)

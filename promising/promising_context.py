@@ -374,12 +374,12 @@ class PromisingContext:
                 raise ValueError("Parent and child PromisingContexts must share the same event loop")
             self._ctx_loop = loop
 
-        self._children = set[PromisingContext]()
-        self._children_lock = threading.Lock()
+        self._active_children = set[PromisingContext]()
+        self._active_children_lock = threading.Lock()
 
         if self._parent is not None:
-            with self._parent._children_lock:
-                self._parent._children.add(self)
+            with self._parent._active_children_lock:
+                self._parent._active_children.add(self)
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -525,13 +525,13 @@ class PromisingContext:
             # Non-Promise awaitables don't have .done(), so
             # collect_remaining_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
-            with self._children_lock:
+            with self._active_children_lock:
                 for child in children:
                     # TODO TODO TODO Discard only fully-awaited subtrees (not
                     #  all of them might be fully awaited if recursively=False)
                     # TODO TODO TODO Use "unregister_from_parent" method
                     #  instead of the child ? What about the lock ?
-                    self._children.discard(child)
+                    self._active_children.discard(child)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
@@ -611,8 +611,8 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        with self._children_lock:
-            children = list[PromisingContext](self._children)
+        with self._active_children_lock:
+            children = list[PromisingContext](self._active_children)
 
         result = {
             child

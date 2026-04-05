@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from promising.errors import (
     ContextAlreadyActiveError,
+    ContextAlreadyUsedError,
     ContextError,
     ContextNotActiveError,
     ContextNotFoundError,
@@ -52,6 +53,7 @@ class Defaults:
 __all__ = [
     "ASYNCIO_DEFAULT",
     "ContextAlreadyActiveError",
+    "ContextAlreadyUsedError",
     "ContextError",
     "ContextNotActiveError",
     "ContextNotFoundError",

@@ -29,6 +29,10 @@ class ContextAlreadyActiveError(ContextError):
     pass
 
 
+class ContextAlreadyUsedError(ContextError):
+    pass
+
+
 class ContextNotActiveError(ContextError):
     pass
 

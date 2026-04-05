@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
+    ContextAlreadyUsedError,
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
@@ -374,6 +375,7 @@ class PromisingContext:
                 raise ValueError("Parent and child PromisingContexts must share the same event loop")
             self._ctx_loop = loop
 
+        self._used = False
         self._active_children = set[PromisingContext]()
         self._active_children_lock = threading.Lock()
 
@@ -504,6 +506,8 @@ class PromisingContext:
             exclude_non_awaitable=True,  # TODO TODO TODO
             exclude_done=True,  # TODO TODO TODO
         ):
+            # TODO Safeguard from awaiting a child that happens to be the
+            #  currently active context
             to_be_gathered = [child.unpack_once() if isinstance(child, Promise) else child for child in children]
             if recursively:
                 to_be_gathered.extend(
@@ -640,6 +644,8 @@ class PromisingContext:
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
             raise ContextAlreadyActiveError("This PromisingContext is already active")
+        if self._used:
+            raise ContextAlreadyUsedError("This PromisingContext has already been used and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -656,6 +662,7 @@ class PromisingContext:
 
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
+            self._used = True
 
         except BaseException as exc:
             if exc_value is None:

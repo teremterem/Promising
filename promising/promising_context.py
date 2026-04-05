@@ -528,9 +528,6 @@ class PromisingContext:
             # Non-Promise awaitables don't have .done(), so
             # collect_active_children can't detect they've completed.
             # Remove them after awaiting to prevent infinite re-collection.
-            # TODO TODO TODO Discard only fully-awaited subtrees (not
-            #  all of them might be fully awaited if recursively=False)
-            self._unregister_children_threadsafe(*children)
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """
@@ -662,13 +659,17 @@ class PromisingContext:
 
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
-            self._used = True
 
         except BaseException as exc:
             if exc_value is None:
                 raise exc
             else:
                 raise exc from exc_value
+
+        finally:
+            with self._active_children_lock:
+                self._used = True
+            self._unregister_from_parent_if_time()
 
         return False  # Let's not suppress any exceptions
 
@@ -766,12 +767,23 @@ class PromisingContext:
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
+
         with self._active_children_lock:
+            if self._used:
+                raise ContextAlreadyUsedError(
+                    "Cannot register children to a PromisingContext that has already been exited"
+                )
             self._active_children.update(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+        # TODO Do we really need to check this upon unregistration as well ?
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
         with self._active_children_lock:
             self._active_children.difference_update(children)
+        self._unregister_from_parent_if_time()
+
+    def _unregister_from_parent_if_time(self) -> None:
+        if self._used and self._parent is not None and not self._active_children:
+            self._parent._unregister_children_threadsafe(self)

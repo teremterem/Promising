@@ -2,9 +2,8 @@ import asyncio
 import concurrent.futures
 import contextvars
 import functools
-import inspect
 import threading
-from asyncio import AbstractEventLoop, Future
+from asyncio import AbstractEventLoop
 from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
@@ -265,8 +264,8 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
 def collect_active_children(
     *,
     recursively: bool = True,
-    exclude_non_awaitable: bool = True,
-    exclude_done: bool = True,
+    promises_only: bool = True,
+    open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
     Collect child contexts of the active context that haven't been garbage
@@ -290,8 +289,8 @@ def collect_active_children(
     """
     return get_active_context().collect_active_children(
         recursively=recursively,
-        exclude_non_awaitable=exclude_non_awaitable,
-        exclude_done=exclude_done,
+        promises_only=promises_only,
+        open_contexts_only=open_contexts_only,
     )
 
 
@@ -615,26 +614,21 @@ class PromisingContext:
         result = {
             child
             for child in children
-            if (not exclude_non_awaitable or inspect.isawaitable(child))
-            and (not exclude_done or not isinstance(child, Future) or not child.done())
+            if (not promises_only or isinstance(child, Promise))
+            and (not open_contexts_only or not child._context_closed)
         }
 
         if recursively:
-            # We are iterating over all the children, regardless of
-            # the exclude_done and exclude_non_awaitable settings,
-            # because some children that are done or non-awaitable
-            # might have children of their own which are awaitable and
-            # are still in progress and so on. (This works because
-            # those children of children prevent their parents from
-            # being garbage collected, since they, while themselves
-            # being active, still hold a strong reference to their
-            # parents.)
+            # We are iterating over all the children, regardless of the
+            # promises_only and open_contexts_only settings, because some
+            # children may still be "active" simply because they still have
+            # "active" children of their own.
             for child in children:
                 result.update(
                     child.collect_active_children(
                         recursively=True,
-                        exclude_non_awaitable=exclude_non_awaitable,
-                        exclude_done=exclude_done,
+                        promises_only=promises_only,
+                        open_contexts_only=open_contexts_only,
                     )
                 )
 

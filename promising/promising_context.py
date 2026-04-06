@@ -230,7 +230,7 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = True) -> None:
+async def await_children(*, recursively: bool = True, promises_only: bool = False) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
@@ -241,7 +241,7 @@ async def await_children(*, recursively: bool = True) -> None:
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
-    return await get_active_context().await_children(recursively=recursively)
+    return await get_active_context().await_children(recursively=recursively, promises_only=promises_only)
 
 
 def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
@@ -486,7 +486,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, recursively: bool = True) -> None:
+    async def await_children(self, *, recursively: bool = True, promises_only: bool = False) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -504,18 +504,23 @@ class PromisingContext:
         # are being awaited
         while children := self.collect_active_children(
             recursively=False,
-            exclude_non_awaitable=True,  # TODO TODO TODO
-            exclude_done=True,  # TODO TODO TODO
+            futures_only=False,
+            # For the sake of possible children under closed parents which
+            #  themselves are still open:
+            open_contexts_only=False,
         ):
             # TODO Safeguard from awaiting a child that happens to be the
             #  currently active context
-            to_be_gathered = [child.unpack_once() if isinstance(child, Promise) else child for child in children]
+            to_be_gathered = [
+                # TODO We need a test that checks whether awaiting on a Promise
+                #  via `gather()` does `unpack_once()` or `unpack_all()`
+                child
+                for child in children
+                if isinstance(child, Promise if promises_only else asyncio.Future)
+            ]
             if recursively:
                 to_be_gathered.extend(
-                    child.await_children(recursively=True)
-                    for child in children
-                    # TODO TODO TODO We should disallow non-PromisingContext children
-                    if isinstance(child, PromisingContext)
+                    child.await_children(recursively=True, promises_only=promises_only) for child in children
                 )
 
             await asyncio.gather(
@@ -526,9 +531,6 @@ class PromisingContext:
                 # the first one, if any, fails)
                 return_exceptions=True,
             )
-            # Non-Promise awaitables don't have .done(), so
-            # collect_active_children can't detect they've completed.
-            # Remove them after awaiting to prevent infinite re-collection.
 
     def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
         """

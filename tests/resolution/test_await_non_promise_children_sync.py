@@ -98,9 +98,14 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     actual parent's ``_active_children``.  The discard was a no-op, causing
     ``collect_active_children`` to keep finding them → infinite loop.
     """
+    # TODO Update name and docstring ?
+    # TODO Replicate changes to the sync variant too ?
+    # TODO Add a test that tries to attach a child promise to a promise that
+    #  was prefilled upon creation
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:
+        Promise[str](prefilled_result="prefilled_gread_grandchild")
         execution_order.append("non_promise_great_grandchild_1_done")
         return "great_grandchild_work"
 
@@ -122,7 +127,9 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
+        Promise[str](prefilled_result="prefilled_grandchild_1")
         with promising.context() as ctx:
+            Promise[str](prefilled_result="prefilled_grandchild_2")
             awaitable_ctx = AwaitableContext(grandchild_non_promise())
             assert awaitable_ctx.get_parent_context() is ctx
 

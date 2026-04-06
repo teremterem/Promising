@@ -139,6 +139,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            close_context_immediately=awaitable is None,
         )
         Future.__init__(
             self,

@@ -506,7 +506,7 @@ class PromisingContext:
             recursively=False,
             futures_only=False,
             # For the sake of possible children under closed parents which
-            #  themselves are still open:
+            # themselves are still open:
             open_contexts_only=False,
         ):
             # TODO Safeguard from awaiting a child that happens to be the

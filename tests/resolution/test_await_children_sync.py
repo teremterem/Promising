@@ -5,8 +5,6 @@ import pytest
 
 import promising
 
-# ── Basic functionality ─────────────────────────────────────────
-
 
 @pytest.mark.parametrize("await_children", [True, False])
 async def test_await_children(*, await_children: bool) -> None:
@@ -53,23 +51,21 @@ async def test_await_children(*, await_children: bool) -> None:
         ]
     else:
         assert execution_order == ["parent_coro_done"]
-        # Let's await for all the children to complete,
-        # so that we don't get any asyncio warnings about
-        # coroutines never being awaited
+        # Let's await for all the children to complete, so that we don't
+        # get any asyncio warnings about coroutines never being awaited
         await promise.await_children()
 
 
 @pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_recursively(
-    *,
-    recursively: bool,
-) -> None:
+async def test_await_children_recursively(*, recursively: bool) -> None:
     """
-    Three levels of nesting:
-    sync root -> async child -> async grandchild
-      -> async great-grandchild.
-    With recursively=True: await_children_sync waits for
-    every level to complete before the root resolves.
+    Parametrized over recursively={True, False}.
+    Three levels of nesting: root → child → grandchild → great-grandchild.
+    With True: await_children_sync(recursively=True) is called on the
+    root, so every level completes before the root resolves.
+    With False: await_children_sync(recursively=False) only waits for
+    direct children (child), so grandchild and great-grandchild may still
+    be running when the root resolves.
     """
     execution_order: list[str] = []
 
@@ -121,12 +117,12 @@ async def test_await_children_recursively(
 
 
 @pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_sync_recursively_all_sync(
+async def test_await_children_recursively_sync_children(
     *,
     recursively: bool,
 ) -> None:
     """
-    Same as test_await_children_sync_recursively but every
+    Same as test_await_children_recursively but every
     promising function in the hierarchy is synchronous
     (runs in a thread pool).
     sync root -> sync child -> sync grandchild

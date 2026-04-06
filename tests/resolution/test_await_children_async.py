@@ -123,9 +123,11 @@ async def test_await_children_recursively_sync_children(
     recursively: bool,
 ) -> None:
     """
-    Same as test_await_children_recursively but only the
-    root is async — child, grandchild, and great-grandchild
-    are all sync promising functions running in thread pools.
+    Same as test_await_children_recursively but every
+    promising function in the hierarchy is synchronous
+    (runs in a thread pool).
+    sync root -> sync child -> sync grandchild
+      -> sync great-grandchild.
     """
     execution_order: list[str] = []
 

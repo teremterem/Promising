@@ -264,7 +264,7 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
 def collect_active_children(
     *,
     recursively: bool = True,
-    promises_only: bool = True,
+    futures_only: bool = True,
     open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
@@ -289,7 +289,7 @@ def collect_active_children(
     """
     return get_active_context().collect_active_children(
         recursively=recursively,
-        promises_only=promises_only,
+        futures_only=futures_only,
         open_contexts_only=open_contexts_only,
     )
 
@@ -580,7 +580,7 @@ class PromisingContext:
         self,
         *,
         recursively: bool = True,
-        promises_only: bool = True,
+        futures_only: bool = True,
         open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
         """
@@ -614,20 +614,20 @@ class PromisingContext:
         result = {
             child
             for child in children
-            if (not promises_only or isinstance(child, Promise))
+            if (not futures_only or isinstance(child, asyncio.Future))
             and (not open_contexts_only or not child._context_closed)
         }
 
         if recursively:
             # We are iterating over all the children, regardless of the
-            # promises_only and open_contexts_only settings, because some
+            # futures_only and open_contexts_only settings, because some
             # children may still be "active" simply because they still have
             # "active" children of their own.
             for child in children:
                 result.update(
                     child.collect_active_children(
                         recursively=True,
-                        promises_only=promises_only,
+                        futures_only=futures_only,
                         open_contexts_only=open_contexts_only,
                     )
                 )

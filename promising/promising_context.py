@@ -532,7 +532,13 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
+    def await_children_sync(
+        self,
+        *,
+        recursively: bool = True,
+        promises_only: bool = False,
+        timeout: float | None = None,
+    ) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -563,7 +569,7 @@ class PromisingContext:
 
         async def await_children_and_notify() -> None:
             try:
-                await self.await_children(recursively=recursively)
+                await self.await_children(recursively=recursively, promises_only=promises_only)
             except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from

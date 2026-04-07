@@ -1,4 +1,5 @@
 import concurrent.futures
+import inspect
 import time
 from asyncio import AbstractEventLoop, Future, Task
 from collections.abc import Awaitable, Generator
@@ -103,7 +104,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
-        TypeError: If awaitable does not have __await__ when provided.
+        TypeError: If awaitable is not awaitable when provided.
     """
 
     # TODO [P1] Figure out how to support async generator interface as well
@@ -440,7 +441,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                     f"Cannot create a Promise without an awaitable or prefilled result/exception for {self}"
                 )
         else:
-            if not hasattr(self._awaitable, "__await__"):
+            if not inspect.isawaitable(self._awaitable):
                 raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
             if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
@@ -469,7 +470,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Args:
             result: The result value to set.
         """
-        if hasattr(result, "__await__") and not isinstance(result, Promise):
+        if inspect.isawaitable(result) and not isinstance(result, Promise):
             result = Promise[Any](
                 result,
                 loop=self._ctx_loop,

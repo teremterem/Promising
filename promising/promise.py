@@ -362,12 +362,9 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             # Should not happen
             raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
 
-        result = UNCHANGED
-        exception = None
-
         try:
             with self:
-                result = await self._awaitable
+                self.set_result(await self._awaitable)
 
         except BaseException as exc:
             exception = exc
@@ -383,11 +380,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
                 pass
-        finally:
-            if exception is None:
-                self.set_result(result)
-            else:
-                self.set_exception(exception)
+
+            self.set_exception(exception)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
@@ -476,7 +470,15 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             result: The result value to set.
         """
         if hasattr(result, "__await__") and not isinstance(result, Promise):
-            result = Promise[Any](result, parent=self)
+            result = Promise[Any](
+                result,
+                loop=self._ctx_loop,
+                parent=self,
+                thread_pool=self._thread_pool,
+                start_soon=self._start_soon,
+                children_start_soon=self._children_start_soon,
+                start_soon_default=self._start_soon_default,
+            )
 
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be

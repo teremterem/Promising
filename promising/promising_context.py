@@ -358,8 +358,8 @@ class PromisingContext:
             self._parent = parent
         else:
             raise ValueError(
-                "`parent` must be either INHERIT, another PromisingContext "
-                f"or None, but `{type(parent)}` was given instead"
+                f"`parent` must be either INHERIT, another PromisingContext "
+                f"or None, but `{type(parent)}` was given for {self} instead"
             )
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
@@ -373,7 +373,11 @@ class PromisingContext:
                 self._ctx_loop = self._parent._ctx_loop
         else:
             if self._parent is not None and loop is not self._parent._ctx_loop:
-                raise ValueError("Parent and child PromisingContexts must share the same event loop")
+                raise ValueError(
+                    f"Parent and child PromisingContexts must share the same event loop.\n"
+                    f"Parent: {self._parent}\n"
+                    f"Child: {self}"
+                )
             self._ctx_loop = loop
 
         self._context_closed = close_context_immediately
@@ -422,7 +426,7 @@ class PromisingContext:
                 raise_if_none is True.
         """
         if raise_if_none and self._parent is None:
-            raise ContextNotFoundError("No parent PromisingContext found")
+            raise ContextNotFoundError(f"No parent PromisingContext found for {self}")
         return self._parent
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -448,7 +452,7 @@ class PromisingContext:
             parent = parent.get_parent_context(raise_if_none=False)
 
         if raise_if_none and parent is None:
-            raise PromiseNotFoundError("No parent Promise found")
+            raise PromiseNotFoundError(f"No parent Promise found for {self}")
         return parent
 
     def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
@@ -644,9 +648,9 @@ class PromisingContext:
 
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
-            raise ContextAlreadyActiveError("This PromisingContext is already active")
+            raise ContextAlreadyActiveError(f"{self} is already active")
         if self._context_closed:
-            raise ContextAlreadyUsedError("This PromisingContext has already been used and cannot be re-entered")
+            raise ContextAlreadyUsedError(f"{self} has already been used and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -659,7 +663,7 @@ class PromisingContext:
     ) -> bool:
         try:
             if self._previous_token is None:
-                raise ContextNotActiveError("This PromisingContext is not active")
+                raise ContextNotActiveError(f"{self} is not active")
 
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
@@ -697,8 +701,8 @@ class PromisingContext:
             return self._parent._start_soon_default
 
         raise ValueError(
-            "`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
-            f"but `{type(start_soon_default)}` was given instead"
+            f"`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(start_soon_default)}` was given for {self} instead"
         )
 
     def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:
@@ -718,8 +722,8 @@ class PromisingContext:
             return self._parent._children_start_soon
 
         raise ValueError(
-            "`children_start_soon` must be either None, INHERIT or a boolean value, "
-            f"but `{type(children_start_soon)}` was given instead"
+            f"`children_start_soon` must be either None, INHERIT or a boolean value, "
+            f"but `{type(children_start_soon)}` was given for {self} instead"
         )
 
     def _resolve_thread_pool(
@@ -747,8 +751,8 @@ class PromisingContext:
             return self._parent._thread_pool
 
         raise ValueError(
-            "`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
-            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given instead"
+            f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
+            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self} instead"
         )
 
     def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
@@ -774,9 +778,7 @@ class PromisingContext:
 
         with self._active_children_lock:
             if self._context_closed:
-                raise ContextAlreadyUsedError(
-                    "Cannot register children to a PromisingContext that has already been exited"
-                )
+                raise ContextAlreadyUsedError(f"Cannot register children in already used context {self}")
             self._active_children.update(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:

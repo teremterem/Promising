@@ -433,20 +433,25 @@ class Promise(PromisingContext, Future, Generic[T_co]):
     ) -> None:
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED and prefilled_exception is not None:
-                raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
+                raise ValueError(
+                    f"Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters for {self}"
+                )
 
             if prefilled_result is not UNCHANGED:
                 self.set_result(prefilled_result)
             elif prefilled_exception is not None:
                 self.set_exception(prefilled_exception)
             else:
-                raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
+                raise ValueError(
+                    f"Cannot create a Promise without an awaitable or prefilled result/exception for {self}"
+                )
         else:
             if not hasattr(self._awaitable, "__await__"):
                 raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
             if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
-                    "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
+                    f"Cannot provide both 'awaitable' and 'prefilled_result' "
+                    f"or 'prefilled_exception' parameters for {self}"
                 )
 
             if self._start_soon:

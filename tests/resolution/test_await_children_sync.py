@@ -177,33 +177,6 @@ async def test_await_children_recursively_sync_children(
         await promise.await_children(recursively=True)
 
 
-# ── Event loop thread guard ─────────────────────────────────────
-
-
-async def test_await_children_raises_on_event_loop_thread() -> None:
-    """
-    await_children_sync() raises SyncUsageError
-    when called from the event loop thread, because it
-    would deadlock.
-    """
-
-    @promising.function
-    async def some_async_func() -> None:
-        with pytest.raises(
-            promising.SyncUsageError,
-            match="deadlock",
-        ):
-            promising.await_children_sync()
-
-    await some_async_func()
-
-
-# ── Bare PromisingContext (not a Promise) ──────────────────────
-# These tests call await_children_sync on a bare PromisingContext via
-# loop.run_in_executor (rather than a @promising.function) to avoid
-# creating a child Promise that would cause a cycle/deadlock.
-
-
 async def test_await_children_on_bare_context() -> None:
     """
     ``await_children_sync`` works when called on a bare PromisingContext
@@ -296,3 +269,21 @@ async def test_await_children_module_level_on_bare_context() -> None:
         await loop.run_in_executor(None, ctx.await_children_sync)
 
     assert execution_order == ["child_done"]
+
+
+async def test_await_children_raises_on_event_loop_thread() -> None:
+    """
+    await_children_sync() raises SyncUsageError
+    when called from the event loop thread, because it
+    would deadlock.
+    """
+
+    @promising.function
+    async def some_async_func() -> None:
+        with pytest.raises(
+            promising.SyncUsageError,
+            match="deadlock",
+        ):
+            promising.await_children_sync()
+
+    await some_async_func()

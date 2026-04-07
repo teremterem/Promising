@@ -180,7 +180,7 @@ async def test_await_children_recursively_sync_children(
 # ── Event loop thread guard ─────────────────────────────────────
 
 
-async def test_await_children_sync_raises_on_event_loop_thread() -> None:
+async def test_await_children_raises_on_event_loop_thread() -> None:
     """
     await_children_sync() raises SyncUsageError
     when called from the event loop thread, because it
@@ -204,7 +204,7 @@ async def test_await_children_sync_raises_on_event_loop_thread() -> None:
 # creating a child Promise that would cause a cycle/deadlock.
 
 
-async def test_await_children_sync_on_bare_context() -> None:
+async def test_await_children_on_bare_context() -> None:
     """
     ``await_children_sync`` works when called on a bare PromisingContext
     (not a Promise) that has Promise children spawned inside it.
@@ -232,7 +232,7 @@ async def test_await_children_sync_on_bare_context() -> None:
 
 
 @pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_sync_on_bare_context_recursively(
+async def test_await_children_on_bare_context_recursively(
     *,
     recursively: bool,
 ) -> None:
@@ -274,7 +274,7 @@ async def test_await_children_sync_on_bare_context_recursively(
         await ctx.await_children(recursively=True)
 
 
-async def test_await_children_sync_module_level_on_bare_context() -> None:
+async def test_await_children_module_level_on_bare_context() -> None:
     """
     The module-level ``promising.await_children_sync()`` works when the active
     context is a bare PromisingContext (not a Promise).

@@ -125,7 +125,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(method: str) -> 
     await child_promise
 
 
-async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
+async def test_await_children_raises_sync_usage_error_with_no_thread_pool() -> None:
     """
     Calling await_children_sync() inside a use_thread_pool=False
     function raises SyncUsageError because it would deadlock.
@@ -181,7 +181,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
         assert result == "child result"
 
 
-async def test_await_children_sync_works_with_thread_pool() -> None:
+async def test_await_children_works_with_thread_pool() -> None:
     """
     Calling await_children_sync() inside a use_thread_pool=True
     function works fine.

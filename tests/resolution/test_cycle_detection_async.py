@@ -103,7 +103,7 @@ async def test_indirect_promise_cycle(await_before_return: bool) -> None:
 
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
-async def test_await_children_on_bare_context() -> None:
+async def test_self_cycle_on_bare_context() -> None:
     """
     ``await_children`` on a bare PromisingContext that has Promise
     children spawned inside it. The waiter is itself a child of the
@@ -133,7 +133,7 @@ async def test_await_children_on_bare_context() -> None:
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
 @pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_on_bare_context_recursively(
+async def test_self_cycle_on_bare_context_recursively(
     *,
     recursively: bool,
 ) -> None:
@@ -175,7 +175,7 @@ async def test_await_children_on_bare_context_recursively(
 
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
-async def test_await_children_module_level_on_bare_context() -> None:
+async def test_module_level_self_cycle_on_bare_context() -> None:
     """
     ``await_children`` called from an async promising function whose parent
     is a bare PromisingContext. The waiter is itself a child of the bare

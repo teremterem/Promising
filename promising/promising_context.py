@@ -778,7 +778,9 @@ class PromisingContext:
 
         with self._active_children_lock:
             if self._context_closed:
-                raise ContextAlreadyUsedError(f"Cannot register children in already used context {self}")
+                raise ContextAlreadyUsedError(
+                    f"Cannot register children in an already used context.\nContext: {self}\nChildren: {children}"
+                )
             self._active_children.update(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:

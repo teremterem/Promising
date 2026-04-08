@@ -514,6 +514,9 @@ class PromisingContext:
         while children := self.collect_active_children(
             recursively=recursively,
             futures_only=True,
+            # We assume that if a context is already closed, then it also
+            # finished already (either was explicitly awaited for or finished
+            # in the background due to "start soon")
             open_contexts_only=True,
         ):
             # TODO Safeguard from awaiting a child that happens to be the

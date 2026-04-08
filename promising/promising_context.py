@@ -231,7 +231,7 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = True, promises_only: bool = False) -> None:
+async def await_children(*, recursively: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
@@ -242,7 +242,7 @@ async def await_children(*, recursively: bool = True, promises_only: bool = Fals
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
-    return await get_active_context().await_children(recursively=recursively, promises_only=promises_only)
+    return await get_active_context().await_children(recursively=recursively)
 
 
 def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
@@ -517,6 +517,7 @@ class PromisingContext:
             # We assume that if a context is already closed, then it also
             # finished already (either was explicitly awaited for or finished
             # in the background due to "start soon")
+            # TODO Try setting it to False ?
             open_contexts_only=True,
         ):
             # TODO Safeguard from awaiting a child that happens to be the
@@ -537,7 +538,6 @@ class PromisingContext:
         self,
         *,
         recursively: bool = True,
-        promises_only: bool = False,
         timeout: float | None = None,
     ) -> None:
         """
@@ -570,7 +570,7 @@ class PromisingContext:
 
         async def await_children_and_notify() -> None:
             try:
-                await self.await_children(recursively=recursively, promises_only=promises_only)
+                await self.await_children(recursively=recursively)
             except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from

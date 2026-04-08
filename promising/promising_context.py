@@ -768,22 +768,24 @@ class PromisingContext:
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
         for child in children:
             if not isinstance(child, PromisingContext):
-                raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
+                raise TypeError(
+                    f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
             if inspect.isawaitable(child) and not isinstance(child, asyncio.Future):
-                raise TypeError(f"Cannot register an awaitable child that is not a Future: {child}")
+                raise TypeError(
+                    f"Cannot register an awaitable child that is not an asyncio.Future.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
 
         with self._active_children_lock:
             if self._context_closed:
                 raise ContextAlreadyUsedError(
-                    f"Cannot register children in an already used context.\nContext: {self}\nChildren: {children}"
+                    f"Cannot register children in an already used context.\nContext: {self!r}\nChildren: {children!r}"
                 )
             self._active_children.update(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
-        # TODO Do we really need to check this upon unregistration as well ?
-        for child in children:
-            if not isinstance(child, PromisingContext):
-                raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
         with self._active_children_lock:
             self._active_children.difference_update(children)
         self._unregister_from_parent_if_time()

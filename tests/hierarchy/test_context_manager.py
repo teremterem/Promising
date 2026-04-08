@@ -73,7 +73,7 @@ async def test_context_manager_reuse_raises() -> None:
 async def test_context_manager_reuse_after_exit_raises() -> None:
     """
     Re-entering a PromisingContext that has already been used and exited
-    raises ContextAlreadyUsedError.
+    raises ContextAlreadyClosedError.
 
     This is tested on PromisingContext directly rather than on
     promising.context(), because promising.context() creates a fresh
@@ -87,7 +87,7 @@ async def test_context_manager_reuse_after_exit_raises() -> None:
     with ctx:
         pass
 
-    with pytest.raises(promising.ContextAlreadyUsedError):
+    with pytest.raises(promising.ContextAlreadyClosedError):
         with ctx:
             pass
 

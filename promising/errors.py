@@ -29,7 +29,7 @@ class ContextAlreadyActiveError(ContextError):
     pass
 
 
-class ContextAlreadyUsedError(ContextError):
+class ContextAlreadyClosedError(ContextError):
     pass
 
 

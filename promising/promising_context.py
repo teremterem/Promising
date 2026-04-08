@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
-    ContextAlreadyUsedError,
+    ContextAlreadyClosedError,
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
@@ -644,7 +644,7 @@ class PromisingContext:
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")
         if self._context_closed:
-            raise ContextAlreadyUsedError(f"{self!r} has already been used and cannot be re-entered")
+            raise ContextAlreadyClosedError(f"{self!r} is already closed and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -780,8 +780,9 @@ class PromisingContext:
 
         with self._active_children_lock:
             if self._context_closed:
-                raise ContextAlreadyUsedError(
-                    f"Cannot register children in an already used context.\nContext: {self!r}\nChildren: {children!r}"
+                raise ContextAlreadyClosedError(
+                    f"Cannot register children in a context that is already closed.\n"
+                    f"Context: {self!r}\nChildren: {children!r}"
                 )
             self._active_children.update(children)
 

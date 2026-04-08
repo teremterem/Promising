@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 import contextvars
 import functools
+import inspect
 import threading
 from asyncio import AbstractEventLoop
 from collections.abc import Callable
@@ -359,7 +360,7 @@ class PromisingContext:
         else:
             raise ValueError(
                 f"`parent` must be either INHERIT, another PromisingContext "
-                f"or None, but `{type(parent)}` was given for {self} instead"
+                f"or None, but `{type(parent)}` was given for {self!r} instead"
             )
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
@@ -375,8 +376,8 @@ class PromisingContext:
             if self._parent is not None and loop is not self._parent._ctx_loop:
                 raise ValueError(
                     f"Parent and child PromisingContexts must share the same event loop.\n"
-                    f"Parent: {self._parent}\n"
-                    f"Child: {self}"
+                    f"Parent: {self._parent!r}\n"
+                    f"Child: {self!r}"
                 )
             self._ctx_loop = loop
 
@@ -409,6 +410,12 @@ class PromisingContext:
             raise ContextNotFoundError("No active PromisingContext found")
         return active
 
+    def is_still_open(self) -> bool:
+        """
+        Check if the context is still open.
+        """
+        return not self._context_closed
+
     def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
         Get the immediate parent PromisingContext of this PromisingContext.
@@ -426,7 +433,7 @@ class PromisingContext:
                 raise_if_none is True.
         """
         if raise_if_none and self._parent is None:
-            raise ContextNotFoundError(f"No parent PromisingContext found for {self}")
+            raise ContextNotFoundError(f"No parent PromisingContext found for {self!r}")
         return self._parent
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -452,7 +459,7 @@ class PromisingContext:
             parent = parent.get_parent_context(raise_if_none=False)
 
         if raise_if_none and parent is None:
-            raise PromiseNotFoundError(f"No parent Promise found for {self}")
+            raise PromiseNotFoundError(f"No parent Promise found for {self!r}")
         return parent
 
     def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
@@ -490,7 +497,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, recursively: bool = True, promises_only: bool = False) -> None:
+    async def await_children(self, *, recursively: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -501,34 +508,21 @@ class PromisingContext:
             recursively: If True (the default), wait for all descendants,
                 not just direct children.
         """
-        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
-
         # The loop is needed because, in case of recursive awaiting, new
         # children may be spawned by existing ones while the existing ones
         # are being awaited
         while children := self.collect_active_children(
-            recursively=False,
-            futures_only=False,
-            # For the sake of possible children under closed parents which
-            # themselves are still open:
-            open_contexts_only=False,
+            recursively=recursively,
+            futures_only=True,
+            open_contexts_only=True,
         ):
             # TODO Safeguard from awaiting a child that happens to be the
-            #  currently active context
-            to_be_gathered = [
-                # TODO We need a test that checks whether awaiting on a Promise
-                #  via `gather()` does `unpack_once()` or `unpack_all()`
-                child
-                for child in children
-                if isinstance(child, Promise if promises_only else asyncio.Future)
-            ]
-            if recursively:
-                to_be_gathered.extend(
-                    child.await_children(recursively=True, promises_only=promises_only) for child in children
-                )
-
+            #  currently active context (or a parent of the currently active
+            #  context ?)
+            # TODO We need a test that checks whether awaiting on a Promise
+            #  via `gather()` does `unpack_once()` or `unpack_all()`
             await asyncio.gather(
-                *to_be_gathered,
+                *children,
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until
@@ -627,7 +621,7 @@ class PromisingContext:
             child
             for child in children
             if (not futures_only or isinstance(child, asyncio.Future))
-            and (not open_contexts_only or not child._context_closed)
+            and (not open_contexts_only or not child.is_still_open())
         }
 
         if recursively:
@@ -648,9 +642,9 @@ class PromisingContext:
 
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
-            raise ContextAlreadyActiveError(f"{self} is already active")
+            raise ContextAlreadyActiveError(f"{self!r} is already active")
         if self._context_closed:
-            raise ContextAlreadyUsedError(f"{self} has already been used and cannot be re-entered")
+            raise ContextAlreadyUsedError(f"{self!r} has already been used and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -663,7 +657,7 @@ class PromisingContext:
     ) -> bool:
         try:
             if self._previous_token is None:
-                raise ContextNotActiveError(f"{self} is not active")
+                raise ContextNotActiveError(f"{self!r} is not active")
 
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
@@ -702,7 +696,7 @@ class PromisingContext:
 
         raise ValueError(
             f"`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
-            f"but `{type(start_soon_default)}` was given for {self} instead"
+            f"but `{type(start_soon_default)}` was given for {self!r} instead"
         )
 
     def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:
@@ -723,7 +717,7 @@ class PromisingContext:
 
         raise ValueError(
             f"`children_start_soon` must be either None, INHERIT or a boolean value, "
-            f"but `{type(children_start_soon)}` was given for {self} instead"
+            f"but `{type(children_start_soon)}` was given for {self!r} instead"
         )
 
     def _resolve_thread_pool(
@@ -752,7 +746,7 @@ class PromisingContext:
 
         raise ValueError(
             f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
-            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self} instead"
+            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
 
     def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
@@ -767,7 +761,7 @@ class PromisingContext:
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
         if not self._ctx_loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self} is not running")
+            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
 
         self._ctx_loop.call_soon_threadsafe(callback)
 
@@ -775,6 +769,8 @@ class PromisingContext:
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(f"Expected a PromisingContext, got {type(child).__name__}")
+            if inspect.isawaitable(child) and not isinstance(child, asyncio.Future):
+                raise TypeError(f"Cannot register an awaitable child that is not a Future: {child}")
 
         with self._active_children_lock:
             if self._context_closed:

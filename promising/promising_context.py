@@ -623,7 +623,7 @@ class PromisingContext:
         result = {
             child
             for child in children
-            if (not futures_only or isinstance(child, asyncio.Future))
+            if (not futures_only or isinstance(child, PromisingFuture))
             and (not open_contexts_only or not child.is_still_open())
         }
 
@@ -775,9 +775,9 @@ class PromisingContext:
                     f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
                     f"Context: {self!r}\nChild: {child!r}"
                 )
-            if inspect.isawaitable(child) and not isinstance(child, asyncio.Future):
+            if inspect.isawaitable(child) and not isinstance(child, PromisingFuture):
                 raise TypeError(
-                    f"Cannot register an awaitable child that is not an asyncio.Future.\n"
+                    f"Cannot register an awaitable child that is not a PromisingFuture.\n"
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 

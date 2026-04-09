@@ -800,6 +800,9 @@ class PromisingContext:
 
 
 class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
+    # TODO Explain in the docstring why we set `_context_closed` to True in
+    #  `set_result` and `set_exception` even though in `PromisingContext` it is
+    #  also set to False upon exiting the context manager
     def __init__(
         self,
         *,
@@ -822,3 +825,11 @@ class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
             close_context_immediately=close_context_immediately,
         )
         asyncio.Future.__init__(self, loop=self._ctx_loop)
+
+    def set_result(self, result: T_co) -> None:
+        self._context_closed = True
+        super().set_result(result)
+
+    def set_exception(self, exception: type | BaseException) -> None:
+        self._context_closed = True
+        super().set_exception(exception)

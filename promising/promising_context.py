@@ -21,7 +21,7 @@ from promising.errors import (
     PromiseNotFoundError,
 )
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
-from promising.types import DecoratableFunctionType
+from promising.types import DecoratableFunctionType, T_co
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
 
 if TYPE_CHECKING:
@@ -797,3 +797,28 @@ class PromisingContext:
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._active_children:
             self._parent._unregister_children_threadsafe(self)
+
+
+class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
+    def __init__(
+        self,
+        *,
+        namespace: str | None = None,
+        loop: AbstractEventLoop | None = None,
+        parent: "PromisingContext | None | Sentinel" = INHERIT,
+        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
+        children_start_soon: bool | None | Sentinel = None,
+        start_soon_default: bool | Sentinel = INHERIT,
+        close_context_immediately: bool = False,
+    ) -> None:
+        PromisingContext.__init__(
+            self,
+            namespace=namespace,
+            loop=loop,
+            parent=parent,
+            thread_pool=thread_pool,
+            children_start_soon=children_start_soon,
+            start_soon_default=start_soon_default,
+            close_context_immediately=close_context_immediately,
+        )
+        asyncio.Future.__init__(self, loop=self._ctx_loop)

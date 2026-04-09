@@ -18,6 +18,7 @@ from promising.errors import (
 from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise
 from promising.promising_context import (
     PromisingContext,
+    PromisingFuture,
     await_children,
     await_children_sync,
     collect_active_children,
@@ -70,6 +71,7 @@ __all__ = [
     "PromisingContext",
     "PromisingError",
     "PromisingFunction",
+    "PromisingFuture",
     "RECURSIVELY",
     "Sentinel",
     "SentinelUsageError",

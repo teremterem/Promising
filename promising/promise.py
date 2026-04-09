@@ -1,12 +1,12 @@
 import concurrent.futures
 import inspect
 import time
-from asyncio import AbstractEventLoop, Future, Task
+from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
 from promising.errors import EventLoopMismatchError, PromiseNotFoundError
-from promising.promising_context import PromisingContext
+from promising.promising_context import PromisingContext, PromisingFuture
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop, resolve_namespace
@@ -32,7 +32,7 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     return Promise.get_active_promise(raise_if_none=raise_if_none)
 
 
-class Promise(PromisingContext, Future, Generic[T_co]):
+class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
     """
     A Promise combines PromisingContext's hierarchical context management
     with asyncio Future functionality.
@@ -127,28 +127,17 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
-        namespace = resolve_namespace(
-            provided_explicitly=namespace,
-            named_object_fallback=awaitable,
-        )
-
-        PromisingContext.__init__(
-            self,
-            namespace=namespace,
+        super().__init__(
+            namespace=resolve_namespace(
+                provided_explicitly=namespace,
+                named_object_fallback=awaitable,
+            ),
             loop=loop,
             parent=parent,
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
             close_context_immediately=awaitable is None,
-        )
-        Future.__init__(
-            self,
-            # We will use the loop that PromisingContext resolved for us in its
-            # __init__, instead of letting Future's __init__ decide how to
-            # interpret the loop directly parameter (specifically when it's
-            # None)
-            loop=self._ctx_loop,
         )
 
         self._task: Task[T_co] | None = None
@@ -289,7 +278,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         return result
 
-    async def unpack_once(self) -> "T_co | Promise[Any]":
+    async def unpack_once(self) -> T_co | "Promise[T_co]":
         """
         Await the Promise, resolving only one level without recursively
         unpacking nested awaitables.
@@ -306,7 +295,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
 
-    def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
+    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | "Promise[T_co]":
         """
         Synchronously wait for and return the Promise result, blocking the
         calling thread. Does not recursively unpack nested awaitables
@@ -505,7 +494,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._concurrent_future.set_exception(exception)
 
 
-class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
+class PromiseBackedConcurrentFuture(concurrent.futures.Future[T_co | "Promise[T_co]"], Generic[T_co]):
     """
     A thread-safe `concurrent.futures.Future` backed by a ``Promise``.
 
@@ -527,7 +516,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         super().__init__()
         self._promise = promise
 
-    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> "T_co | Promise[Any]":
+    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> T_co | "Promise[T_co]":
         """
         Get the result of the Promise.
 
@@ -641,7 +630,7 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._promise = promise
         self._unpack_all = unpack_all
 
-    def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
+    def __await__(self) -> Generator[Any, None, T_co | Promise[T_co]]:
         running_loop = get_running_asyncio_loop(raise_if_none=True)
         if running_loop is not self._promise._ctx_loop:
             raise EventLoopMismatchError(

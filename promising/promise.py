@@ -357,21 +357,20 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
                 self.set_result(await self._awaitable)
 
         except BaseException as exc:
-            exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
                 # TODO Borrow from MiniAgents the mechanism that logs this
                 #  "promising breadcrumb" together with the error tracebacks
-                if not hasattr(exception, "__promising_context__"):
+                if not hasattr(exc, "__promising_context__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
-                    exception.__promising_context__ = self
+                    exc.__promising_context__ = self
             except BaseException:
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
                 pass
 
-            self.set_exception(exception)
+            self.set_exception(exc)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
@@ -460,7 +459,7 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
             result: The result value to set.
         """
         if inspect.isawaitable(result) and not isinstance(result, Promise):
-            result = Promise[Any](
+            result = Promise[T_co](
                 result,
                 loop=self._ctx_loop,
                 parent=self,

@@ -3,6 +3,7 @@ import concurrent.futures
 import contextvars
 import functools
 import inspect
+import logging
 import threading
 from asyncio import AbstractEventLoop
 from collections.abc import Callable, Coroutine
@@ -23,6 +24,8 @@ from promising.errors import (
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -525,16 +528,7 @@ class PromisingContext:
             #  context ?)
             # TODO We need a test that checks whether awaiting on a Promise
             #  via `gather()` does `unpack_once()` or `unpack_all()`
-            print()
-            print("AWAITING CHILDREN")
-            print(f"  parent:   {self}")
-            print(f"             {'OPEN' if self.is_still_open() else 'CLOSED'}")
-            for active_child in self._active_children:
-                print(f"  active:   {active_child}")
-                print(f"             {'OPEN' if active_child.is_still_open() else 'CLOSED'}")
-            for child in children:
-                print(f"  awaiting: {child}")
-                print(f"             {'OPEN' if child.is_still_open() else 'CLOSED'}")
+            self._log_awaiting_children(children)
             await asyncio.gather(
                 *children,
                 # `return_exceptions` is set to True to make sure we wait for
@@ -543,12 +537,7 @@ class PromisingContext:
                 # the first one, if any, fails)
                 return_exceptions=True,
             )
-        print()
-        print("CHILDREN AWAITED")
-        print(f"  parent: {self}")
-        for active_child in self._active_children:
-            print(f"  active: {active_child}")
-            print(f"           {'OPEN' if active_child.is_still_open() else 'CLOSED'}")
+        self._log_children_awaited()
 
     def await_children_sync(
         self,
@@ -711,12 +700,7 @@ class PromisingContext:
 
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._active_children:
-            print()
-            print("UNREGISTERING FROM PARENT")
-            print(f"  parent: {self._parent}")
-            print(f"           {'OPEN' if self._parent.is_still_open() else 'CLOSED'}")
-            print(f"  child:  {self}")
-            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
+            self._log_unregistering_from_parent()
             self._parent._unregister_children_threadsafe(self)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
@@ -739,24 +723,12 @@ class PromisingContext:
                     f"Context: {self!r}\nChildren: {children!r}"
                 )
             self._active_children.update(children)
-            print()
-            print("CHILDREN REGISTERED")
-            print(f"  parent: {self}")
-            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
-            for child in children:
-                print(f"  child:  {child}")
-                print(f"           {'OPEN' if child.is_still_open() else 'CLOSED'}")
+            self._log_children_registered(children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
         with self._active_children_lock:
             self._active_children.difference_update(children)
-            print()
-            print("CHILDREN UNREGISTERED")
-            print(f"  parent: {self}")
-            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
-            for child in children:
-                print(f"  child:  {child}")
-                print(f"           {'OPEN' if child.is_still_open() else 'CLOSED'}")
+            self._log_children_unregistered(children)
         self._unregister_from_parent_if_time()
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
@@ -838,6 +810,44 @@ class PromisingContext:
             f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
+
+    @staticmethod
+    def _fmt(label: str, ctx: "PromisingContext") -> str:
+        status = "OPEN" if ctx.is_still_open() else "CLOSED"
+        return f"  {label}: [{status}] {ctx}"
+
+    def _log_awaiting_children(self, children: "set[PromisingContext]") -> None:
+        lines = ["\nAWAITING CHILDREN", self._fmt("parent", self)]
+        for child in self._active_children:
+            lines.append(self._fmt("direct child", child))
+        for child in children:
+            lines.append(self._fmt("awaiting for", child))
+        logger.debug("\n".join(lines))
+
+    def _log_children_awaited(self) -> None:
+        lines = ["\nCHILDREN AWAITED", self._fmt("parent", self)]
+        for child in self._active_children:
+            lines.append(self._fmt("active", child))
+        logger.debug("\n".join(lines))
+
+    def _log_unregistering_from_parent(self) -> None:
+        logger.debug(
+            "\nUNREGISTERING FROM PARENT\n%s\n%s",
+            self._fmt("parent", self._parent),
+            self._fmt("child", self),
+        )
+
+    def _log_children_registered(self, children: "tuple[PromisingContext, ...]") -> None:
+        lines = ["\nCHILDREN REGISTERED", self._fmt("parent", self)]
+        for child in children:
+            lines.append(self._fmt("child", child))
+        logger.debug("\n".join(lines))
+
+    def _log_children_unregistered(self, children: "tuple[PromisingContext, ...]") -> None:
+        lines = ["\nCHILDREN UNREGISTERED", self._fmt("parent", self)]
+        for child in children:
+            lines.append(self._fmt("child", child))
+        logger.debug("\n".join(lines))
 
 
 class PromisingFuture(PromisingContext, asyncio.Future[T_co]):

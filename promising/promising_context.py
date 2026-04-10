@@ -5,8 +5,8 @@ import functools
 import inspect
 import threading
 from asyncio import AbstractEventLoop
-from collections.abc import Callable
-from contextvars import ContextVar
+from collections.abc import Callable, Coroutine
+from contextvars import Context, ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
@@ -643,6 +643,12 @@ class PromisingContext:
 
         return result
 
+    def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
+        """
+        Return the thread pool executor for ``loop.run_in_executor``.
+        """
+        return self._thread_pool
+
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")
@@ -672,11 +678,54 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            with self._active_children_lock:
-                self._context_closed = True
-            self._unregister_from_parent_if_time()
+            self.close_context_threadsafe()
 
         return False  # Let's not suppress any exceptions
+
+    def close_context_threadsafe(self) -> None:
+        with self._active_children_lock:
+            self._context_closed = True
+        self._unregister_from_parent_if_time()
+
+    def __repr__(self) -> str:
+        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
+        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
+
+    def _unregister_from_parent_if_time(self) -> None:
+        if self._context_closed and self._parent is not None and not self._active_children:
+            self._parent._unregister_children_threadsafe(self)
+
+    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+        for child in children:
+            if not isinstance(child, PromisingContext):
+                raise TypeError(
+                    f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
+            if inspect.isawaitable(child) and not isinstance(child, PromisingFuture):
+                raise TypeError(
+                    f"Cannot register an Awaitable child that is not a PromisingFuture.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
+
+        with self._active_children_lock:
+            if self._context_closed:
+                raise ContextAlreadyClosedError(
+                    f"Cannot register children in a context that is already closed.\n"
+                    f"Context: {self!r}\nChildren: {children!r}"
+                )
+            self._active_children.update(children)
+
+    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+        with self._active_children_lock:
+            self._active_children.difference_update(children)
+        self._unregister_from_parent_if_time()
+
+    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
+        if not self._ctx_loop.is_running():
+            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
+
+        self._ctx_loop.call_soon_threadsafe(callback)
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
@@ -752,84 +801,38 @@ class PromisingContext:
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
 
-    def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
-        """
-        Return the thread pool executor for ``loop.run_in_executor``.
-        """
-        return self._thread_pool
-
-    def __repr__(self) -> str:
-        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
-        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
-
-    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
-        if not self._ctx_loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
-
-        self._ctx_loop.call_soon_threadsafe(callback)
-
-    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
-        for child in children:
-            if not isinstance(child, PromisingContext):
-                raise TypeError(
-                    f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
-                    f"Context: {self!r}\nChild: {child!r}"
-                )
-            if inspect.isawaitable(child) and not isinstance(child, PromisingFuture):
-                raise TypeError(
-                    f"Cannot register an awaitable child that is not a PromisingFuture.\n"
-                    f"Context: {self!r}\nChild: {child!r}"
-                )
-
-        with self._active_children_lock:
-            if self._context_closed:
-                raise ContextAlreadyClosedError(
-                    f"Cannot register children in a context that is already closed.\n"
-                    f"Context: {self!r}\nChildren: {children!r}"
-                )
-            self._active_children.update(children)
-
-    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
-        with self._active_children_lock:
-            self._active_children.difference_update(children)
-        self._unregister_from_parent_if_time()
-
-    def _unregister_from_parent_if_time(self) -> None:
-        if self._context_closed and self._parent is not None and not self._active_children:
-            self._parent._unregister_children_threadsafe(self)
-
 
 class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
-    # TODO Explain in the docstring why we set `_context_closed` to True in
-    #  `set_result` and `set_exception` even though in `PromisingContext` it is
-    #  also set to False upon exiting the context manager
-    def __init__(
-        self,
-        *,
-        namespace: str | None = None,
-        loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | None | Sentinel" = INHERIT,
-        thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
-        children_start_soon: bool | None | Sentinel = None,
-        start_soon_default: bool | Sentinel = INHERIT,
-        close_context_immediately: bool = False,
-    ) -> None:
-        PromisingContext.__init__(
-            self,
-            namespace=namespace,
-            loop=loop,
-            parent=parent,
-            thread_pool=thread_pool,
-            children_start_soon=children_start_soon,
-            start_soon_default=start_soon_default,
-            close_context_immediately=close_context_immediately,
-        )
-        asyncio.Future.__init__(self, loop=self._ctx_loop)
+    # TODO Explain in the docstring why we do `close_context_threadsafe()` in
+    #  `set_result()` and `set_exception()` even though in `PromisingContext`
+    #  it is also set to False upon exiting the context manager
+
+    def __init__(self, **kwargs: Any) -> None:
+        # PromisingContext.__init__
+        super().__init__(**kwargs)
+        # Expected to be asyncio.Future[T_co].__init__
+        super(PromisingContext, self).__init__(loop=self._ctx_loop)
 
     def set_result(self, result: T_co) -> None:
-        self._context_closed = True
+        self.close_context_threadsafe()
         super().set_result(result)
 
     def set_exception(self, exception: type | BaseException) -> None:
-        self._context_closed = True
+        self.close_context_threadsafe()
         super().set_exception(exception)
+
+
+class PromisingTask(PromisingFuture, asyncio.Task[T_co]):
+    def __init__(
+        self,
+        coro: Coroutine[Any, Any, T_co],
+        *,
+        name: str | None = None,
+        context: Context | None = None,
+        **kwargs: Any,
+    ) -> None:
+        # Expected to be PromisingContext.__init__
+        super(PromisingFuture, self).__init__(**kwargs)
+        # Expected to be asyncio.Task[T_co].__init__
+        super(PromisingContext, self).__init__(coro, loop=self._ctx_loop, name=name, context=context)
+        # TODO Add unit test(s) that validates the MRO

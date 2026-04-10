@@ -1,11 +1,9 @@
-import asyncio
 import re
 import threading
 from collections.abc import Callable
 from typing import Any
 
 import promising
-from promising.promising_context import PromisingContext
 
 
 def normalize_object_repr(s: str) -> str:
@@ -21,21 +19,11 @@ def normalize_object_repr(s: str) -> str:
     return s
 
 
-class AwaitableContext(PromisingContext):
+class AwaitableContext(promising.PromisingTask):
     """
     A PromisingContext subclass that is awaitable (has ``__await__``) but is
     NOT a Promise.  Simulates a third-party or user-defined awaitable child.
     """
-
-    def __init__(self, coro, **kwargs):
-        super().__init__(**kwargs)
-        self._coro = coro
-        self._task: asyncio.Task | None = None
-
-    def __await__(self):
-        if self._task is None:
-            self._task = asyncio.ensure_future(self._coro)
-        return self._task.__await__()
 
 
 def run_in_thread(fn: Callable[[], None], timeout: float | None = None) -> None:

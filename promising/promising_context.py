@@ -817,37 +817,59 @@ class PromisingContext:
         return f"  {label}: [{status}] {ctx}"
 
     def _log_awaiting_children(self, children: "set[PromisingContext]") -> None:
-        lines = ["\nAWAITING CHILDREN", self._fmt("parent", self)]
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        lines = ["AWAITING CHILDREN", self._fmt("parent", self)]
         for child in self._active_children:
             lines.append(self._fmt("direct child", child))
         for child in children:
-            lines.append(self._fmt("awaiting for", child))
-        logger.debug("\n".join(lines))
+            lines.append(self._fmt("awaiting", child))
+        log_message = "\n".join(lines)
+
+        logger.debug(f"\n{log_message}\n")
 
     def _log_children_awaited(self) -> None:
-        lines = ["\nCHILDREN AWAITED", self._fmt("parent", self)]
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        lines = ["CHILDREN AWAITED", self._fmt("parent", self)]
         for child in self._active_children:
-            lines.append(self._fmt("active", child))
-        logger.debug("\n".join(lines))
+            lines.append(self._fmt("(!)outstanding direct child", child))
+        log_message = "\n".join(lines)
+
+        logger.debug(f"\n{log_message}\n")
 
     def _log_unregistering_from_parent(self) -> None:
-        logger.debug(
-            "\nUNREGISTERING FROM PARENT\n%s\n%s",
-            self._fmt("parent", self._parent),
-            self._fmt("child", self),
-        )
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        lines = ["UNREGISTERING FROM PARENT", self._fmt("parent", self._parent), self._fmt("child", self)]
+        log_message = "\n".join(lines)
+
+        logger.debug(f"\n{log_message}\n")
 
     def _log_children_registered(self, children: "tuple[PromisingContext, ...]") -> None:
-        lines = ["\nCHILDREN REGISTERED", self._fmt("parent", self)]
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        lines = ["CHILDREN REGISTERED", self._fmt("parent", self)]
         for child in children:
             lines.append(self._fmt("child", child))
-        logger.debug("\n".join(lines))
+        log_message = "\n".join(lines)
+
+        logger.debug(f"\n{log_message}\n")
 
     def _log_children_unregistered(self, children: "tuple[PromisingContext, ...]") -> None:
-        lines = ["\nCHILDREN UNREGISTERED", self._fmt("parent", self)]
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        lines = ["CHILDREN UNREGISTERED", self._fmt("parent", self)]
         for child in children:
             lines.append(self._fmt("child", child))
-        logger.debug("\n".join(lines))
+        log_message = "\n".join(lines)
+
+        logger.debug(f"\n{log_message}\n")
 
 
 class PromisingFuture(PromisingContext, asyncio.Future[T_co]):

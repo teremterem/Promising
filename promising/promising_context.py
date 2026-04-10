@@ -823,6 +823,8 @@ class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
 
 
 class PromisingTask(PromisingFuture, asyncio.Task[T_co]):
+    # TODO Explain in the docstring that this is a "very simplistic" version of
+    #  Promise ?
     def __init__(
         self,
         coro: Coroutine[Any, Any, T_co],

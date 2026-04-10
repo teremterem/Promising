@@ -6,22 +6,8 @@ Async variants — uses ``await`` and ``await_children``.
 """
 
 import asyncio
-import inspect
 
 import promising
-from promising.promise import Promise
-from tests.utils_for_tests import AwaitableContext
-
-
-async def test_awaitable_context_is_awaitable_but_not_promise() -> None:
-    """Sanity check: AwaitableContext is awaitable but not a Promise."""
-    loop = asyncio.get_running_loop()
-    with promising.context(loop=loop) as ctx:
-        child = AwaitableContext(asyncio.sleep(0), parent=ctx, loop=loop)
-        assert inspect.isawaitable(child)
-        assert not isinstance(child, Promise)
-        # Clean up
-        await child
 
 
 async def test_await_children_with_non_promise_awaitable() -> None:
@@ -48,7 +34,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         promise_child()
 
         # Spawn a non-Promise awaitable child registered in the same context
-        AwaitableContext(slow_work())
+        promising.PromisingTask(slow_work())
 
         execution_order.append("parent_coro_done")
         await promising.await_children()
@@ -76,8 +62,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
     @promising.function
     async def parent_func() -> str:
-        AwaitableContext(work("a"))
-        AwaitableContext(work("b"))
+        promising.PromisingTask(work("a"))
+        promising.PromisingTask(work("b"))
         await promising.await_children()
         return "parent"
 
@@ -109,20 +95,20 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     async def grandchild_non_promise() -> str:
         await asyncio.sleep(0.1)
-        AwaitableContext(great_grandchild_2_non_promise())
+        promising.PromisingTask(great_grandchild_2_non_promise())
         execution_order.append("non_promise_grandchild_done")
         return "grandchild_work"
 
     @promising.function
     async def grandchild_func() -> str:
-        AwaitableContext(great_grandchild_1_non_promise())
+        promising.PromisingTask(great_grandchild_1_non_promise())
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function
     async def child_func() -> str:
         with promising.context() as ctx:
-            awaitable_ctx = AwaitableContext(grandchild_non_promise())
+            awaitable_ctx = promising.PromisingTask(grandchild_non_promise())
             assert awaitable_ctx.get_parent_context() is ctx
 
         execution_order.append("child_done")

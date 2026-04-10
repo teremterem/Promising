@@ -6,23 +6,9 @@ Sync variants — uses ``await_children_sync`` from thread-pool functions.
 """
 
 import asyncio
-import inspect
 import time
 
 import promising
-from promising.promise import Promise
-from tests.utils_for_tests import AwaitableContext
-
-
-async def test_awaitable_context_is_awaitable_but_not_promise() -> None:
-    """Sanity check: AwaitableContext is awaitable but not a Promise."""
-    loop = asyncio.get_running_loop()
-    with promising.context(loop=loop) as ctx:
-        child = AwaitableContext(asyncio.sleep(0), parent=ctx, loop=loop)
-        assert inspect.isawaitable(child)
-        assert not isinstance(child, Promise)
-        # Clean up
-        await child
 
 
 async def test_await_children_with_non_promise_awaitable() -> None:
@@ -49,7 +35,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         promise_child()
 
         # Spawn a non-Promise awaitable child registered in the same context
-        AwaitableContext(slow_work())
+        promising.PromisingTask(slow_work())
 
         execution_order.append("parent_coro_done")
         promising.await_children_sync()
@@ -77,8 +63,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
     @promising.function(use_thread_pool=True)
     def parent_func() -> str:
-        AwaitableContext(work("a"))
-        AwaitableContext(work("b"))
+        promising.PromisingTask(work("a"))
+        promising.PromisingTask(work("b"))
         promising.await_children_sync()
         return "parent"
 
@@ -105,7 +91,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:
-        Promise[str](prefilled_result="prefilled_gread_grandchild")
+        promising.Promise[str](prefilled_result="prefilled_gread_grandchild")
         execution_order.append("non_promise_great_grandchild_1_done")
         return "great_grandchild_work"
 
@@ -115,22 +101,22 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     async def grandchild_non_promise() -> str:
         await asyncio.sleep(0.1)
-        AwaitableContext(great_grandchild_2_non_promise())
+        promising.PromisingTask(great_grandchild_2_non_promise())
         execution_order.append("non_promise_grandchild_done")
         return "grandchild_work"
 
     @promising.function(use_thread_pool=True)
     def grandchild_func() -> str:
-        AwaitableContext(great_grandchild_1_non_promise())
+        promising.PromisingTask(great_grandchild_1_non_promise())
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
-        Promise[str](prefilled_result="prefilled_grandchild_1")
+        promising.Promise[str](prefilled_result="prefilled_grandchild_1")
         with promising.context() as ctx:
-            Promise[str](prefilled_result="prefilled_grandchild_2")
-            awaitable_ctx = AwaitableContext(grandchild_non_promise())
+            promising.Promise[str](prefilled_result="prefilled_grandchild_2")
+            awaitable_ctx = promising.PromisingTask(grandchild_non_promise())
             assert awaitable_ctx.get_parent_context() is ctx
 
         execution_order.append("child_done")

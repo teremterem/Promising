@@ -19,13 +19,6 @@ def normalize_object_repr(s: str) -> str:
     return s
 
 
-class AwaitableContext(promising.PromisingTask):
-    """
-    A PromisingContext subclass that is awaitable (has ``__await__``) but is
-    NOT a Promise.  Simulates a third-party or user-defined awaitable child.
-    """
-
-
 def run_in_thread(fn: Callable[[], None], timeout: float | None = None) -> None:
     """Run *fn* in a dedicated thread, re-raising any error.
 

@@ -525,6 +525,16 @@ class PromisingContext:
             #  context ?)
             # TODO We need a test that checks whether awaiting on a Promise
             #  via `gather()` does `unpack_once()` or `unpack_all()`
+            print()
+            print("AWAITING CHILDREN")
+            print(f"  parent:   {self}")
+            print(f"             {'OPEN' if self.is_still_open() else 'CLOSED'}")
+            for active_child in self._active_children:
+                print(f"  active:   {active_child}")
+                print(f"             {'OPEN' if active_child.is_still_open() else 'CLOSED'}")
+            for child in children:
+                print(f"  awaiting: {child}")
+                print(f"             {'OPEN' if child.is_still_open() else 'CLOSED'}")
             await asyncio.gather(
                 *children,
                 # `return_exceptions` is set to True to make sure we wait for
@@ -533,6 +543,12 @@ class PromisingContext:
                 # the first one, if any, fails)
                 return_exceptions=True,
             )
+        print()
+        print("CHILDREN AWAITED")
+        print(f"  parent: {self}")
+        for active_child in self._active_children:
+            print(f"  active: {active_child}")
+            print(f"           {'OPEN' if active_child.is_still_open() else 'CLOSED'}")
 
     def await_children_sync(
         self,
@@ -623,8 +639,10 @@ class PromisingContext:
         result = {
             child
             for child in children
-            if (not futures_only or isinstance(child, PromisingFuture))
-            and (not open_contexts_only or not child.is_still_open())
+            if (
+                (not futures_only or isinstance(child, PromisingFuture))
+                and (not open_contexts_only or child.is_still_open())
+            )
         }
 
         if recursively:
@@ -653,7 +671,7 @@ class PromisingContext:
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")
         if self._context_closed:
-            raise ContextAlreadyClosedError(f"{self!r} is already closed and cannot be re-entered")
+            raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -693,6 +711,12 @@ class PromisingContext:
 
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._active_children:
+            print()
+            print("UNREGISTERING FROM PARENT")
+            print(f"  parent: {self._parent}")
+            print(f"           {'OPEN' if self._parent.is_still_open() else 'CLOSED'}")
+            print(f"  child:  {self}")
+            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
             self._parent._unregister_children_threadsafe(self)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
@@ -711,14 +735,28 @@ class PromisingContext:
         with self._active_children_lock:
             if self._context_closed:
                 raise ContextAlreadyClosedError(
-                    f"Cannot register children in a context that is already closed.\n"
+                    f"Cannot register children in a context that has already been closed.\n"
                     f"Context: {self!r}\nChildren: {children!r}"
                 )
             self._active_children.update(children)
+            print()
+            print("CHILDREN REGISTERED")
+            print(f"  parent: {self}")
+            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
+            for child in children:
+                print(f"  child:  {child}")
+                print(f"           {'OPEN' if child.is_still_open() else 'CLOSED'}")
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
         with self._active_children_lock:
             self._active_children.difference_update(children)
+            print()
+            print("CHILDREN UNREGISTERED")
+            print(f"  parent: {self}")
+            print(f"           {'OPEN' if self.is_still_open() else 'CLOSED'}")
+            for child in children:
+                print(f"  child:  {child}")
+                print(f"           {'OPEN' if child.is_still_open() else 'CLOSED'}")
         self._unregister_from_parent_if_time()
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:

@@ -86,8 +86,6 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     """
     # TODO Update name and docstring ?
     # TODO Replicate changes to the sync variant too ?
-    # TODO Add a test that tries to attach a child promise to a promise that
-    #  was prefilled upon creation
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:

@@ -735,7 +735,7 @@ class PromisingContext:
         with self._active_children_lock:
             self._active_children.difference_update(children)
 
-            _hierarchy_logger.log_children_unregistered(self, children)
+            _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
         self._unregister_from_parent_if_time()
 

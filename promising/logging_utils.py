@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,62 +10,61 @@ class PromisingHierarchyLogger:
     def __init__(self, logger: logging.Logger | None = None):
         self.logger = logger or logging.getLogger(type(self).__name__)
 
-    @staticmethod
-    def _fmt(label: str, ctx: "PromisingContext") -> str:
-        status = "OPEN" if ctx.is_still_open() else "CLOSED"
-        return f"  {label}: [{status}] {ctx}"
-
-    def _log_awaiting_children(self, children: "set[PromisingContext]") -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
+    def log_awaiting_children(self, parent: "PromisingContext", children: Iterable["PromisingContext"]) -> None:
+        if not self.logger.isEnabledFor(logging.DEBUG):
             return
 
-        lines = ["AWAITING CHILDREN", self._fmt("parent", self)]
-        for child in self._active_children:
+        lines = ["AWAITING CHILDREN", self._fmt("parent", parent)]
+        for child in parent._active_children:
             lines.append(self._fmt("direct child", child))
         for child in children:
             lines.append(self._fmt("awaiting", child))
         log_message = "\n".join(lines)
 
-        logger.debug(f"\n{log_message}\n")
+        self.logger.debug(f"\n{log_message}\n")
 
-    def _log_children_awaited(self) -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
+    def log_children_awaited(self, parent: "PromisingContext") -> None:
+        if not self.logger.isEnabledFor(logging.DEBUG):
             return
 
-        lines = ["CHILDREN AWAITED", self._fmt("parent", self)]
-        for child in self._active_children:
+        lines = ["CHILDREN AWAITED", self._fmt("parent", parent)]
+        for child in parent._active_children:
             lines.append(self._fmt("(!)outstanding direct child", child))
         log_message = "\n".join(lines)
 
-        logger.debug(f"\n{log_message}\n")
+        self.logger.debug(f"\n{log_message}\n")
 
-    def _log_unregistering_from_parent(self) -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
+    def log_unregistering_from_parent(self, parent: "PromisingContext", child: "PromisingContext") -> None:
+        if not self.logger.isEnabledFor(logging.DEBUG):
             return
 
-        lines = ["UNREGISTERING FROM PARENT", self._fmt("parent", self._parent), self._fmt("child", self)]
+        lines = ["UNREGISTERING FROM PARENT", self._fmt("parent", parent), self._fmt("child", child)]
         log_message = "\n".join(lines)
 
-        logger.debug(f"\n{log_message}\n")
+        self.logger.debug(f"\n{log_message}\n")
 
-    def _log_children_registered(self, children: "tuple[PromisingContext, ...]") -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
+    def log_children_registered(self, parent: "PromisingContext", children: Iterable["PromisingContext"]) -> None:
+        if not self.logger.isEnabledFor(logging.DEBUG):
             return
 
-        lines = ["CHILDREN REGISTERED", self._fmt("parent", self)]
+        lines = ["CHILDREN REGISTERED", self._fmt("parent", parent)]
         for child in children:
             lines.append(self._fmt("child", child))
         log_message = "\n".join(lines)
 
-        logger.debug(f"\n{log_message}\n")
+        self.logger.debug(f"\n{log_message}\n")
 
-    def _log_children_unregistered(self, children: "tuple[PromisingContext, ...]") -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
+    def log_children_unregistered(self, parent: "PromisingContext", children: Iterable["PromisingContext"]) -> None:
+        if not self.logger.isEnabledFor(logging.DEBUG):
             return
 
-        lines = ["CHILDREN UNREGISTERED", self._fmt("parent", self)]
+        lines = ["CHILDREN UNREGISTERED", self._fmt("parent", parent)]
         for child in children:
             lines.append(self._fmt("child", child))
         log_message = "\n".join(lines)
 
-        logger.debug(f"\n{log_message}\n")
+        self.logger.debug(f"\n{log_message}\n")
+
+    def _fmt(self, label: str, ctx: "PromisingContext") -> str:
+        status = "OPEN" if ctx.is_still_open() else "CLOSED"
+        return f"  {label}: [{status}] {ctx}"

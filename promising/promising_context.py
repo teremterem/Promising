@@ -3,7 +3,6 @@ import concurrent.futures
 import contextvars
 import functools
 import inspect
-import logging
 import threading
 from asyncio import AbstractEventLoop
 from collections.abc import Callable, Coroutine
@@ -21,14 +20,16 @@ from promising.errors import (
     NoRunningEventLoopError,
     PromiseNotFoundError,
 )
+from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
 
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from promising.promise import Promise
+
+
+_hierarchy_logger = PromisingHierarchyLogger()
 
 
 class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
@@ -528,7 +529,7 @@ class PromisingContext:
             #  context ?)
             # TODO We need a test that checks whether awaiting on a Promise
             #  via `gather()` does `unpack_once()` or `unpack_all()`
-            self._log_awaiting_children(children)
+            _hierarchy_logger.log_awaiting_children(self, children)
             await asyncio.gather(
                 *children,
                 # `return_exceptions` is set to True to make sure we wait for
@@ -537,7 +538,7 @@ class PromisingContext:
                 # the first one, if any, fails)
                 return_exceptions=True,
             )
-        self._log_children_awaited()
+        _hierarchy_logger.log_children_awaited(self)
 
     def await_children_sync(
         self,
@@ -700,7 +701,7 @@ class PromisingContext:
 
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._active_children:
-            self._log_unregistering_from_parent()
+            _hierarchy_logger.log_unregistering_from_parent(self._parent, self)
             self._parent._unregister_children_threadsafe(self)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
@@ -723,12 +724,12 @@ class PromisingContext:
                     f"Context: {self!r}\nChildren: {children!r}"
                 )
             self._active_children.update(children)
-            self._log_children_registered(children)
+            _hierarchy_logger.log_children_registered(self, children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
         with self._active_children_lock:
             self._active_children.difference_update(children)
-            self._log_children_unregistered(children)
+            _hierarchy_logger.log_children_unregistered(self, children)
         self._unregister_from_parent_if_time()
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:

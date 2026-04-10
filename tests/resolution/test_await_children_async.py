@@ -4,7 +4,6 @@ import time
 import pytest
 
 import promising
-from promising.promising_context import PromisingContext
 
 
 @pytest.mark.parametrize("await_children", [True, False])
@@ -192,7 +191,7 @@ async def test_await_children_on_bare_context() -> None:
         return "child"
 
     with promising.context() as ctx:
-        assert isinstance(ctx, PromisingContext)
+        assert isinstance(ctx, promising.PromisingContext)
         assert not isinstance(ctx, promising.Promise)
 
         child_func()

@@ -24,7 +24,7 @@ from promising.errors import (
 from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType, T_co
-from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
+from promising.utils import assert_no_sync_usage_deadlock, awaitable_as_coroutine, get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -530,10 +530,8 @@ class PromisingContext:
             # TODO Safeguard from awaiting a child that happens to be the
             #  currently active context (or a parent of the currently active
             #  context ?)
-            # TODO We need a test that checks whether awaiting on a Promise
-            #  via `gather()` does `unpack_once()` or `unpack_all()`
             await asyncio.gather(
-                *children,
+                *[asyncio.create_task(awaitable_as_coroutine(child)) for child in children],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until

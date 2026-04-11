@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 from asyncio import AbstractEventLoop
+from collections.abc import Awaitable
 from typing import Any
 
 from promising.errors import NoRunningEventLoopError, SyncUsageError
@@ -77,3 +78,7 @@ def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: st
 
     if running_loop is loop_of_future:
         raise SyncUsageError(message)
+
+
+async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
+    return await awaitable

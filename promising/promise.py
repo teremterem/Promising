@@ -37,7 +37,8 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
     A Promise combines PromisingContext's hierarchical context management
     with asyncio Future functionality.
 
-    Promise extends both PromisingContext and asyncio Future to provide:
+    Promise extends ``PromisingFuture`` — which itself combines
+    ``PromisingContext`` and ``asyncio.Future`` — to provide:
     - Asynchronous computation backed by an awaitable
     - Result/exception propagation via the Future interface
     - Thread-safe synchronous access via concurrent.futures compatibility

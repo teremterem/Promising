@@ -498,7 +498,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 
 ### Promise
 
-`Promise` extends both `PromisingContext` and `asyncio.Future`. It inherits all hierarchy and configuration methods from `PromisingContext` (see below) and adds coroutine execution and thread-safe access.
+`Promise` extends `PromisingFuture` — an intermediate class that combines `PromisingContext` and `asyncio.Future`. It inherits all hierarchy and configuration methods from `PromisingContext` (see below) and adds coroutine execution and thread-safe access.
 
 | Method / Property | Description |
 |---|---|
@@ -512,9 +512,22 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
 | `promise.as_concurrent_future()` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |
 
+### PromisingFuture
+
+`PromisingFuture[T_co]` is the intermediate class between `PromisingContext` and `Promise` — a `PromisingContext` that is also an `asyncio.Future`. `Promise` is its main subclass, but you can also subclass `PromisingFuture` directly to plug a custom awaitable type into the hierarchy. Anything that should appear as an *awaitable* child of a `PromisingContext` must be a `PromisingFuture` — registering a non-`PromisingFuture` awaitable as a child raises `TypeError`.
+
+A subclass is expected to override `__await__` to drive its own resolution logic and to publish the result by calling `set_result()` (or `set_exception()`).
+
+| Method / Property | Description |
+|---|---|
+| `future.set_result(result)` | Set the future's result. Overridden to call `close_context_threadsafe()` *before* delegating to `asyncio.Future`, so the surrounding context is closed in lockstep with the result becoming visible to observers — a parent's `await_children()` loop will not pick this child up again on its next iteration. |
+| `future.set_exception(exception)` | Same as `set_result()`, but for exceptions. |
+| *inherited from `asyncio.Future`* | `done()`, `result()`, `exception()`, `add_done_callback()`, `cancel()`, and the rest of the future protocol. |
+| *inherited from `PromisingContext`* | All hierarchy and configuration methods — see [PromisingContext](#promisingcontext) below. |
+
 ### PromisingContext
 
-`PromisingContext` is the base class that manages the parent-child hierarchy, configuration inheritance, and context variable tracking. `Promise` inherits from it. It can also be used standalone as a lightweight context node that participates in the hierarchy without being an `asyncio.Future`.
+`PromisingContext` is the base class that manages the parent-child hierarchy, configuration inheritance, and context variable tracking. `Promise` inherits from it (via `PromisingFuture`). It can also be used standalone as a lightweight context node that participates in the hierarchy without being an `asyncio.Future`. To plug a *custom awaitable* into the hierarchy as an awaitable child, subclass [`PromisingFuture`](#promisingfuture) instead.
 
 | Method / Property | Description |
 |---|---|

@@ -7,7 +7,8 @@ import promising
 
 
 @pytest.mark.parametrize("await_children", [True, False])
-async def test_await_children(*, await_children: bool) -> None:
+@pytest.mark.parametrize("start_soon", [True, False])
+async def test_await_children(*, start_soon: bool, await_children: bool) -> None:
     """
     Parametrized over await_children={True, False}.
     With True: the sync parent calls
@@ -18,20 +19,20 @@ async def test_await_children(*, await_children: bool) -> None:
     execution_order: list[str] = []
     child_promise = None
 
-    @promising.function
-    async def grandchild_func() -> str:
-        await asyncio.sleep(0.2)
+    @promising.function(start_soon=start_soon, use_thread_pool=True)
+    def grandchild_func() -> str:
+        time.sleep(0.2)
         execution_order.append("grandchild_done")
         return "grandchild"
 
-    @promising.function
-    async def child_func() -> str:
+    @promising.function(start_soon=start_soon, use_thread_pool=True)
+    def child_func() -> str:
         grandchild_func()
-        await asyncio.sleep(0.1)
+        time.sleep(0.1)
         execution_order.append("child_done")
         return "child"
 
-    @promising.function(use_thread_pool=True)
+    @promising.function(start_soon=start_soon, use_thread_pool=True)
     def parent_func() -> str:
         nonlocal child_promise
         child_promise = child_func()

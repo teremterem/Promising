@@ -274,8 +274,9 @@ def collect_active_children(
     open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
-    Collect child contexts of the active context that haven't been garbage
-    collected.
+    Collect child contexts of the active context that are still being
+    tracked by their parent (i.e. they have not yet been unregistered
+    after being closed and having all of their own descendants drain).
 
     This is the module-level counterpart of
     ``PromisingContext.collect_active_children()``.
@@ -283,12 +284,14 @@ def collect_active_children(
     Args:
         recursively: If True (default), include descendants at all levels,
             not just direct children.
-        exclude_non_awaitable: If True (default), exclude children that
-            are not awaitable (i.e. plain PromisingContexts that are not
-            Futures).
-        exclude_done: If True (default), exclude children that weren't
-            garbage collected yet, but are done nonetheless (i.e. Futures
-            with a result or exception already set).
+        futures_only: If True (default), exclude children that are not
+            ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
+            nodes created via ``promising.context``).
+        open_contexts_only: If True (default), exclude children whose
+            ``with`` block has already exited (or whose ``set_result`` /
+            ``set_exception`` has been called, in the case of a
+            ``PromisingFuture``). Such children may still be tracked
+            because they themselves have active descendants.
 
     Returns:
         Set of child PromisingContexts matching the filter criteria.
@@ -417,7 +420,14 @@ class PromisingContext:
 
     def is_still_open(self) -> bool:
         """
-        Check if the context is still open.
+        Whether this context is still open.
+
+        A ``PromisingContext`` is "open" from the moment it is constructed
+        until ``close_context_threadsafe()`` runs (which happens
+        automatically when the ``with`` block exits, or when a
+        ``PromisingFuture`` subclass receives a result/exception). Closed
+        contexts are still kept around in their parent's
+        ``_active_children`` until their own active descendants drain.
         """
         return not self._context_closed
 
@@ -600,26 +610,33 @@ class PromisingContext:
         open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
         """
-        Collect child contexts that haven't been garbage collected.
+        Collect children that are still tracked by this context.
 
-        Children are held via a WeakSet, so only children that are still
-        strongly referenced elsewhere will be returned. Filtering options
-        allow narrowing the set to awaitable and/or in-progress children.
+        Children register themselves in ``_active_children`` (a strong-ref
+        ``set`` guarded by a lock) at construction time and unregister
+        themselves once they are closed *and* have no active descendants
+        of their own. Filtering options allow narrowing the set further.
 
-        A child is considered "awaitable" if ``inspect.isawaitable()``
-        returns True for it (e.g. Promises, which are Futures). A child is
-        considered "done" if it is an asyncio Future whose ``done()`` method
-        returns True.
+        A child is considered a "future" if it is an instance of
+        ``PromisingFuture`` (i.e. anything awaitable that lives in the
+        hierarchy — registering a non-``PromisingFuture`` awaitable as a
+        child raises ``TypeError``). A child is considered "open" until
+        either its ``with`` block exits (``close_context_threadsafe()``
+        runs) or, for ``PromisingFuture`` subclasses, its ``set_result()``
+        / ``set_exception()`` is called.
 
         Args:
-            recursively: If True (default), include descendants at all levels,
-                not just direct children.
-            exclude_non_awaitable: If True (default), exclude children that
-                are not awaitable (i.e. plain PromisingContexts that are not
-                Futures).
-            exclude_done: If True (default), exclude children that weren't
-                garbage collected yet, but are done nonetheless (i.e. Futures
-                with a result or exception already set).
+            recursively: If True (default), include descendants at all
+                levels, not just direct children.
+            futures_only: If True (default), exclude children that are not
+                ``PromisingFuture`` instances (i.e. plain
+                ``PromisingContext`` nodes created via
+                ``promising.context``).
+            open_contexts_only: If True (default), exclude children that
+                are already closed. Such children may still be tracked
+                because they themselves have active descendants — recursive
+                traversal still walks through them so their open
+                descendants can be discovered.
 
         Returns:
             Set of child PromisingContexts matching the filter criteria.
@@ -692,6 +709,18 @@ class PromisingContext:
         return False  # Let's not suppress any exceptions
 
     def close_context_threadsafe(self) -> None:
+        """
+        Mark this context as closed and unregister it from its parent if
+        no active descendants remain. Safe to call from any thread.
+
+        Called automatically by ``__exit__`` (so a normal ``with`` block
+        always closes the context) and by ``PromisingFuture.set_result``
+        / ``PromisingFuture.set_exception`` (so a future-backed context
+        is also closed the moment its result is set, even if no ``with``
+        block was used). After this runs, any further attempt to enter
+        the context or to register children on it raises
+        ``ContextAlreadyClosedError``.
+        """
         with self._active_children_lock:
             self._context_closed = True
         self._unregister_from_parent_if_time()
@@ -819,9 +848,30 @@ class PromisingContext:
 
 
 class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
-    # TODO Explain in the docstring why we do `close_context_threadsafe()` in
-    #  `set_result()` and `set_exception()` even though in `PromisingContext`
-    #  it is also set to False upon exiting the context manager
+    """
+    A ``PromisingContext`` that is also an ``asyncio.Future``.
+
+    ``PromisingFuture`` is the bridge between the hierarchical context
+    machinery and the asyncio future protocol — anything that should
+    appear as an *awaitable* child in a ``PromisingContext`` hierarchy
+    must be a ``PromisingFuture`` (registering an ``Awaitable`` child
+    that is not a ``PromisingFuture`` raises ``TypeError``). ``Promise``
+    is the most prominent subclass.
+
+    The class overrides ``set_result`` and ``set_exception`` to call
+    ``close_context_threadsafe()`` *before* delegating to
+    ``asyncio.Future``. This is necessary in addition to the
+    ``__exit__``-based close in ``PromisingContext`` because the future
+    lifecycle and the context manager lifecycle are independent: a
+    ``PromisingFuture`` can be resolved without ever being entered as a
+    context manager (e.g. a prefilled ``Promise``), and even when it
+    *is* entered, observers awaiting the future may be woken up before
+    the surrounding ``with`` block exits. Closing the context first
+    ensures that anyone who sees the future as done also sees its
+    context as closed — in particular, a parent's
+    ``await_children()`` loop will not pick this child up again on its
+    next iteration.
+    """
 
     def __init__(self, **kwargs: Any) -> None:
         # PromisingContext.__init__

@@ -85,8 +85,6 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     actual parent's ``_active_children``.  The discard was a no-op, causing
     ``collect_active_children`` to keep finding them → infinite loop.
     """
-    # TODO Update name and docstring ?
-    # TODO Replicate changes to the sync variant too ?
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:

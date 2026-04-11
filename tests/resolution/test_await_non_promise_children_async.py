@@ -87,6 +87,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:
+        promising.Promise[str](prefilled_result="prefilled_gread_grandchild")
         execution_order.append("non_promise_great_grandchild_1_done")
         return "great_grandchild_work"
 
@@ -108,7 +109,9 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     @promising.function
     async def child_func() -> str:
+        promising.Promise[str](prefilled_result="prefilled_grandchild_1")
         with promising.context() as ctx:
+            promising.Promise[str](prefilled_result="prefilled_grandchild_2")
             awaitable_ctx = NonPromiseAwaitableContext(grandchild_non_promise())
             assert awaitable_ctx.get_parent_context() is ctx
 

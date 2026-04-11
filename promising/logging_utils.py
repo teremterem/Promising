@@ -50,7 +50,9 @@ class PromisingHierarchyLogger:
 
         lines = ["CHILDREN REGISTERED", self._fmt("parent", parent)]
         for child in children:
-            lines.append(self._fmt("child", child))
+            lines.append(self._fmt("registered", child))
+        for child in parent._active_children:
+            lines.append(self._fmt("(!)outstanding direct child", child))
         log_message = "\n".join(lines)
 
         self.logger.log(self.level, f"\n{log_message}\n")
@@ -61,7 +63,9 @@ class PromisingHierarchyLogger:
 
         lines = ["CHILDREN UNREGISTERED", self._fmt("parent", parent)]
         for child in children:
-            lines.append(self._fmt("child", child))
+            lines.append(self._fmt("unregistered", child))
+        for child in parent._active_children:
+            lines.append(self._fmt("(!)outstanding direct child", child))
         log_message = "\n".join(lines)
 
         self.logger.log(self.level, f"\n{log_message}\n")

@@ -6,8 +6,8 @@ import inspect
 import logging
 import threading
 from asyncio import AbstractEventLoop
-from collections.abc import Callable, Coroutine
-from contextvars import Context, ContextVar
+from collections.abc import Callable
+from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
@@ -838,21 +838,3 @@ class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
     def set_exception(self, exception: type | BaseException) -> None:
         self.close_context_threadsafe()
         super().set_exception(exception)
-
-
-class PromisingTask(PromisingFuture, asyncio.Task[T_co]):
-    # TODO Explain in the docstring that this is a "very simplistic" version of
-    #  Promise ?
-    def __init__(
-        self,
-        coro: Coroutine[Any, Any, T_co],
-        *,
-        name: str | None = None,
-        context: Context | None = None,
-        **kwargs: Any,
-    ) -> None:
-        # Expected to be PromisingContext.__init__
-        super(PromisingFuture, self).__init__(**kwargs)
-        # Expected to be asyncio.Task[T_co].__init__
-        super(PromisingContext, self).__init__(coro, loop=self._ctx_loop, name=name, context=context)
-        # TODO Add unit test(s) that validates the MRO

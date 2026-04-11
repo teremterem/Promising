@@ -19,7 +19,6 @@ from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active
 from promising.promising_context import (
     PromisingContext,
     PromisingFuture,
-    PromisingTask,
     await_children,
     await_children_sync,
     collect_active_children,
@@ -73,7 +72,6 @@ __all__ = [
     "PromisingError",
     "PromisingFunction",
     "PromisingFuture",
-    "PromisingTask",
     "RECURSIVELY",
     "Sentinel",
     "SentinelUsageError",

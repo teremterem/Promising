@@ -8,6 +8,7 @@ Async variants — uses ``await`` and ``await_children``.
 import asyncio
 
 import promising
+from tests.utils_for_tests import NonPromiseAwaitableContext
 
 
 async def test_await_children_with_non_promise_awaitable() -> None:
@@ -34,7 +35,7 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         promise_child()
 
         # Spawn a non-Promise awaitable child registered in the same context
-        promising.PromisingTask(slow_work())
+        NonPromiseAwaitableContext(slow_work())
 
         execution_order.append("parent_coro_done")
         await promising.await_children()
@@ -62,8 +63,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
     @promising.function
     async def parent_func() -> str:
-        promising.PromisingTask(work("a"))
-        promising.PromisingTask(work("b"))
+        NonPromiseAwaitableContext(work("a"))
+        NonPromiseAwaitableContext(work("b"))
         await promising.await_children()
         return "parent"
 
@@ -95,20 +96,20 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
 
     async def grandchild_non_promise() -> str:
         await asyncio.sleep(0.1)
-        promising.PromisingTask(great_grandchild_2_non_promise())
+        NonPromiseAwaitableContext(great_grandchild_2_non_promise())
         execution_order.append("non_promise_grandchild_done")
         return "grandchild_work"
 
     @promising.function
     async def grandchild_func() -> str:
-        promising.PromisingTask(great_grandchild_1_non_promise())
+        NonPromiseAwaitableContext(great_grandchild_1_non_promise())
         execution_order.append("grandchild_done")
         return "grandchild"
 
     @promising.function
     async def child_func() -> str:
         with promising.context() as ctx:
-            awaitable_ctx = promising.PromisingTask(grandchild_non_promise())
+            awaitable_ctx = NonPromiseAwaitableContext(grandchild_non_promise())
             assert awaitable_ctx.get_parent_context() is ctx
 
         execution_order.append("child_done")

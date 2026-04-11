@@ -450,8 +450,11 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         directly by users; it is managed by the Promise's lifecycle.
 
         If the result is an awaitable but not a Promise, it is automatically
-        wrapped in a Promise so that downstream unpacking (in ``sync()``,
-        ``__await__``, etc.) can always assume awaitable results are Promises.
+        wrapped in a child Promise so that downstream unpacking (in
+        ``sync()``, ``__await__``, etc.) can always assume awaitable
+        results are Promises. The wrapper inherits this Promise's
+        ``loop``, ``thread_pool``, ``start_soon``, ``children_start_soon``,
+        and ``start_soon_default`` settings.
 
         Also sets the result on the concurrent.futures.Future for thread
         compatibility (see `as_concurrent_future()` method).

@@ -86,10 +86,8 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
         await parent_a
         await parent_a.await_children(recursively=True)
 
-        # parent_a subtree fully drained → unregistered from root
-        assert parent_a not in root._active_children
-        # parent_b subtree still active → still registered
-        assert parent_b in root._active_children
+        # parent_a subtree fully drained → only parent_b remains
+        assert root._active_children == {parent_b}
 
         await root.await_children(recursively=True)
 
@@ -111,17 +109,17 @@ async def test_cascading_unregister_with_bare_contexts() -> None:
                 level3 = promising.PromisingContext(parent=level2)
                 with level3:
                     # All four levels active
-                    assert level3 in level2._active_children
-                    assert level2 in level1._active_children
-                    assert level1 in root._active_children
+                    assert level2._active_children == {level3}
+                    assert level1._active_children == {level2}
+                    assert root._active_children == {level1}
 
                 # level3 exited, childless → unregisters from level2
-                assert level3 not in level2._active_children
+                assert level2._active_children == set()
 
             # level2 exited, now childless → cascades up to level1
-            assert level2 not in level1._active_children
+            assert level1._active_children == set()
 
         # level1 exited, now childless → cascades up to root
-        assert level1 not in root._active_children
+        assert root._active_children == set()
 
     assert root._active_children == set()

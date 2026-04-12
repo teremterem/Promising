@@ -76,7 +76,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
 
 async def test_await_children_recursively_non_promise_grandchildren() -> None:
     """
-    ``await_children(recursively=True)`` must correctly discard non-Promise
+    ``await_children()`` must correctly discard non-Promise
     awaitable *grandchildren* after awaiting them.
 
     Regression: the code discarded non-Promise awaitables from
@@ -123,7 +123,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
         result = child_func()
         await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
-        await promising.await_children(recursively=True)
+        await promising.await_children()
         return result
 
     promise = root_func()

@@ -41,7 +41,7 @@ async def test_cascading_unregister_through_four_levels() -> None:
 
     with promising.context() as root:
         parent_promise = parent_func()
-        await root.await_children(recursively=True)
+        await root.await_children()
 
     assert parent_promise._active_children == set()
     assert root._active_children == set()
@@ -84,12 +84,12 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
 
         # Wait for parent_a and its entire subtree to drain
         await parent_a
-        await parent_a.await_children(recursively=True)
+        await parent_a.await_children()
 
         # parent_a subtree fully drained → only parent_b remains
         assert root._active_children == {parent_b}
 
-        await root.await_children(recursively=True)
+        await root.await_children()
 
     assert root._active_children == set()
 

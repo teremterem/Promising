@@ -53,7 +53,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             # Promises created here become children of `ctx`
             ...
         ...
-        await ctx.await_children(recursively=True)
+        await ctx.await_children()
 
     As a **decorator** (wraps a function so every call runs inside a fresh
     ``PromisingContext``)::

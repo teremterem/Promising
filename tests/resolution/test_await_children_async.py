@@ -112,7 +112,7 @@ async def test_await_children_recursively(*, recursively: bool) -> None:
         ]
         # Let's await for all the children to complete anyway, so that we don't
         # get any asyncio warnings about coroutines never being awaited
-        await promise.await_children(recursively=True)
+        await promise.await_children()
 
 
 @pytest.mark.parametrize("recursively", [True, False])
@@ -173,7 +173,7 @@ async def test_await_children_recursively_sync_children(
         ]
         # Let's await for all the children to complete anyway, so that we don't
         # get any asyncio warnings about coroutines never being awaited
-        await promise.await_children(recursively=True)
+        await promise.await_children()
 
 
 async def test_await_children_on_bare_context() -> None:
@@ -238,7 +238,7 @@ async def test_await_children_on_bare_context_recursively(
     else:
         assert execution_order == ["child_done"]
         # Clean up remaining grandchild
-        await ctx.await_children(recursively=True)
+        await ctx.await_children()
 
 
 async def test_await_children_module_level_on_bare_context() -> None:

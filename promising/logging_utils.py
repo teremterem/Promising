@@ -11,10 +11,19 @@ class PromisingHierarchyLogger:
         self.logger = logger or logging.getLogger(type(self).__name__)
         self.level = level
 
-    @staticmethod
-    def _direct_children_snapshot(parent: "PromisingContext") -> tuple["PromisingContext", ...]:
-        with parent._active_children_lock:
-            return tuple(parent._active_children)
+    def _direct_children_snapshot(self, parent: "PromisingContext") -> tuple["PromisingContext", ...]:
+        num_retries = 10
+
+        for attempt in range(num_retries):
+            try:
+                return tuple(parent._active_children)
+            except RuntimeError:
+                if attempt < num_retries - 1:
+                    self.logger.log(
+                        self.level, f"Retrying active-children snapshot (attempt {attempt + 1}/{num_retries})"
+                    )
+        self.logger.warning("[MINOR] Failed to snapshot active children after 10 attempts for logging purposes")
+        return ()
 
     def log_awaiting_children(self, *, parent: "PromisingContext", children: Iterable["PromisingContext"]) -> None:
         if not self.logger.isEnabledFor(self.level):

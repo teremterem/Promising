@@ -87,7 +87,7 @@ async def test_await_children_recursively_non_promise_grandchildren() -> None:
     execution_order: list[str] = []
 
     async def great_grandchild_1_non_promise() -> str:
-        promising.Promise[str](prefilled_result="prefilled_gread_grandchild")
+        promising.Promise[str](prefilled_result="prefilled_great_grandchild")
         execution_order.append("non_promise_great_grandchild_1_done")
         return "great_grandchild_work"
 

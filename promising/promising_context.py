@@ -393,7 +393,7 @@ class PromisingContext:
         self._active_children = set[PromisingContext]()
         self._active_children_lock = threading.Lock()
 
-        if self._parent is not None:
+        if self._parent is not None and not self._context_closed:
             self._parent._register_children_threadsafe(self)
 
     @classmethod

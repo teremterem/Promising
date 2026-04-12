@@ -98,8 +98,9 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
-        prefilled_result: Pre-set result value. Cannot be combined with awaitable
-            or prefilled_exception.
+        prefilled_result: Pre-set result value. Cannot be an awaitable (pass
+            awaitables as the first positional argument instead). Cannot be
+            combined with awaitable or prefilled_exception.
         prefilled_exception: Pre-set exception. Cannot be combined with awaitable
             or prefilled_result.
 
@@ -125,7 +126,7 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
+        prefilled_result: T_co | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
         super().__init__(
@@ -419,6 +420,12 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
             if prefilled_result is not UNCHANGED and prefilled_exception is not None:
                 raise ValueError(
                     f"Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters for {self!r}"
+                )
+
+            if prefilled_result is not UNCHANGED and inspect.isawaitable(prefilled_result):
+                raise TypeError(
+                    f"Cannot pass an awaitable as 'prefilled_result' for {self!r}. "
+                    f"Pass it as the first positional argument instead."
                 )
 
             if prefilled_result is not UNCHANGED:

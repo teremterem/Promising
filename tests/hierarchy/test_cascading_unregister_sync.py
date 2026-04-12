@@ -92,34 +92,3 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
         await root.await_children()
 
     assert root._active_children == set()
-
-
-async def test_cascading_unregister_with_bare_contexts() -> None:
-    """
-    Four-level hierarchy using only bare PromisingContexts (no Promises).
-
-    Exiting each ``with`` block from the inside out triggers the cascade
-    once the innermost context closes.
-    """
-    with promising.context() as root:
-        level1 = promising.PromisingContext(parent=root)
-        with level1:
-            level2 = promising.PromisingContext(parent=level1)
-            with level2:
-                level3 = promising.PromisingContext(parent=level2)
-                with level3:
-                    # All four levels active
-                    assert level2._active_children == {level3}
-                    assert level1._active_children == {level2}
-                    assert root._active_children == {level1}
-
-                # level3 exited, childless → unregisters from level2
-                assert level2._active_children == set()
-
-            # level2 exited, now childless → cascades up to level1
-            assert level1._active_children == set()
-
-        # level1 exited, now childless → cascades up to root
-        assert root._active_children == set()
-
-    assert root._active_children == set()

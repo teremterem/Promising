@@ -115,11 +115,19 @@ async def test_cascading_unregister_with_bare_contexts() -> None:
 
                 # level3 exited, childless → unregisters from level2
                 assert level2._active_children == set()
+                assert level1._active_children == {level2}
+                assert root._active_children == {level1}
 
             # level2 exited, now childless → cascades up to level1
+            assert level2._active_children == set()
             assert level1._active_children == set()
+            assert root._active_children == {level1}
 
         # level1 exited, now childless → cascades up to root
+        assert level2._active_children == set()
+        assert level1._active_children == set()
         assert root._active_children == set()
 
+    assert level2._active_children == set()
+    assert level1._active_children == set()
     assert root._active_children == set()

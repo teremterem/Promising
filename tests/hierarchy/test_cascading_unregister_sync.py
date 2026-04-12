@@ -158,6 +158,14 @@ async def test_cascading_unregister_with_bare_contexts() -> None:
 
 
 async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
+    """
+    Four-level hierarchy of bare PromisingContexts with a Promise leaf.
+
+    All bare context ``with`` blocks exit while the leaf Promise is still
+    unresolved. The bare contexts must stay registered in their parents
+    because the Promise descendant is still active. Once the Promise is
+    synced and completes, the entire chain cascades upward in one shot.
+    """
 
     @promising.function(use_thread_pool=True)
     def level4_func() -> str:

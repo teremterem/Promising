@@ -61,8 +61,6 @@ def collect_parent_promises(ctx: promising.PromisingContext) -> list[promising.P
 
 
 class NonPromiseAwaitableContext(promising.PromisingFuture):
-    # TODO Explain in the docstring that this is a "very simplistic" version of
-    #  Promise ?
     def __init__(
         self,
         coro: Awaitable[Any],

@@ -94,7 +94,7 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
     assert root._active_children == set()
 
 
-async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
+async def test_cascading_unregister_with_bare_contexts() -> None:
     """
     Four-level hierarchy using only bare PromisingContexts (no Promises).
 
@@ -108,7 +108,50 @@ async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
             with level2:
                 level3 = promising.PromisingContext(parent=level2)
                 with level3:
-                    level4_promise = promising.Promise(awaitable=asyncio.sleep(0))
+                    # All four levels active
+                    assert level3._active_children == set()
+                    assert level2._active_children == {level3}
+                    assert level1._active_children == {level2}
+                    assert root._active_children == {level1}
+
+                # level3 exited, childless → unregisters from level2
+                assert level3._active_children == set()
+                assert level2._active_children == set()
+                assert level1._active_children == {level2}
+                assert root._active_children == {level1}
+
+            # level2 exited, now childless → cascades up to level1
+            assert level3._active_children == set()
+            assert level2._active_children == set()
+            assert level1._active_children == set()
+            assert root._active_children == {level1}
+
+        # level1 exited, now childless → cascades up to root
+        assert level3._active_children == set()
+        assert level2._active_children == set()
+        assert level1._active_children == set()
+        assert root._active_children == set()
+
+    assert level3._active_children == set()
+    assert level2._active_children == set()
+    assert level1._active_children == set()
+    assert root._active_children == set()
+
+
+async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
+
+    @promising.function
+    async def level4_func() -> str:
+        return "level4"
+
+    with promising.context() as root:
+        level1 = promising.PromisingContext(parent=root)
+        with level1:
+            level2 = promising.PromisingContext(parent=level1)
+            with level2:
+                level3 = promising.PromisingContext(parent=level2)
+                with level3:
+                    level4_promise = level4_func()
 
                     # All four levels active
                     assert level4_promise._active_children == set()
@@ -149,50 +192,6 @@ async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
 
     # None of the levels active anymore
     assert level4_promise._active_children == set()
-    assert level3._active_children == set()
-    assert level2._active_children == set()
-    assert level1._active_children == set()
-    assert root._active_children == set()
-
-
-async def test_cascading_unregister_with_bare_contexts() -> None:
-    """
-    Four-level hierarchy using only bare PromisingContexts (no Promises).
-
-    Exiting each ``with`` block from the inside out triggers the cascade
-    once the innermost context closes.
-    """
-    with promising.context() as root:
-        level1 = promising.PromisingContext(parent=root)
-        with level1:
-            level2 = promising.PromisingContext(parent=level1)
-            with level2:
-                level3 = promising.PromisingContext(parent=level2)
-                with level3:
-                    # All four levels active
-                    assert level3._active_children == set()
-                    assert level2._active_children == {level3}
-                    assert level1._active_children == {level2}
-                    assert root._active_children == {level1}
-
-                # level3 exited, childless → unregisters from level2
-                assert level3._active_children == set()
-                assert level2._active_children == set()
-                assert level1._active_children == {level2}
-                assert root._active_children == {level1}
-
-            # level2 exited, now childless → cascades up to level1
-            assert level3._active_children == set()
-            assert level2._active_children == set()
-            assert level1._active_children == set()
-            assert root._active_children == {level1}
-
-        # level1 exited, now childless → cascades up to root
-        assert level3._active_children == set()
-        assert level2._active_children == set()
-        assert level1._active_children == set()
-        assert root._active_children == set()
-
     assert level3._active_children == set()
     assert level2._active_children == set()
     assert level1._active_children == set()

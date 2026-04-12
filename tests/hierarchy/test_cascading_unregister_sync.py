@@ -39,12 +39,18 @@ async def test_cascading_unregister_through_four_levels() -> None:
         child_func()
         return "parent"
 
-    with promising.context() as root:
-        parent_promise = parent_func()
-        await root.await_children()
+    @promising.function(use_thread_pool=True)
+    def _test() -> str:
+        with promising.context() as root:
+            parent_promise = parent_func()
+            root.await_children_sync()
 
-    assert parent_promise._active_children == set()
-    assert root._active_children == set()
+        assert parent_promise._active_children == set()
+        assert root._active_children == set()
+
+        return "success"
+
+    assert await _test.protected_run() == "success"
 
 
 async def test_cascading_unregister_partial_when_sibling_remains() -> None:
@@ -78,17 +84,140 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
         slow_grandchild()
         return "parent_b"
 
-    with promising.context() as root:
-        parent_a = parent_a_func()
-        parent_b = parent_b_func()
+    @promising.function(use_thread_pool=True)
+    def _test() -> str:
+        with promising.context() as root:
+            parent_a = parent_a_func()
+            parent_b = parent_b_func()
 
-        # Wait for parent_a and its entire subtree to drain
-        await parent_a
-        await parent_a.await_children()
+            # Wait for parent_a and its entire subtree to drain
+            parent_a.sync()
+            parent_a.await_children_sync()
 
-        # parent_a subtree fully drained → only parent_b remains
-        assert root._active_children == {parent_b}
+            # parent_a subtree fully drained → only parent_b remains
+            assert root._active_children == {parent_b}
 
-        await root.await_children()
+            root.await_children_sync()
 
-    assert root._active_children == set()
+        assert root._active_children == set()
+
+        return "success"
+
+    assert await _test.protected_run() == "success"
+
+
+async def test_cascading_unregister_with_bare_contexts() -> None:
+    """
+    Four-level hierarchy using only bare PromisingContexts (no Promises).
+
+    Exiting each ``with`` block from the inside out triggers the cascade
+    once the innermost context closes.
+    """
+
+    @promising.function(use_thread_pool=True)
+    def _test() -> str:
+        with promising.context() as root:
+            level1 = promising.PromisingContext(parent=root)
+            with level1:
+                level2 = promising.PromisingContext(parent=level1)
+                with level2:
+                    level3 = promising.PromisingContext(parent=level2)
+                    with level3:
+                        # All four levels active
+                        assert level3._active_children == set()
+                        assert level2._active_children == {level3}
+                        assert level1._active_children == {level2}
+                        assert root._active_children == {level1}
+
+                    # level3 exited, childless → unregisters from level2
+                    assert level3._active_children == set()
+                    assert level2._active_children == set()
+                    assert level1._active_children == {level2}
+                    assert root._active_children == {level1}
+
+                # level2 exited, now childless → cascades up to level1
+                assert level3._active_children == set()
+                assert level2._active_children == set()
+                assert level1._active_children == set()
+                assert root._active_children == {level1}
+
+            # level1 exited, now childless → cascades up to root
+            assert level3._active_children == set()
+            assert level2._active_children == set()
+            assert level1._active_children == set()
+            assert root._active_children == set()
+
+        assert level3._active_children == set()
+        assert level2._active_children == set()
+        assert level1._active_children == set()
+        assert root._active_children == set()
+
+        return "success"
+
+    assert await _test.protected_run() == "success"
+
+
+async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
+
+    @promising.function(use_thread_pool=True)
+    def level4_func() -> str:
+        return "level4"
+
+    @promising.function(use_thread_pool=True)
+    def _test() -> str:
+        with promising.context() as root:
+            level1 = promising.PromisingContext(parent=root)
+            with level1:
+                level2 = promising.PromisingContext(parent=level1)
+                with level2:
+                    level3 = promising.PromisingContext(parent=level2)
+                    with level3:
+                        level4_promise = level4_func()
+
+                        # All four levels active
+                        assert level4_promise._active_children == set()
+                        assert level3._active_children == {level4_promise}
+                        assert level2._active_children == {level3}
+                        assert level1._active_children == {level2}
+                        assert root._active_children == {level1}
+
+                    # All four levels still active (because of the unfinished promise)
+                    assert level4_promise._active_children == set()
+                    assert level3._active_children == {level4_promise}
+                    assert level2._active_children == {level3}
+                    assert level1._active_children == {level2}
+                    assert root._active_children == {level1}
+
+                # All four levels still active (because of the unfinished promise)
+                assert level4_promise._active_children == set()
+                assert level3._active_children == {level4_promise}
+                assert level2._active_children == {level3}
+                assert level1._active_children == {level2}
+                assert root._active_children == {level1}
+
+            # All four levels active (because of the unfinished promise)
+            assert level4_promise._active_children == set()
+            assert level3._active_children == {level4_promise}
+            assert level2._active_children == {level3}
+            assert level1._active_children == {level2}
+            assert root._active_children == {level1}
+
+        # All four levels active (because of the unfinished promise)
+        assert level4_promise._active_children == set()
+        assert level3._active_children == {level4_promise}
+        assert level2._active_children == {level3}
+        assert level1._active_children == {level2}
+        assert root._active_children == {level1}
+
+        level4_promise.sync()
+
+        # None of the levels active anymore
+        assert level4_promise._active_children == set()
+        assert level3._active_children == set()
+        assert level2._active_children == set()
+        assert level1._active_children == set()
+        assert root._active_children == set()
+
+        return "success"
+
+    assert await _test.protected_run() == "success"

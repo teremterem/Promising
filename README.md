@@ -465,7 +465,7 @@ uv sync --extra examples
 
 ## Design Note: Settings Are Frozen at Creation Time
 
-All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
+All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` have no effect on already-created promises.
 
 This is intentional: because a `Promise` may execute eagerly (the default) or be deferred, the user cannot predict *when* the underlying coroutine will run. Freezing settings at creation time guarantees that the behavior a promise was *created with* is the behavior it *runs with*, regardless of scheduling.
 

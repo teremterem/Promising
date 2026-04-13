@@ -175,11 +175,11 @@ async def test_self_cycle_on_bare_context_recursively(
 
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
-async def test_module_level_self_cycle_on_bare_context() -> None:
+async def test_parent_context_self_cycle_on_bare_context() -> None:
     """
-    ``await_children`` called from an async promising function whose parent
-    is a bare PromisingContext. The waiter is itself a child of the bare
-    context, creating a cycle.
+    ``await_children()`` on the parent bare PromisingContext, called from an
+    async promising function that is itself a child of that context, creating
+    a cycle.
     """
 
     @promising.function

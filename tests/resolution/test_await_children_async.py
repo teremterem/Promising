@@ -263,3 +263,41 @@ async def test_await_children_module_level_on_bare_context() -> None:
         await promising.await_children()
 
     assert execution_order == ["child_done"]
+
+
+async def test_await_children_non_recursive_does_not_wait_returned_promise() -> None:
+    """
+    When a child *returns* a nested Promise (as opposed to merely spawning
+    one inside its body), ``await_children(recursively=False)`` must still
+    NOT transitively wait for that returned Promise to resolve.
+    """
+    execution_order: list[str] = []
+
+    @promising.function
+    async def grandchild_func() -> str:
+        await asyncio.sleep(0.2)
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function
+    async def child_func() -> str:
+        execution_order.append("child_done")
+        return grandchild_func()
+
+    @promising.function
+    async def root_func() -> str:
+        child_func()
+        await asyncio.sleep(0.1)
+        execution_order.append("root_coro_done")
+        await promising.await_children(recursively=False)
+        return "root"
+
+    promise = root_func()
+    await promise
+
+    assert execution_order == [
+        "child_done",
+        "root_coro_done",
+    ]
+    # Clean up remaining grandchild to avoid asyncio warnings
+    await promise.await_children()

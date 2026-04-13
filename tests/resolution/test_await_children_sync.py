@@ -11,11 +11,9 @@ import promising
 @pytest.mark.parametrize("start_soon", [True, False])
 async def test_await_children(*, start_soon: bool, await_children: bool) -> None:
     """
-    Parametrized over await_children={True, False}.
-    With True: the sync parent calls
-    await_children_sync(), so the child completes before
-    the parent resolves. With False: the parent resolves
-    without waiting for the child.
+    With await_children=True: the parent coro body explicitly calls
+    await_children(), so the child completes before the parent resolves. With
+    await_children=False: the parent resolves without waiting for the child.
     """
     execution_order: list[str] = []
     child_promise = None
@@ -236,10 +234,7 @@ async def test_await_children_on_bare_context_recursively(
 
         child_func()
 
-        await loop.run_in_executor(
-            None,
-            lambda: ctx.await_children_sync(recursively=recursively),
-        )
+        await loop.run_in_executor(None, lambda: ctx.await_children_sync(recursively=recursively))
 
     if recursively:
         assert execution_order == ["child_done", "grandchild_done"]

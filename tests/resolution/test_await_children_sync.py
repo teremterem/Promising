@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import time
 
 import pytest
@@ -267,7 +268,8 @@ async def test_await_children_module_level_on_bare_context() -> None:
 
         child_func()
 
-        await loop.run_in_executor(None, ctx.await_children_sync)
+        ctx_vars = contextvars.copy_context()
+        await loop.run_in_executor(None, ctx_vars.run, ctx.await_children_sync)
 
     assert execution_order == ["child_done"]
 

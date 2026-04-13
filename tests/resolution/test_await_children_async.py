@@ -293,8 +293,8 @@ async def test_await_children_non_recursive_does_not_wait_returned_promise() -> 
         return "root"
 
     promise = root_func()
-    await promise
 
+    assert await promise == "root"
     assert execution_order == [
         "child_done",
         "root_coro_done",

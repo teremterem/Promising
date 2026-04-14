@@ -428,7 +428,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             coro = _sync_inline()
 
         return Promise[T_co](
-            namespace=settings_as_dict.get("namespace", self.resolve_namespace()),
+            namespace=settings_as_dict.get("namespace", self.namespace),
             awaitable=coro,
             start_soon=settings_as_dict.get("start_soon", self.start_soon),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),

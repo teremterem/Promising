@@ -201,7 +201,7 @@ async def test_promising_function_auto_namespace() -> None:
         return "data"
 
     assert (
-        fetch_data.resolve_namespace()
+        fetch_data.namespace
         == "tests.observability.test_namespaces::test_promising_function_auto_namespace.<locals>.fetch_data"
     )
 
@@ -213,7 +213,7 @@ async def test_promising_function_explicit_namespace() -> None:
     async def fetch_data() -> str:
         return "data"
 
-    assert fetch_data.resolve_namespace() == "CustomNS"
+    assert fetch_data.namespace == "CustomNS"
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
@@ -357,7 +357,7 @@ async def test_promising_function_on_instance_method_qualname(*, use_promise_rep
             return "processed"
 
     if use_promise_repr is None:
-        assert Service.process.resolve_namespace() == (
+        assert Service.process.namespace == (
             "tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
         )
 
@@ -384,7 +384,7 @@ async def test_promising_function_on_static_method_qualname(*, use_promise_repr:
             return "helped"
 
     if use_promise_repr is None:
-        assert Service.helper.resolve_namespace() == (
+        assert Service.helper.namespace == (
             "tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
         )
 
@@ -410,7 +410,7 @@ async def test_promising_function_on_class_method_qualname(*, use_promise_repr: 
             return "created"
 
     if use_promise_repr is None:
-        assert Service.create.resolve_namespace() == (
+        assert Service.create.namespace == (
             "tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create"
         )
 

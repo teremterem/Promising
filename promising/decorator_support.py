@@ -34,8 +34,7 @@ class DecoratorSupport:
     ) -> None:
         self.__wrapped__ = None
         self._is_wrapped_async = UNCHANGED  # Prevent boolean coercion to None
-        self._namespace = namespace
-        self._resolved_namespace = UNCHANGED
+        self.namespace = namespace
         if func_or_method is None:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
@@ -54,6 +53,10 @@ class DecoratorSupport:
                 f"classmethod, but `{type(func_or_method)}` was given instead"
             )
 
+        self.namespace = resolve_namespace(
+            provided_explicitly=self.namespace,
+            named_object_fallback=func_or_method,
+        )
         self._is_wrapped_async = is_func_or_method_async(func_or_method)
         if self._is_wrapped_async:
             # A magic marker for `asyncio.iscoroutinefunction()` to recognize

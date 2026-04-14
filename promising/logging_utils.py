@@ -20,9 +20,9 @@ class PromisingHierarchyLogger:
             except RuntimeError:
                 if attempt < num_retries - 1:
                     self.logger.log(
-                        self.level, f"Retrying active-children snapshot (attempt {attempt + 1}/{num_retries})"
+                        self.level, f"Retrying unsettled-children snapshot (attempt {attempt + 1}/{num_retries})"
                     )
-        self.logger.warning("[MINOR] Failed to snapshot active children after 10 attempts for logging purposes")
+        self.logger.warning("[MINOR] Failed to snapshot unsettled children for logging purposes after 10 attempts")
         return ()
 
     def log_awaiting_children_started(self, *, parent: "PromisingContext") -> None:

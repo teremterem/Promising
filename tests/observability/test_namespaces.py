@@ -136,7 +136,7 @@ def test_name_fallback_with_module_but_no_qualname() -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
+async def test_promise_repr_with_explicit_namespace(*, use_repr: bool) -> None:
     """Promise with explicit namespace shows it quoted before the class name."""
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
@@ -146,7 +146,7 @@ async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_without_namespace(use_repr: bool) -> None:
+async def test_promise_repr_without_namespace(*, use_repr: bool) -> None:
     """Prefilled promise with no namespace and no awaitable: bare repr."""
     promise = promising.Promise(prefilled_result="x")
 
@@ -156,7 +156,7 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None:
+async def test_promise_repr_auto_resolves_from_coroutine(*, use_repr: bool) -> None:
     """Promise wrapping a coroutine auto-resolves namespace from its qualname.
 
     Coroutine objects have __qualname__ but NOT __module__. The module is
@@ -178,7 +178,7 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) -> None:
+async def test_promise_repr_explicit_overrides_coroutine_name(*, use_repr: bool) -> None:
     """Explicit namespace wins even when a named coroutine is provided."""
 
     async def do_work() -> str:
@@ -217,7 +217,7 @@ async def test_promising_function_explicit_namespace() -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> None:
+async def test_promising_function_promise_inherits_namespace(*, use_repr: bool) -> None:
     """Promise returned by a PromisingFunction carries its explicit namespace."""
 
     @promising.function(namespace="FetchOp")
@@ -231,7 +231,7 @@ async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> 
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool) -> None:
+async def test_promising_function_auto_namespace_in_promise_repr(*, use_repr: bool) -> None:
     """Promise from @promising.function (no explicit ns) shows module::qualname."""
 
     @promising.function
@@ -249,7 +249,7 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_namespace_override_at_call_time(use_repr: bool) -> None:
+async def test_promising_function_namespace_override_at_call_time(*, use_repr: bool) -> None:
     """Namespace can be overridden per-call via keyword argument."""
 
     @promising.function(namespace="Default")
@@ -263,7 +263,7 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use_repr: bool) -> None:
+async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(*, use_repr: bool) -> None:
     """
     Passing namespace=UNCHANGED at call time falls back to decorator's namespace.
     """
@@ -282,7 +282,7 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
+async def test_context_manager_explicit_namespace(*, use_repr: bool) -> None:
     """promising.context() as context manager with explicit namespace."""
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
@@ -291,7 +291,7 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_manager_no_namespace(use_repr: bool) -> None:
+async def test_context_manager_no_namespace(*, use_repr: bool) -> None:
     """promising.context() with no namespace: namespace is None."""
     with promising.context() as ctx:
         assert ctx.namespace is None
@@ -301,7 +301,7 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
 
 @pytest.mark.parametrize("use_repr", [True, False])
 @pytest.mark.parametrize("parametrized_decorator", [True, False])
-async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_decorator: bool) -> None:
+async def test_context_decorator_auto_namespace(*, use_repr: bool, parametrized_decorator: bool) -> None:
     """@promising.context as decorator auto-resolves to module::qualname."""
     captured_ctx = None
     ctx_decorator = promising.context() if parametrized_decorator else promising.context
@@ -327,7 +327,7 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
+async def test_context_decorator_explicit_namespace(*, use_repr: bool) -> None:
     """@promising.context(namespace=...) as decorator uses the exact string."""
     captured_ctx = None
 
@@ -348,7 +348,7 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_instance_method_qualname(use_promise_repr: bool | None) -> None:
+async def test_promising_function_on_instance_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating an instance method: namespace is module::Class.method."""
 
     class Service:
@@ -374,7 +374,7 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_static_method_qualname(use_promise_repr: bool | None) -> None:
+async def test_promising_function_on_static_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating a staticmethod: namespace is module::Class.method."""
 
     class Service:
@@ -400,7 +400,7 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_class_method_qualname(use_promise_repr: bool | None) -> None:
+async def test_promising_function_on_class_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating a classmethod: namespace is module::Class.method."""
 
     class Service:

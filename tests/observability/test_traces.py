@@ -15,7 +15,7 @@ async def test_get_trace_single_context() -> None:
 
 
 @pytest.mark.parametrize("parents_first", [True, False], ids=["parents_first", "children_first"])
-async def test_get_trace_with_promise(parents_first: bool) -> None:
+async def test_get_trace_with_promise(*, parents_first: bool) -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
     with promising.context(namespace="Outer") as outer:
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
@@ -54,7 +54,7 @@ async def test_get_trace_with_promise(parents_first: bool) -> None:
     ],
     ids=["parents_first", "children_first"],
 )
-async def test_format_trace_nested_contexts(parents_first: bool, expected: list[str]) -> None:
+async def test_format_trace_nested_contexts(*, parents_first: bool, expected: list[str]) -> None:
     """format_trace returns string representations in the requested order."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):

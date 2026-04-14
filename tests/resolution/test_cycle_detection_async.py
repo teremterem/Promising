@@ -20,7 +20,7 @@ from promising.promising_context import PromisingContext
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
-async def test_promise_resolving_to_itself(await_before_return: bool) -> None:
+async def test_promise_resolving_to_itself(*, await_before_return: bool) -> None:
     """
     A promising function that returns get_active_promise() creates a
     direct self-reference: the promise resolves to itself. Awaiting it
@@ -42,7 +42,7 @@ async def test_promise_resolving_to_itself(await_before_return: bool) -> None:
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
-async def test_inner_returns_parent_promise(await_before_return: bool) -> None:
+async def test_inner_returns_parent_promise(*, await_before_return: bool) -> None:
     """
     An inner promising function returns get_parent_promise(), which is the
     outer promise. When the outer awaits the inner, unpacking leads back to
@@ -68,7 +68,7 @@ async def test_inner_returns_parent_promise(await_before_return: bool) -> None:
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
-async def test_indirect_promise_cycle(await_before_return: bool) -> None:
+async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
     """
     Two promising functions that return each other's promises form an
     indirect cycle. Awaiting either should raise a clear error, not

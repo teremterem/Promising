@@ -106,7 +106,7 @@ async def test_context_manager_with_explicit_parent_none() -> None:
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_context_manager_inside_promising_function_run(use_thread_pool: bool | None) -> None:
+def test_context_manager_inside_promising_function_run(*, use_thread_pool: bool | None) -> None:
     """
     `with promising.context()` works inside a @promising.function
     executed via .run(). The context is activated and deactivated correctly.

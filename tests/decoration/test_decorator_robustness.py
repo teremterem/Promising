@@ -74,9 +74,7 @@ async def test_plain_async_raises_arg_error_at_call_time() -> None:
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_context_alone_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
+async def test_context_alone_raises_arg_error_at_call_time(*, with_parens: bool) -> None:
     """
     Baseline 2 for test_context_on_top_of_function_raises_arg_error_at_call_time:
     @promising.context alone on an async function that requires arguments
@@ -96,9 +94,7 @@ async def test_context_alone_raises_arg_error_at_call_time(
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
+async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(*, with_parens: bool) -> None:
     """
     Baseline for test_context_on_top_of_sync_function_raises_arg_error_at_await_time:
     @promising.context alone on a sync function that requires arguments should
@@ -127,6 +123,7 @@ async def test_context_alone_on_sync_function_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("use_thread_pool", [True, False])
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
 async def test_function_alone_raises_use_thread_pool_error_at_call_time(
+    *,
     with_parens: bool,
     use_thread_pool: bool,
 ) -> None:
@@ -150,9 +147,7 @@ async def test_function_alone_raises_use_thread_pool_error_at_call_time(
 
 
 @pytest.mark.parametrize("with_parens", [False, True], ids=["no-parens", "with-parens"])
-async def test_function_alone_raises_arg_error_at_call_time(
-    with_parens: bool,
-) -> None:
+async def test_function_alone_raises_arg_error_at_call_time(*, with_parens: bool) -> None:
     """
     Baseline: @promising.function alone on an async function should raise
     TypeError immediately at call-time when called with wrong arguments.
@@ -173,6 +168,7 @@ async def test_function_alone_raises_arg_error_at_call_time(
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 async def test_function_alone_on_sync_raises_use_thread_pool_error_at_call_time(
+    *,
     decorator_use_thread_pool: bool,
 ) -> None:
     """
@@ -195,9 +191,7 @@ async def test_function_alone_on_sync_raises_use_thread_pool_error_at_call_time(
 
 
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
-async def test_function_alone_on_sync_raises_arg_error_at_await_time(
-    decorator_use_thread_pool: bool,
-) -> None:
+async def test_function_alone_on_sync_raises_arg_error_at_await_time(*, decorator_use_thread_pool: bool) -> None:
     """
     Baseline: @promising.function on a sync function. Unlike async functions,
     a decorated sync function has no separation between coroutine creation and
@@ -227,6 +221,7 @@ async def test_function_alone_on_sync_raises_arg_error_at_await_time(
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 @pytest.mark.parametrize("function_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_time(
+    *,
     function_with_parens: bool,
     context_with_parens: bool,
     use_thread_pool: bool,
@@ -261,6 +256,7 @@ async def test_context_on_top_of_function_raises_use_thread_pool_error_at_call_t
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 @pytest.mark.parametrize("function_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 async def test_context_on_top_of_function_raises_arg_error_at_call_time(
+    *,
     function_with_parens: bool,
     context_with_parens: bool,
 ) -> None:
@@ -293,6 +289,7 @@ async def test_context_on_top_of_function_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 @pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_function_on_top_of_function_raises_use_thread_pool_error_at_call_time(
+    *,
     inner_with_parens: bool,
     outer_with_parens: bool,
     use_thread_pool: bool,
@@ -323,6 +320,7 @@ async def test_function_on_top_of_function_raises_use_thread_pool_error_at_call_
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 @pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_function_on_top_of_function_raises_arg_error_at_call_time(
+    *,
     inner_with_parens: bool,
     outer_with_parens: bool,
 ) -> None:
@@ -352,6 +350,7 @@ async def test_function_on_top_of_function_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_raises_use_thread_pool_error_at_call_time(
+    *,
     ctx_with_parens: bool,
     func_with_parens: bool,
     use_thread_pool: bool,
@@ -382,6 +381,7 @@ async def test_function_on_top_of_context_raises_use_thread_pool_error_at_call_t
 @pytest.mark.parametrize("func_with_parens", [False, True], ids=["func-no-parens", "func-with-parens"])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_raises_arg_error_at_call_time(
+    *,
     ctx_with_parens: bool,
     func_with_parens: bool,
 ) -> None:
@@ -410,6 +410,7 @@ async def test_function_on_top_of_context_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 @pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_context_on_top_of_context_raises_arg_error_at_call_time(
+    *,
     inner_with_parens: bool,
     outer_with_parens: bool,
 ) -> None:
@@ -435,6 +436,7 @@ async def test_context_on_top_of_context_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 @pytest.mark.parametrize("inner_with_parens", [False, True], ids=["inner-no-parens", "inner-with-parens"])
 async def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
+    *,
     inner_with_parens: bool,
     outer_with_parens: bool,
 ) -> None:
@@ -464,6 +466,7 @@ async def test_context_on_top_of_context_on_sync_raises_arg_error_at_call_time(
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_call_time(
+    *,
     context_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -498,6 +501,7 @@ async def test_context_on_top_of_sync_function_rejects_use_thread_pool_none_at_c
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("context_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
+    *,
     context_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -533,6 +537,7 @@ async def test_context_on_top_of_sync_function_raises_arg_error_at_await_time(
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 async def test_function_on_top_of_function_on_sync_accepts_use_thread_pool_none(
+    *,
     outer_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -566,6 +571,7 @@ async def test_function_on_top_of_function_on_sync_accepts_use_thread_pool_none(
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("outer_with_parens", [False, True], ids=["outer-no-parens", "outer-with-parens"])
 async def test_function_on_top_of_function_on_sync_raises_arg_error_at_await_time(
+    *,
     outer_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -598,6 +604,7 @@ async def test_function_on_top_of_function_on_sync_raises_arg_error_at_await_tim
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_at_call_time(
+    *,
     ctx_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:
@@ -628,6 +635,7 @@ async def test_function_on_top_of_context_on_sync_raises_use_thread_pool_error_a
 @pytest.mark.parametrize("decorator_use_thread_pool", [True, False])
 @pytest.mark.parametrize("ctx_with_parens", [False, True], ids=["ctx-no-parens", "ctx-with-parens"])
 async def test_function_on_top_of_context_on_sync_raises_arg_error_at_await_time(
+    *,
     ctx_with_parens: bool,
     decorator_use_thread_pool: bool,
 ) -> None:

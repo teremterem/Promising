@@ -236,7 +236,7 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 
 
 @pytest.mark.parametrize("longer_timeout", [False, True])
-async def test_sync_times_out_on_slow_coroutine_result(longer_timeout: bool) -> None:
+async def test_sync_times_out_on_slow_coroutine_result(*, longer_timeout: bool) -> None:
     """
     sync() raises TimeoutError when the promise returns a coroutine
     (not a Promise) that takes too long.

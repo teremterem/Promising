@@ -303,7 +303,7 @@ def collect_unsettled_children(
             ``with`` block has already exited (or whose ``set_result`` /
             ``set_exception`` has been called, in the case of a
             ``PromisingFuture``). Such children may still be tracked
-            because they themselves have active descendants.
+            because they themselves have unsettled descendants.
 
     Returns:
         Set of child PromisingContexts matching the filter criteria.
@@ -439,7 +439,7 @@ class PromisingContext:
         automatically when the ``with`` block exits, or when a
         ``PromisingFuture`` subclass receives a result/exception). Closed
         contexts are still kept around in their parent's
-        ``_unsettled_children`` until their own active descendants drain.
+        ``_unsettled_children`` until their own unsettled descendants drain.
         """
         return not self._context_closed
 
@@ -641,7 +641,7 @@ class PromisingContext:
 
         Children register themselves in ``_unsettled_children`` (a strong-ref
         ``set`` guarded by a lock) at construction time and unregister
-        themselves once they are closed *and* have no active descendants
+        themselves once they are closed *and* have no unsettled descendants
         of their own. Filtering options allow narrowing the set further.
 
         A child is considered a "future" if it is an instance of
@@ -661,7 +661,7 @@ class PromisingContext:
                 ``promising.context``).
             open_contexts_only: If True (default), exclude children that
                 are already closed. Such children may still be tracked
-                because they themselves have active descendants — recursive
+                because they themselves have unsettled descendants — recursive
                 traversal still walks through them so their open
                 descendants can be discovered.
 
@@ -683,8 +683,8 @@ class PromisingContext:
         if whole_subtree:
             # We are iterating over all the children, regardless of the
             # futures_only and open_contexts_only settings, because some
-            # children may still be "active" simply because they still have
-            # "active" children of their own.
+            # children may still be "unsettled" simply because they still have
+            # "unsettled" children of their own.
             for child in children:
                 result.update(
                     child.collect_unsettled_children(
@@ -738,7 +738,7 @@ class PromisingContext:
     def close_context_threadsafe(self) -> None:
         """
         Mark this context as closed and unregister it from its parent if
-        no active descendants remain. Safe to call from any thread.
+        no unsettled descendants remain. Safe to call from any thread.
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
         always closes the context) and by ``PromisingFuture.set_result``

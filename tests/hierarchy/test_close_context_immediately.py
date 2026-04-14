@@ -27,7 +27,7 @@ async def test_immediately_closed_child_not_in_parent_unsettled_children() -> No
 async def test_immediately_closed_child_not_in_collect_unsettled_children() -> None:
     """
     ``collect_unsettled_children(open_contexts_only=False, futures_only=False)``
-    must not include an immediately-closed child that has no active
+    must not include an immediately-closed child that has no unsettled
     descendants.
     """
     with promising.context() as parent:

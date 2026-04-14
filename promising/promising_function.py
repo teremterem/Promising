@@ -8,7 +8,7 @@ from typing import Any, Generic
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
-from promising.sentinels import INHERIT, RECURSIVELY, UNCHANGED, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, WHOLE_SUBTREE, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
 
@@ -268,7 +268,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon_default: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
-        await_children: bool | Sentinel = RECURSIVELY,
+        await_children: bool | Sentinel = WHOLE_SUBTREE,
         **kwargs: Any,
     ) -> T_co:
         """
@@ -300,7 +300,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
             await_children: Whether to await children after the
-                promise completes. ``RECURSIVELY`` (default)
+                promise completes. ``WHOLE_SUBTREE`` (default)
                 awaits the entire subtree, ``True`` awaits
                 direct children only, ``False`` skips child
                 awaiting.
@@ -335,7 +335,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon_default: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
-        await_children: bool | Sentinel = RECURSIVELY,
+        await_children: bool | Sentinel = WHOLE_SUBTREE,
         **kwargs: Any,
     ) -> T_co:
         """
@@ -364,7 +364,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
             await_children: Whether to await children after the
-                promise completes. ``RECURSIVELY`` (default)
+                promise completes. ``WHOLE_SUBTREE`` (default)
                 awaits the entire subtree, ``True`` awaits
                 direct children only, ``False`` skips child
                 awaiting.
@@ -385,7 +385,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         try:
             return await promise
         finally:
-            if await_children is RECURSIVELY:
+            if await_children is WHOLE_SUBTREE:
                 await promise.await_children(whole_subtree=True)
             elif await_children:
                 await promise.await_children(whole_subtree=False)

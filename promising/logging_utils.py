@@ -16,7 +16,7 @@ class PromisingHierarchyLogger:
 
         for attempt in range(num_retries):
             try:
-                return tuple(parent._active_children)
+                return tuple(parent._unsettled_children)
             except RuntimeError:
                 if attempt < num_retries - 1:
                     self.logger.log(
@@ -25,6 +25,17 @@ class PromisingHierarchyLogger:
         self.logger.warning("[MINOR] Failed to snapshot active children after 10 attempts for logging purposes")
         return ()
 
+    def log_awaiting_children_started(self, *, parent: "PromisingContext") -> None:
+        if not self.logger.isEnabledFor(self.level):
+            return
+
+        lines = ["AWAITING CHILDREN", self._fmt("parent", parent), "CURRENT STATE"]
+        for child in self._direct_children_snapshot(parent):
+            lines.append(self._fmt("direct child", child))
+        log_message = "\n".join(lines)
+
+        self.logger.log(self.level, f"\n{log_message}\n")
+
     def log_awaiting_children(self, *, parent: "PromisingContext", children: Iterable["PromisingContext"]) -> None:
         if not self.logger.isEnabledFor(self.level):
             return
@@ -32,6 +43,7 @@ class PromisingHierarchyLogger:
         lines = ["AWAITING CHILDREN", self._fmt("parent", parent)]
         for child in self._direct_children_snapshot(parent):
             lines.append(self._fmt("direct child", child))
+        lines.append("CURRENT STATE")
         for child in children:
             lines.append(self._fmt("awaiting", child))
         log_message = "\n".join(lines)
@@ -42,7 +54,7 @@ class PromisingHierarchyLogger:
         if not self.logger.isEnabledFor(self.level):
             return
 
-        lines = ["CHILDREN AWAITED", self._fmt("parent", parent)]
+        lines = ["CHILDREN AWAITED", self._fmt("parent", parent), "CURRENT STATE"]
         for child in self._direct_children_snapshot(parent):
             lines.append(self._fmt("(!)outstanding direct child", child))
         log_message = "\n".join(lines)

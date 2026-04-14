@@ -279,7 +279,7 @@ def await_children_sync(
     )
 
 
-def collect_active_children(
+def collect_unsettled_children(
     *,
     whole_subtree: bool = True,
     futures_only: bool = True,
@@ -291,7 +291,7 @@ def collect_active_children(
     after being closed and having all of their own descendants drain).
 
     This is the module-level counterpart of
-    ``PromisingContext.collect_active_children()``.
+    ``PromisingContext.collect_unsettled_children()``.
 
     Args:
         whole_subtree: If True (default), include descendants at all levels,
@@ -308,7 +308,7 @@ def collect_active_children(
     Returns:
         Set of child PromisingContexts matching the filter criteria.
     """
-    return get_active_context().collect_active_children(
+    return get_active_context().collect_unsettled_children(
         whole_subtree=whole_subtree,
         futures_only=futures_only,
         open_contexts_only=open_contexts_only,
@@ -402,8 +402,8 @@ class PromisingContext:
             self._ctx_loop = loop
 
         self._context_closed = close_context_immediately
-        self._active_children = set[PromisingContext]()
-        self._active_children_lock = threading.Lock()
+        self._unsettled_children = set[PromisingContext]()
+        self._unsettled_children_lock = threading.Lock()
 
         if self._parent is not None and not self._context_closed:
             self._parent._register_children_threadsafe(self)
@@ -439,7 +439,7 @@ class PromisingContext:
         automatically when the ``with`` block exits, or when a
         ``PromisingFuture`` subclass receives a result/exception). Closed
         contexts are still kept around in their parent's
-        ``_active_children`` until their own active descendants drain.
+        ``_unsettled_children`` until their own active descendants drain.
         """
         return not self._context_closed
 
@@ -537,10 +537,12 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
+        _hierarchy_logger.log_awaiting_children_started(parent=self)
+
         # The loop is needed because, in case of recursive awaiting, new
         # children may be spawned by existing ones while the existing ones
         # are being awaited
-        while children := self.collect_active_children(
+        while children := self.collect_unsettled_children(
             whole_subtree=whole_subtree,
             futures_only=True,
             # We assume that if a context is already closed, then it also
@@ -627,7 +629,7 @@ class PromisingContext:
         self._call_soon_threadsafe(schedule_await_children)
         concurrent_future.result(timeout=timeout)
 
-    def collect_active_children(
+    def collect_unsettled_children(
         self,
         *,
         whole_subtree: bool = True,
@@ -637,7 +639,7 @@ class PromisingContext:
         """
         Collect children that are still tracked by this context.
 
-        Children register themselves in ``_active_children`` (a strong-ref
+        Children register themselves in ``_unsettled_children`` (a strong-ref
         ``set`` guarded by a lock) at construction time and unregister
         themselves once they are closed *and* have no active descendants
         of their own. Filtering options allow narrowing the set further.
@@ -666,8 +668,8 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        with self._active_children_lock:
-            children = list[PromisingContext](self._active_children)
+        with self._unsettled_children_lock:
+            children = list[PromisingContext](self._unsettled_children)
 
         result = {
             child
@@ -685,7 +687,7 @@ class PromisingContext:
             # "active" children of their own.
             for child in children:
                 result.update(
-                    child.collect_active_children(
+                    child.collect_unsettled_children(
                         whole_subtree=True,
                         futures_only=futures_only,
                         open_contexts_only=open_contexts_only,
@@ -746,7 +748,7 @@ class PromisingContext:
         the context or to register children on it raises
         ``ContextAlreadyClosedError``.
         """
-        with self._active_children_lock:
+        with self._unsettled_children_lock:
             self._context_closed = True
         self._unregister_from_parent_if_time()
 
@@ -755,7 +757,7 @@ class PromisingContext:
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
     def _unregister_from_parent_if_time(self) -> None:
-        if self._context_closed and self._parent is not None and not self._active_children:
+        if self._context_closed and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
             self._parent._unregister_children_threadsafe(self)
@@ -773,19 +775,19 @@ class PromisingContext:
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 
-        with self._active_children_lock:
+        with self._unsettled_children_lock:
             if self._context_closed:
                 raise ContextAlreadyClosedError(
                     f"Cannot register children in a context that has already been closed.\n"
                     f"Context: {self!r}\nChildren: {children!r}"
                 )
-            self._active_children.update(children)
+            self._unsettled_children.update(children)
 
             _hierarchy_logger.log_children_registered(parent=self, children=children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
-        with self._active_children_lock:
-            self._active_children.difference_update(children)
+        with self._unsettled_children_lock:
+            self._unsettled_children.difference_update(children)
 
             _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 

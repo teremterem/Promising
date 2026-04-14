@@ -21,7 +21,7 @@ async def test_cascading_unregister_through_four_levels() -> None:
     All inner contexts exit before ``await_children_sync`` is called on root.
     When grandchild completes (the deepest leaf), the cascade should
     unregister grandchild from child, then child from parent, then parent
-    from root — leaving ``_active_children`` empty at every level.
+    from root — leaving ``_unsettled_children`` empty at every level.
     """
 
     @promising.function(use_thread_pool=True)
@@ -45,8 +45,8 @@ async def test_cascading_unregister_through_four_levels() -> None:
             parent_promise = parent_func()
             root.await_children_sync()
 
-        assert parent_promise._active_children == set()
-        assert root._active_children == set()
+        assert parent_promise._unsettled_children == set()
+        assert root._unsettled_children == set()
 
         return "success"
 
@@ -95,11 +95,11 @@ async def test_cascading_unregister_partial_when_sibling_remains() -> None:
             parent_a.await_children_sync()
 
             # parent_a subtree fully drained → only parent_b remains
-            assert root._active_children == {parent_b}
+            assert root._unsettled_children == {parent_b}
 
             root.await_children_sync()
 
-        assert root._active_children == set()
+        assert root._unsettled_children == set()
 
         return "success"
 
@@ -124,33 +124,33 @@ async def test_cascading_unregister_with_bare_contexts() -> None:
                     level3 = promising.PromisingContext(parent=level2)
                     with level3:
                         # All four levels active
-                        assert level3._active_children == set()
-                        assert level2._active_children == {level3}
-                        assert level1._active_children == {level2}
-                        assert root._active_children == {level1}
+                        assert level3._unsettled_children == set()
+                        assert level2._unsettled_children == {level3}
+                        assert level1._unsettled_children == {level2}
+                        assert root._unsettled_children == {level1}
 
                     # level3 exited, childless → unregisters from level2
-                    assert level3._active_children == set()
-                    assert level2._active_children == set()
-                    assert level1._active_children == {level2}
-                    assert root._active_children == {level1}
+                    assert level3._unsettled_children == set()
+                    assert level2._unsettled_children == set()
+                    assert level1._unsettled_children == {level2}
+                    assert root._unsettled_children == {level1}
 
                 # level2 exited, now childless → cascades up to level1
-                assert level3._active_children == set()
-                assert level2._active_children == set()
-                assert level1._active_children == set()
-                assert root._active_children == {level1}
+                assert level3._unsettled_children == set()
+                assert level2._unsettled_children == set()
+                assert level1._unsettled_children == set()
+                assert root._unsettled_children == {level1}
 
             # level1 exited, now childless → cascades up to root
-            assert level3._active_children == set()
-            assert level2._active_children == set()
-            assert level1._active_children == set()
-            assert root._active_children == set()
+            assert level3._unsettled_children == set()
+            assert level2._unsettled_children == set()
+            assert level1._unsettled_children == set()
+            assert root._unsettled_children == set()
 
-        assert level3._active_children == set()
-        assert level2._active_children == set()
-        assert level1._active_children == set()
-        assert root._active_children == set()
+        assert level3._unsettled_children == set()
+        assert level2._unsettled_children == set()
+        assert level1._unsettled_children == set()
+        assert root._unsettled_children == set()
 
         return "success"
 
@@ -183,48 +183,48 @@ async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
                         level4_promise = level4_func()
 
                         # All four levels active
-                        assert level4_promise._active_children == set()
-                        assert level3._active_children == {level4_promise}
-                        assert level2._active_children == {level3}
-                        assert level1._active_children == {level2}
-                        assert root._active_children == {level1}
+                        assert level4_promise._unsettled_children == set()
+                        assert level3._unsettled_children == {level4_promise}
+                        assert level2._unsettled_children == {level3}
+                        assert level1._unsettled_children == {level2}
+                        assert root._unsettled_children == {level1}
 
                     # All four levels still active (because of the unfinished promise)
-                    assert level4_promise._active_children == set()
-                    assert level3._active_children == {level4_promise}
-                    assert level2._active_children == {level3}
-                    assert level1._active_children == {level2}
-                    assert root._active_children == {level1}
+                    assert level4_promise._unsettled_children == set()
+                    assert level3._unsettled_children == {level4_promise}
+                    assert level2._unsettled_children == {level3}
+                    assert level1._unsettled_children == {level2}
+                    assert root._unsettled_children == {level1}
 
                 # All four levels still active (because of the unfinished promise)
-                assert level4_promise._active_children == set()
-                assert level3._active_children == {level4_promise}
-                assert level2._active_children == {level3}
-                assert level1._active_children == {level2}
-                assert root._active_children == {level1}
+                assert level4_promise._unsettled_children == set()
+                assert level3._unsettled_children == {level4_promise}
+                assert level2._unsettled_children == {level3}
+                assert level1._unsettled_children == {level2}
+                assert root._unsettled_children == {level1}
 
             # All four levels active (because of the unfinished promise)
-            assert level4_promise._active_children == set()
-            assert level3._active_children == {level4_promise}
-            assert level2._active_children == {level3}
-            assert level1._active_children == {level2}
-            assert root._active_children == {level1}
+            assert level4_promise._unsettled_children == set()
+            assert level3._unsettled_children == {level4_promise}
+            assert level2._unsettled_children == {level3}
+            assert level1._unsettled_children == {level2}
+            assert root._unsettled_children == {level1}
 
         # All four levels active (because of the unfinished promise)
-        assert level4_promise._active_children == set()
-        assert level3._active_children == {level4_promise}
-        assert level2._active_children == {level3}
-        assert level1._active_children == {level2}
-        assert root._active_children == {level1}
+        assert level4_promise._unsettled_children == set()
+        assert level3._unsettled_children == {level4_promise}
+        assert level2._unsettled_children == {level3}
+        assert level1._unsettled_children == {level2}
+        assert root._unsettled_children == {level1}
 
         level4_promise.sync()
 
         # None of the levels active anymore
-        assert level4_promise._active_children == set()
-        assert level3._active_children == set()
-        assert level2._active_children == set()
-        assert level1._active_children == set()
-        assert root._active_children == set()
+        assert level4_promise._unsettled_children == set()
+        assert level3._unsettled_children == set()
+        assert level2._unsettled_children == set()
+        assert level1._unsettled_children == set()
+        assert root._unsettled_children == set()
 
         return "success"
 

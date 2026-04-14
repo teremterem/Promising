@@ -21,12 +21,12 @@ async def test_unregisters_from_parent_on_exit_when_no_children() -> None:
     """
     with promising.context() as parent:
         child = promising.PromisingContext(parent=parent)
-        assert child in parent._active_children
+        assert child in parent._unsettled_children
 
         with child:
             pass
 
-        assert child not in parent._active_children
+        assert child not in parent._unsettled_children
 
 
 async def test_does_not_unregister_from_parent_on_exit_when_children_remain() -> None:
@@ -39,11 +39,11 @@ async def test_does_not_unregister_from_parent_on_exit_when_children_remain() ->
         parent = promising.PromisingContext(parent=grandparent)
         with parent:
             grandchild = promising.PromisingContext(parent=parent)
-            assert grandchild in parent._active_children
+            assert grandchild in parent._unsettled_children
 
         # parent has exited but grandchild is still registered
-        assert grandchild in parent._active_children
-        assert parent in grandparent._active_children
+        assert grandchild in parent._unsettled_children
+        assert parent in grandparent._unsettled_children
 
 
 async def test_unregisters_from_parent_when_last_child_is_unregistered() -> None:
@@ -58,12 +58,12 @@ async def test_unregisters_from_parent_when_last_child_is_unregistered() -> None
             grandchild = promising.PromisingContext(parent=parent)
 
         # parent exited, but still registered because grandchild exists
-        assert parent in grandparent._active_children
+        assert parent in grandparent._unsettled_children
 
         # removing the last child triggers deferred unregistration
         parent._unregister_children_threadsafe(grandchild)
-        assert grandchild not in parent._active_children
-        assert parent not in grandparent._active_children
+        assert grandchild not in parent._unsettled_children
+        assert parent not in grandparent._unsettled_children
 
 
 async def test_does_not_unregister_while_other_children_remain() -> None:
@@ -78,15 +78,15 @@ async def test_does_not_unregister_while_other_children_remain() -> None:
             child_b = promising.PromisingContext(parent=parent)
 
         # parent exited with two children still registered
-        assert parent in grandparent._active_children
+        assert parent in grandparent._unsettled_children
 
         # removing one child — parent should stay registered
         parent._unregister_children_threadsafe(child_a)
-        assert parent in grandparent._active_children
+        assert parent in grandparent._unsettled_children
 
         # removing the last child triggers deferred unregistration
         parent._unregister_children_threadsafe(child_b)
-        assert parent not in grandparent._active_children
+        assert parent not in grandparent._unsettled_children
 
 
 async def test_does_not_unregister_from_parent_while_still_active() -> None:
@@ -96,8 +96,8 @@ async def test_does_not_unregister_from_parent_while_still_active() -> None:
     """
     with promising.context() as parent:
         child = promising.PromisingContext(parent=parent)
-        assert child in parent._active_children
+        assert child in parent._unsettled_children
 
         # child was never entered/exited — it's not "used"
         assert not child._context_closed
-        assert child in parent._active_children
+        assert child in parent._unsettled_children

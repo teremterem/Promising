@@ -4,6 +4,7 @@ import promising
 from tests.utils_for_tests import normalize_object_repr
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_get_trace_single_context() -> None:
     """A single context with no parent returns a one-element trace."""
     with promising.context(namespace="Root") as ctx:
@@ -15,6 +16,7 @@ async def test_get_trace_single_context() -> None:
 
 
 @pytest.mark.parametrize("parents_first", [True, False], ids=["parents_first", "children_first"])
+@pytest.mark.do_not_patch_qualnames
 async def test_get_trace_with_promise(*, parents_first: bool) -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
     with promising.context(namespace="Outer") as outer:
@@ -54,6 +56,7 @@ async def test_get_trace_with_promise(*, parents_first: bool) -> None:
     ],
     ids=["parents_first", "children_first"],
 )
+@pytest.mark.do_not_patch_qualnames
 async def test_format_trace_nested_contexts(*, parents_first: bool, expected: list[str]) -> None:
     """format_trace returns string representations in the requested order."""
     with promising.context(namespace="App"):
@@ -65,6 +68,7 @@ async def test_format_trace_nested_contexts(*, parents_first: bool, expected: li
     assert [normalize_object_repr(s) for s in trace_strs] == expected
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_format_trace_no_namespace() -> None:
     """Contexts without namespaces still appear in the trace."""
     with promising.context():
@@ -78,6 +82,7 @@ async def test_format_trace_no_namespace() -> None:
     ]
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_format_trace_nested_promising_functions() -> None:
     """Nested @promising.function and @promising.context calls with auto-derived
     namespaces produce a correct trace from outermost to innermost."""

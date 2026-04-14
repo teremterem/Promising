@@ -265,7 +265,8 @@ async def test_await_children_module_level_on_bare_context() -> None:
     assert execution_order == ["child_done"]
 
 
-async def test_await_children_non_recursive_does_not_wait_returned_promise() -> None:
+@pytest.mark.parametrize("sleep_in_root", [True, False])
+async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sleep_in_root: bool) -> None:
     """
     When a child *returns* a nested Promise (as opposed to merely spawning
     one inside its body), ``await_children(recursively=False)`` must still
@@ -287,7 +288,8 @@ async def test_await_children_non_recursive_does_not_wait_returned_promise() -> 
     @promising.function
     async def root_func() -> str:
         child_func()
-        await asyncio.sleep(0.1)
+        if sleep_in_root:
+            await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
         await promising.await_children(recursively=False)
         return "root"
@@ -295,9 +297,15 @@ async def test_await_children_non_recursive_does_not_wait_returned_promise() -> 
     promise = root_func()
 
     assert await promise == "root"
-    assert execution_order == [
-        "child_done",
-        "root_coro_done",
-    ]
+    if sleep_in_root:
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+        ]
+    else:
+        assert execution_order == [
+            "root_coro_done",
+            "child_done",
+        ]
     # Clean up remaining grandchild to avoid asyncio warnings
     await promise.await_children()

@@ -66,7 +66,7 @@ class PromisingHierarchyLogger:
         for child in children:
             lines.append(self._fmt("registered", child))
         for child in self._direct_children_snapshot(parent):
-            lines.append(self._fmt("(!)outstanding direct child", child))
+            lines.append(self._fmt("direct child", child))
         log_message = "\n".join(lines)
 
         self.logger.log(self.level, f"\n{log_message}\n")
@@ -79,7 +79,7 @@ class PromisingHierarchyLogger:
         for child in children:
             lines.append(self._fmt("unregistered", child))
         for child in self._direct_children_snapshot(parent):
-            lines.append(self._fmt("(!)outstanding direct child", child))
+            lines.append(self._fmt("direct child", child))
         log_message = "\n".join(lines)
 
         self.logger.log(self.level, f"\n{log_message}\n")

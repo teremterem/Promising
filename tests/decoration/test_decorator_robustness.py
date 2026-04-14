@@ -693,14 +693,14 @@ async def test_double_function_decorator_attrs_stay_independent() -> None:
 
     # -- Promising-specific attrs must reflect each layer's own values ------
 
-    assert add.namespace == "outer"
+    assert add.resolve_namespace() == "outer"
     assert add.start_soon is True
     assert add.children_start_soon is True
     assert add.start_soon_default is True
     assert add.thread_pool is outer_pool
 
     inner = add.__wrapped__
-    assert inner.namespace == "inner"
+    assert inner.resolve_namespace() == "inner"
     assert inner.start_soon is False
     assert inner.children_start_soon is False
     assert inner.start_soon_default is False
@@ -752,14 +752,14 @@ async def test_double_context_decorator_attrs_stay_independent() -> None:
 
     # -- Promising-specific attrs must reflect each layer's own values ------
 
-    assert add.namespace == "outer"
+    assert add.resolve_namespace() == "outer"
     assert add.children_start_soon is True
     assert add.start_soon_default is True
     assert add.thread_pool is outer_pool
     assert add.parent is None
 
     inner = add.__wrapped__
-    assert inner.namespace == "inner"
+    assert inner.resolve_namespace() == "inner"
     assert inner.children_start_soon is False
     assert inner.start_soon_default is False
     assert inner.thread_pool is inner_pool

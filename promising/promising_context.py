@@ -139,7 +139,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
 
         if self._promising_context is None:
             self._promising_context = PromisingContext(
-                namespace=self.namespace,
+                namespace=self.resolve_namespace(),
                 loop=self.ctx_loop,
                 parent=self.parent,
                 thread_pool=self.thread_pool,
@@ -191,7 +191,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         ctx = PromisingContext(
-            namespace=settings_as_dict.get("namespace", self.namespace),
+            namespace=settings_as_dict.get("namespace", self.resolve_namespace()),
             loop=settings_as_dict.get("loop", self.ctx_loop),
             parent=settings_as_dict.get("parent", self.parent),
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),

@@ -52,17 +52,21 @@ def get_running_asyncio_loop(*, raise_if_none: bool = True) -> AbstractEventLoop
 
 
 def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any | None) -> str | None:
+    from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
     if provided_explicitly is not None:
         return provided_explicitly
 
     if named_object_fallback is None:
         return None
 
-    prefix = resolve_module_name(named_object_fallback)
-    prefix = f"{prefix}::" if prefix else ""
-
-    if hasattr(named_object_fallback, "__qualname__"):
-        return f"{prefix}{named_object_fallback.__qualname__}"
+    if Defaults.QUALNAMES_IN_NAMESPACES:
+        prefix = resolve_module_name(named_object_fallback)
+        prefix = f"{prefix}::" if prefix else ""
+        if hasattr(named_object_fallback, "__qualname__"):
+            return f"{prefix}{named_object_fallback.__qualname__}"
+    else:
+        prefix = ""
 
     if hasattr(named_object_fallback, "__name__"):
         return f"{prefix}{named_object_fallback.__name__}"

@@ -51,6 +51,7 @@ class Defaults:
     #  that is awaiting)
     # TODO Introduce a "promise factory" setting, both - as a global default
     #  and as an inheritable setting ?
+    QUALNAMES_IN_NAMESPACES = True
 
 
 __all__ = [

@@ -34,7 +34,8 @@ class DecoratorSupport:
     ) -> None:
         self.__wrapped__ = None
         self._is_wrapped_async = UNCHANGED  # Prevent boolean coercion to None
-        self.namespace = namespace
+        self._namespace = namespace
+        self._resolved_namespace = UNCHANGED
         if func_or_method is None:
             # For the constructor it is OK not to have a function or method to
             # decorate - this would mean that the decorator is being used as a
@@ -53,10 +54,6 @@ class DecoratorSupport:
                 f"classmethod, but `{type(func_or_method)}` was given instead"
             )
 
-        self.namespace = resolve_namespace(
-            provided_explicitly=self.namespace,
-            named_object_fallback=func_or_method,
-        )
         self._is_wrapped_async = is_func_or_method_async(func_or_method)
         if self._is_wrapped_async:
             # A magic marker for `asyncio.iscoroutinefunction()` to recognize
@@ -94,6 +91,19 @@ class DecoratorSupport:
         # staticmethod objects are callable without going through the
         # descriptor protocol. No binding is required or desired here.
         return self
+
+    def resolve_namespace(self) -> str | None:
+        """
+        Each decorator resolves its namespace lazily to give manual changes in
+        `promising.Defaults` a chance to take effect before the namespace is
+        used for anything.
+        """
+        if self._resolved_namespace is UNCHANGED:
+            self._resolved_namespace = resolve_namespace(
+                provided_explicitly=self._namespace,
+                named_object_fallback=self.__wrapped__,
+            )
+        return self._resolved_namespace
 
     @property
     def _wrapped_as_callable(self) -> CallableType:

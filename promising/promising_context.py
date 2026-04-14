@@ -523,6 +523,8 @@ class PromisingContext:
             recursively: If True (the default), wait for all descendants,
                 not just direct children.
         """
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
         # The loop is needed because, in case of recursive awaiting, new
         # children may be spawned by existing ones while the existing ones
         # are being awaited
@@ -541,7 +543,14 @@ class PromisingContext:
             #  currently active context (or a parent of the currently active
             #  context ?)
             await asyncio.gather(
-                *[asyncio.create_task(awaitable_as_coroutine(child)) for child in children],
+                *[
+                    asyncio.create_task(
+                        # TODO Replace this temporary workaround with
+                        #  `unpack_once()` ?
+                        child.unpack_once() if isinstance(child, Promise) else awaitable_as_coroutine(child)
+                    )
+                    for child in children
+                ],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until

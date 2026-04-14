@@ -264,9 +264,55 @@ async def test_await_children_module_level_on_bare_context() -> None:
         child_func()
 
         ctx_vars = contextvars.copy_context()
-        await loop.run_in_executor(None, ctx_vars.run, ctx.await_children_sync)
+        await loop.run_in_executor(None, ctx_vars.run, promising.await_children_sync)
 
     assert execution_order == ["child_done"]
+
+
+@pytest.mark.parametrize("sleep_in_root", [True, False])
+async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sleep_in_root: bool) -> None:
+    """
+    When a child *returns* a nested Promise (as opposed to merely spawning
+    one inside its body), ``await_children_sync(recursively=False)`` must still
+    NOT transitively wait for that returned Promise to resolve.
+    """
+    execution_order: list[str] = []
+
+    @promising.function(use_thread_pool=True)
+    def grandchild_func() -> str:
+        time.sleep(0.2)
+        execution_order.append("grandchild_done")
+        return "grandchild"
+
+    @promising.function(use_thread_pool=True)
+    def child_func() -> str:
+        execution_order.append("child_done")
+        return grandchild_func()
+
+    @promising.function(use_thread_pool=True)
+    def root_func() -> str:
+        child_func()
+        if sleep_in_root:
+            time.sleep(0.1)
+        execution_order.append("root_coro_done")
+        promising.await_children_sync(recursively=False)
+        return "root"
+
+    promise = root_func()
+
+    assert await promise == "root"
+    if sleep_in_root:
+        assert execution_order == [
+            "child_done",
+            "root_coro_done",
+        ]
+    else:
+        assert execution_order == [
+            "root_coro_done",
+            "child_done",
+        ]
+    # Clean up remaining grandchild to avoid asyncio warnings
+    await promise.await_children()
 
 
 async def test_await_children_raises_on_event_loop_thread() -> None:

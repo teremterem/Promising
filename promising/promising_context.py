@@ -236,7 +236,7 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, whole_subtree: bool = True) -> None:
+async def await_children(*, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
@@ -247,10 +247,18 @@ async def await_children(*, whole_subtree: bool = True) -> None:
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
-    return await get_active_context().await_children(whole_subtree=whole_subtree)
+    return await get_active_context().await_children(
+        whole_subtree=whole_subtree,
+        unpack_all_promises=unpack_all_promises,
+    )
 
 
-def await_children_sync(*, whole_subtree: bool = True, timeout: float | None = None) -> None:
+def await_children_sync(
+    *,
+    whole_subtree: bool = True,
+    unpack_all_promises: bool = True,
+    timeout: float | None = None,
+) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -264,7 +272,11 @@ def await_children_sync(*, whole_subtree: bool = True, timeout: float | None = N
             not just direct children.
         timeout: Maximum time to wait in seconds.
     """
-    return get_active_context().await_children_sync(whole_subtree=whole_subtree, timeout=timeout)
+    return get_active_context().await_children_sync(
+        whole_subtree=whole_subtree,
+        unpack_all_promises=unpack_all_promises,
+        timeout=timeout,
+    )
 
 
 def collect_active_children(
@@ -512,7 +524,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, whole_subtree: bool = True) -> None:
+    async def await_children(self, *, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -545,9 +557,9 @@ class PromisingContext:
             await asyncio.gather(
                 *[
                     asyncio.create_task(
-                        # TODO Replace this temporary workaround with
-                        #  `unpack_once()` ?
-                        child.unpack_once() if isinstance(child, Promise) else awaitable_as_coroutine(child)
+                        child.unpack_once()
+                        if not unpack_all_promises and isinstance(child, Promise)
+                        else awaitable_as_coroutine(child)
                     )
                     for child in children
                 ],
@@ -564,6 +576,7 @@ class PromisingContext:
         self,
         *,
         whole_subtree: bool = True,
+        unpack_all_promises: bool = True,
         timeout: float | None = None,
     ) -> None:
         """
@@ -596,7 +609,10 @@ class PromisingContext:
 
         async def await_children_and_notify() -> None:
             try:
-                await self.await_children(whole_subtree=whole_subtree)
+                await self.await_children(
+                    whole_subtree=whole_subtree,
+                    unpack_all_promises=unpack_all_promises,
+                )
             except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from

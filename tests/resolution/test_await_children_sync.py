@@ -263,8 +263,26 @@ async def test_await_children_module_level_on_bare_context() -> None:
     assert execution_order == ["child_done"]
 
 
-@pytest.mark.parametrize("sleep_in_root", [True, False])
-async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sleep_in_root: bool) -> None:
+@pytest.mark.parametrize(
+    "unpack_all_promises",
+    [
+        pytest.param(True, id="unpack_all"),
+        pytest.param(False, id="unpack_once"),
+        pytest.param(None, id="unpack_default"),
+    ],
+)
+@pytest.mark.parametrize(
+    "sleep_in_root",
+    [
+        pytest.param(True, id="root_sleeps"),
+        pytest.param(False, id="root_nosleep"),
+    ],
+)
+async def test_await_children_direct_only_but_unpack_all_promises(
+    *,
+    sleep_in_root: bool,
+    unpack_all_promises: bool | None,
+) -> None:
     """
     When a child *returns* a nested Promise (as opposed to merely spawning
     one inside its body), ``await_children_sync(whole_subtree=False)`` must still
@@ -289,22 +307,41 @@ async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sl
         if sleep_in_root:
             time.sleep(0.1)
         execution_order.append("root_coro_done")
-        promising.await_children_sync(whole_subtree=False)
+
+        kwargs = {}
+        if unpack_all_promises is not None:  # We use None to test the default
+            kwargs["unpack_all_promises"] = unpack_all_promises
+        promising.await_children_sync(whole_subtree=False, **kwargs)
+
         return "root"
 
     promise = root_func()
-
     assert await promise == "root"
+
     if sleep_in_root:
+        if unpack_all_promises is False:
+            assert execution_order == [
+                "child_done",
+                "root_coro_done",
+            ]
+        else:
+            assert execution_order == [
+                "child_done",
+                "root_coro_done",
+                "grandchild_done",
+            ]
+    elif unpack_all_promises is False:
         assert execution_order == [
-            "child_done",
             "root_coro_done",
+            "child_done",
         ]
     else:
         assert execution_order == [
             "root_coro_done",
             "child_done",
+            "grandchild_done",
         ]
+
     # Clean up remaining grandchild to avoid asyncio warnings
     await promise.await_children()
 

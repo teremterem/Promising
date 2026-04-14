@@ -181,18 +181,22 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
 
     def __await__(self) -> Generator[Any, None, T_co]:
         """
-        Await the Promise, fully unpacking all nested awaitables.
+        Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to
         complete. Once the Promise resolves, recursively awaits the result as
         long as it is itself a Promise (non-Promise awaitables are
         auto-wrapped into Promises by ``set_result``), returning the final
-        non-awaitable value.
+        non-Promise value.
+
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
-            awaitables).
+            nested Promises).
         """
         return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
@@ -205,7 +209,8 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
-            The fully unpacked result of the Promise (no remaining awaitables).
+            The fully unpacked result of the Promise (no remaining
+            nested Promises).
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
@@ -230,6 +235,10 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         utilities will wrap it in a Task, which invokes ``__await__`` and
         triggers full recursive unpacking as expected.
 
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
+
         Example::
 
             # Instead of this (may return a nested Promise):
@@ -240,26 +249,30 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
 
         Returns:
             The fully unpacked result of the Promise (no remaining
-            awaitables).
+            nested Promises).
         """
         return await self
 
     def unpack_all_sync(self, *, timeout: float | None = None) -> T_co:
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread. Recursively unpacks nested awaitables (non-Promise
+        calling thread. Recursively unpacks nested Promises (non-Promise
         awaitables are auto-wrapped into Promises by ``set_result``) until
         the result is no longer a Promise, similar to ``__await__``.
 
         This is the synchronous counterpart of ``__await__`` — intended for
         use inside sync promising functions that run in a thread pool executor.
 
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
+
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
-            awaitables).
+            nested Promises).
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
@@ -283,7 +296,7 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
     async def unpack_once(self) -> T_co | "Promise[T_co]":
         """
         Await the Promise, resolving only one level without recursively
-        unpacking nested awaitables.
+        unpacking nested Promises.
 
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to

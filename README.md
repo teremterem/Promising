@@ -376,7 +376,7 @@ Like `await`, blocking on the concurrent future (`concurrent_future.result()`, `
 
 A decorated function always returns a `Promise`, regardless of whether the underlying function returns a concrete value, a coroutine, or another Promise. When a Promise's result is an awaitable that isn't already a `Promise`, it is automatically wrapped in a child `Promise`. This means:
 
-- `await promise` (and the equivalent coroutine `promise.unpack_all()`) and `promise.sync()` (alias for `promise.unpack_all_sync()`) always return a concrete value — they recursively unpack nested Promises until a non-Promise result is reached.
+- `await promise` (and the equivalent coroutine `promise.unpack_all()`) and `promise.sync()` (alias for `promise.unpack_all_sync()`) always return a concrete value — they recursively unpack nested Promises until a non-Promise result is reached. Note that unpacking only traverses `Promise` instances specifically — it does not unpack arbitrary awaitables or `PromisingFuture` objects in general.
 - `promise.unpack_once()` and `promise.unpack_once_sync()` unpack only one level — they return either a concrete value or another `Promise`.
 
 ```python

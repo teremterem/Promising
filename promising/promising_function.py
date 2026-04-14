@@ -386,9 +386,9 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             return await promise
         finally:
             if await_children is RECURSIVELY:
-                await promise.await_children(recursively=True)
+                await promise.await_children(whole_subtree=True)
             elif await_children:
-                await promise.await_children(recursively=False)
+                await promise.await_children(whole_subtree=False)
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would

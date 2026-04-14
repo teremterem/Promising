@@ -144,13 +144,13 @@ async def test_self_cycle_on_bare_context() -> None:
 
 
 @pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
-@pytest.mark.parametrize("recursively", [True, False])
+@pytest.mark.parametrize("whole_subtree", [True, False])
 async def test_self_cycle_on_bare_context_recursively(
     *,
-    recursively: bool,
+    whole_subtree: bool,
 ) -> None:
     """
-    ``await_children_sync(recursively=...)`` on a bare PromisingContext
+    ``await_children_sync(whole_subtree=...)`` on a bare PromisingContext
     with nested Promise children (child -> grandchild). The waiter is
     itself a child of the bare context, creating a cycle.
     """
@@ -169,7 +169,7 @@ async def test_self_cycle_on_bare_context_recursively(
     @promising.function(use_thread_pool=True)
     def sync_waiter() -> None:
         promising.get_active_promise().get_parent_context().await_children_sync(
-            recursively=recursively,
+            whole_subtree=whole_subtree,
         )
 
     with promising.context() as ctx:

@@ -236,21 +236,21 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = True) -> None:
+async def await_children(*, whole_subtree: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
     Args:
-        recursively: If True (the default), wait for all descendants,
+        whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
     """
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
-    return await get_active_context().await_children(recursively=recursively)
+    return await get_active_context().await_children(whole_subtree=whole_subtree)
 
 
-def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
+def await_children_sync(*, whole_subtree: bool = True, timeout: float | None = None) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -260,16 +260,16 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
     executor, where ``await`` is not available.
 
     Args:
-        recursively: If True (the default), wait for all descendants,
+        whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
         timeout: Maximum time to wait in seconds.
     """
-    return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
+    return get_active_context().await_children_sync(whole_subtree=whole_subtree, timeout=timeout)
 
 
 def collect_active_children(
     *,
-    recursively: bool = True,
+    whole_subtree: bool = True,
     futures_only: bool = True,
     open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
@@ -282,7 +282,7 @@ def collect_active_children(
     ``PromisingContext.collect_active_children()``.
 
     Args:
-        recursively: If True (default), include descendants at all levels,
+        whole_subtree: If True (default), include descendants at all levels,
             not just direct children.
         futures_only: If True (default), exclude children that are not
             ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
@@ -297,7 +297,7 @@ def collect_active_children(
         Set of child PromisingContexts matching the filter criteria.
     """
     return get_active_context().collect_active_children(
-        recursively=recursively,
+        whole_subtree=whole_subtree,
         futures_only=futures_only,
         open_contexts_only=open_contexts_only,
     )
@@ -512,7 +512,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, recursively: bool = True) -> None:
+    async def await_children(self, *, whole_subtree: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -520,7 +520,7 @@ class PromisingContext:
         children may spawn new children while being awaited.
 
         Args:
-            recursively: If True (the default), wait for all descendants,
+            whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
@@ -529,7 +529,7 @@ class PromisingContext:
         # children may be spawned by existing ones while the existing ones
         # are being awaited
         while children := self.collect_active_children(
-            recursively=recursively,
+            whole_subtree=whole_subtree,
             futures_only=True,
             # We assume that if a context is already closed, then it also
             # finished already (either was explicitly awaited for or finished
@@ -563,7 +563,7 @@ class PromisingContext:
     def await_children_sync(
         self,
         *,
-        recursively: bool = True,
+        whole_subtree: bool = True,
         timeout: float | None = None,
     ) -> None:
         """
@@ -575,7 +575,7 @@ class PromisingContext:
         executor, where ``await`` is not available.
 
         Args:
-            recursively: If True (the default), wait for all descendants,
+            whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
             timeout: Maximum time to wait in seconds.
 
@@ -596,7 +596,7 @@ class PromisingContext:
 
         async def await_children_and_notify() -> None:
             try:
-                await self.await_children(recursively=recursively)
+                await self.await_children(whole_subtree=whole_subtree)
             except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from
@@ -614,7 +614,7 @@ class PromisingContext:
     def collect_active_children(
         self,
         *,
-        recursively: bool = True,
+        whole_subtree: bool = True,
         futures_only: bool = True,
         open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
@@ -635,7 +635,7 @@ class PromisingContext:
         / ``set_exception()`` is called.
 
         Args:
-            recursively: If True (default), include descendants at all
+            whole_subtree: If True (default), include descendants at all
                 levels, not just direct children.
             futures_only: If True (default), exclude children that are not
                 ``PromisingFuture`` instances (i.e. plain
@@ -662,7 +662,7 @@ class PromisingContext:
             )
         }
 
-        if recursively:
+        if whole_subtree:
             # We are iterating over all the children, regardless of the
             # futures_only and open_contexts_only settings, because some
             # children may still be "active" simply because they still have
@@ -670,7 +670,7 @@ class PromisingContext:
             for child in children:
                 result.update(
                     child.collect_active_children(
-                        recursively=True,
+                        whole_subtree=True,
                         futures_only=futures_only,
                         open_contexts_only=open_contexts_only,
                     )

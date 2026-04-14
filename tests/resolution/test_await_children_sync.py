@@ -56,14 +56,14 @@ async def test_await_children(*, start_soon: bool, await_children: bool) -> None
         await promise.await_children()
 
 
-@pytest.mark.parametrize("recursively", [True, False])
-async def test_await_children_recursively(*, recursively: bool) -> None:
+@pytest.mark.parametrize("whole_subtree", [True, False])
+async def test_await_children_recursively(*, whole_subtree: bool) -> None:
     """
-    Parametrized over recursively={True, False}.
+    Parametrized over whole_subtree={True, False}.
     Three levels of nesting: root → child → grandchild → great-grandchild.
-    With True: await_children_sync(recursively=True) is called on the
+    With True: await_children_sync(whole_subtree=True) is called on the
     root, so every level completes before the root resolves.
-    With False: await_children_sync(recursively=False) only waits for
+    With False: await_children_sync(whole_subtree=False) only waits for
     direct children (child), so grandchild and great-grandchild may still
     be running when the root resolves.
     """
@@ -93,13 +93,13 @@ async def test_await_children_recursively(*, recursively: bool) -> None:
         child_func()
         time.sleep(0.1)
         execution_order.append("root_coro_done")
-        promising.await_children_sync(recursively=recursively)
+        promising.await_children_sync(whole_subtree=whole_subtree)
         return "root"
 
     promise = root_func()
     await promise
 
-    if recursively:
+    if whole_subtree:
         assert execution_order == [
             "child_done",
             "root_coro_done",
@@ -116,10 +116,10 @@ async def test_await_children_recursively(*, recursively: bool) -> None:
         await promise.await_children()
 
 
-@pytest.mark.parametrize("recursively", [True, False])
+@pytest.mark.parametrize("whole_subtree", [True, False])
 async def test_await_children_recursively_sync_children(
     *,
-    recursively: bool,
+    whole_subtree: bool,
 ) -> None:
     """
     Same as test_await_children_recursively but every
@@ -154,13 +154,13 @@ async def test_await_children_recursively_sync_children(
         child_func()
         time.sleep(0.1)
         execution_order.append("root_coro_done")
-        promising.await_children_sync(recursively=recursively)
+        promising.await_children_sync(whole_subtree=whole_subtree)
         return "root"
 
     promise = root_func()
     await promise
 
-    if recursively:
+    if whole_subtree:
         assert execution_order == [
             "child_done",
             "root_coro_done",
@@ -204,13 +204,13 @@ async def test_await_children_on_bare_context() -> None:
     assert execution_order == ["before_await", "child_done", "child_done"]
 
 
-@pytest.mark.parametrize("recursively", [True, False])
+@pytest.mark.parametrize("whole_subtree", [True, False])
 async def test_await_children_on_bare_context_recursively(
     *,
-    recursively: bool,
+    whole_subtree: bool,
 ) -> None:
     """
-    ``await_children_sync(recursively=...)`` works on a bare PromisingContext
+    ``await_children_sync(whole_subtree=...)`` works on a bare PromisingContext
     with nested Promise children (child -> grandchild).
     """
     execution_order: list[str] = []
@@ -234,9 +234,9 @@ async def test_await_children_on_bare_context_recursively(
 
         child_func()
 
-        await loop.run_in_executor(None, lambda: ctx.await_children_sync(recursively=recursively))
+        await loop.run_in_executor(None, lambda: ctx.await_children_sync(whole_subtree=whole_subtree))
 
-    if recursively:
+    if whole_subtree:
         assert execution_order == ["child_done", "grandchild_done"]
     else:
         assert execution_order == ["child_done"]
@@ -273,7 +273,7 @@ async def test_await_children_module_level_on_bare_context() -> None:
 async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sleep_in_root: bool) -> None:
     """
     When a child *returns* a nested Promise (as opposed to merely spawning
-    one inside its body), ``await_children_sync(recursively=False)`` must still
+    one inside its body), ``await_children_sync(whole_subtree=False)`` must still
     NOT transitively wait for that returned Promise to resolve.
     """
     execution_order: list[str] = []
@@ -295,7 +295,7 @@ async def test_await_children_non_recursive_does_not_wait_returned_promise(*, sl
         if sleep_in_root:
             time.sleep(0.1)
         execution_order.append("root_coro_done")
-        promising.await_children_sync(recursively=False)
+        promising.await_children_sync(whole_subtree=False)
         return "root"
 
     promise = root_func()

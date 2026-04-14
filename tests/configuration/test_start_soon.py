@@ -84,11 +84,7 @@ async def test_start_soon_behavior(*, start_soon: bool) -> None:
 
 @pytest.mark.parametrize("start_soon_default", [True, False])
 @pytest.mark.parametrize("parent_start_soon", [True, False])
-async def test_start_soon_default_inherits_from_parent(
-    *,
-    start_soon_default: bool,
-    parent_start_soon: bool,
-) -> None:
+async def test_start_soon_default_inherits_from_parent(*, start_soon_default: bool, parent_start_soon: bool) -> None:
     """
     INHERIT (the default for start_soon_default)
     propagates the parent's value to child Promises. A parent

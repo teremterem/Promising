@@ -116,10 +116,7 @@ async def test_await_children_recursively(*, whole_subtree: bool) -> None:
 
 
 @pytest.mark.parametrize("whole_subtree", [True, False])
-async def test_await_children_recursively_sync_children(
-    *,
-    whole_subtree: bool,
-) -> None:
+async def test_await_children_recursively_sync_children(*, whole_subtree: bool) -> None:
     """
     Same as test_await_children_recursively but every
     promising function in the hierarchy is synchronous
@@ -203,10 +200,7 @@ async def test_await_children_on_bare_context() -> None:
 
 
 @pytest.mark.parametrize("whole_subtree", [True, False])
-async def test_await_children_on_bare_context_recursively(
-    *,
-    whole_subtree: bool,
-) -> None:
+async def test_await_children_on_bare_context_recursively(*, whole_subtree: bool) -> None:
     """
     ``await_children(whole_subtree=...)`` works on a bare PromisingContext
     with nested Promise children (child -> grandchild).

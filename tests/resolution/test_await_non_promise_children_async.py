@@ -74,7 +74,7 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     assert sorted(results) == ["a", "b"]
 
 
-async def test_await_children_recursively_non_promise_grandchildren() -> None:
+async def test_await_children_whole_subtree_non_promise_grandchildren() -> None:
     """
     ``await_children()`` must correctly discard non-Promise
     awaitable *grandchildren* after awaiting them.

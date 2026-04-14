@@ -57,7 +57,7 @@ async def test_await_children(*, start_soon: bool, await_children: bool) -> None
 
 
 @pytest.mark.parametrize("whole_subtree", [True, False])
-async def test_await_children_recursively(*, whole_subtree: bool) -> None:
+async def test_await_children_whole_subtree(*, whole_subtree: bool) -> None:
     """
     Parametrized over whole_subtree={True, False}.
     Three levels of nesting: root → child → grandchild → great-grandchild.
@@ -117,9 +117,9 @@ async def test_await_children_recursively(*, whole_subtree: bool) -> None:
 
 
 @pytest.mark.parametrize("whole_subtree", [True, False])
-async def test_await_children_recursively_sync_children(*, whole_subtree: bool) -> None:
+async def test_await_children_whole_subtree_sync_children(*, whole_subtree: bool) -> None:
     """
-    Same as test_await_children_recursively but every
+    Same as test_await_children_whole_subtree but every
     promising function in the hierarchy is synchronous
     (runs in a thread pool).
     sync root -> sync child -> sync grandchild
@@ -202,7 +202,7 @@ async def test_await_children_on_bare_context() -> None:
 
 
 @pytest.mark.parametrize("whole_subtree", [True, False])
-async def test_await_children_on_bare_context_recursively(*, whole_subtree: bool) -> None:
+async def test_await_children_on_bare_context_whole_subtree(*, whole_subtree: bool) -> None:
     """
     ``await_children_sync(whole_subtree=...)`` works on a bare PromisingContext
     with nested Promise children (child -> grandchild).

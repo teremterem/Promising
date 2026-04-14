@@ -95,19 +95,6 @@ class DecoratorSupport:
         # descriptor protocol. No binding is required or desired here.
         return self
 
-    def resolve_namespace(self) -> str | None:
-        """
-        Each decorator resolves its namespace lazily to give manual changes in
-        `promising.Defaults` a chance to take effect before the namespace is
-        used for anything.
-        """
-        if self._resolved_namespace is UNCHANGED:
-            self._resolved_namespace = resolve_namespace(
-                provided_explicitly=self._namespace,
-                named_object_fallback=self.__wrapped__,
-            )
-        return self._resolved_namespace
-
     @property
     def _wrapped_as_callable(self) -> CallableType:
         """

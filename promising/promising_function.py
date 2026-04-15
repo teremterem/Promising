@@ -179,9 +179,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         self.start_soon = start_soon
         self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
-        # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
-        #  to resolve postponed type hints correctly, when you implement input
-        #  params as Promises.
+        # TODO Make sure to use `typing.get_type_hints()` to resolve postponed
+        #  type hints correctly, when you implement input params as Promises.
         # TODO Safeguard against the wrapped function accepting keyword
         #  arguments that are reserved to configure the Promise (`start_soon`,
         #  `children_start_soon`, `start_soon_default`):

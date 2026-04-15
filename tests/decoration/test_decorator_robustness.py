@@ -40,12 +40,13 @@ Stacking two identical decorators (``@promising.function`` on top of
 ``@promising.function``, or ``@promising.context`` on top of
 ``@promising.context``) must preserve each layer's attributes independently,
 while still propagating standard ``functools.update_wrapper`` attributes
-(``__name__``, ``__qualname__``, ``__doc__``, ``__module__``,
-``__annotations__``) from the original function through both layers.
+(``__name__``, ``__qualname__``, ``__doc__``, ``__module__``, etc.) from the
+original function through both layers.
 """
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from typing import get_type_hints
 
 import pytest
 
@@ -713,13 +714,13 @@ async def test_double_function_decorator_attrs_stay_independent() -> None:
     assert add.__qualname__ == "test_double_function_decorator_attrs_stay_independent.<locals>.add"
     assert add.__doc__ == "Add two numbers."
     assert add.__module__ == __name__
-    assert add.__annotations__ == {"a": int, "b": int, "return": int}
+    assert get_type_hints(add) == {"a": int, "b": int, "return": int}
 
     assert inner.__name__ == "add"
     assert inner.__qualname__ == "test_double_function_decorator_attrs_stay_independent.<locals>.add"
     assert inner.__doc__ == "Add two numbers."
     assert inner.__module__ == __name__
-    assert inner.__annotations__ == {"a": int, "b": int, "return": int}
+    assert get_type_hints(inner) == {"a": int, "b": int, "return": int}
 
     # -- Sanity-check: the decorated function still works --------------------
 
@@ -772,13 +773,13 @@ async def test_double_context_decorator_attrs_stay_independent() -> None:
     assert add.__qualname__ == "test_double_context_decorator_attrs_stay_independent.<locals>.add"
     assert add.__doc__ == "Add two numbers."
     assert add.__module__ == __name__
-    assert add.__annotations__ == {"a": int, "b": int, "return": int}
+    assert get_type_hints(add) == {"a": int, "b": int, "return": int}
 
     assert inner.__name__ == "add"
     assert inner.__qualname__ == "test_double_context_decorator_attrs_stay_independent.<locals>.add"
     assert inner.__doc__ == "Add two numbers."
     assert inner.__module__ == __name__
-    assert inner.__annotations__ == {"a": int, "b": int, "return": int}
+    assert get_type_hints(inner) == {"a": int, "b": int, "return": int}
 
     # -- Sanity-check: the decorated function still works --------------------
 

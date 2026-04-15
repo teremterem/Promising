@@ -433,8 +433,10 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         prefilled_result: Any,
         prefilled_exception: BaseException | None,
     ) -> None:
-        """Validate constructor args before ``super().__init__`` to prevent
-        registering an unsettled child with the parent on bad input."""
+        """
+        Validate constructor args before ``super().__init__`` to prevent
+        registering an unsettled child with the parent on bad input.
+        """
         if awaitable is None:
             if prefilled_result is not UNCHANGED and prefilled_exception is not None:
                 raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
@@ -448,7 +450,7 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
                 raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
         else:
             if not inspect.isawaitable(awaitable):
-                raise TypeError("Promise must be created with an awaitable. Got {type(awaitable)}.")
+                raise TypeError(f"Promise must be created with an awaitable. Got {type(awaitable)}.")
 
             if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(

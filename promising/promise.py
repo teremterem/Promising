@@ -427,8 +427,8 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
             f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
 
+    @staticmethod
     def _validate_init_args(
-        self,
         awaitable: Awaitable[Any] | None,
         prefilled_result: Any,
         prefilled_exception: BaseException | None,
@@ -437,28 +437,22 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         registering an unsettled child with the parent on bad input."""
         if awaitable is None:
             if prefilled_result is not UNCHANGED and prefilled_exception is not None:
-                raise ValueError(
-                    f"Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters for {self!r}"
-                )
+                raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
 
             if prefilled_result is not UNCHANGED and inspect.isawaitable(prefilled_result):
                 raise TypeError(
-                    f"Cannot pass an awaitable as 'prefilled_result' for {self!r}. "
-                    f"Pass it as the first positional argument instead."
+                    "Cannot pass an awaitable as 'prefilled_result'. Pass it as the first positional argument instead."
                 )
 
             if prefilled_result is UNCHANGED and prefilled_exception is None:
-                raise ValueError(
-                    f"Cannot create a Promise without an awaitable or prefilled result/exception: {self!r}"
-                )
+                raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
         else:
             if not inspect.isawaitable(awaitable):
-                raise TypeError(f"Promise must be created with an awaitable. Got {type(awaitable)}.\n{self!r}")
+                raise TypeError("Promise must be created with an awaitable. Got {type(awaitable)}.")
 
             if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
-                    f"Cannot provide both 'awaitable' and 'prefilled_result' "
-                    f"or 'prefilled_exception' parameters for {self!r}"
+                    "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )
 
     def _finish_initialization(

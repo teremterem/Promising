@@ -100,7 +100,8 @@ class PromisingHierarchyLogger:
 
         return ["CURRENT UNSETTLED STATE", *[self._fmt("direct child", child) for child in unsettled_children]]
 
-    def _fmt(self, label: str, ctx: "PromisingContext") -> str:
+    @staticmethod
+    def _fmt(label: str, ctx: "PromisingContext") -> str:
         status = "OPEN" if ctx.is_still_open() else "CLOSED"
         return f"  {label}: [{status}] {ctx}"
 

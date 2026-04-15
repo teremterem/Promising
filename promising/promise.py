@@ -129,6 +129,10 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
         prefilled_result: T_co | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
+        # Validate before super().__init__ to avoid registering an unsettled
+        # child with the parent when arguments are invalid.
+        self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
+
         super().__init__(
             namespace=resolve_namespace(
                 provided_explicitly=namespace,
@@ -423,13 +427,15 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
             f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
 
-    def _finish_initialization(
+    def _validate_init_args(
         self,
-        *,
-        prefilled_result: T_co | Awaitable[Any] | Sentinel,
+        awaitable: Awaitable[Any] | None,
+        prefilled_result: Any,
         prefilled_exception: BaseException | None,
     ) -> None:
-        if self._awaitable is None:
+        """Validate constructor args before ``super().__init__`` to prevent
+        registering an unsettled child with the parent on bad input."""
+        if awaitable is None:
             if prefilled_result is not UNCHANGED and prefilled_exception is not None:
                 raise ValueError(
                     f"Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters for {self!r}"
@@ -441,28 +447,38 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
                     f"Pass it as the first positional argument instead."
                 )
 
-            if prefilled_result is not UNCHANGED:
-                self.set_result(prefilled_result)
-            elif prefilled_exception is not None:
-                self.set_exception(prefilled_exception)
-            else:
+            if prefilled_result is UNCHANGED and prefilled_exception is None:
                 raise ValueError(
                     f"Cannot create a Promise without an awaitable or prefilled result/exception: {self!r}"
                 )
         else:
-            if not inspect.isawaitable(self._awaitable):
-                raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.\n{self!r}")
+            if not inspect.isawaitable(awaitable):
+                raise TypeError(f"Promise must be created with an awaitable. Got {type(awaitable)}.\n{self!r}")
+
             if prefilled_result is not UNCHANGED or prefilled_exception is not None:
                 raise ValueError(
                     f"Cannot provide both 'awaitable' and 'prefilled_result' "
                     f"or 'prefilled_exception' parameters for {self!r}"
                 )
 
-            if self._start_soon:
-                # We don't know which thread the Promise is created in, so we
-                # use the event loop's `call_soon_threadsafe` to "stay on the
-                # safe side"
-                self._call_soon_threadsafe(self._ensure_task_scheduled)
+    def _finish_initialization(
+        self,
+        *,
+        prefilled_result: T_co | Awaitable[Any] | Sentinel,
+        prefilled_exception: BaseException | None,
+    ) -> None:
+        # Validation already done in _validate_init_args (before super().__init__).
+        # This method only performs side effects.
+        if self._awaitable is None:
+            if prefilled_result is not UNCHANGED:
+                self.set_result(prefilled_result)
+            else:
+                self.set_exception(prefilled_exception)
+        elif self._start_soon:
+            # We don't know which thread the Promise is created in, so we
+            # use the event loop's `call_soon_threadsafe` to "stay on the
+            # safe side"
+            self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def set_result(self, result: T_co | Awaitable[Any]) -> None:
         """

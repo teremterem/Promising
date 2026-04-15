@@ -290,9 +290,10 @@ async def test_await_children_direct_only_but_unpack_all_promises(
     unpack_all_promises: bool | None,
 ) -> None:
     """
-    When a child *returns* a nested Promise (as opposed to merely spawning
-    one inside its body), ``await_children_sync(whole_subtree=False)`` must still
-    NOT transitively wait for that returned Promise to resolve.
+    With ``whole_subtree=False``, ``await_children_sync`` waits only for direct
+    children.  When ``unpack_all_promises`` is True (or default), the child's
+    returned Promise is recursively unpacked, so the grandchild still runs.
+    When ``unpack_all_promises=False``, the grandchild is never awaited.
     """
     if sleep_in_root and unpack_all_promises is not False:
         pytest.skip("Known issue: grandchild not awaited when root sleeps with unpack_all")

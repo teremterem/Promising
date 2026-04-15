@@ -387,8 +387,10 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         finally:
             if await_children is WHOLE_SUBTREE:
                 await promise.await_children(whole_subtree=True)
-            elif await_children:
+            elif await_children is True:
                 await promise.await_children(whole_subtree=False)
+            elif await_children is not False:
+                raise ValueError(f"Invalid await_children={await_children!r}; expected WHOLE_SUBTREE, True, or False")
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would

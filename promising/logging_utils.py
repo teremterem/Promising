@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class PromisingHierarchyLogger:
-    def __init__(self, *, logger: logging.Logger | None = None, level: int):
+    def __init__(self, *, logger: logging.Logger | None = None, level: int) -> None:
         self.logger = logger or logging.getLogger(type(self).__name__)
         self.level = level
 

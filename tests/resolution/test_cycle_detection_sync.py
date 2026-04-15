@@ -92,7 +92,7 @@ async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
 
     @promising.function
     async def func_b() -> promising.Promise:
-        p = promising.get_active_promise()
+        p = func_a()
         if await_before_return:
             return await p
         return p
@@ -168,33 +168,6 @@ async def test_self_cycle_on_bare_context_whole_subtree(*, whole_subtree: bool) 
         promising.get_active_promise().get_parent_context().await_children_sync(
             whole_subtree=whole_subtree,
         )
-
-    with promising.context() as ctx:
-        assert not isinstance(ctx, promising.Promise)
-
-        child_func()
-
-        # TODO Replace PromisingError with the dedicated cycle error once defined
-        with pytest.raises(promising.PromisingError):
-            await sync_waiter()
-
-
-@pytest.mark.skip(reason="Cycle detection not implemented yet (issue #66)")
-async def test_parent_context_self_cycle_on_bare_context() -> None:
-    """
-    ``await_children_sync()`` on the parent bare PromisingContext, called from
-    a sync promising function that is itself a child of that context, creating
-    a cycle.
-    """
-
-    @promising.function
-    async def child_func() -> str:
-        await asyncio.sleep(0.1)
-        return "child"
-
-    @promising.function(use_thread_pool=True)
-    def sync_waiter() -> None:
-        promising.get_active_promise().get_parent_context().await_children_sync()
 
     with promising.context() as ctx:
         assert not isinstance(ctx, promising.Promise)

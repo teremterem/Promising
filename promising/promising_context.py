@@ -243,6 +243,9 @@ async def await_children(*, whole_subtree: bool = True, unpack_all_promises: boo
     Args:
         whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
+        unpack_all_promises: If True (the default), each Promise child
+            is fully awaited. If False, Promise children are only unpacked
+            one level (via ``unpack_once()``).
     """
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
@@ -270,6 +273,9 @@ def await_children_sync(
     Args:
         whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
+        unpack_all_promises: If True (the default), each Promise child
+            is fully awaited. If False, Promise children are only unpacked
+            one level (via ``unpack_once()``).
         timeout: Maximum time to wait in seconds.
     """
     return get_active_context().await_children_sync(
@@ -534,6 +540,9 @@ class PromisingContext:
         Args:
             whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
+            unpack_all_promises: If True (the default), each Promise child
+                is fully awaited. If False, Promise children are only unpacked
+                one level (``child.unpack_once()``).
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
@@ -592,6 +601,9 @@ class PromisingContext:
         Args:
             whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
+            unpack_all_promises: If True (the default), each Promise child
+                is fully awaited. If False, Promise children are only
+                unpacked one level (via ``unpack_once()``).
             timeout: Maximum time to wait in seconds.
 
         Raises:

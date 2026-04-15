@@ -126,7 +126,7 @@ async def main():
     assert result == 7
 ```
 
-Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result. Like `await`, `.sync()` recursively unpacks nested awaitables (see [Result Unpacking](#result-unpacking)):
+Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result. Like `await`, `.sync()` recursively unpacks nested Promises (see [Result Unpacking](#result-unpacking)):
 
 ```python
 @promising.function
@@ -534,8 +534,8 @@ A subclass is expected to override `__await__` to drive its own resolution logic
 | `ctx.namespace` | Optional human-readable namespace string. Used in `__repr__` output. Set via the `namespace` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
-| `ctx.await_children(whole_subtree=True)` | Async — wait for child contexts to finish. |
-| `ctx.await_children_sync(whole_subtree=True, timeout=None)` | Sync — block until child contexts finish. |
+| `ctx.await_children(whole_subtree=True, unpack_all_promises=True)` | Async — wait for child contexts to finish. With `unpack_all_promises=False`, Promise children are only unpacked one level (via `unpack_once()`) instead of being fully awaited. |
+| `ctx.await_children_sync(whole_subtree=True, unpack_all_promises=True, timeout=None)` | Sync — block until child contexts finish. With `unpack_all_promises=False`, Promise children are only unpacked one level instead of being fully awaited. |
 | `ctx.collect_unsettled_children(whole_subtree=True, futures_only=True, open_contexts_only=True)` | Get the set of child contexts that are still being tracked by this context and have not yet been closed. Pass `open_contexts_only=False` to include closed-but-still-tracked children, or `futures_only=False` to include non-`PromisingFuture` contexts (e.g. bare `PromisingContext` instances). |
 | `ctx.is_still_open()` | Whether the context is still open. A `PromisingContext` is "open" from construction until its `with` block exits (or, for `PromisingFuture` subclasses such as `Promise`, until `set_result()` / `set_exception()` is called). A closed context cannot be re-entered (raises `ContextAlreadyClosedError`) and cannot accept new child registrations. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
@@ -549,14 +549,15 @@ A subclass is expected to override `__await__` to drive its own resolution logic
 |---|---|
 | `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
-| `promising.await_children(whole_subtree=True)` | Wait for all children of the current context. |
-| `promising.await_children_sync(whole_subtree=True, timeout=None)` | Sync counterpart — block until children finish. |
+| `promising.await_children(whole_subtree=True, unpack_all_promises=True)` | Wait for all children of the current context. With `unpack_all_promises=False`, Promise children are only unpacked one level. |
+| `promising.await_children_sync(whole_subtree=True, unpack_all_promises=True, timeout=None)` | Sync counterpart — block until children finish. With `unpack_all_promises=False`, Promise children are only unpacked one level. |
 | `promising.collect_unsettled_children(whole_subtree=True, futures_only=True, open_contexts_only=True)` | Get the set of child contexts of the active context that are still being tracked and have not yet been closed. Pass `open_contexts_only=False` to include closed-but-still-tracked children, or `futures_only=False` to include non-`PromisingFuture` contexts (e.g. bare `PromisingContext` instances). |
 | `promising.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from the active context up to the root (or, rather, root down to the active context when `parents_first=True`). |
 | `promising.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
 | `promising.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
+| `promising.Defaults.QUALNAMES_IN_NAMESPACES` | When `True` (the default), auto-derived namespaces include the fully qualified name (`module::qualname`). When `False`, only the short `__name__` is used. |
 
 ### Sentinels
 

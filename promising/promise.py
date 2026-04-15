@@ -313,7 +313,7 @@ class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
     def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | "Promise[T_co]":
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread. Does not recursively unpack nested awaitables
+        calling thread. Does not recursively unpack nested Promises
         (non-Promise awaitables are auto-wrapped into Promises by
         ``set_result``) — returns the raw result of the Promise's
         awaitable, similar to ``unpack_once``.

@@ -47,9 +47,9 @@ def function(
     automatically wrapped in a child ``Promise`` of the current one, inheriting
     settings (``thread_pool``, ``start_soon_default``, etc.) through the
     standard ``Promise`` inheritance mechanism. When the resulting ``Promise``
-    is awaited (or resolved via ``.sync()``), nested awaitables (non-Promise
+    is awaited (or resolved via ``.sync()``), nested Promises (non-Promise
     awaitables are auto-wrapped into Promises by ``set_result``) are
-    automatically unpacked recursively until a concrete, non-awaitable value is
+    automatically unpacked recursively until a concrete, non-Promise value is
     reached. To unpack only one level, use ``unpack_once()`` or
     ``unpack_once_sync()`` instead.
 

@@ -83,6 +83,8 @@ async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
     not RecursionError.
     """
 
+    promise_a = None
+
     @promising.function
     async def func_a() -> promising.Promise:
         p = func_b()
@@ -92,13 +94,13 @@ async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
 
     @promising.function
     async def func_b() -> promising.Promise:
-        p = func_a()
         if await_before_return:
-            return await p
-        return p
+            return await promise_a
+        return promise_a
 
     @promising.function(use_thread_pool=True)
     def caller() -> None:
+        nonlocal promise_a
         promise_a = func_a()
         # TODO Replace PromisingError with the dedicated cycle error once defined
         with pytest.raises(promising.PromisingError):

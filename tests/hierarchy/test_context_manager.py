@@ -70,6 +70,28 @@ async def test_context_manager_reuse_raises() -> None:
                 pass
 
 
+async def test_context_manager_reuse_after_exit_raises() -> None:
+    """
+    Re-entering a PromisingContext that has already been used and exited
+    raises ContextAlreadyClosedError.
+
+    This is tested on PromisingContext directly rather than on
+    promising.context(), because promising.context() creates a fresh
+    PromisingContext on each entry — the concrete object doesn't exist
+    until the context is entered, so re-entry is not a concern there.
+    The guard exists on PromisingContext to simplify hierarchy tracking:
+    a context that has already participated in a parent-child tree
+    should not be re-activated.
+    """
+    ctx = promising.PromisingContext(parent=None)
+    with ctx:
+        pass
+
+    with pytest.raises(promising.ContextAlreadyClosedError):
+        with ctx:
+            pass
+
+
 async def test_context_manager_with_explicit_parent_none() -> None:
     """
     `promising.context(parent=None)` creates a root context with no
@@ -84,7 +106,7 @@ async def test_context_manager_with_explicit_parent_none() -> None:
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False, None])
-def test_context_manager_inside_promising_function_run(use_thread_pool: bool | None) -> None:
+def test_context_manager_inside_promising_function_run(*, use_thread_pool: bool | None) -> None:
     """
     `with promising.context()` works inside a @promising.function
     executed via .run(). The context is activated and deactivated correctly.

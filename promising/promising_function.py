@@ -8,7 +8,7 @@ from typing import Any, Generic
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
 from promising.promise import Promise, get_active_promise
-from promising.sentinels import INHERIT, RECURSIVELY, UNCHANGED, Sentinel
+from promising.sentinels import INHERIT, UNCHANGED, WHOLE_SUBTREE, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
 
@@ -47,9 +47,9 @@ def function(
     automatically wrapped in a child ``Promise`` of the current one, inheriting
     settings (``thread_pool``, ``start_soon_default``, etc.) through the
     standard ``Promise`` inheritance mechanism. When the resulting ``Promise``
-    is awaited (or resolved via ``.sync()``), nested awaitables (non-Promise
+    is awaited (or resolved via ``.sync()``), nested Promises (non-Promise
     awaitables are auto-wrapped into Promises by ``set_result``) are
-    automatically unpacked recursively until a concrete, non-awaitable value is
+    automatically unpacked recursively until a concrete, non-Promise value is
     reached. To unpack only one level, use ``unpack_once()`` or
     ``unpack_once_sync()`` instead.
 
@@ -79,10 +79,9 @@ def function(
             ``start_soon`` directly.
         children_start_soon: Whether child promises created during this
             ``Promise``'s execution should start executing immediately.
-            Defaults to ``None`` (no enforcement). ``INHERIT`` copies the
-            parent's ``children_start_soon`` setting.
-            TODO Mention here in the docstring that this default is different
-             from the default in promising contexts.
+            Defaults to ``None`` (no enforcement), unlike
+            ``PromisingContext`` where it defaults to ``INHERIT``.
+            ``INHERIT`` copies the parent's ``children_start_soon`` setting.
         start_soon_default: Default ``start_soon`` value propagated to child
             promises. Defaults to ``INHERIT``, meaning the value is inherited
             from the parent ``Promise``.
@@ -180,9 +179,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         self.start_soon = start_soon
         self.use_thread_pool = self._validate_use_thread_pool(use_thread_pool)
 
-        # TODO Make sure to use `get_type_hints()` instead of `__annotations__`
-        #  to resolve postponed type hints correctly, when you implement input
-        #  params as Promises.
+        # TODO Make sure to use `typing.get_type_hints()` to resolve postponed
+        #  type hints correctly, when you implement input params as Promises.
         # TODO Safeguard against the wrapped function accepting keyword
         #  arguments that are reserved to configure the Promise (`start_soon`,
         #  `children_start_soon`, `start_soon_default`):
@@ -269,7 +267,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon_default: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
-        await_children: bool | Sentinel = RECURSIVELY,
+        await_children: bool | Sentinel = WHOLE_SUBTREE,
         **kwargs: Any,
     ) -> T_co:
         """
@@ -301,7 +299,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
             await_children: Whether to await children after the
-                promise completes. ``RECURSIVELY`` (default)
+                promise completes. ``WHOLE_SUBTREE`` (default)
                 awaits the entire subtree, ``True`` awaits
                 direct children only, ``False`` skips child
                 awaiting.
@@ -336,7 +334,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon_default: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
-        await_children: bool | Sentinel = RECURSIVELY,
+        await_children: bool | Sentinel = WHOLE_SUBTREE,
         **kwargs: Any,
     ) -> T_co:
         """
@@ -365,7 +363,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
             await_children: Whether to await children after the
-                promise completes. ``RECURSIVELY`` (default)
+                promise completes. ``WHOLE_SUBTREE`` (default)
                 awaits the entire subtree, ``True`` awaits
                 direct children only, ``False`` skips child
                 awaiting.
@@ -373,6 +371,9 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         Returns:
             The fully unpacked result of the ``Promise``.
         """
+        if await_children is not WHOLE_SUBTREE and not isinstance(await_children, bool):
+            raise ValueError(f"Invalid await_children={await_children!r}; expected WHOLE_SUBTREE, True, or False")
+
         promise = self(
             *args,
             namespace=namespace,
@@ -386,10 +387,10 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         try:
             return await promise
         finally:
-            if await_children is RECURSIVELY:
-                await promise.await_children(recursively=True)
+            if await_children is WHOLE_SUBTREE:
+                await promise.await_children(whole_subtree=True)
             elif await_children:
-                await promise.await_children(recursively=False)
+                await promise.await_children(whole_subtree=False)
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that would

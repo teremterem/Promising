@@ -92,7 +92,7 @@ async def test_use_thread_pool_false_context_propagation() -> None:
     "method",
     ["sync", "concurrent_future_result", "concurrent_future_exception"],
 )
-async def test_sync_raises_sync_usage_error_with_no_thread_pool(method: str) -> None:
+async def test_sync_raises_sync_usage_error_with_no_thread_pool(*, method: str) -> None:
     """
     Calling promise.sync(), concurrent_future.result(), or
     concurrent_future.exception() inside a use_thread_pool=False
@@ -125,7 +125,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(method: str) -> 
     await child_promise
 
 
-async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
+async def test_await_children_raises_sync_usage_error_with_no_thread_pool() -> None:
     """
     Calling await_children_sync() inside a use_thread_pool=False
     function raises SyncUsageError because it would deadlock.
@@ -152,7 +152,7 @@ async def test_await_children_sync_raises_sync_usage_error_with_no_thread_pool()
     ["sync", "concurrent_future_result", "concurrent_future_exception"],
 )
 @pytest.mark.parametrize("start_soon", [True, False])
-async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> None:
+async def test_sync_works_with_thread_pool(*, method: str, start_soon: bool) -> None:
     """
     Calling promise.sync(), concurrent_future.result(), or
     concurrent_future.exception() inside a use_thread_pool=True
@@ -181,7 +181,7 @@ async def test_sync_works_with_thread_pool(method: str, start_soon: bool) -> Non
         assert result == "child result"
 
 
-async def test_await_children_sync_works_with_thread_pool() -> None:
+async def test_await_children_works_with_thread_pool() -> None:
     """
     Calling await_children_sync() inside a use_thread_pool=True
     function works fine.
@@ -207,7 +207,7 @@ async def test_await_children_sync_works_with_thread_pool() -> None:
 
 
 @pytest.mark.parametrize("use_thread_pool", [True, False])
-async def test_use_thread_pool_raises_for_async_functions(use_thread_pool: bool) -> None:
+async def test_use_thread_pool_raises_for_async_functions(*, use_thread_pool: bool) -> None:
     """
     Setting use_thread_pool on an async function raises DecorationError —
     the parameter is only applicable to sync functions.

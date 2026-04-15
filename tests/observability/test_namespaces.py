@@ -15,6 +15,7 @@ from tests.utils_for_tests import normalize_object_repr
 # ── resolve_namespace (unit) ────────────────────────────────────
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_explicit_namespace_wins_over_fallback() -> None:
     """Explicitly provided namespace always takes priority."""
 
@@ -27,6 +28,7 @@ def test_explicit_namespace_wins_over_fallback() -> None:
     assert result == "custom"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_explicit_namespace_wins_even_with_none_fallback() -> None:
     result = resolve_namespace(
         provided_explicitly="explicit",
@@ -35,6 +37,7 @@ def test_explicit_namespace_wins_even_with_none_fallback() -> None:
     assert result == "explicit"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_none_when_both_are_none() -> None:
     result = resolve_namespace(
         provided_explicitly=None,
@@ -43,6 +46,7 @@ def test_none_when_both_are_none() -> None:
     assert result is None
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_qualname_from_function() -> None:
     """Falls back to module::qualname for a plain function."""
 
@@ -55,6 +59,7 @@ def test_qualname_from_function() -> None:
     assert result == "tests.observability.test_namespaces::test_qualname_from_function.<locals>.my_func"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_qualname_from_sync_function() -> None:
     def my_sync_func() -> None: ...
 
@@ -65,6 +70,7 @@ def test_qualname_from_sync_function() -> None:
     assert result == "tests.observability.test_namespaces::test_qualname_from_sync_function.<locals>.my_sync_func"
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_qualname_from_async_generator_object() -> None:
     """Async generator *objects* have __qualname__ but not __module__.
 
@@ -86,6 +92,7 @@ async def test_qualname_from_async_generator_object() -> None:
     await ag.aclose()
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_qualname_from_class() -> None:
     """Classes have __qualname__ and __module__."""
 
@@ -98,6 +105,7 @@ def test_qualname_from_class() -> None:
     assert result == "tests.observability.test_namespaces::test_qualname_from_class.<locals>.Foo"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_qualname_from_method_of_class() -> None:
     class MyClass:
         def method(self) -> None: ...
@@ -109,6 +117,7 @@ def test_qualname_from_method_of_class() -> None:
     assert result == "tests.observability.test_namespaces::test_qualname_from_method_of_class.<locals>.MyClass.method"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_name_fallback_when_no_qualname() -> None:
     """Object with __name__ but no __qualname__ uses __name__."""
     ns = types.SimpleNamespace(__name__="simple_ns")
@@ -121,6 +130,7 @@ def test_name_fallback_when_no_qualname() -> None:
     assert result == "simple_ns"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_name_fallback_with_module_but_no_qualname() -> None:
     """Object with __name__ and __module__ but no __qualname__."""
     ns = types.SimpleNamespace(__name__="my_thing", __module__="some.module")
@@ -136,7 +146,8 @@ def test_name_fallback_with_module_but_no_qualname() -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promise_repr_with_explicit_namespace(*, use_repr: bool) -> None:
     """Promise with explicit namespace shows it quoted before the class name."""
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
@@ -146,7 +157,8 @@ async def test_promise_repr_with_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_without_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promise_repr_without_namespace(*, use_repr: bool) -> None:
     """Prefilled promise with no namespace and no awaitable: bare repr."""
     promise = promising.Promise(prefilled_result="x")
 
@@ -156,7 +168,8 @@ async def test_promise_repr_without_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promise_repr_auto_resolves_from_coroutine(*, use_repr: bool) -> None:
     """Promise wrapping a coroutine auto-resolves namespace from its qualname.
 
     Coroutine objects have __qualname__ but NOT __module__. The module is
@@ -178,7 +191,8 @@ async def test_promise_repr_auto_resolves_from_coroutine(use_repr: bool) -> None
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promise_repr_explicit_overrides_coroutine_name(*, use_repr: bool) -> None:
     """Explicit namespace wins even when a named coroutine is provided."""
 
     async def do_work() -> str:
@@ -193,6 +207,7 @@ async def test_promise_repr_explicit_overrides_coroutine_name(use_repr: bool) ->
 # ── PromisingFunction namespace ─────────────────────────────────
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_promising_function_auto_namespace() -> None:
     """@promising.function auto-resolves namespace to module::qualname."""
 
@@ -206,6 +221,7 @@ async def test_promising_function_auto_namespace() -> None:
     )
 
 
+@pytest.mark.do_not_patch_qualnames
 async def test_promising_function_explicit_namespace() -> None:
     """@promising.function(namespace=...) uses the exact string provided."""
 
@@ -217,7 +233,8 @@ async def test_promising_function_explicit_namespace() -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_promise_inherits_namespace(*, use_repr: bool) -> None:
     """Promise returned by a PromisingFunction carries its explicit namespace."""
 
     @promising.function(namespace="FetchOp")
@@ -231,7 +248,8 @@ async def test_promising_function_promise_inherits_namespace(use_repr: bool) -> 
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_auto_namespace_in_promise_repr(*, use_repr: bool) -> None:
     """Promise from @promising.function (no explicit ns) shows module::qualname."""
 
     @promising.function
@@ -249,7 +267,8 @@ async def test_promising_function_auto_namespace_in_promise_repr(use_repr: bool)
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_namespace_override_at_call_time(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_namespace_override_at_call_time(*, use_repr: bool) -> None:
     """Namespace can be overridden per-call via keyword argument."""
 
     @promising.function(namespace="Default")
@@ -263,7 +282,8 @@ async def test_promising_function_namespace_override_at_call_time(use_repr: bool
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(*, use_repr: bool) -> None:
     """
     Passing namespace=UNCHANGED at call time falls back to decorator's namespace.
     """
@@ -282,7 +302,8 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(use
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_context_manager_explicit_namespace(*, use_repr: bool) -> None:
     """promising.context() as context manager with explicit namespace."""
     with promising.context(namespace="BatchCtx") as ctx:
         assert ctx.namespace == "BatchCtx"
@@ -291,7 +312,8 @@ async def test_context_manager_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_manager_no_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_context_manager_no_namespace(*, use_repr: bool) -> None:
     """promising.context() with no namespace: namespace is None."""
     with promising.context() as ctx:
         assert ctx.namespace is None
@@ -301,7 +323,8 @@ async def test_context_manager_no_namespace(use_repr: bool) -> None:
 
 @pytest.mark.parametrize("use_repr", [True, False])
 @pytest.mark.parametrize("parametrized_decorator", [True, False])
-async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_decorator: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_context_decorator_auto_namespace(*, use_repr: bool, parametrized_decorator: bool) -> None:
     """@promising.context as decorator auto-resolves to module::qualname."""
     captured_ctx = None
     ctx_decorator = promising.context() if parametrized_decorator else promising.context
@@ -327,7 +350,8 @@ async def test_context_decorator_auto_namespace(use_repr: bool, parametrized_dec
 
 
 @pytest.mark.parametrize("use_repr", [True, False])
-async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_context_decorator_explicit_namespace(*, use_repr: bool) -> None:
     """@promising.context(namespace=...) as decorator uses the exact string."""
     captured_ctx = None
 
@@ -348,7 +372,8 @@ async def test_context_decorator_explicit_namespace(use_repr: bool) -> None:
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_instance_method_qualname(use_promise_repr: bool | None) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_on_instance_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating an instance method: namespace is module::Class.method."""
 
     class Service:
@@ -374,7 +399,8 @@ async def test_promising_function_on_instance_method_qualname(use_promise_repr: 
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_static_method_qualname(use_promise_repr: bool | None) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_on_static_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating a staticmethod: namespace is module::Class.method."""
 
     class Service:
@@ -400,7 +426,8 @@ async def test_promising_function_on_static_method_qualname(use_promise_repr: bo
 
 
 @pytest.mark.parametrize("use_promise_repr", [True, False, None])
-async def test_promising_function_on_class_method_qualname(use_promise_repr: bool | None) -> None:
+@pytest.mark.do_not_patch_qualnames
+async def test_promising_function_on_class_method_qualname(*, use_promise_repr: bool | None) -> None:
     """Decorating a classmethod: namespace is module::Class.method."""
 
     class Service:
@@ -428,6 +455,7 @@ async def test_promising_function_on_class_method_qualname(use_promise_repr: boo
 # ── Inherited __module__ on plain instances (reviewer edge cases) ──
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_plain_instance_inherits_module_from_class() -> None:
     """A plain instance of a user-defined class inherits __module__ from its
     class but has no __qualname__ or __name__ of its own.
@@ -452,9 +480,6 @@ def test_plain_instance_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # The module prefix comes from the CLASS, not from the instance itself
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
         "tests.observability.test_namespaces"
         "::<tests.observability.test_namespaces.test_plain_instance_inherits_module_from_class.<locals>.SomeObject"
@@ -462,6 +487,7 @@ def test_plain_instance_inherits_module_from_class() -> None:
     )
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_instance_with_name_inherits_module_from_class() -> None:
     """An instance that has __name__ set also inherits __module__ from its
     class.
@@ -488,12 +514,10 @@ def test_instance_with_name_inherits_module_from_class() -> None:
         named_object_fallback=obj,
     )
     # Module prefix comes from Widget's class, not the instance
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert result == "tests.observability.test_namespaces::custom_name"
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_callable_instance_inherits_module_from_class() -> None:
     """A callable instance (with __call__) still inherits __module__ from its
     class but is not a function or type.
@@ -517,9 +541,6 @@ def test_callable_instance_inherits_module_from_class() -> None:
         provided_explicitly=None,
         named_object_fallback=handler,
     )
-    # TODO Do we even care about this edge case ?
-    #  https://github.com/teremterem/Promising/pull/71/changes#r2930305198
-    #  Maybe... if the object is awaitable... (and/or callable ?)
     assert normalize_object_repr(result) == (
         "tests.observability.test_namespaces"
         "::<tests.observability.test_namespaces.test_callable_instance_inherits_module_from_class.<locals>.Handler"
@@ -527,6 +548,7 @@ def test_callable_instance_inherits_module_from_class() -> None:
     )
 
 
+@pytest.mark.do_not_patch_qualnames
 def test_builtin_type_has_no_inherited_module() -> None:
     """Built-in type instances (int, str, list) do NOT inherit __module__.
 

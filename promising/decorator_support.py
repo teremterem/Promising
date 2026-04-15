@@ -64,14 +64,14 @@ class DecoratorSupport:
             self._is_coroutine = asyncio.coroutines._is_coroutine
 
         # Copy standard wrapper attributes (`__module__`, `__name__`,
-        # `__qualname__`, `__doc__`, `__annotations__`) from
-        # `func_or_method` onto `self` and set `self.__wrapped__` to
-        # `func_or_method`, using `functools.update_wrapper`.
+        # `__qualname__`, `__doc__`, etc.) from `func_or_method` onto `self`
+        # and set `self.__wrapped__` to `func_or_method`, using
+        # `functools.update_wrapper`.
         # NOTE: We pass `updated=()` to skip the default
-        # `self.__dict__.update(func_or_method.__dict__)` step. Without
-        # this, any matching attribute names in `func_or_method.__dict__`
-        # would silently overwrite instance attributes that were already
-        # set on `self` (e.g. `namespace`, `children_start_soon`, etc.).
+        # `self.__dict__.update(func_or_method.__dict__)` step. Without this,
+        # any matching attribute names in `func_or_method.__dict__` would
+        # silently overwrite instance attributes that were already set on
+        # `self` (e.g. `namespace`, `children_start_soon`, etc.).
         functools.update_wrapper(self, func_or_method, updated=())
 
     def __get__(self, obj: Any, objtype: type | None = None) -> CallableType:

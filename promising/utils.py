@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 from asyncio import AbstractEventLoop
+from collections.abc import Awaitable
 from typing import Any
 
 from promising.errors import NoRunningEventLoopError, SyncUsageError
@@ -15,35 +16,6 @@ def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
     if isinstance(func_or_method, (classmethod, staticmethod)):
         return asyncio.iscoroutinefunction(func_or_method.__func__)
     return asyncio.iscoroutinefunction(func_or_method)
-
-
-def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
-    try:
-        running_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        running_loop = None
-
-    if running_loop is loop_of_future:
-        raise SyncUsageError(message)
-
-
-def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any | None) -> str | None:
-    if provided_explicitly is not None:
-        return provided_explicitly
-
-    if named_object_fallback is None:
-        return None
-
-    prefix = resolve_module_name(named_object_fallback)
-    prefix = f"{prefix}::" if prefix else ""
-
-    if hasattr(named_object_fallback, "__qualname__"):
-        return f"{prefix}{named_object_fallback.__qualname__}"
-
-    if hasattr(named_object_fallback, "__name__"):
-        return f"{prefix}{named_object_fallback.__name__}"
-
-    return f"{prefix}{named_object_fallback}"
 
 
 def resolve_module_name(obj: Any) -> str | None:
@@ -77,3 +49,40 @@ def get_running_asyncio_loop(*, raise_if_none: bool = True) -> AbstractEventLoop
         if raise_if_none:
             raise NoRunningEventLoopError(e) from e
         return None
+
+
+def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any | None) -> str | None:
+    from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
+    if provided_explicitly is not None:
+        return provided_explicitly
+
+    if named_object_fallback is None:
+        return None
+
+    if Defaults.QUALNAMES_IN_NAMESPACES:
+        prefix = resolve_module_name(named_object_fallback)
+        prefix = f"{prefix}::" if prefix else ""
+        if hasattr(named_object_fallback, "__qualname__"):
+            return f"{prefix}{named_object_fallback.__qualname__}"
+    else:
+        prefix = ""
+
+    if hasattr(named_object_fallback, "__name__"):
+        return f"{prefix}{named_object_fallback.__name__}"
+
+    return f"{prefix}{named_object_fallback}"
+
+
+def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop is loop_of_future:
+        raise SyncUsageError(message)
+
+
+async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
+    return await awaitable

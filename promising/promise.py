@@ -1,11 +1,12 @@
 import concurrent.futures
+import inspect
 import time
-from asyncio import AbstractEventLoop, Future, Task
+from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
 from promising.errors import EventLoopMismatchError, PromiseNotFoundError
-from promising.promising_context import PromisingContext
+from promising.promising_context import PromisingContext, PromisingFuture
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
 from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop, resolve_namespace
@@ -31,12 +32,13 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
     return Promise.get_active_promise(raise_if_none=raise_if_none)
 
 
-class Promise(PromisingContext, Future, Generic[T_co]):
+class Promise(PromisingFuture[T_co | "Promise[T_co]"], Generic[T_co]):
     """
     A Promise combines PromisingContext's hierarchical context management
     with asyncio Future functionality.
 
-    Promise extends both PromisingContext and asyncio Future to provide:
+    Promise extends ``PromisingFuture`` — which itself combines
+    ``PromisingContext`` and ``asyncio.Future`` — to provide:
     - Asynchronous computation backed by an awaitable
     - Result/exception propagation via the Future interface
     - Thread-safe synchronous access via concurrent.futures compatibility
@@ -96,14 +98,15 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon_default: Local override for the global START_SOON_DEFAULT.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
-        prefilled_result: Pre-set result value. Cannot be combined with awaitable
-            or prefilled_exception.
+        prefilled_result: Pre-set result value. Cannot be an awaitable (pass
+            awaitables as the first positional argument instead). Cannot be
+            combined with awaitable or prefilled_exception.
         prefilled_exception: Pre-set exception. Cannot be combined with awaitable
             or prefilled_result.
 
     Raises:
         ValueError: If invalid parameter combinations are provided.
-        TypeError: If awaitable does not have __await__ when provided.
+        TypeError: If awaitable is not awaitable when provided.
     """
 
     # TODO [P1] Figure out how to support async generator interface as well
@@ -123,30 +126,24 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
-        prefilled_result: T_co | Awaitable[Any] | Sentinel = UNCHANGED,
+        prefilled_result: T_co | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
-        namespace = resolve_namespace(
-            provided_explicitly=namespace,
-            named_object_fallback=awaitable,
-        )
+        # Validate before super().__init__ to avoid registering an unsettled
+        # child with the parent when arguments are invalid.
+        self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
-        PromisingContext.__init__(
-            self,
-            namespace=namespace,
+        super().__init__(
+            namespace=resolve_namespace(
+                provided_explicitly=namespace,
+                named_object_fallback=awaitable,
+            ),
             loop=loop,
             parent=parent,
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
-        )
-        Future.__init__(
-            self,
-            # We will use the loop that PromisingContext resolved for us in its
-            # __init__, instead of letting Future's __init__ decide how to
-            # interpret the loop directly parameter (specifically when it's
-            # None)
-            loop=self._ctx_loop,
+            close_context_immediately=awaitable is None,
         )
 
         self._task: Task[T_co] | None = None
@@ -178,11 +175,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             PromiseNotFoundError: If no active Promise exists and
                 raise_if_none is True.
         """
-        # TODO Unit tests are needed for this method: specifically for the
-        #  cases when active context and active promise are at different levels
-        #  (with and without other contexts separating them). Also, we need to
-        #  verify correct behavior when there are more than two promises in the
-        #  hierarchy.
         current = cls.get_active_context(raise_if_none=False)
         while current is not None and not isinstance(current, Promise):
             current = current.get_parent_context(raise_if_none=False)
@@ -193,37 +185,98 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
     def __await__(self) -> Generator[Any, None, T_co]:
         """
-        Await the Promise, fully unpacking all nested awaitables.
+        Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to
         complete. Once the Promise resolves, recursively awaits the result as
         long as it is itself a Promise (non-Promise awaitables are
         auto-wrapped into Promises by ``set_result``), returning the final
-        non-awaitable value.
+        non-Promise value.
+
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
-            awaitables).
+            nested Promises).
         """
         return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
-        Synchronously wait for and return the Promise result, blocking the
-        calling thread. Recursively unpacks nested awaitables (non-Promise
-        awaitables are auto-wrapped into Promises by ``set_result``) until
-        the result is no longer a Promise, similar to ``__await__``.
-
-        This is the synchronous counterpart of ``__await__`` — intended for
-        use inside sync promising functions that run in a thread pool executor.
+        An alias for ``unpack_all_sync()`` — blocks the calling thread until
+        all nested Promises are fully unpacked.
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
-            awaitables).
+            nested Promises).
+
+        Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
+            TimeoutError: If timeout expires before completion.
+        """
+        return self.unpack_all_sync(timeout=timeout)
+
+    async def unpack_all(self) -> T_co:
+        """
+        Coroutine that fully unpacks all nested Promises, equivalent to
+        ``await promise``.
+
+        Use this instead of passing the bare promise to asyncio utilities
+        like ``asyncio.wait_for``, ``asyncio.gather``, or ``asyncio.shield``.
+        These utilities detect that ``Promise`` is an ``asyncio.Future`` and
+        wait for it directly, bypassing ``__await__`` and its recursive
+        unpacking logic. As a result, passing a bare promise may return a
+        nested ``Promise`` object instead of the final resolved value.
+
+        Because ``unpack_all()`` is a coroutine (not a Future), asyncio
+        utilities will wrap it in a Task, which invokes ``__await__`` and
+        triggers full recursive unpacking as expected.
+
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
+
+        Example::
+
+            # Instead of this (may return a nested Promise):
+            result = await asyncio.wait_for(promise, timeout=5)
+
+            # Do this:
+            result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
+
+        Returns:
+            The fully unpacked result of the Promise (no remaining
+            nested Promises).
+        """
+        return await self
+
+    def unpack_all_sync(self, *, timeout: float | None = None) -> T_co:
+        """
+        Synchronously wait for and return the Promise result, blocking the
+        calling thread. Recursively unpacks nested Promises (non-Promise
+        awaitables are auto-wrapped into Promises by ``set_result``) until
+        the result is no longer a Promise, similar to ``__await__``.
+
+        This is the synchronous counterpart of ``__await__`` — intended for
+        use inside sync promising functions that run in a thread pool executor.
+
+        Note that unpacking only traverses ``Promise`` instances specifically
+        — it does not unpack arbitrary awaitables or ``PromisingFuture``
+        objects in general.
+
+        Args:
+            timeout: Maximum time to wait for the result in seconds.
+
+        Returns:
+            The fully unpacked result of the Promise (no remaining
+            nested Promises).
 
         Raises:
             SyncUsageError: If called from the same thread as the event loop,
@@ -236,8 +289,6 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         while isinstance(result, Promise):
             remaining = None if deadline is None else deadline - time.monotonic()
-            # TODO Add a test to ensure that unpacking of a chain of awaitables
-            #  goes on [roughly] for the duration of the timeout
             if remaining is not None:
                 # Make sure it does not go below zero
                 remaining = max(remaining, 0)
@@ -246,10 +297,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
 
         return result
 
-    async def unpack_once(self) -> "T_co | Promise[Any]":
+    async def unpack_once(self) -> T_co | "Promise[T_co]":
         """
         Await the Promise, resolving only one level without recursively
-        unpacking nested awaitables.
+        unpacking nested Promises.
 
         If the Promise hasn't started yet, starts execution via _fulfill().
         If already started via start_soon, waits for the existing task to
@@ -263,10 +314,10 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         return await _AwaitablePromiseUnpacker[T_co](self, unpack_all=False)
 
-    def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
+    def unpack_once_sync(self, *, timeout: float | None = None) -> T_co | "Promise[T_co]":
         """
         Synchronously wait for and return the Promise result, blocking the
-        calling thread. Does not recursively unpack nested awaitables
+        calling thread. Does not recursively unpack nested Promises
         (non-Promise awaitables are auto-wrapped into Promises by
         ``set_result``) — returns the raw result of the Promise's
         awaitable, similar to ``unpack_once``.
@@ -315,37 +366,30 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         """
         if self.done():
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self}")
+            raise RuntimeError(f"An attempt was made to fulfill a Promise that is already done: {self!r}")
         if self._awaitable is None:
             # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self}")
-
-        result = UNCHANGED
-        exception = None
+            raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self!r}")
 
         try:
             with self:
-                result = await self._awaitable
+                self.set_result(await self._awaitable)
 
         except BaseException as exc:
-            exception = exc
             try:
                 # TODO Make it possible to disable setting this trace ?
                 # TODO Borrow from MiniAgents the mechanism that logs this
                 #  "promising breadcrumb" together with the error tracebacks
-                if not hasattr(exception, "__promising_context__"):
+                if not hasattr(exc, "__promising_context__"):
                     # We only let it be set at the deepest level of the promise
                     # hierarchy
-                    exception.__promising_context__ = self
+                    exc.__promising_context__ = self
             except BaseException:
                 # Suppress the error if any - failure to store the trace should
                 # not affect the exception handling
                 pass
-        finally:
-            if exception is None:
-                self.set_result(result)
-            else:
-                self.set_exception(exception)
+
+            self.set_exception(exc)
 
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
@@ -367,6 +411,8 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             return self._start_soon_default
 
         # TODO Do we even need this kind of inheritance for start_soon ?
+        #  Revisit all the settings after you develop some examples, and think
+        #  again if the settings as they currently are make sense.
         if start_soon is INHERIT:
             parent_promise = self.get_parent_promise(raise_if_none=False)
 
@@ -381,35 +427,54 @@ class Promise(PromisingContext, Future, Generic[T_co]):
             f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
 
+    @staticmethod
+    def _validate_init_args(
+        awaitable: Awaitable[Any] | None,
+        prefilled_result: Any,
+        prefilled_exception: BaseException | None,
+    ) -> None:
+        """
+        Validate constructor args before ``super().__init__`` to prevent
+        registering an unsettled child with the parent on bad input.
+        """
+        if awaitable is None:
+            if prefilled_result is not UNCHANGED and prefilled_exception is not None:
+                raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
+
+            if prefilled_result is not UNCHANGED and inspect.isawaitable(prefilled_result):
+                raise TypeError(
+                    "Cannot pass an awaitable as 'prefilled_result'. Pass it as the first positional argument instead."
+                )
+
+            if prefilled_result is UNCHANGED and prefilled_exception is None:
+                raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
+        else:
+            if not inspect.isawaitable(awaitable):
+                raise TypeError(f"Promise must be created with an awaitable. Got {type(awaitable)}.")
+
+            if prefilled_result is not UNCHANGED or prefilled_exception is not None:
+                raise ValueError(
+                    "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
+                )
+
     def _finish_initialization(
         self,
         *,
         prefilled_result: T_co | Awaitable[Any] | Sentinel,
         prefilled_exception: BaseException | None,
     ) -> None:
+        # Validation already done in _validate_init_args (before super().__init__).
+        # This method only performs side effects.
         if self._awaitable is None:
-            if prefilled_result is not UNCHANGED and prefilled_exception is not None:
-                raise ValueError("Cannot provide both 'prefilled_result' and 'prefilled_exception' parameters")
-
             if prefilled_result is not UNCHANGED:
                 self.set_result(prefilled_result)
-            elif prefilled_exception is not None:
-                self.set_exception(prefilled_exception)
             else:
-                raise ValueError("Cannot create a Promise without an awaitable or prefilled result/exception")
-        else:
-            if not hasattr(self._awaitable, "__await__"):
-                raise TypeError(f"Promise must be created with an awaitable. Got {type(self._awaitable)}.")
-            if prefilled_result is not UNCHANGED or prefilled_exception is not None:
-                raise ValueError(
-                    "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
-                )
-
-            if self._start_soon:
-                # We don't know which thread the Promise is created in, so we
-                # use the event loop's `call_soon_threadsafe` to "stay on the
-                # safe side"
-                self._call_soon_threadsafe(self._ensure_task_scheduled)
+                self.set_exception(prefilled_exception)
+        elif self._start_soon:
+            # We don't know which thread the Promise is created in, so we
+            # use the event loop's `call_soon_threadsafe` to "stay on the
+            # safe side"
+            self._call_soon_threadsafe(self._ensure_task_scheduled)
 
     def set_result(self, result: T_co | Awaitable[Any]) -> None:
         """
@@ -417,8 +482,11 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         directly by users; it is managed by the Promise's lifecycle.
 
         If the result is an awaitable but not a Promise, it is automatically
-        wrapped in a Promise so that downstream unpacking (in ``sync()``,
-        ``__await__``, etc.) can always assume awaitable results are Promises.
+        wrapped in a child Promise so that downstream unpacking (in
+        ``sync()``, ``__await__``, etc.) can always assume awaitable
+        results are Promises. The wrapper inherits this Promise's
+        ``loop``, ``thread_pool``, ``start_soon``, ``children_start_soon``,
+        and ``start_soon_default`` settings.
 
         Also sets the result on the concurrent.futures.Future for thread
         compatibility (see `as_concurrent_future()` method).
@@ -426,8 +494,16 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         Args:
             result: The result value to set.
         """
-        if hasattr(result, "__await__") and not isinstance(result, Promise):
-            result = Promise[Any](result, parent=self)
+        if inspect.isawaitable(result) and not isinstance(result, Promise):
+            result = Promise[T_co](
+                result,
+                loop=self._ctx_loop,
+                parent=self,
+                thread_pool=self._thread_pool,
+                start_soon=self._start_soon,
+                children_start_soon=self._children_start_soon,
+                start_soon_default=self._start_soon_default,
+            )
 
         super().set_result(result)
         # TODO Account for the fact that the concurrent future itself might be
@@ -453,7 +529,7 @@ class Promise(PromisingContext, Future, Generic[T_co]):
         self._concurrent_future.set_exception(exception)
 
 
-class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
+class PromiseBackedConcurrentFuture(concurrent.futures.Future[T_co | "Promise[T_co]"], Generic[T_co]):
     """
     A thread-safe `concurrent.futures.Future` backed by a ``Promise``.
 
@@ -475,7 +551,7 @@ class PromiseBackedConcurrentFuture(concurrent.futures.Future, Generic[T_co]):
         super().__init__()
         self._promise = promise
 
-    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> "T_co | Promise[Any]":
+    def result(self, timeout: float | None = None, *, ensure_task_scheduled: bool = True) -> T_co | "Promise[T_co]":
         """
         Get the result of the Promise.
 
@@ -589,7 +665,7 @@ class _AwaitablePromiseUnpacker(Generic[T_co]):
         self._promise = promise
         self._unpack_all = unpack_all
 
-    def __await__(self) -> Generator[Any, None, T_co | Promise[Any]]:
+    def __await__(self) -> Generator[Any, None, T_co | Promise[T_co]]:
         running_loop = get_running_asyncio_loop(raise_if_none=True)
         if running_loop is not self._promise._ctx_loop:
             raise EventLoopMismatchError(

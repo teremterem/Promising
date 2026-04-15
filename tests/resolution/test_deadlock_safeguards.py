@@ -8,9 +8,7 @@ from promising import Promise, SyncUsageError
 
 
 @pytest.mark.parametrize("method", ["result", "exception"])
-async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_result(
-    method: str,
-) -> None:
+async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_result(*, method: str) -> None:
     """
     Calling concurrent_future.result() or .exception() from the event loop
     thread raises SyncUsageError because it would deadlock.
@@ -26,7 +24,7 @@ async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_res
 
 
 @pytest.mark.parametrize("method", ["result", "exception"])
-async def test_raises_sync_usage_error_even_when_done(method: str) -> None:
+async def test_raises_sync_usage_error_even_when_done(*, method: str) -> None:
     """
     Calling concurrent_future.result() or .exception() from the event loop
     thread raises SyncUsageError even when the future is already done.
@@ -49,9 +47,7 @@ async def test_raises_sync_usage_error_even_when_done(method: str) -> None:
 
 
 @pytest.mark.parametrize("method", ["result", "exception"])
-async def test_raises_sync_usage_error_with_prefilled_exception(
-    method: str,
-) -> None:
+async def test_raises_sync_usage_error_with_prefilled_exception(*, method: str) -> None:
     """
     Calling concurrent_future.result() or .exception() from the event loop
     thread raises SyncUsageError, not the prefilled exception.
@@ -77,7 +73,7 @@ async def test_raises_sync_usage_error_with_prefilled_exception(
     [(0.1, 0.2), (0.2, 0.1)],
     ids=["completes", "times-out"],
 )
-async def test_from_separate_thread(method: str, coro_sleep: float, timeout: float) -> None:
+async def test_from_separate_thread(*, method: str, coro_sleep: float, timeout: float) -> None:
     """
     Calling concurrent_future.result() or .exception() from a separate
     thread succeeds when the promise resolves in time, and raises

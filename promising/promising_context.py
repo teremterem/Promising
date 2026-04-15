@@ -3,28 +3,34 @@ import concurrent.futures
 import contextvars
 import functools
 import inspect
-from asyncio import AbstractEventLoop, Future
+import logging
+import threading
+from asyncio import AbstractEventLoop
 from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
-from weakref import WeakSet
 
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
+    ContextAlreadyClosedError,
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
     NoRunningEventLoopError,
     PromiseNotFoundError,
 )
+from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
-from promising.types import DecoratableFunctionType
-from promising.utils import assert_no_sync_usage_deadlock, get_running_asyncio_loop
+from promising.types import DecoratableFunctionType, T_co
+from promising.utils import assert_no_sync_usage_deadlock, awaitable_as_coroutine, get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
+
+
+_hierarchy_logger = PromisingHierarchyLogger(level=logging.DEBUG)
 
 
 class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
@@ -47,7 +53,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             # Promises created here become children of `ctx`
             ...
         ...
-        await ctx.await_children(recursively=True)
+        await ctx.await_children()
 
     As a **decorator** (wraps a function so every call runs inside a fresh
     ``PromisingContext``)::
@@ -87,11 +93,10 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             Promises whose own ``start_soon`` is None. Controls whether
             they start executing immediately (i.e. as soon as the event loop
             allows), or defer until awaited one way or another. ``INHERIT``
-            (default) copies the parent's setting.
-            TODO Are we sure about INHERIT being the default for
-             children_start_soon in promising contexts, while being None by
-             default in promising functions ?
-            TODO Mention this difference here in the docstring
+            (default) copies the parent's setting. Note: this defaults to
+            ``INHERIT`` (unlike ``promising`` functions, which default to
+            ``None``), so that a ``PromisingContext`` is transparent by
+            default — settings flow through from the enclosing ``Promise``.
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
@@ -231,23 +236,32 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, recursively: bool = True) -> None:
+async def await_children(*, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
     Args:
-        recursively: If True (the default), wait for all descendants,
+        whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
+        unpack_all_promises: If True (the default), each Promise child
+            is fully awaited. If False, Promise children are only unpacked
+            one level (via ``unpack_once()``).
     """
-    # TODO We need unit tests that ensure this function works correctly even
-    #  when called on a bare PromisingContext, and not on a Promise.
     # TODO Do we need a check that ensures that this function was called in a
     #  thread that contains the event loop of this particular
     #  PromisingContext ? What other functions or methods might we need it in ?
-    return await get_active_context().await_children(recursively=recursively)
+    return await get_active_context().await_children(
+        whole_subtree=whole_subtree,
+        unpack_all_promises=unpack_all_promises,
+    )
 
 
-def await_children_sync(*, recursively: bool = True, timeout: float | None = None) -> None:
+def await_children_sync(
+    *,
+    whole_subtree: bool = True,
+    unpack_all_promises: bool = True,
+    timeout: float | None = None,
+) -> None:
     """
     Wait for all awaitable children of the active context to finish,
     blocking the calling thread.
@@ -257,45 +271,53 @@ def await_children_sync(*, recursively: bool = True, timeout: float | None = Non
     executor, where ``await`` is not available.
 
     Args:
-        recursively: If True (the default), wait for all descendants,
+        whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
+        unpack_all_promises: If True (the default), each Promise child
+            is fully awaited. If False, Promise children are only unpacked
+            one level (via ``unpack_once()``).
         timeout: Maximum time to wait in seconds.
     """
-    # TODO We need unit tests that ensure this function works correctly even
-    #  when called on a bare PromisingContext, and not on a Promise.
-    return get_active_context().await_children_sync(recursively=recursively, timeout=timeout)
+    return get_active_context().await_children_sync(
+        whole_subtree=whole_subtree,
+        unpack_all_promises=unpack_all_promises,
+        timeout=timeout,
+    )
 
 
-def collect_remaining_children(
+def collect_unsettled_children(
     *,
-    recursively: bool = True,
-    exclude_non_awaitable: bool = True,
-    exclude_done: bool = True,
+    whole_subtree: bool = True,
+    futures_only: bool = True,
+    open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
-    Collect child contexts of the active context that haven't been garbage
-    collected.
+    Collect child contexts of the active context that are still being
+    tracked by their parent (i.e. they have not yet been unregistered
+    after being closed and having all of their own descendants drain).
 
     This is the module-level counterpart of
-    ``PromisingContext.collect_remaining_children()``.
+    ``PromisingContext.collect_unsettled_children()``.
 
     Args:
-        recursively: If True (default), include descendants at all levels,
+        whole_subtree: If True (default), include descendants at all levels,
             not just direct children.
-        exclude_non_awaitable: If True (default), exclude children that
-            are not awaitable (i.e. plain PromisingContexts that are not
-            Futures).
-        exclude_done: If True (default), exclude children that weren't
-            garbage collected yet, but are done nonetheless (i.e. Futures
-            with a result or exception already set).
+        futures_only: If True (default), exclude children that are not
+            ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
+            nodes created via ``promising.context``).
+        open_contexts_only: If True (default), exclude children whose
+            ``with`` block has already exited (or whose ``set_result`` /
+            ``set_exception`` has been called, in the case of a
+            ``PromisingFuture``). Such children may still be tracked
+            because they themselves have unsettled descendants.
 
     Returns:
         Set of child PromisingContexts matching the filter criteria.
     """
-    return get_active_context().collect_remaining_children(
-        recursively=recursively,
-        exclude_non_awaitable=exclude_non_awaitable,
-        exclude_done=exclude_done,
+    return get_active_context().collect_unsettled_children(
+        whole_subtree=whole_subtree,
+        futures_only=futures_only,
+        open_contexts_only=open_contexts_only,
     )
 
 
@@ -330,10 +352,11 @@ def print_trace(*, parents_first: bool = True) -> None:
 
 
 class PromisingContext:
-    """Hierarchical context node that tracks parent-child relationships
-    between promises. Usually created via ``promising.context``; see
-    :class:`promising.context` for usage details and parameter
-    descriptions."""
+    """
+    Hierarchical context node that tracks parent-child relationships between
+    promises. Usually created via ``promising.context``; see
+    :class:`promising.context` for usage details and parameter descriptions.
+    """
 
     namespace: str | None
 
@@ -351,6 +374,7 @@ class PromisingContext:
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        close_context_immediately: bool = False,
     ) -> None:
         self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
@@ -361,8 +385,8 @@ class PromisingContext:
             self._parent = parent
         else:
             raise ValueError(
-                "`parent` must be either INHERIT, another PromisingContext "
-                f"or None, but `{type(parent)}` was given instead"
+                f"`parent` must be either INHERIT, another PromisingContext "
+                f"or None, but `{type(parent)}` was given for {self!r} instead"
             )
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
@@ -376,12 +400,19 @@ class PromisingContext:
                 self._ctx_loop = self._parent._ctx_loop
         else:
             if self._parent is not None and loop is not self._parent._ctx_loop:
-                raise ValueError("Parent and child PromisingContexts must share the same event loop")
+                raise ValueError(
+                    f"Parent and child PromisingContexts must share the same event loop.\n"
+                    f"Parent: {self._parent!r}\n"
+                    f"Child: {self!r}"
+                )
             self._ctx_loop = loop
 
-        self._children = WeakSet[PromisingContext]()
-        if self._parent is not None:
-            self._parent._children.add(self)
+        self._context_closed = close_context_immediately
+        self._unsettled_children = set[PromisingContext]()
+        self._unsettled_children_lock = threading.Lock()
+
+        if self._parent is not None and not self._context_closed:
+            self._parent._register_children_threadsafe(self)
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -405,6 +436,19 @@ class PromisingContext:
             raise ContextNotFoundError("No active PromisingContext found")
         return active
 
+    def is_still_open(self) -> bool:
+        """
+        Whether this context is still open.
+
+        A ``PromisingContext`` is "open" from the moment it is constructed
+        until ``close_context_threadsafe()`` runs (which happens
+        automatically when the ``with`` block exits, or when a
+        ``PromisingFuture`` subclass receives a result/exception). Closed
+        contexts are still kept around in their parent's
+        ``_unsettled_children`` until their own unsettled descendants drain.
+        """
+        return not self._context_closed
+
     def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
         Get the immediate parent PromisingContext of this PromisingContext.
@@ -422,7 +466,7 @@ class PromisingContext:
                 raise_if_none is True.
         """
         if raise_if_none and self._parent is None:
-            raise ContextNotFoundError("No parent PromisingContext found")
+            raise ContextNotFoundError(f"No parent PromisingContext found for {self!r}")
         return self._parent
 
     def get_parent_promise(self, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -448,7 +492,7 @@ class PromisingContext:
             parent = parent.get_parent_context(raise_if_none=False)
 
         if raise_if_none and parent is None:
-            raise PromiseNotFoundError("No parent Promise found")
+            raise PromiseNotFoundError(f"No parent Promise found for {self!r}")
         return parent
 
     def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
@@ -486,7 +530,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, recursively: bool = True) -> None:
+    async def await_children(self, *, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -494,19 +538,42 @@ class PromisingContext:
         children may spawn new children while being awaited.
 
         Args:
-            recursively: If True (the default), wait for all descendants,
+            whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
+            unpack_all_promises: If True (the default), each Promise child
+                is fully awaited. If False, Promise children are only unpacked
+                one level (``child.unpack_once()``).
         """
-        while children := self.collect_remaining_children(
-            recursively=recursively,
-            exclude_non_awaitable=True,
-            exclude_done=True,
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
+        _hierarchy_logger.log_awaiting_children_started(parent=self)
+
+        # The loop is needed because, in case of recursive awaiting, new
+        # children may be spawned by existing ones while the existing ones
+        # are being awaited
+        while children := self.collect_unsettled_children(
+            whole_subtree=whole_subtree,
+            futures_only=True,
+            # We assume that if a context is already closed, then it also
+            # finished already (either was explicitly awaited for or finished
+            # in the background due to "start soon")
+            # TODO Try setting it to False, just for an experiment's sake
+            open_contexts_only=True,
         ):
-            # The loop is needed because, in case of recursive awaiting, new
-            # children may be spawned by existing ones while the existing ones
-            # are being awaited
+            _hierarchy_logger.log_awaiting_children(parent=self, children=children)
+
+            # TODO Safeguard from awaiting a child that happens to be the
+            #  currently active context (or a parent of the currently active
+            #  context ?)
             await asyncio.gather(
-                *[child.unpack_once() for child in children],
+                *[
+                    asyncio.create_task(
+                        child.unpack_once()
+                        if not unpack_all_promises and isinstance(child, Promise)
+                        else awaitable_as_coroutine(child)
+                    )
+                    for child in children
+                ],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of
                 # whether any of them fail (we don't want to wait only until
@@ -514,7 +581,15 @@ class PromisingContext:
                 return_exceptions=True,
             )
 
-    def await_children_sync(self, *, recursively: bool = True, timeout: float | None = None) -> None:
+        _hierarchy_logger.log_children_awaited(parent=self)
+
+    def await_children_sync(
+        self,
+        *,
+        whole_subtree: bool = True,
+        unpack_all_promises: bool = True,
+        timeout: float | None = None,
+    ) -> None:
         """
         Wait for all awaitable children to finish, blocking the calling
         thread.
@@ -524,8 +599,11 @@ class PromisingContext:
         executor, where ``await`` is not available.
 
         Args:
-            recursively: If True (the default), wait for all descendants,
+            whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
+            unpack_all_promises: If True (the default), each Promise child
+                is fully awaited. If False, Promise children are only
+                unpacked one level (via ``unpack_once()``).
             timeout: Maximum time to wait in seconds.
 
         Raises:
@@ -545,7 +623,10 @@ class PromisingContext:
 
         async def await_children_and_notify() -> None:
             try:
-                await self.await_children(recursively=recursively)
+                await self.await_children(
+                    whole_subtree=whole_subtree,
+                    unpack_all_promises=unpack_all_promises,
+                )
             except BaseException as exc:
                 # This ideally should not happen (provided there are no bugs in
                 # the framework) - `await_children` gathers all exceptions from
@@ -560,87 +641,84 @@ class PromisingContext:
         self._call_soon_threadsafe(schedule_await_children)
         concurrent_future.result(timeout=timeout)
 
-    def collect_remaining_children(
+    def collect_unsettled_children(
         self,
         *,
-        recursively: bool = True,
-        exclude_non_awaitable: bool = True,
-        exclude_done: bool = True,
+        whole_subtree: bool = True,
+        futures_only: bool = True,
+        open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
         """
-        Collect child contexts that haven't been garbage collected.
+        Collect children that are still tracked by this context.
 
-        Children are held via a WeakSet, so only children that are still
-        strongly referenced elsewhere will be returned. Filtering options
-        allow narrowing the set to awaitable and/or in-progress children.
+        Children register themselves in ``_unsettled_children`` (a strong-ref
+        ``set`` guarded by a lock) at construction time and unregister
+        themselves once they are closed *and* have no unsettled descendants
+        of their own. Filtering options allow narrowing the set further.
 
-        A child is considered "awaitable" if ``inspect.isawaitable()``
-        returns True for it (e.g. Promises, which are Futures). A child is
-        considered "done" if it is an asyncio Future whose ``done()`` method
-        returns True.
+        A child is considered a "future" if it is an instance of
+        ``PromisingFuture`` (i.e. anything awaitable that lives in the
+        hierarchy — registering a non-``PromisingFuture`` awaitable as a
+        child raises ``TypeError``). A child is considered "open" until
+        either its ``with`` block exits (``close_context_threadsafe()``
+        runs) or, for ``PromisingFuture`` subclasses, its ``set_result()``
+        / ``set_exception()`` is called.
 
         Args:
-            recursively: If True (default), include descendants at all levels,
-                not just direct children.
-            exclude_non_awaitable: If True (default), exclude children that
-                are not awaitable (i.e. plain PromisingContexts that are not
-                Futures).
-            exclude_done: If True (default), exclude children that weren't
-                garbage collected yet, but are done nonetheless (i.e. Futures
-                with a result or exception already set).
+            whole_subtree: If True (default), include descendants at all
+                levels, not just direct children.
+            futures_only: If True (default), exclude children that are not
+                ``PromisingFuture`` instances (i.e. plain
+                ``PromisingContext`` nodes created via
+                ``promising.context``).
+            open_contexts_only: If True (default), exclude children that
+                are already closed. Such children may still be tracked
+                because they themselves have unsettled descendants — recursive
+                traversal still walks through them so their open
+                descendants can be discovered.
 
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        # # COPIED FROM asyncio.tasks::all_tasks():
-        # Looping over a WeakSet (_all_tasks) isn't safe as it can be updated from another
-        # thread while we do so. Therefore we cast it to list prior to filtering. The list
-        # cast itself requires iteration, so we repeat it several times ignoring
-        # RuntimeErrors (which are not very likely to occur). See issues 34970 and 36607 for
-        # details.
-        i = 0
-        while True:
-            try:
-                # In `asyncio.tasks::all_tasks()` it was `_all_tasks` instead of
-                # `self._children`
-                children = list[PromisingContext](self._children)
-            except RuntimeError:
-                i += 1
-                if i > 1000:  # noqa: PLR2004 (magic-value-comparison)
-                    raise
+        with self._unsettled_children_lock:
+            children = list[PromisingContext](self._unsettled_children)
 
-            else:
-                result = {
-                    child
-                    for child in children
-                    if (not exclude_non_awaitable or inspect.isawaitable(child))
-                    and (not exclude_done or not isinstance(child, Future) or not child.done())
-                }
+        result = {
+            child
+            for child in children
+            if (
+                (not futures_only or isinstance(child, PromisingFuture))
+                and (not open_contexts_only or child.is_still_open())
+            )
+        }
 
-                if recursively:
-                    # We are iterating over all the children, regardless of
-                    # the exclude_done and exclude_non_awaitable settings,
-                    # because some children that are done or non-awaitable
-                    # might have children of their own which are awaitable and
-                    # are still in progress and so on. (This works because
-                    # those children of children prevent their parents from
-                    # being garbage collected, since they, while themselves
-                    # being active, still hold a strong reference to their
-                    # parents.)
-                    for child in children:
-                        result.update(
-                            child.collect_remaining_children(
-                                recursively=True,
-                                exclude_non_awaitable=exclude_non_awaitable,
-                                exclude_done=exclude_done,
-                            )
-                        )
+        if whole_subtree:
+            # We are iterating over all the children, regardless of the
+            # futures_only and open_contexts_only settings, because some
+            # children may still be "unsettled" simply because they still have
+            # "unsettled" children of their own.
+            for child in children:
+                result.update(
+                    child.collect_unsettled_children(
+                        whole_subtree=True,
+                        futures_only=futures_only,
+                        open_contexts_only=open_contexts_only,
+                    )
+                )
 
-                return result
+        return result
+
+    def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
+        """
+        Return the thread pool executor for ``loop.run_in_executor``.
+        """
+        return self._thread_pool
 
     def __enter__(self) -> "PromisingContext":
         if self._previous_token is not None:
-            raise ContextAlreadyActiveError("This PromisingContext is already active")
+            raise ContextAlreadyActiveError(f"{self!r} is already active")
+        if self._context_closed:
+            raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
 
         self._previous_token = self.__active_context.set(self)
         return self
@@ -653,7 +731,7 @@ class PromisingContext:
     ) -> bool:
         try:
             if self._previous_token is None:
-                raise ContextNotActiveError("This PromisingContext is not active")
+                raise ContextNotActiveError(f"{self!r} is not active")
 
             self.__active_context.reset(self._previous_token)
             self._previous_token = None
@@ -664,7 +742,74 @@ class PromisingContext:
             else:
                 raise exc from exc_value
 
+        finally:
+            self.close_context_threadsafe()
+
         return False  # Let's not suppress any exceptions
+
+    def close_context_threadsafe(self) -> None:
+        """
+        Mark this context as closed and unregister it from its parent if
+        no unsettled descendants remain. Safe to call from any thread.
+
+        Called automatically by ``__exit__`` (so a normal ``with`` block
+        always closes the context) and by ``PromisingFuture.set_result``
+        / ``PromisingFuture.set_exception`` (so a future-backed context
+        is also closed the moment its result is set, even if no ``with``
+        block was used). After this runs, any further attempt to enter
+        the context or to register children on it raises
+        ``ContextAlreadyClosedError``.
+        """
+        with self._unsettled_children_lock:
+            self._context_closed = True
+        self._unregister_from_parent_if_time()
+
+    def __repr__(self) -> str:
+        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
+        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
+
+    def _unregister_from_parent_if_time(self) -> None:
+        if self._context_closed and self._parent is not None and not self._unsettled_children:
+            _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
+
+            self._parent._unregister_children_threadsafe(self)
+
+    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+        for child in children:
+            if not isinstance(child, PromisingContext):
+                raise TypeError(
+                    f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
+            if inspect.isawaitable(child) and not isinstance(child, PromisingFuture):
+                raise TypeError(
+                    f"Cannot register an Awaitable child that is not a PromisingFuture.\n"
+                    f"Context: {self!r}\nChild: {child!r}"
+                )
+
+        with self._unsettled_children_lock:
+            if self._context_closed:
+                raise ContextAlreadyClosedError(
+                    f"Cannot register children in a context that has already been closed.\n"
+                    f"Context: {self!r}\nChildren: {children!r}"
+                )
+            self._unsettled_children.update(children)
+
+            _hierarchy_logger.log_children_registered(parent=self, children=children)
+
+    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+        with self._unsettled_children_lock:
+            self._unsettled_children.difference_update(children)
+
+            _hierarchy_logger.log_children_unregistered(parent=self, children=children)
+
+        self._unregister_from_parent_if_time()
+
+    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
+        if not self._ctx_loop.is_running():
+            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
+
+        self._ctx_loop.call_soon_threadsafe(callback)
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
@@ -686,8 +831,8 @@ class PromisingContext:
             return self._parent._start_soon_default
 
         raise ValueError(
-            "`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
-            f"but `{type(start_soon_default)}` was given instead"
+            f"`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(start_soon_default)}` was given for {self!r} instead"
         )
 
     def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:
@@ -707,8 +852,8 @@ class PromisingContext:
             return self._parent._children_start_soon
 
         raise ValueError(
-            "`children_start_soon` must be either None, INHERIT or a boolean value, "
-            f"but `{type(children_start_soon)}` was given instead"
+            f"`children_start_soon` must be either None, INHERIT or a boolean value, "
+            f"but `{type(children_start_soon)}` was given for {self!r} instead"
         )
 
     def _resolve_thread_pool(
@@ -736,22 +881,47 @@ class PromisingContext:
             return self._parent._thread_pool
 
         raise ValueError(
-            "`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
-            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given instead"
+            f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
+            f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
 
-    def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
-        """
-        Return the thread pool executor for ``loop.run_in_executor``.
-        """
-        return self._thread_pool
 
-    def __repr__(self) -> str:
-        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
-        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
+class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
+    """
+    A ``PromisingContext`` that is also an ``asyncio.Future``.
 
-    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
-        if not self._ctx_loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self} is not running")
+    ``PromisingFuture`` is the bridge between the hierarchical context
+    machinery and the asyncio future protocol — anything that should
+    appear as an *awaitable* child in a ``PromisingContext`` hierarchy
+    must be a ``PromisingFuture`` (registering an ``Awaitable`` child
+    that is not a ``PromisingFuture`` raises ``TypeError``). ``Promise``
+    is the most prominent subclass.
 
-        self._ctx_loop.call_soon_threadsafe(callback)
+    The class overrides ``set_result`` and ``set_exception`` to call
+    ``close_context_threadsafe()`` *before* delegating to
+    ``asyncio.Future``. This is necessary in addition to the
+    ``__exit__``-based close in ``PromisingContext`` because the future
+    lifecycle and the context manager lifecycle are independent: a
+    ``PromisingFuture`` can be resolved without ever being entered as a
+    context manager (e.g. a prefilled ``Promise``), and even when it
+    *is* entered, observers awaiting the future may be woken up before
+    the surrounding ``with`` block exits. Closing the context first
+    ensures that anyone who sees the future as done also sees its
+    context as closed — in particular, a parent's
+    ``await_children()`` loop will not pick this child up again on its
+    next iteration.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        # PromisingContext.__init__
+        super().__init__(**kwargs)
+        # Expected to be asyncio.Future[T_co].__init__
+        super(PromisingContext, self).__init__(loop=self._ctx_loop)
+
+    def set_result(self, result: T_co) -> None:
+        self.close_context_threadsafe()
+        super().set_result(result)
+
+    def set_exception(self, exception: type | BaseException) -> None:
+        self.close_context_threadsafe()
+        super().set_exception(exception)

@@ -1,6 +1,6 @@
 import re
 import threading
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 
 import promising
@@ -58,3 +58,26 @@ def collect_parent_promises(ctx: promising.PromisingContext) -> list[promising.P
         result.append(parent)
         ctx = parent
     return result
+
+
+class NonPromiseAwaitableContext(promising.PromisingFuture):
+    def __init__(
+        self,
+        coro: Awaitable[Any],
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._coro = coro
+
+    def __await__(self) -> Generator[Any, None, Any]:
+        if not self.done():
+            # Here, a race condition is possible with multiple awaiters, but
+            # for the purposes of testing, we will ignore such a possibility
+            yield from self._fulfill().__await__()
+        return (yield from super().__await__())
+
+    async def _fulfill(self) -> None:
+        try:
+            self.set_result(await self._coro)
+        except BaseException as exc:
+            self.set_exception(exc)

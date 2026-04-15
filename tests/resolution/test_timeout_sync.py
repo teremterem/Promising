@@ -5,6 +5,7 @@ Tests for timeout behavior of ``Promise.sync()`` and
 
 import asyncio
 import functools
+import time
 from typing import Any
 
 import pytest
@@ -176,6 +177,38 @@ async def test_sync_timeout_spans_multiple_levels() -> None:
     assert await promise == "done"
 
 
+async def test_sync_timeout_spans_multiple_levels_elapsed_time() -> None:
+    """The total elapsed time until TimeoutError should be roughly
+    equal to the timeout value — the deadline must carry across
+    all unpacking levels, not restart per level."""
+
+    async def make_chain(depth: int) -> Any:
+        await asyncio.sleep(0.15)
+        if depth == 0:
+            return "done"
+        return Promise(make_chain(depth - 1))
+
+    # 5 levels × 0.15s = 0.75s total work; 0.4s timeout
+    # should fail after ~0.4s (not immediately, not after 0.75s)
+    timeout = 0.4
+    promise = Promise(make_chain(4))
+    loop = asyncio.get_running_loop()
+
+    start = time.monotonic()
+    with pytest.raises(TimeoutError):
+        await loop.run_in_executor(
+            None,
+            functools.partial(promise.sync, timeout=timeout),
+        )
+    elapsed = time.monotonic() - start
+
+    assert elapsed >= timeout * 0.9, f"Timed out too early: {elapsed:.3f}s < {timeout * 0.9:.3f}s"
+    assert elapsed < timeout * 1.1, f"Timed out too late: {elapsed:.3f}s > {timeout * 1.1:.3f}s"
+
+    # Get rid of the asyncio warning
+    assert await promise == "done"
+
+
 async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
     """A chain of small delays that fits within the timeout
     should succeed."""
@@ -203,7 +236,7 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 
 
 @pytest.mark.parametrize("longer_timeout", [False, True])
-async def test_sync_times_out_on_slow_coroutine_result(longer_timeout: bool) -> None:
+async def test_sync_times_out_on_slow_coroutine_result(*, longer_timeout: bool) -> None:
     """
     sync() raises TimeoutError when the promise returns a coroutine
     (not a Promise) that takes too long.

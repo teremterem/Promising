@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from promising.errors import (
     ContextAlreadyActiveError,
+    ContextAlreadyClosedError,
     ContextError,
     ContextNotActiveError,
     ContextNotFoundError,
@@ -17,9 +18,10 @@ from promising.errors import (
 from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise
 from promising.promising_context import (
     PromisingContext,
+    PromisingFuture,
     await_children,
     await_children_sync,
-    collect_remaining_children,
+    collect_unsettled_children,
     context,
     format_trace,
     get_active_context,
@@ -27,7 +29,7 @@ from promising.promising_context import (
     print_trace,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, RECURSIVELY, UNCHANGED, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, WHOLE_SUBTREE, Sentinel
 
 
 class Defaults:
@@ -47,11 +49,15 @@ class Defaults:
     #  for an even deeper promise, which, in turn, cannot be scheduled because
     #  the thread pool is already fully occupied exactly with the promise chain
     #  that is awaiting)
+    # TODO Introduce a "promise factory" setting, both - as a global default
+    #  and as an inheritable setting ?
+    QUALNAMES_IN_NAMESPACES = True
 
 
 __all__ = [
     "ASYNCIO_DEFAULT",
     "ContextAlreadyActiveError",
+    "ContextAlreadyClosedError",
     "ContextError",
     "ContextNotActiveError",
     "ContextNotFoundError",
@@ -68,14 +74,15 @@ __all__ = [
     "PromisingContext",
     "PromisingError",
     "PromisingFunction",
-    "RECURSIVELY",
+    "PromisingFuture",
     "Sentinel",
     "SentinelUsageError",
     "SyncUsageError",
     "UNCHANGED",
+    "WHOLE_SUBTREE",
     "await_children",
     "await_children_sync",
-    "collect_remaining_children",
+    "collect_unsettled_children",
     "context",
     "format_trace",
     "function",

@@ -35,7 +35,7 @@ async def main():
 asyncio.run(main())
 ```
 
-A Promise can be consumed multiple times — via `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` — without re-executing the underlying function. The result is cached on first resolution:
+A Promise can be consumed multiple times — via `await`, `unpack_all()`, `.sync()` (alias for `unpack_all_sync()`), `unpack_once()`, or `unpack_once_sync()` — without re-executing the underlying function. The result is cached on first resolution:
 
 ```python
 promise = fetch_data("https://example.com")
@@ -86,10 +86,10 @@ async def parent_task() -> str:
     return "all done"
 ```
 
-To wait only for direct children (not grandchildren), pass `recursively=False`:
+To wait only for direct children (not grandchildren), pass `whole_subtree=False`:
 
 ```python
-await promising.await_children(recursively=False)
+await promising.await_children(whole_subtree=False)
 ```
 
 > **Note:** `await_children()` and `await_children_sync()` are purely for
@@ -126,7 +126,7 @@ async def main():
     assert result == 7
 ```
 
-Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result. Like `await`, `.sync()` recursively unpacks nested awaitables (see [Result Unpacking](#result-unpacking)):
+Inside a sync promising function, use `.sync()` instead of `await` to get a child Promise's result. Like `await`, `.sync()` recursively unpacks nested Promises (see [Result Unpacking](#result-unpacking)):
 
 ```python
 @promising.function
@@ -376,7 +376,7 @@ Like `await`, blocking on the concurrent future (`concurrent_future.result()`, `
 
 A decorated function always returns a `Promise`, regardless of whether the underlying function returns a concrete value, a coroutine, or another Promise. When a Promise's result is an awaitable that isn't already a `Promise`, it is automatically wrapped in a child `Promise`. This means:
 
-- `await promise` and `promise.sync()` always return a concrete value — they recursively unpack nested Promises until a non-Promise result is reached.
+- `await promise` (and the equivalent coroutine `promise.unpack_all()`) and `promise.sync()` (alias for `promise.unpack_all_sync()`) always return a concrete value — they recursively unpack nested Promises until a non-Promise result is reached. Note that unpacking only traverses `Promise` instances specifically — it does not unpack arbitrary awaitables or `PromisingFuture` objects in general.
 - `promise.unpack_once()` and `promise.unpack_once_sync()` unpack only one level — they return either a concrete value or another `Promise`.
 
 ```python
@@ -397,6 +397,16 @@ To inspect intermediate layers, use `unpack_once()` (async) or `unpack_once_sync
 one_level = await outer().unpack_once()  # Returns the inner Promise
 final = await one_level                   # Returns "hello"
 ```
+
+> **Note:** When passing a `Promise` to `asyncio.wait_for`, `asyncio.gather`, `asyncio.shield`, or any other asyncio utility, wrap it with `promise.unpack_all()` instead of handing over the bare `Promise`. Those utilities detect that `Promise` is an `asyncio.Future` and wait on it directly, bypassing `__await__` and its recursive unpacking logic — so a bare `Promise` may resolve to a nested `Promise` rather than to the final value. Because `unpack_all()` returns a coroutine, asyncio wraps it in a Task and full recursive unpacking happens as expected.
+>
+> ```python
+> # Bad — may return a nested Promise:
+> result = await asyncio.wait_for(promise, timeout=5)
+>
+> # Good — recursively unpacks to the final value:
+> result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
+> ```
 
 The sync counterparts follow the same pattern — `promise.sync()` fully unpacks, while `promise.unpack_once_sync()` resolves only one level. Like `unpack_once()`, it returns the same dual-purpose `Promise` objects that support both async and sync consumption — the caller can continue with `.sync()` if still in a sync context, or switch to `await` if the context is async:
 
@@ -455,7 +465,7 @@ uv sync --extra examples
 
 ## Design Note: Settings Are Frozen at Creation Time
 
-All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` or parent contexts have no effect on already-created promises.
+All configuration — `start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc. — is resolved and frozen the moment a `Promise` or `PromisingContext` is created. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately, so later changes to `Defaults` have no effect on already-created promises.
 
 This is intentional: because a `Promise` may execute eagerly (the default) or be deferred, the user cannot predict *when* the underlying coroutine will run. Freezing settings at creation time guarantees that the behavior a promise was *created with* is the behavior it *runs with*, regardless of scheduling.
 
@@ -467,7 +477,7 @@ Wrapping every async (or sync) operation in a `Promise` gives you:
 
 - **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool (with `use_thread_pool=True`). Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
-- **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children(recursively=True)`), inspect what's still running (`collect_remaining_children`), or scope configuration to a subtree — all without manual bookkeeping.
+- **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children()`), inspect what's still running (`collect_unsettled_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
 - **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value, a coroutine, or another Promise. `await` and `.sync()` always return a concrete value. Non-Promise awaitables are auto-wrapped into child Promises, so every layer in the chain is a `Promise` with the same uniform interface.
 - **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
@@ -482,36 +492,52 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
-| `promising.PromisingFunction.run(*args, **kwargs)` | Top-level entrypoint for running a decorated function from non-async code — analogous to `asyncio.run()`. Calls `asyncio.run()` on `protected_run()`, which means it creates its own event loop, awaits the result, and by default awaits all children recursively (`await_children=RECURSIVELY`). This is **not** the same as `promise.sync()`: `.sync()` is for consuming a promise's result from within a sync promising function that already runs inside an event loop (in a thread pool), whereas `.run()` is for starting the whole promise tree from scratch. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
-| `promising.PromisingFunction.protected_run(*args, **kwargs)` | Returns a **coroutine** (not a `Promise`), making it safe to pass to `asyncio.run()` — unlike calling the decorated function directly, which would construct a `Promise` (an `asyncio.Future` subclass) before the event loop exists and fail. Inside, the coroutine calls the decorated function, awaits the resulting `Promise`, and awaits its children (controlled by `await_children`, which defaults to `RECURSIVELY`). Used by `run()` internally. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
+| `promising.PromisingFunction.run(*args, **kwargs)` | Top-level entrypoint for running a decorated function from non-async code — analogous to `asyncio.run()`. Calls `asyncio.run()` on `protected_run()`, which means it creates its own event loop, awaits the result, and by default awaits all children recursively (`await_children=WHOLE_SUBTREE`). This is **not** the same as `promise.sync()`: `.sync()` is for consuming a promise's result from within a sync promising function that already runs inside an event loop (in a thread pool), whereas `.run()` is for starting the whole promise tree from scratch. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
+| `promising.PromisingFunction.protected_run(*args, **kwargs)` | Returns a **coroutine** (not a `Promise`), making it safe to pass to `asyncio.run()` — unlike calling the decorated function directly, which would construct a `Promise` (an `asyncio.Future` subclass) before the event loop exists and fail. Inside, the coroutine calls the decorated function, awaits the resulting `Promise`, and awaits its children (controlled by `await_children`, which defaults to `WHOLE_SUBTREE`). Used by `run()` internally. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
 | `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
 
 ### Promise
 
-`Promise` extends both `PromisingContext` and `asyncio.Future`. It inherits all hierarchy and configuration methods from `PromisingContext` (see below) and adds coroutine execution and thread-safe access.
+`Promise` extends `PromisingFuture` — an intermediate class that combines `PromisingContext` and `asyncio.Future`. It inherits all hierarchy and configuration methods from `PromisingContext` (see below) and adds coroutine execution and thread-safe access.
 
 | Method / Property | Description |
 |---|---|
-| `await promise` | Wait for and return the result. Recursively unpacks nested Promises and always returns a concrete value. All consumption methods (`await`, `sync`, `unpack_once`, `unpack_once_sync`) can be called multiple times and always return the same cached result. |
+| `await promise` | Wait for and return the result. Recursively unpacks nested Promises and always returns a concrete value. All consumption methods (`await`, `unpack_all`, `sync`, `unpack_all_sync`, `unpack_once`, `unpack_once_sync`) can be called multiple times and always return the same cached result. |
+| `promise.unpack_all()` | Coroutine equivalent of `await promise`. Use this — instead of the bare `Promise` — when handing the promise to `asyncio.wait_for`, `asyncio.gather`, `asyncio.shield`, etc. Those utilities detect that `Promise` is an `asyncio.Future` and wait on it directly, bypassing `__await__` and its recursive unpacking; wrapping the call in `unpack_all()` forces full recursive unpacking. |
 | `promise.unpack_once()` | Async — resolve the Promise but unpack only one level. Returns either a concrete value or another `Promise`. |
-| `promise.sync(timeout=None)` | Synchronous counterpart of `await promise` — blocks the calling thread, recursively unpacks nested Promises, and always returns a concrete value. Must not be called from the event loop thread. |
+| `promise.unpack_all_sync(timeout=None)` | Synchronous counterpart of `await promise` — blocks the calling thread, recursively unpacks nested Promises, and always returns a concrete value. Must not be called from the event loop thread. |
+| `promise.sync(timeout=None)` | Alias for `unpack_all_sync()`. |
 | `promise.unpack_once_sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and unpacks only one level. Returns either a concrete value or another `Promise`. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
 | `promise.as_concurrent_future()` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |
 
+### PromisingFuture
+
+`PromisingFuture[T_co]` is the intermediate class between `PromisingContext` and `Promise` — a `PromisingContext` that is also an `asyncio.Future`. `Promise` is its main subclass, but you can also subclass `PromisingFuture` directly to plug a custom awaitable type into the hierarchy. Anything that should appear as an *awaitable* child of a `PromisingContext` must be a `PromisingFuture` — registering a non-`PromisingFuture` awaitable as a child raises `TypeError`.
+
+A subclass is expected to override `__await__` to drive its own resolution logic and to publish the result by calling `set_result()` (or `set_exception()`).
+
+| Method / Property | Description |
+|---|---|
+| `future.set_result(result)` | Set the future's result. Overridden to call `close_context_threadsafe()` *before* delegating to `asyncio.Future`, so the surrounding context is closed in lockstep with the result becoming visible to observers — a parent's `await_children()` loop will not pick this child up again on its next iteration. |
+| `future.set_exception(exception)` | Same as `set_result()`, but for exceptions. |
+| *inherited from `asyncio.Future`* | `done()`, `result()`, `exception()`, `add_done_callback()`, `cancel()`, and the rest of the future protocol. |
+| *inherited from `PromisingContext`* | All hierarchy and configuration methods — see [PromisingContext](#promisingcontext) below. |
+
 ### PromisingContext
 
-`PromisingContext` is the base class that manages the parent-child hierarchy, configuration inheritance, and context variable tracking. `Promise` inherits from it. It can also be used standalone as a lightweight context node that participates in the hierarchy without being an `asyncio.Future`.
+`PromisingContext` is the base class that manages the parent-child hierarchy, configuration inheritance, and context variable tracking. `Promise` inherits from it (via `PromisingFuture`). It can also be used standalone as a lightweight context node that participates in the hierarchy without being an `asyncio.Future`. To plug a *custom awaitable* into the hierarchy as an awaitable child, subclass [`PromisingFuture`](#promisingfuture) instead.
 
 | Method / Property | Description |
 |---|---|
 | `ctx.namespace` | Optional human-readable namespace string. Used in `__repr__` output. Set via the `namespace` constructor parameter. |
 | `ctx.get_parent_context(raise_if_none=True)` | Get the immediate parent context (may be a `PromisingContext` or a `Promise`). |
 | `ctx.get_parent_promise(raise_if_none=True)` | Get the nearest ancestor that is a `Promise` (walks up past non-Promise contexts). |
-| `ctx.await_children(recursively=True)` | Async — wait for child contexts to finish. |
-| `ctx.await_children_sync(recursively=True, timeout=None)` | Sync — block until child contexts finish. |
-| `ctx.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
+| `ctx.await_children(whole_subtree=True, unpack_all_promises=True)` | Async — wait for child contexts to finish. With `unpack_all_promises=False`, Promise children are only unpacked one level (via `unpack_once()`) instead of being fully awaited. |
+| `ctx.await_children_sync(whole_subtree=True, unpack_all_promises=True, timeout=None)` | Sync — block until child contexts finish. With `unpack_all_promises=False`, Promise children are only unpacked one level instead of being fully awaited. |
+| `ctx.collect_unsettled_children(whole_subtree=True, futures_only=True, open_contexts_only=True)` | Get the set of child contexts that are still being tracked by this context and have not yet been closed. Pass `open_contexts_only=False` to include closed-but-still-tracked children, or `futures_only=False` to include non-`PromisingFuture` contexts (e.g. bare `PromisingContext` instances). |
+| `ctx.is_still_open()` | Whether the context is still open. A `PromisingContext` is "open" from construction until its `with` block exits (or, for `PromisingFuture` subclasses such as `Promise`, until `set_result()` / `set_exception()` is called). A closed context cannot be re-entered (raises `ContextAlreadyClosedError`) and cannot accept new child registrations. |
 | `ctx.get_thread_pool_executor()` | Return the resolved thread pool executor for this context (`ThreadPoolExecutor`, or `None` if `ASYNCIO_DEFAULT`). |
 | `ctx.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from this context up to the root (or, rather, root down to this context when `parents_first=True`). |
 | `ctx.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
@@ -523,14 +549,15 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `promising.get_active_context(raise_if_none=True)` | Get the currently active `PromisingContext` (may be a `PromisingContext` or a `Promise`). |
 | `promising.get_active_promise(raise_if_none=True)` | Get the currently active `Promise` (walks up the parent chain past non-Promise contexts). |
-| `promising.await_children(recursively=True)` | Wait for all children of the current context. |
-| `promising.await_children_sync(recursively=True, timeout=None)` | Sync counterpart — block until children finish. |
-| `promising.collect_remaining_children(recursively=True, exclude_non_awaitable=True, exclude_done=True)` | Get the set of child contexts of the active context that are still reachable (not garbage-collected) and still running. Pass `exclude_done=False` to include finished-but-still-reachable children, or `exclude_non_awaitable=False` to include non-awaitable contexts. |
+| `promising.await_children(whole_subtree=True, unpack_all_promises=True)` | Wait for all children of the current context. With `unpack_all_promises=False`, Promise children are only unpacked one level. |
+| `promising.await_children_sync(whole_subtree=True, unpack_all_promises=True, timeout=None)` | Sync counterpart — block until children finish. With `unpack_all_promises=False`, Promise children are only unpacked one level. |
+| `promising.collect_unsettled_children(whole_subtree=True, futures_only=True, open_contexts_only=True)` | Get the set of child contexts of the active context that are still being tracked and have not yet been closed. Pass `open_contexts_only=False` to include closed-but-still-tracked children, or `futures_only=False` to include non-`PromisingFuture` contexts (e.g. bare `PromisingContext` instances). |
 | `promising.get_trace(parents_first=True)` | Get a list of `PromisingContext` objects from the active context up to the root (or, rather, root down to the active context when `parents_first=True`). |
 | `promising.format_trace(parents_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
 | `promising.print_trace(parents_first=True)` | Print each context in the trace on a separate line. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
+| `promising.Defaults.QUALNAMES_IN_NAMESPACES` | When `True` (the default), auto-derived namespaces include the fully qualified name (`module::qualname`). When `False`, only the short `__name__` is used. |
 
 ### Sentinels
 
@@ -540,7 +567,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promising.INHERIT` | Copy from the parent context; fall back to the global default when there is no parent. |
 | `promising.PROMISING_DEFAULT` | Read the current global setting directly, ignoring the parent chain. |
 | `promising.ASYNCIO_DEFAULT` | Let the event loop use its own default executor (passes `None` to `run_in_executor`). Used with the `thread_pool` parameter. |
-| `promising.RECURSIVELY` | Used as the default for the `await_children` parameter in `PromisingFunction.run()` and `protected_run()`, indicating that all descendants (not just direct children) should be awaited. |
+| `promising.WHOLE_SUBTREE` | Used as the default for the `await_children` parameter in `PromisingFunction.run()` and `protected_run()`, indicating that all descendants (not just direct children) should be awaited. |
 | `promising.Sentinel` | The sentinel class. All sentinels above are instances of it. |
 
 All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
@@ -553,6 +580,7 @@ All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 | `promising.ContextError` | Base class for context-related errors. Inherits from `PromisingError`. |
 | `promising.ContextNotFoundError` | No active `PromisingContext` is found (e.g. calling `get_active_context()` or `await_children()` outside a promising function). Inherits from `ContextError`. |
 | `promising.ContextAlreadyActiveError` | Attempting to enter a `PromisingContext` that is already active (e.g. nested `with ctx:` on the same instance). Inherits from `ContextError`. |
+| `promising.ContextAlreadyClosedError` | Attempting to re-enter a `PromisingContext` that has already been closed, or registering a child on a closed context. A `PromisingContext` can only be entered once — once it has been exited, it is closed for good. Inherits from `ContextError`. |
 | `promising.ContextNotActiveError` | Attempting to exit a `PromisingContext` that is not active. Inherits from `ContextError`. |
 | `promising.DecorationError` | Invalid decorator usage (e.g. passing a non-callable to `@promising.function` or `@promising.context`, omitting `use_thread_pool` on a sync function, setting `use_thread_pool` on an async function, or using the same `promising.context` instance as both context manager and decorator). |
 | `promising.EventLoopError` | Base class for event loop-related errors. Inherits from `PromisingError`. |

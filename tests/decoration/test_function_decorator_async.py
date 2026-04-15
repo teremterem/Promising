@@ -128,10 +128,10 @@ async def test_exception_propagates_through_promise() -> None:
 
 
 @pytest.mark.parametrize(
-    "exc_type",
+    "exception_type",
     [ValueError, TypeError, RuntimeError, KeyError],
 )
-async def test_various_exception_types(*, exc_type: type) -> None:
+async def test_various_exception_types(*, exception_type: type) -> None:
     """
     Parametrized: each exception type propagates
     through the Promise correctly.
@@ -139,9 +139,9 @@ async def test_various_exception_types(*, exc_type: type) -> None:
 
     @promising.function
     async def failing() -> None:
-        raise exc_type("specific error")
+        raise exception_type("specific error")
 
-    with pytest.raises(exc_type):
+    with pytest.raises(exception_type):
         await failing()
 
 

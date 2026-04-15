@@ -92,6 +92,8 @@ async def test_await_children_whole_subtree(*, whole_subtree: bool) -> None:
         child_func()
         await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children(whole_subtree=whole_subtree)
         return "root"
 
@@ -150,6 +152,8 @@ async def test_await_children_whole_subtree_sync_children(*, whole_subtree: bool
         child_func()
         await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children(whole_subtree=whole_subtree)
         return "root"
 
@@ -254,6 +258,8 @@ async def test_await_children_module_level_on_bare_context() -> None:
         child_func()
 
         # Use the module-level function (which finds the active context)
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children()
 
     assert execution_order == ["child_done"]
@@ -307,6 +313,8 @@ async def test_await_children_direct_only_but_unpack_all_promises(
             await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
 
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         kwargs = {}
         if unpack_all_promises is not None:  # We use None to test the default
             kwargs["unpack_all_promises"] = unpack_all_promises

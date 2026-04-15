@@ -71,6 +71,8 @@ class NonPromiseAwaitableContext(promising.PromisingFuture):
 
     def __await__(self) -> Generator[Any, None, Any]:
         if not self.done():
+            # Here, a race condition is possible with multiple awaiters, but
+            # for the purposes of testing, we will ignore such a possibility
             yield from self._fulfill().__await__()
         return (yield from super().__await__())
 

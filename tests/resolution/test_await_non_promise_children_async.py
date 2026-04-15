@@ -38,6 +38,8 @@ async def test_await_children_with_non_promise_awaitable() -> None:
         NonPromiseAwaitableContext(slow_work())
 
         execution_order.append("parent_coro_done")
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children()
         return "parent"
 
@@ -65,6 +67,8 @@ async def test_await_children_only_non_promise_awaitables() -> None:
     async def parent_func() -> str:
         NonPromiseAwaitableContext(work("a"))
         NonPromiseAwaitableContext(work("b"))
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children()
         return "parent"
 
@@ -123,6 +127,8 @@ async def test_await_children_whole_subtree_non_promise_grandchildren() -> None:
         result = child_func()
         await asyncio.sleep(0.1)
         execution_order.append("root_coro_done")
+        # TODO Parametrize and check with and without await_children() to
+        #  ensure it has effect ?
         await promising.await_children()
         return result
 

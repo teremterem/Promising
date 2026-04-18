@@ -245,13 +245,17 @@ class Promise(PromisingContext, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done or has no awaitable.
         """
-        if self._awaitable is None:
-            # Should not happen
-            raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self!r}")
-
         try:
+            if self._awaitable is None:
+                # Should not happen
+                raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self!r}")
+
             with self:
-                self._set_result(await self._awaitable)
+                result = await self._awaitable
+                while isinstance(result, Promise):
+                    result = await result
+
+                self._set_result(result)
 
         except BaseException as exc:
             try:

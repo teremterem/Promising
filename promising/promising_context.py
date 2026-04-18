@@ -23,7 +23,7 @@ from promising.errors import (
 )
 from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
-from promising.types import DecoratableFunctionType, T_co
+from promising.types import DecoratableFunctionType
 from promising.utils import assert_no_sync_usage_deadlock, awaitable_as_coroutine, get_running_asyncio_loop
 
 if TYPE_CHECKING:
@@ -374,6 +374,10 @@ class PromisingContext:
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        # TODO Introduce inheritable promise_class parameter
+        #  (and promise_class_default ?)
+        # TODO Introduce inheritable wrap_coroutines parameter
+        #  (and wrap_coroutines_default ?)
         close_context_immediately: bool = False,
     ) -> None:
         self.namespace = namespace
@@ -395,17 +399,17 @@ class PromisingContext:
 
         if loop is None:
             if self._parent is None:
-                self._ctx_loop = get_running_asyncio_loop(raise_if_none=True)
+                self._loop = get_running_asyncio_loop(raise_if_none=True)
             else:
-                self._ctx_loop = self._parent._ctx_loop
+                self._loop = self._parent.loop
         else:
-            if self._parent is not None and loop is not self._parent._ctx_loop:
+            if self._parent is not None and loop is not self._parent.loop:
                 raise ValueError(
                     f"Parent and child PromisingContexts must share the same event loop.\n"
                     f"Parent: {self._parent!r}\n"
                     f"Child: {self!r}"
                 )
-            self._ctx_loop = loop
+            self._loop = loop
 
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
@@ -413,6 +417,10 @@ class PromisingContext:
 
         if self._parent is not None and not self._context_closed:
             self._parent._register_children_threadsafe(self)
+
+    @property
+    def loop(self) -> AbstractEventLoop:
+        return self._loop
 
     @classmethod
     def get_active_context(cls, *, raise_if_none: bool = True) -> "PromisingContext | None":
@@ -613,7 +621,7 @@ class PromisingContext:
                 completion.
         """
         assert_no_sync_usage_deadlock(
-            self._ctx_loop,
+            self.loop,
             "`await_children_sync()` cannot be called from the "
             "event loop thread because it would deadlock. Use "
             "`await promise.await_children()` or "
@@ -636,7 +644,7 @@ class PromisingContext:
                 concurrent_future.set_result(None)
 
         def schedule_await_children() -> None:
-            self._ctx_loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
+            self.loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
 
         self._call_soon_threadsafe(schedule_await_children)
         concurrent_future.result(timeout=timeout)
@@ -806,10 +814,10 @@ class PromisingContext:
         self._unregister_from_parent_if_time()
 
     def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
-        if not self._ctx_loop.is_running():
+        if not self.loop.is_running():
             raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
 
-        self._ctx_loop.call_soon_threadsafe(callback)
+        self.loop.call_soon_threadsafe(callback)
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
@@ -884,44 +892,3 @@ class PromisingContext:
             f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
-
-
-class PromisingFuture(PromisingContext, asyncio.Future[T_co]):
-    """
-    A ``PromisingContext`` that is also an ``asyncio.Future``.
-
-    ``PromisingFuture`` is the bridge between the hierarchical context
-    machinery and the asyncio future protocol — anything that should
-    appear as an *awaitable* child in a ``PromisingContext`` hierarchy
-    must be a ``PromisingFuture`` (registering an ``Awaitable`` child
-    that is not a ``PromisingFuture`` raises ``TypeError``). ``Promise``
-    is the most prominent subclass.
-
-    The class overrides ``set_result`` and ``set_exception`` to call
-    ``close_context_threadsafe()`` *before* delegating to
-    ``asyncio.Future``. This is necessary in addition to the
-    ``__exit__``-based close in ``PromisingContext`` because the future
-    lifecycle and the context manager lifecycle are independent: a
-    ``PromisingFuture`` can be resolved without ever being entered as a
-    context manager (e.g. a prefilled ``Promise``), and even when it
-    *is* entered, observers awaiting the future may be woken up before
-    the surrounding ``with`` block exits. Closing the context first
-    ensures that anyone who sees the future as done also sees its
-    context as closed — in particular, a parent's
-    ``await_children()`` loop will not pick this child up again on its
-    next iteration.
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        # PromisingContext.__init__
-        super().__init__(**kwargs)
-        # Expected to be asyncio.Future[T_co].__init__
-        super(PromisingContext, self).__init__(loop=self._ctx_loop)
-
-    def set_result(self, result: T_co) -> None:
-        self.close_context_threadsafe()
-        super().set_result(result)
-
-    def set_exception(self, exception: type | BaseException) -> None:
-        self.close_context_threadsafe()
-        super().set_exception(exception)

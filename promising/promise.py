@@ -193,12 +193,12 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         Await the Promise, fully unpacking all nested Promises.
 
-        If the Promise hasn't started yet, starts execution via _fulfill().
-        If already started via start_soon, waits for the existing task to
-        complete. Once the Promise resolves, recursively awaits the result as
-        long as it is itself a Promise (non-Promise awaitables are
-        auto-wrapped into Promises by ``set_result``), returning the final
-        non-Promise value.
+        If the Promise hasn't started yet, starts execution via
+        _perform_complete_unpacking(). If already started via start_soon,
+        waits for the existing task to complete. Once the Promise resolves,
+        recursively awaits the result as long as it is itself a Promise
+        (non-Promise awaitables are auto-wrapped into Promises by
+        ``set_result``), returning the final non-Promise value.
 
         Note that unpacking only traverses ``Promise`` instances specifically
         — it does not unpack arbitrary awaitables or ``PromisingFuture``
@@ -233,7 +233,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # TODO TODO TODO
         pass
 
-    async def _fulfill(self) -> None:
+    async def _perform_complete_unpacking(self) -> None:
         """
         Execute the Promise's awaitable and manage its lifecycle.
 
@@ -277,7 +277,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def _ensure_task_scheduled(self) -> None:
         if self._task is None and not self.done():
             # TODO TODO TODO
-            self._task = self.loop.create_task(self._fulfill(), name=str(self) + "-Task")
+            self._task = self.loop.create_task(self._perform_complete_unpacking(), name=str(self) + "-Task")
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):

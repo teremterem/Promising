@@ -5,7 +5,7 @@ from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
-from promising.errors import EventLoopMismatchError, PromiseNotFoundError
+from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
@@ -240,10 +240,7 @@ class Promise(PromisingContext, Generic[T_co]):
             The fully unpacked result of the Promise (no remaining
             nested Promises).
         """
-        if not self.is_on_running_context_loop():
-            raise EventLoopMismatchError(
-                f"Cannot await {self!r} from a different event loop than the one it belongs to."
-            )
+        self.assert_awaiting_on_correct_event_loop()
 
         if self._exception is not None:
             raise self._exception
@@ -279,8 +276,9 @@ class Promise(PromisingContext, Generic[T_co]):
         return concurrent_future.result(timeout=timeout)
 
     async def unpack_once(self) -> "T_co | Promise[Any]":
+        self.assert_awaiting_on_correct_event_loop()
+
         # TODO TODO TODO
-        pass
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         self.assert_no_sync_usage_deadlock()

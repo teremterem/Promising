@@ -19,6 +19,7 @@ from promising.errors import (
     ContextNotActiveError,
     ContextNotFoundError,
     DecorationError,
+    EventLoopMismatchError,
     NoRunningEventLoopError,
     PromiseNotFoundError,
 )
@@ -764,6 +765,12 @@ class PromisingContext:
                 f"Synchronous operations of {self!r} cannot be performed on "
                 f"its own event loop thread, as that typically leads to a "
                 f"deadlock. Use awaitable operations instead."
+            )
+
+    def assert_awaiting_on_correct_event_loop(self) -> None:
+        if not self.is_on_running_context_loop():
+            raise EventLoopMismatchError(
+                f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )
 
     def __repr__(self) -> str:

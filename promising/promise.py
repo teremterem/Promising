@@ -294,11 +294,19 @@ class Promise(PromisingContext, Generic[T_co]):
     def unpacked_once(self) -> bool:
         return self.done() or self._intermediate_promise is not None
 
+    def cancelled(self) -> bool:
+        # TODO TODO TODO
+        pass
+
     def result(self) -> T_co:
         # TODO TODO TODO
         pass
 
     def intermediate_promise(self) -> "Promise[Any] | None":
+        # TODO TODO TODO
+        pass
+
+    def exception(self) -> BaseException | None:
         # TODO TODO TODO
         pass
 

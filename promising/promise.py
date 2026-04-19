@@ -1,14 +1,44 @@
+import asyncio
 import concurrent.futures
 import inspect
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
-from promising.errors import PromiseNotFoundError
+from promising.errors import EventLoopMismatchError, PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import INHERIT, UNCHANGED, Sentinel
 from promising.types import T_co
 from promising.utils import resolve_namespace
+
+
+def wrap_awaitable(
+    awaitable: Awaitable[Any] | None = None,
+    *,
+    namespace: str | None = None,
+    loop: AbstractEventLoop | None = None,
+    parent: "PromisingContext | None | Sentinel" = INHERIT,
+    thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
+    start_soon: bool | None | Sentinel = None,
+    children_start_soon: bool | None | Sentinel = None,
+    start_soon_default: bool | Sentinel = INHERIT,
+    prefilled_result: T_co | Sentinel = UNCHANGED,
+    prefilled_exception: BaseException | None = None,
+) -> "Promise[Any]":
+    # TODO Make it possible change the default Promise class in by parent
+    #  PromisingContexts
+    return Promise(
+        awaitable=awaitable,
+        namespace=namespace,
+        loop=loop,
+        parent=parent,
+        thread_pool=thread_pool,
+        start_soon=start_soon,
+        children_start_soon=children_start_soon,
+        start_soon_default=start_soon_default,
+        prefilled_result=prefilled_result,
+        prefilled_exception=prefilled_exception,
+    )
 
 
 def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -157,11 +187,12 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_result(prefilled_result)
             else:
                 self._set_exception(prefilled_exception)
+
         elif self._start_soon:
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
-            self._call_soon_threadsafe(self._ensure_task_scheduled)
+            self._call_soon_threadsafe(self._ensure_full_unpacking_scheduled)
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -194,7 +225,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via
-        _perform_complete_unpacking(). If already started via start_soon,
+        _fully_unpack_in_background(). If already started via start_soon,
         waits for the existing task to complete. Once the Promise resolves,
         recursively awaits the result as long as it is itself a Promise
         (non-Promise awaitables are auto-wrapped into Promises by
@@ -208,7 +239,21 @@ class Promise(PromisingContext, Generic[T_co]):
             The fully unpacked result of the Promise (no remaining
             nested Promises).
         """
-        return (yield from _AwaitablePromiseUnpacker(self, unpack_all=True).__await__())
+        if not self.is_on_running_context_loop():
+            raise EventLoopMismatchError(
+                f"Cannot await {self!r} from a different event loop than the one it belongs to."
+            )
+
+        if self._exception is not None:
+            raise self._exception
+
+        if self._result is not UNCHANGED:
+            return self._result
+
+        if self._task is None:
+            self._ensure_full_unpacking_scheduled()
+
+        return (yield from self._task)
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
@@ -227,13 +272,33 @@ class Promise(PromisingContext, Generic[T_co]):
                 which would deadlock.
             TimeoutError: If timeout expires before completion.
         """
-        return self.unpack_all_sync(timeout=timeout)
+        self.assert_no_sync_usage_deadlock()
+
+        concurrent_future = asyncio.run_coroutine_threadsafe(self, self.loop)
+        return concurrent_future.result(timeout=timeout)
+
+    def done(self) -> bool:
+        # TODO Introduce _state, like in asyncio.Future ?
+        return self._result is not UNCHANGED or self._exception is not None
 
     def cancel(self, msg: str | None = None) -> bool:
-        # TODO TODO TODO
-        pass
+        if self.is_on_running_context_loop():
+            return self._cancel_in_background(msg)
 
-    async def _perform_complete_unpacking(self) -> None:
+        concurrent_future = asyncio.run_coroutine_threadsafe(self._cancel_in_background(msg), self.loop)
+        return concurrent_future.result()
+
+    def _cancel_in_background(self, msg: str | None = None) -> bool:
+        if self._task is None:
+            if self.done():
+                return False
+
+            # TODO Set "state" to CANCELLED
+            return True
+
+        return self._task.cancel(msg)
+
+    async def _fully_unpack_in_background(self) -> None:
         """
         Execute the Promise's awaitable and manage its lifecycle.
 
@@ -246,9 +311,14 @@ class Promise(PromisingContext, Generic[T_co]):
             RuntimeError: If the Promise is already done or has no awaitable.
         """
         try:
+            if self.done():
+                # Should not happen
+                raise RuntimeError(f"An attempt was made to _fully_unpack_in_background a done Promise: {self!r}")
             if self._awaitable is None:
                 # Should not happen
-                raise RuntimeError(f"An attempt was made to fulfill a Promise with no awaitable: {self!r}")
+                raise RuntimeError(
+                    f"An attempt was made to _fully_unpack_in_background a Promise with no awaitable: {self!r}"
+                )
 
             with self:
                 result = await self._awaitable
@@ -274,10 +344,42 @@ class Promise(PromisingContext, Generic[T_co]):
 
             self._set_exception(exc)
 
-    def _ensure_task_scheduled(self) -> None:
+    def _ensure_full_unpacking_scheduled(self) -> None:
         if self._task is None and not self.done():
-            # TODO TODO TODO
-            self._task = self.loop.create_task(self._perform_complete_unpacking(), name=str(self) + "-Task")
+            self._task = self.loop.create_task(self._fully_unpack_in_background(), name=str(self) + "-Task")
+
+    def _set_result(self, result: T_co) -> None:
+        """
+        Set the result of the Promise. This method is not intended to be called
+        directly by users; it is managed by the Promise's lifecycle.
+
+        If the result is an awaitable but not a Promise, it is automatically
+        wrapped in a child Promise so that downstream unpacking (in
+        ``sync()``, ``__await__``, etc.) can always assume awaitable
+        results are Promises. The wrapper inherits this Promise's
+        ``loop``, ``thread_pool``, ``start_soon``, ``children_start_soon``,
+        and ``start_soon_default`` settings.
+
+        Also sets the result on the concurrent.futures.Future for thread
+        compatibility (see `as_concurrent_future()` method).
+
+        Args:
+            result: The result value to set.
+        """
+        self._result = result
+
+    def _set_exception(self, exception: BaseException) -> None:
+        """
+        Set an exception on the Promise. This method is not intended to be
+        called directly by users; it is managed by the Promise's lifecycle.
+
+        Also sets the exception on the concurrent.futures.Future for thread
+        compatibility (see `as_concurrent_future()` method).
+
+        Args:
+            exception: The exception to set.
+        """
+        self._exception = exception
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):
@@ -310,61 +412,6 @@ class Promise(PromisingContext, Generic[T_co]):
         raise ValueError(
             f"`start_soon` must be either None, INHERIT or a boolean value, but `{type(start_soon)}` was given instead"
         )
-
-    def _set_result(self, result: T_co | Awaitable[Any]) -> None:
-        """
-        Set the result of the Promise. This method is not intended to be called
-        directly by users; it is managed by the Promise's lifecycle.
-
-        If the result is an awaitable but not a Promise, it is automatically
-        wrapped in a child Promise so that downstream unpacking (in
-        ``sync()``, ``__await__``, etc.) can always assume awaitable
-        results are Promises. The wrapper inherits this Promise's
-        ``loop``, ``thread_pool``, ``start_soon``, ``children_start_soon``,
-        and ``start_soon_default`` settings.
-
-        Also sets the result on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            result: The result value to set.
-        """
-        # TODO TODO TODO
-        if inspect.isawaitable(result) and not isinstance(result, Promise):
-            result = Promise[T_co](
-                result,
-                loop=self.loop,
-                parent=self,
-                thread_pool=self._thread_pool,
-                start_soon=self._start_soon,
-                children_start_soon=self._children_start_soon,
-                start_soon_default=self._start_soon_default,
-            )
-
-        # TODO TODO TODO
-        super().set_result(result)
-        # TODO Account for the fact that the concurrent future itself might be
-        #  cancelled by the user:
-        #  https://github.com/teremterem/Promising/pull/57#discussion_r2864024491
-        self._concurrent_future.set_result(result)
-
-    def _set_exception(self, exception: BaseException) -> None:
-        """
-        Set an exception on the Promise. This method is not intended to be
-        called directly by users; it is managed by the Promise's lifecycle.
-
-        Also sets the exception on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            exception: The exception to set.
-        """
-        super().set_exception(exception)
-        # TODO TODO TODO
-        # TODO Account for the fact that the concurrent future itself might be
-        #  cancelled by the user:
-        #  https://github.com/teremterem/Promising/pull/57#discussion_r2864024491
-        self._concurrent_future.set_exception(exception)
 
     @staticmethod
     def _validate_init_args(

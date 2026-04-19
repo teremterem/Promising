@@ -4,7 +4,7 @@ from asyncio import AbstractEventLoop
 from collections.abc import Awaitable
 from typing import Any
 
-from promising.errors import NoRunningEventLoopError, SyncUsageError
+from promising.errors import NoRunningEventLoopError
 from promising.types import DecoratableFunctionType
 
 
@@ -72,16 +72,6 @@ def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback:
         return f"{prefix}{named_object_fallback.__name__}"
 
     return f"{prefix}{named_object_fallback}"
-
-
-def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
-    try:
-        running_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        running_loop = None
-
-    if running_loop is loop_of_future:
-        raise SyncUsageError(message)
 
 
 async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:

@@ -7,7 +7,7 @@ from typing import Any, Generic
 
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
-from promising.promise import Promise, get_active_promise
+from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.sentinels import INHERIT, UNCHANGED, WHOLE_SUBTREE, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
@@ -429,7 +429,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
 
             coro = _sync_inline()
 
-        return Promise[T_co](
+        return wrap_awaitable(
             namespace=settings_as_dict.get("namespace", self.namespace),
             awaitable=coro,
             start_soon=settings_as_dict.get("start_soon", self.start_soon),

@@ -11,6 +11,7 @@ from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
+from promising import SyncUsageError
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
@@ -24,7 +25,7 @@ from promising.errors import (
 from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import assert_no_sync_usage_deadlock, awaitable_as_coroutine, get_running_asyncio_loop
+from promising.utils import awaitable_as_coroutine, get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -108,6 +109,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
+        # TODO Use a more self-explanatory sentinel as `parent`'s default value ?
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -620,34 +622,16 @@ class PromisingContext:
             TimeoutError: If timeout expires before
                 completion.
         """
-        assert_no_sync_usage_deadlock(
+        self.assert_no_sync_usage_deadlock()
+
+        concurrent_future = asyncio.run_coroutine_threadsafe(
+            self.await_children(
+                whole_subtree=whole_subtree,
+                unpack_all_promises=unpack_all_promises,
+            ),
             self.loop,
-            "`await_children_sync()` cannot be called from the "
-            "event loop thread because it would deadlock. Use "
-            "`await promise.await_children()` or "
-            "`await promising.await_children()` instead.",
         )
-        concurrent_future = concurrent.futures.Future[None]()
-
-        async def await_children_and_notify() -> None:
-            try:
-                await self.await_children(
-                    whole_subtree=whole_subtree,
-                    unpack_all_promises=unpack_all_promises,
-                )
-            except BaseException as exc:
-                # This ideally should not happen (provided there are no bugs in
-                # the framework) - `await_children` gathers all exceptions from
-                # the children and suppresses them
-                concurrent_future.set_exception(exc)
-            else:
-                concurrent_future.set_result(None)
-
-        def schedule_await_children() -> None:
-            self.loop.create_task(await_children_and_notify(), name=str(self) + "-AwaitChildrenSyncTask")
-
-        self._call_soon_threadsafe(schedule_await_children)
-        concurrent_future.result(timeout=timeout)
+        return concurrent_future.result(timeout=timeout)
 
     def collect_unsettled_children(
         self,
@@ -699,7 +683,6 @@ class PromisingContext:
                 and (not open_contexts_only or child.is_still_open())
             )
         }
-
         if whole_subtree:
             # We are iterating over all the children, regardless of the
             # futures_only and open_contexts_only settings, because some
@@ -713,7 +696,6 @@ class PromisingContext:
                         open_contexts_only=open_contexts_only,
                     )
                 )
-
         return result
 
     def get_thread_pool_executor(self) -> concurrent.futures.ThreadPoolExecutor | None:
@@ -771,6 +753,18 @@ class PromisingContext:
         with self._unsettled_children_lock:
             self._context_closed = True
         self._unregister_from_parent_if_time()
+
+    def is_on_running_context_loop(self) -> bool:
+        running_loop = get_running_asyncio_loop(raise_if_none=True)
+        return running_loop is self.loop
+
+    def assert_no_sync_usage_deadlock(self) -> None:
+        if self.is_on_running_context_loop():
+            raise SyncUsageError(
+                f"Synchronous operations of {self!r} cannot be performed on "
+                f"its own event loop thread, as that typically leads to a "
+                f"deadlock. Use awaitable operations instead."
+            )
 
     def __repr__(self) -> str:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "

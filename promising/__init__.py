@@ -15,7 +15,7 @@ from promising.errors import (
     SentinelUsageError,
     SyncUsageError,
 )
-from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise
+from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise, wrap_awaitable
 from promising.promising_context import (
     PromisingContext,
     PromisingFuture,
@@ -90,4 +90,5 @@ __all__ = [
     "get_active_promise",
     "get_trace",
     "print_trace",
+    "wrap_awaitable",
 ]

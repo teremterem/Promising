@@ -312,10 +312,12 @@ class Promise(PromisingContext, Generic[T_co]):
         if self.is_on_running_context_loop():
             return self._cancel_in_background(msg)
 
+        # TODO TODO TODO _cancel_in_background is not a coroutine
         concurrent_future = asyncio.run_coroutine_threadsafe(self._cancel_in_background(msg), self.loop)
         return concurrent_future.result()
 
     def _cancel_in_background(self, msg: str | None = None) -> bool:
+        # TODO TODO TODO
         if self.done():
             return False
 

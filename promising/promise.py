@@ -146,7 +146,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def __init__(
         self,
-        awaitable: Awaitable[T_co | Awaitable[Any]] | None = None,
+        awaitable: Awaitable[T_co | "Promise[Any]"] | None = None,
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
@@ -177,6 +177,7 @@ class Promise(PromisingContext, Generic[T_co]):
         self._awaitable = awaitable
         self._start_soon = self._resolve_start_soon(start_soon)
 
+        self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None
 
@@ -184,9 +185,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED:
-                self._set_result(prefilled_result)
+                self._result = prefilled_result
             else:
-                self._set_exception(prefilled_exception)
+                self._exception = prefilled_exception
 
         elif self._start_soon:
             # We don't know which thread the Promise is created in, so we
@@ -277,9 +278,29 @@ class Promise(PromisingContext, Generic[T_co]):
         concurrent_future = asyncio.run_coroutine_threadsafe(self, self.loop)
         return concurrent_future.result(timeout=timeout)
 
+    async def unpack_once(self) -> "T_co | Promise[Any]":
+        # TODO TODO TODO
+        pass
+
+    def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
+        self.assert_no_sync_usage_deadlock()
+
+        concurrent_future = asyncio.run_coroutine_threadsafe(self.unpack_once(), self.loop)
+        return concurrent_future.result(timeout=timeout)
+
     def done(self) -> bool:
-        # TODO Introduce _state, like in asyncio.Future ?
         return self._result is not UNCHANGED or self._exception is not None
+
+    def unpacked_once(self) -> bool:
+        return self.done() or self._intermediate_promise is not None
+
+    def result(self) -> T_co:
+        # TODO TODO TODO
+        pass
+
+    def intermediate_promise(self) -> "Promise[Any] | None":
+        # TODO TODO TODO
+        pass
 
     def cancel(self, msg: str | None = None) -> bool:
         if self.is_on_running_context_loop():
@@ -289,14 +310,42 @@ class Promise(PromisingContext, Generic[T_co]):
         return concurrent_future.result()
 
     def _cancel_in_background(self, msg: str | None = None) -> bool:
-        if self._task is None:
-            if self.done():
-                return False
+        if self.done():
+            return False
 
+        if self._task is None:
             # TODO Set "state" to CANCELLED
             return True
 
         return self._task.cancel(msg)
+
+    async def _unpack_once_in_background(self) -> None:
+        try:
+            if self._intermediate_promise is not None:
+                # Should not happen
+                raise RuntimeError(
+                    f"An attempt was made to _unpack_once_in_background a Promise that was already unpacked once: "
+                    f"{self!r}"
+                )
+            if self.done():
+                # Should not happen
+                raise RuntimeError(f"An attempt was made to _unpack_once_in_background a done Promise: {self!r}")
+            if self._awaitable is None:
+                # Should not happen
+                raise RuntimeError(
+                    f"An attempt was made to _unpack_once_in_background a Promise with no awaitable: {self!r}"
+                )
+
+            result = await self._awaitable
+
+            if isinstance(result, Promise):
+                self._intermediate_promise = result
+            else:
+                self._result = result
+
+        except BaseException as exc:
+            self._attach_context_to_exception(exc)
+            self._exception = exc
 
     async def _fully_unpack_in_background(self) -> None:
         """
@@ -320,66 +369,37 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _fully_unpack_in_background a Promise with no awaitable: {self!r}"
                 )
 
+            # TODO TODO TODO
+            # TODO What will cancelling do to this whole unpacking chain ?
             with self:
                 result = await self._awaitable
                 while isinstance(result, Promise):
                     result = await result
 
-                self._set_result(result)
+                self._result = result
 
         except BaseException as exc:
-            try:
-                # TODO Make it possible to disable setting this trace ?
-                # TODO Borrow from MiniAgents the mechanism that logs this
-                #  "promising breadcrumb" together with the error tracebacks
-                if not hasattr(exc, "__promising_context__"):
-                    # We only let it be set at the deepest level of the promise
-                    # hierarchy
-                    exc.__promising_context__ = self
-            except BaseException:
-                # Suppress the error if any - failure to store the trace should
-                # not affect the exception handling
-                # TODO Introduce a debug level log here
-                pass
-
-            self._set_exception(exc)
+            self._attach_context_to_exception(exc)
+            self._exception = exc
 
     def _ensure_full_unpacking_scheduled(self) -> None:
         if self._task is None and not self.done():
             self._task = self.loop.create_task(self._fully_unpack_in_background(), name=str(self) + "-Task")
 
-    def _set_result(self, result: T_co) -> None:
-        """
-        Set the result of the Promise. This method is not intended to be called
-        directly by users; it is managed by the Promise's lifecycle.
-
-        If the result is an awaitable but not a Promise, it is automatically
-        wrapped in a child Promise so that downstream unpacking (in
-        ``sync()``, ``__await__``, etc.) can always assume awaitable
-        results are Promises. The wrapper inherits this Promise's
-        ``loop``, ``thread_pool``, ``start_soon``, ``children_start_soon``,
-        and ``start_soon_default`` settings.
-
-        Also sets the result on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            result: The result value to set.
-        """
-        self._result = result
-
-    def _set_exception(self, exception: BaseException) -> None:
-        """
-        Set an exception on the Promise. This method is not intended to be
-        called directly by users; it is managed by the Promise's lifecycle.
-
-        Also sets the exception on the concurrent.futures.Future for thread
-        compatibility (see `as_concurrent_future()` method).
-
-        Args:
-            exception: The exception to set.
-        """
-        self._exception = exception
+    def _attach_context_to_exception(self, exception: BaseException) -> None:
+        try:
+            # TODO Make it possible to disable setting this trace ?
+            # TODO Borrow from MiniAgents the mechanism that logs this
+            #  "promising breadcrumb" together with the error tracebacks
+            if not hasattr(exception, "__promising_context__"):
+                # We only let it be set at the deepest level of the promise
+                # hierarchy
+                exception.__promising_context__ = self
+        except BaseException:
+            # Suppress the error if any - failure to store the trace should
+            # not affect the exception handling
+            # TODO Introduce a debug level log here
+            pass
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):

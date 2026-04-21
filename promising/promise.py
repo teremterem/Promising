@@ -464,7 +464,8 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _unpack_once_from_loop a Promise with no awaitable: {self!r}"
                 )
 
-            result = await self._awaitable
+            with self:
+                result = await self._awaitable
 
             if isinstance(result, Promise):
                 self._intermediate_promise = result
@@ -500,16 +501,13 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _fully_unpack_from_loop a Promise with no awaitable: {self!r}"
                 )
 
-            self._ensure_single_unpacking_scheduled()
-            await self._single_unpacking_task
-
             # TODO What will cancelling do to this whole unpacking chain ?
-            with self:
-                result = await self._awaitable
-                while isinstance(result, Promise):
-                    result = await result
+            result = await self.unpack_once()
 
-                self._result = result
+            while isinstance(result, Promise):
+                result = await result
+
+            self._result = result
 
         except BaseException as exc:
             self._attach_context_to_exception(exc)

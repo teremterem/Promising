@@ -15,10 +15,9 @@ from promising.errors import (
     SentinelUsageError,
     SyncUsageError,
 )
-from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise, wrap_awaitable
+from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.promising_context import (
     PromisingContext,
-    PromisingFuture,
     await_children,
     await_children_sync,
     collect_unsettled_children,
@@ -76,12 +75,10 @@ __all__ = [
     "NoRunningEventLoopError",
     "PROMISING_DEFAULT",
     "Promise",
-    "PromiseBackedConcurrentFuture",
     "PromiseNotFoundError",
     "PromisingContext",
     "PromisingError",
     "PromisingFunction",
-    "PromisingFuture",
     "Sentinel",
     "SentinelUsageError",
     "SyncUsageError",

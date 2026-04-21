@@ -291,7 +291,7 @@ def await_children_sync(
 def collect_unsettled_children(
     *,
     whole_subtree: bool = True,
-    futures_only: bool = True,
+    awaitables_only: bool = True,
     open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
@@ -305,7 +305,7 @@ def collect_unsettled_children(
     Args:
         whole_subtree: If True (default), include descendants at all levels,
             not just direct children.
-        futures_only: If True (default), exclude children that are not
+        awaitables_only: If True (default), exclude children that are not
             ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
             nodes created via ``promising.context``).
         open_contexts_only: If True (default), exclude children whose
@@ -319,7 +319,7 @@ def collect_unsettled_children(
     """
     return get_active_context().collect_unsettled_children(
         whole_subtree=whole_subtree,
-        futures_only=futures_only,
+        awaitables_only=awaitables_only,
         open_contexts_only=open_contexts_only,
     )
 
@@ -564,7 +564,7 @@ class PromisingContext:
         # are being awaited
         while children := self.collect_unsettled_children(
             whole_subtree=whole_subtree,
-            futures_only=True,
+            awaitables_only=True,
             # We assume that if a context is already closed, then it also
             # finished already (either was explicitly awaited for or finished
             # in the background due to "start soon")
@@ -638,7 +638,7 @@ class PromisingContext:
         self,
         *,
         whole_subtree: bool = True,
-        futures_only: bool = True,
+        awaitables_only: bool = True,
         open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
         """
@@ -660,7 +660,7 @@ class PromisingContext:
         Args:
             whole_subtree: If True (default), include descendants at all
                 levels, not just direct children.
-            futures_only: If True (default), exclude children that are not
+            awaitables_only: If True (default), exclude children that are not
                 ``PromisingFuture`` instances (i.e. plain
                 ``PromisingContext`` nodes created via
                 ``promising.context``).
@@ -680,20 +680,20 @@ class PromisingContext:
             child
             for child in children
             if (
-                (not futures_only or isinstance(child, PromisingFuture))
+                (not awaitables_only or inspect.isawaitable(child))
                 and (not open_contexts_only or child.is_still_open())
             )
         }
         if whole_subtree:
             # We are iterating over all the children, regardless of the
-            # futures_only and open_contexts_only settings, because some
+            # awaitables_only and open_contexts_only settings, because some
             # children may still be "unsettled" simply because they still have
             # "unsettled" children of their own.
             for child in children:
                 result.update(
                     child.collect_unsettled_children(
                         whole_subtree=True,
-                        futures_only=futures_only,
+                        awaitables_only=awaitables_only,
                         open_contexts_only=open_contexts_only,
                     )
                 )
@@ -788,11 +788,6 @@ class PromisingContext:
             if not isinstance(child, PromisingContext):
                 raise TypeError(
                     f"Expected a PromisingContext as a child, got {type(child).__name__}.\n"
-                    f"Context: {self!r}\nChild: {child!r}"
-                )
-            if inspect.isawaitable(child) and not isinstance(child, PromisingFuture):
-                raise TypeError(
-                    f"Cannot register an Awaitable child that is not a PromisingFuture.\n"
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 

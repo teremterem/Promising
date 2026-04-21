@@ -7,7 +7,16 @@ from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
-from promising.sentinels import INHERIT, UNCHANGED, Sentinel
+from promising.sentinels import (
+    _CANCELLED,
+    _CANCELLED_AFTER_FIRST_UNPACKING,
+    _FINISHED,
+    _PENDING,
+    _UNPACKED_ONCE,
+    INHERIT,
+    UNCHANGED,
+    Sentinel,
+)
 from promising.types import T_co
 from promising.utils import resolve_namespace
 
@@ -177,11 +186,13 @@ class Promise(PromisingContext, Generic[T_co]):
         self._awaitable = awaitable
         self._start_soon = self._resolve_start_soon(start_soon)
 
+        self._state: Sentinel = _PENDING
         self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None
 
-        self._task: Task[T_co] | None = None
+        self._full_unpacking_task: Task[T_co] | None = None
+        self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
 
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED:
@@ -239,19 +250,20 @@ class Promise(PromisingContext, Generic[T_co]):
         Returns:
             The fully unpacked result of the Promise (no remaining
             nested Promises).
+
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        if self._exception is not None:
-            raise self._exception
+        if self.done():
+            return self.result()
 
-        if self._result is not UNCHANGED:
-            return self._result
-
-        if self._task is None:
+        if self._full_unpacking_task is None:
             self._ensure_full_unpacking_scheduled()
 
-        return (yield from self._task)
+        yield from self._full_unpacking_task
+        return self.result()
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
@@ -269,6 +281,9 @@ class Promise(PromisingContext, Generic[T_co]):
             SyncUsageError: If called from the same thread as the event loop,
                 which would deadlock.
             TimeoutError: If timeout expires before completion.
+
+        NOTE: This method is thread-safe, but it is unavailable from the event
+        loop of this Promise to avoid a deadlock.
         """
         self.assert_no_sync_usage_deadlock()
 
@@ -276,39 +291,95 @@ class Promise(PromisingContext, Generic[T_co]):
         return concurrent_future.result(timeout=timeout)
 
     async def unpack_once(self) -> "T_co | Promise[Any]":
+        """
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
+        """
         self.assert_awaiting_on_correct_event_loop()
 
-        # TODO TODO TODO
+        if self.unpacked_once():
+            return self.intermediate_promise()
+
+        if self._single_unpacking_task is None:
+            self._ensure_single_unpacking_scheduled()
+
+        return await self._single_unpacking_task
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
+        """
+        NOTE: This method is thread-safe, but it is unavailable from the event
+        loop of this Promise to avoid a deadlock.
+        """
         self.assert_no_sync_usage_deadlock()
 
         concurrent_future = asyncio.run_coroutine_threadsafe(self.unpack_once(), self.loop)
         return concurrent_future.result(timeout=timeout)
 
     def done(self) -> bool:
-        return self._result is not UNCHANGED or self._exception is not None
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        state = self._state
+        return state in (_FINISHED, _CANCELLED, _CANCELLED_AFTER_FIRST_UNPACKING)
 
     def unpacked_once(self) -> bool:
-        return self.done() or self._intermediate_promise is not None
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        state = self._state
+        return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_FIRST_UNPACKING)
 
     def cancelled(self) -> bool:
-        # TODO TODO TODO
-        pass
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        state = self._state
+        return state in (_CANCELLED, _CANCELLED_AFTER_FIRST_UNPACKING)
 
     def result(self) -> T_co:
-        # TODO TODO TODO
-        pass
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        self._assert_done_and_not_cancelled()
+
+        if self._exception is not None:
+            raise self._exception
+
+        return self._result
 
     def intermediate_promise(self) -> "Promise[Any] | None":
-        # TODO TODO TODO
-        pass
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        if not self.unpacked_once():
+            # TODO Introduce a PromisingError subclass for this ?
+            #  Should it be specific to "unpacking once" ?
+            #  Should it also inherit from asyncio.InvalidStateError AND
+            #  concurrent.futures.InvalidStateError ?
+            #  Isn't there a common builtin error for both - concurrent and
+            #  asyncio - just like TimeoutError ?
+            raise asyncio.InvalidStateError(f"Promise is not unpacked even once: {self!r}")
+
+        return self._intermediate_promise
 
     def exception(self) -> BaseException | None:
-        # TODO TODO TODO
-        pass
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        self._assert_done_and_not_cancelled()
+        return self._exception
 
     def cancel(self, msg: str | None = None) -> bool:
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
         if self.is_on_running_context_loop():
             return self._cancel_in_background(msg)
 
@@ -316,7 +387,34 @@ class Promise(PromisingContext, Generic[T_co]):
         concurrent_future = asyncio.run_coroutine_threadsafe(self._cancel_in_background(msg), self.loop)
         return concurrent_future.result()
 
+    def _assert_done_and_not_cancelled(self) -> None:
+        """
+        NOTE: This method is thread-safe, including from the event loop of this
+        Promise.
+        """
+        if not self.done():
+            # TODO Introduce a PromisingError subclass for this ?
+            #  Should it be specific to "done" ?
+            #  Should it also inherit from asyncio.InvalidStateError AND
+            #  concurrent.futures.InvalidStateError ?
+            #  Isn't there a common builtin error for both - concurrent and
+            #  asyncio - just like TimeoutError ?
+            raise asyncio.InvalidStateError(f"Promise is not done: {self!r}")
+
+        if self.cancelled():
+            # TODO Introduce a PromisingError subclass for this ?
+            #  Should it be specific to "cancelled" ?
+            #  Should it also inherit from asyncio.CancelledError AND
+            #  concurrent.futures.CancelledError ?
+            #  Isn't there a common builtin error for both - concurrent and
+            #  asyncio - just like TimeoutError ?
+            raise asyncio.CancelledError(f"Promise is cancelled: {self!r}")
+
     def _cancel_in_background(self, msg: str | None = None) -> bool:
+        """
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
+        """
         # TODO TODO TODO
         if self.done():
             return False
@@ -328,6 +426,10 @@ class Promise(PromisingContext, Generic[T_co]):
         return self._task.cancel(msg)
 
     async def _unpack_once_in_background(self) -> None:
+        """
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
+        """
         try:
             if self._intermediate_promise is not None:
                 # Should not happen
@@ -366,6 +468,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Raises:
             RuntimeError: If the Promise is already done or has no awaitable.
+
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
         """
         try:
             if self.done():
@@ -390,9 +495,25 @@ class Promise(PromisingContext, Generic[T_co]):
             self._attach_context_to_exception(exc)
             self._exception = exc
 
+    def _ensure_single_unpacking_scheduled(self) -> None:
+        """
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
+        """
+        if self._single_unpacking_task is None and not self.done():
+            self._single_unpacking_task = self.loop.create_task(
+                self._unpack_once_in_background(), name=str(self) + "-SingleUnpackingTask"
+            )
+
     def _ensure_full_unpacking_scheduled(self) -> None:
-        if self._task is None and not self.done():
-            self._task = self.loop.create_task(self._fully_unpack_in_background(), name=str(self) + "-Task")
+        """
+        NOTE: This method is only to be used from the event loop of this
+        Promise.
+        """
+        if self._full_unpacking_task is None and not self.done():
+            self._full_unpacking_task = self.loop.create_task(
+                self._fully_unpack_in_background(), name=str(self) + "-FullUnpackingTask"
+            )
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:
         try:

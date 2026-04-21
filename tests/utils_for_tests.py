@@ -60,7 +60,7 @@ def collect_parent_promises(ctx: promising.PromisingContext) -> list[promising.P
     return result
 
 
-class NonPromiseAwaitableContext(promising.PromisingFuture):
+class NonPromiseAwaitableContext(promising.PromisingContext):
     def __init__(
         self,
         coro: Awaitable[Any],

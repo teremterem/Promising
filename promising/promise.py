@@ -8,8 +8,8 @@ from typing import Any, Generic
 from promising.errors import PromiseNotFoundError
 from promising.promising_context import PromisingContext
 from promising.sentinels import (
-    _CANCELLED,
-    _CANCELLED_AFTER_FIRST_UNPACKING,
+    _CANCELLED_AFTER_UNPACKED_ONCE,
+    _CANCELLED_BEFORE_UNPACKED_ONCE,
     _FINISHED,
     _PENDING,
     _UNPACKED_ONCE,
@@ -303,7 +303,8 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._single_unpacking_task is None:
             self._ensure_single_unpacking_scheduled()
 
-        return await self._single_unpacking_task
+        await self._single_unpacking_task
+        return self.intermediate_promise()
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         """
@@ -321,7 +322,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Promise.
         """
         state = self._state
-        return state in (_FINISHED, _CANCELLED, _CANCELLED_AFTER_FIRST_UNPACKING)
+        return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
 
     def unpacked_once(self) -> bool:
         """
@@ -329,7 +330,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Promise.
         """
         state = self._state
-        return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_FIRST_UNPACKING)
+        return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
 
     def cancelled(self) -> bool:
         """
@@ -337,7 +338,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Promise.
         """
         state = self._state
-        return state in (_CANCELLED, _CANCELLED_AFTER_FIRST_UNPACKING)
+        return state in (_CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
 
     def result(self) -> T_co:
         """

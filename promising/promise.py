@@ -256,13 +256,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        if self.done():
-            return self.result()
+        if self._ensure_full_unpacking_scheduled():
+            yield from self._full_unpacking_task
 
-        if self._full_unpacking_task is None:
-            self._ensure_full_unpacking_scheduled()
-
-        yield from self._full_unpacking_task
         return self.result()
 
     def sync(self, *, timeout: float | None = None) -> T_co:
@@ -297,13 +293,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        if self.unpacked_once():
-            return self.intermediate_promise()
+        if self._ensure_single_unpacking_scheduled():
+            await self._single_unpacking_task
 
-        if self._single_unpacking_task is None:
-            self._ensure_single_unpacking_scheduled()
-
-        await self._single_unpacking_task
         return self.intermediate_promise()
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
@@ -429,15 +421,28 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        # TODO TODO TODO
+        # TODO Review this method once again - I'm not entirely sure the logic
+        #  is sound
         if self.done():
             return False
 
-        if self._task is None:
-            # TODO Set "state" to CANCELLED
-            return True
+        single_unpacking_cancelled = False
+        full_unpacking_cancelled = False
+        try:
+            if self._single_unpacking_task is not None and not self.unpacked_once():
+                single_unpacking_cancelled = self._single_unpacking_task.cancel(msg)
 
-        return self._task.cancel(msg)
+                if single_unpacking_cancelled:
+                    self._state = _CANCELLED_BEFORE_UNPACKED_ONCE
+
+        finally:
+            if self._full_unpacking_task is not None:
+                full_unpacking_cancelled = self._full_unpacking_task.cancel(msg)
+
+                if full_unpacking_cancelled and not single_unpacking_cancelled:
+                    self._state = _CANCELLED_AFTER_UNPACKED_ONCE
+
+        return single_unpacking_cancelled or full_unpacking_cancelled
 
     async def _unpack_once_from_loop(self) -> None:
         """
@@ -495,7 +500,9 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _fully_unpack_from_loop a Promise with no awaitable: {self!r}"
                 )
 
-            # TODO TODO TODO
+            self._ensure_single_unpacking_scheduled()
+            await self._single_unpacking_task
+
             # TODO What will cancelling do to this whole unpacking chain ?
             with self:
                 result = await self._awaitable
@@ -508,17 +515,20 @@ class Promise(PromisingContext, Generic[T_co]):
             self._attach_context_to_exception(exc)
             self._exception = exc
 
-    def _ensure_single_unpacking_scheduled(self) -> None:
+    def _ensure_single_unpacking_scheduled(self) -> bool:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        if self._single_unpacking_task is None and not self.done():
+        if self._single_unpacking_task is None and not self.done() and not self.unpacked_once():
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
+            return True
 
-    def _ensure_full_unpacking_scheduled(self) -> None:
+        return False
+
+    def _ensure_full_unpacking_scheduled(self) -> bool:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
@@ -527,6 +537,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
+            return True
+
+        return False
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:
         try:

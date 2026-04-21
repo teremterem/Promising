@@ -237,7 +237,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via
-        _fully_unpack_in_background(). If already started via start_soon,
+        _fully_unpack_from_loop(). If already started via start_soon,
         waits for the existing task to complete. Once the Promise resolves,
         recursively awaits the result as long as it is itself a Promise
         (non-Promise awaitables are auto-wrapped into Promises by
@@ -382,11 +382,24 @@ class Promise(PromisingContext, Generic[T_co]):
         Promise.
         """
         if self.is_on_running_context_loop():
-            return self._cancel_in_background(msg)
+            # We are on the event loop of the Promise, so we can cancel it
+            # directly
+            return self._cancel_from_loop(msg)
 
-        # TODO TODO TODO _cancel_in_background is not a coroutine
-        concurrent_future = asyncio.run_coroutine_threadsafe(self._cancel_in_background(msg), self.loop)
-        return concurrent_future.result()
+        # We are on a different thread, so we need to use a thread-safe
+        # mechanism to cancel the Promise
+        future = concurrent.futures.Future()
+
+        def callback():
+            try:
+                result = self._cancel_from_loop(msg)
+            except BaseException as exc:
+                future.set_exception(exc)
+            else:
+                future.set_result(result)
+
+        self.loop.call_soon_threadsafe(callback)
+        return future.result()
 
     def _assert_done_and_not_cancelled(self) -> None:
         """
@@ -411,7 +424,7 @@ class Promise(PromisingContext, Generic[T_co]):
             #  asyncio - just like TimeoutError ?
             raise asyncio.CancelledError(f"Promise is cancelled: {self!r}")
 
-    def _cancel_in_background(self, msg: str | None = None) -> bool:
+    def _cancel_from_loop(self, msg: str | None = None) -> bool:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
@@ -426,7 +439,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         return self._task.cancel(msg)
 
-    async def _unpack_once_in_background(self) -> None:
+    async def _unpack_once_from_loop(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
@@ -435,16 +448,15 @@ class Promise(PromisingContext, Generic[T_co]):
             if self._intermediate_promise is not None:
                 # Should not happen
                 raise RuntimeError(
-                    f"An attempt was made to _unpack_once_in_background a Promise that was already unpacked once: "
-                    f"{self!r}"
+                    f"An attempt was made to _unpack_once_from_loop a Promise that was already unpacked once: {self!r}"
                 )
             if self.done():
                 # Should not happen
-                raise RuntimeError(f"An attempt was made to _unpack_once_in_background a done Promise: {self!r}")
+                raise RuntimeError(f"An attempt was made to _unpack_once_from_loop a done Promise: {self!r}")
             if self._awaitable is None:
                 # Should not happen
                 raise RuntimeError(
-                    f"An attempt was made to _unpack_once_in_background a Promise with no awaitable: {self!r}"
+                    f"An attempt was made to _unpack_once_from_loop a Promise with no awaitable: {self!r}"
                 )
 
             result = await self._awaitable
@@ -458,7 +470,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._attach_context_to_exception(exc)
             self._exception = exc
 
-    async def _fully_unpack_in_background(self) -> None:
+    async def _fully_unpack_from_loop(self) -> None:
         """
         Execute the Promise's awaitable and manage its lifecycle.
 
@@ -476,11 +488,11 @@ class Promise(PromisingContext, Generic[T_co]):
         try:
             if self.done():
                 # Should not happen
-                raise RuntimeError(f"An attempt was made to _fully_unpack_in_background a done Promise: {self!r}")
+                raise RuntimeError(f"An attempt was made to _fully_unpack_from_loop a done Promise: {self!r}")
             if self._awaitable is None:
                 # Should not happen
                 raise RuntimeError(
-                    f"An attempt was made to _fully_unpack_in_background a Promise with no awaitable: {self!r}"
+                    f"An attempt was made to _fully_unpack_from_loop a Promise with no awaitable: {self!r}"
                 )
 
             # TODO TODO TODO
@@ -503,7 +515,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         if self._single_unpacking_task is None and not self.done():
             self._single_unpacking_task = self.loop.create_task(
-                self._unpack_once_in_background(), name=str(self) + "-SingleUnpackingTask"
+                self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
 
     def _ensure_full_unpacking_scheduled(self) -> None:
@@ -513,7 +525,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         if self._full_unpacking_task is None and not self.done():
             self._full_unpacking_task = self.loop.create_task(
-                self._fully_unpack_in_background(), name=str(self) + "-FullUnpackingTask"
+                self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:

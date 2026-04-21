@@ -251,7 +251,7 @@ class Promise(PromisingContext, Generic[T_co]):
             The fully unpacked result of the Promise (no remaining
             nested Promises).
 
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
@@ -283,7 +283,7 @@ class Promise(PromisingContext, Generic[T_co]):
             TimeoutError: If timeout expires before completion.
 
         NOTE: This method is thread-safe, but it is unavailable from the event
-        loop of this Promise to avoid a deadlock.
+        loop of the Promise to avoid a deadlock.
         """
         self.assert_no_sync_usage_deadlock()
 
@@ -292,7 +292,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def unpack_once(self) -> "T_co | Promise[Any]":
         """
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
@@ -308,7 +308,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         """
         NOTE: This method is thread-safe, but it is unavailable from the event
-        loop of this Promise to avoid a deadlock.
+        loop of the Promise to avoid a deadlock.
         """
         self.assert_no_sync_usage_deadlock()
 
@@ -317,7 +317,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def done(self) -> bool:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         state = self._state
@@ -325,7 +325,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def unpacked_once(self) -> bool:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         state = self._state
@@ -333,7 +333,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def cancelled(self) -> bool:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         state = self._state
@@ -341,7 +341,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def result(self) -> T_co:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         self._assert_done_and_not_cancelled()
@@ -353,7 +353,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def intermediate_promise(self) -> "Promise[Any] | None":
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         if not self.unpacked_once():
@@ -369,7 +369,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def exception(self) -> BaseException | None:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         self._assert_done_and_not_cancelled()
@@ -377,7 +377,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def cancel(self, msg: str | None = None) -> bool:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         if self.is_on_running_context_loop():
@@ -389,7 +389,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _assert_done_and_not_cancelled(self) -> None:
         """
-        NOTE: This method is thread-safe, including from the event loop of this
+        NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
         if not self.done():
@@ -412,7 +412,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _cancel_in_background(self, msg: str | None = None) -> bool:
         """
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         # TODO TODO TODO
@@ -427,7 +427,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def _unpack_once_in_background(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         try:
@@ -469,7 +469,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done or has no awaitable.
 
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         try:
@@ -497,7 +497,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _ensure_single_unpacking_scheduled(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         if self._single_unpacking_task is None and not self.done():
@@ -507,7 +507,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _ensure_full_unpacking_scheduled(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of this
+        NOTE: This method is only to be used from the event loop of the
         Promise.
         """
         if self._full_unpacking_task is None and not self.done():

@@ -455,6 +455,6 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 f"`use_thread_pool` setting. Set `use_thread_pool=True` "
                 f"(recommended for most cases, so CPU-heavy workloads "
                 f"don't block the event loop thread) or "
-                f"`use_thread_pool=False`."
+                f"`use_thread_pool=False` on the decorator."
             )
         return use_thread_pool

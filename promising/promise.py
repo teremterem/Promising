@@ -34,7 +34,7 @@ def wrap_awaitable(
     prefilled_result: T_co | Sentinel = UNCHANGED,
     prefilled_exception: BaseException | None = None,
 ) -> "Promise[Any]":
-    # TODO Make it possible change the default Promise class in by parent
+    # TODO Make it possible change the default Promise class in parent
     #  PromisingContexts
     return Promise(
         awaitable=awaitable,
@@ -171,6 +171,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
+        self._state: Sentinel = _PENDING
         super().__init__(
             namespace=resolve_namespace(
                 provided_explicitly=namespace,
@@ -186,7 +187,6 @@ class Promise(PromisingContext, Generic[T_co]):
         self._awaitable = awaitable
         self._start_soon = self._resolve_start_soon(start_soon)
 
-        self._state: Sentinel = _PENDING
         self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None

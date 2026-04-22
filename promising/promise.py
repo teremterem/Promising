@@ -476,6 +476,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self._attach_context_to_exception(exc)
             self._exception = exc
 
+        finally:
+            self._state = _UNPACKED_ONCE
+
     async def _fully_unpack_from_loop(self) -> None:
         """
         Execute the Promise's awaitable and manage its lifecycle.
@@ -512,6 +515,9 @@ class Promise(PromisingContext, Generic[T_co]):
         except BaseException as exc:
             self._attach_context_to_exception(exc)
             self._exception = exc
+
+        finally:
+            self._state = _FINISHED
 
     def _ensure_single_unpacking_scheduled(self) -> bool:
         """

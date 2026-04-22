@@ -239,14 +239,14 @@ def get_active_context(*, raise_if_none: bool = True) -> "PromisingContext | Non
     return PromisingContext.get_active_context(raise_if_none=raise_if_none)
 
 
-async def await_children(*, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
+async def await_children(*, whole_subtree: bool = True, fully_unpack_promises: bool = True) -> None:
     """
     Wait for all awaitable children of the active context to finish.
 
     Args:
         whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
-        unpack_all_promises: If True (the default), each Promise child
+        fully_unpack_promises: If True (the default), each Promise child
             is fully awaited. If False, Promise children are only unpacked
             one level (via ``unpack_once()``).
     """
@@ -255,14 +255,14 @@ async def await_children(*, whole_subtree: bool = True, unpack_all_promises: boo
     #  PromisingContext ? What other functions or methods might we need it in ?
     return await get_active_context().await_children(
         whole_subtree=whole_subtree,
-        unpack_all_promises=unpack_all_promises,
+        fully_unpack_promises=fully_unpack_promises,
     )
 
 
 def await_children_sync(
     *,
     whole_subtree: bool = True,
-    unpack_all_promises: bool = True,
+    fully_unpack_promises: bool = True,
     timeout: float | None = None,
 ) -> None:
     """
@@ -276,14 +276,14 @@ def await_children_sync(
     Args:
         whole_subtree: If True (the default), wait for all descendants,
             not just direct children.
-        unpack_all_promises: If True (the default), each Promise child
+        fully_unpack_promises: If True (the default), each Promise child
             is fully awaited. If False, Promise children are only unpacked
             one level (via ``unpack_once()``).
         timeout: Maximum time to wait in seconds.
     """
     return get_active_context().await_children_sync(
         whole_subtree=whole_subtree,
-        unpack_all_promises=unpack_all_promises,
+        fully_unpack_promises=fully_unpack_promises,
         timeout=timeout,
     )
 
@@ -541,7 +541,7 @@ class PromisingContext:
         for line in self.format_trace(parents_first=parents_first):
             print(line)
 
-    async def await_children(self, *, whole_subtree: bool = True, unpack_all_promises: bool = True) -> None:
+    async def await_children(self, *, whole_subtree: bool = True, fully_unpack_promises: bool = True) -> None:
         """
         Wait for all awaitable children to finish.
 
@@ -551,7 +551,7 @@ class PromisingContext:
         Args:
             whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
-            unpack_all_promises: If True (the default), each Promise child
+            fully_unpack_promises: If True (the default), each Promise child
                 is fully awaited. If False, Promise children are only unpacked
                 one level (``child.unpack_once()``).
         """
@@ -579,7 +579,7 @@ class PromisingContext:
             await asyncio.gather(
                 *[
                     child.unpack_once()
-                    if not unpack_all_promises and isinstance(child, Promise)
+                    if not fully_unpack_promises and isinstance(child, Promise)
                     else awaitable_as_coroutine(child)
                     for child in children
                 ],
@@ -596,7 +596,7 @@ class PromisingContext:
         self,
         *,
         whole_subtree: bool = True,
-        unpack_all_promises: bool = True,
+        fully_unpack_promises: bool = True,
         timeout: float | None = None,
     ) -> None:
         """
@@ -610,7 +610,7 @@ class PromisingContext:
         Args:
             whole_subtree: If True (the default), wait for all descendants,
                 not just direct children.
-            unpack_all_promises: If True (the default), each Promise child
+            fully_unpack_promises: If True (the default), each Promise child
                 is fully awaited. If False, Promise children are only
                 unpacked one level (via ``unpack_once()``).
             timeout: Maximum time to wait in seconds.
@@ -626,7 +626,7 @@ class PromisingContext:
         concurrent_future = asyncio.run_coroutine_threadsafe(
             self.await_children(
                 whole_subtree=whole_subtree,
-                unpack_all_promises=unpack_all_promises,
+                fully_unpack_promises=fully_unpack_promises,
             ),
             self.loop,
         )

@@ -578,11 +578,9 @@ class PromisingContext:
             #  context ?)
             await asyncio.gather(
                 *[
-                    asyncio.create_task(
-                        child.unpack_once()
-                        if not unpack_all_promises and isinstance(child, Promise)
-                        else awaitable_as_coroutine(child)
-                    )
+                    child.unpack_once()
+                    if not unpack_all_promises and isinstance(child, Promise)
+                    else awaitable_as_coroutine(child)
                     for child in children
                 ],
                 # `return_exceptions` is set to True to make sure we wait for

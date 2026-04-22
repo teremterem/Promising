@@ -18,7 +18,7 @@ class PromisingHierarchyLogger:
         log_message = "\n".join(
             [
                 "AWAITING CHILDREN STARTED",
-                self._fmt("parent", parent),
+                self._fmt("awaiter", parent),
                 *self._lines_for_unsettled_children(parent=parent),
             ]
         )
@@ -31,7 +31,7 @@ class PromisingHierarchyLogger:
         log_message = "\n".join(
             [
                 "AWAITING CHILDREN...",
-                self._fmt("parent", parent),
+                self._fmt("awaiter", parent),
                 *[self._fmt("awaiting", child) for child in children],
                 *self._lines_for_unsettled_children(parent=parent),
             ]
@@ -45,7 +45,7 @@ class PromisingHierarchyLogger:
         log_message = "\n".join(
             [
                 "CHILDREN AWAITED",
-                self._fmt("parent", parent),
+                self._fmt("awaiter", parent),
                 *self._lines_for_unsettled_children(parent=parent),
             ]
         )

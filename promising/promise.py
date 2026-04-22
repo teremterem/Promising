@@ -615,3 +615,6 @@ class Promise(PromisingContext, Generic[T_co]):
                 raise ValueError(
                     "Cannot provide both 'awaitable' and 'prefilled_result' or 'prefilled_exception' parameters"
                 )
+
+    def __repr__(self) -> str:
+        return f"{super().__repr__()}.{self._state}"

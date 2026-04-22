@@ -409,12 +409,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 # Get the event loop from the active promise that is running
                 # this async wrapper function
                 active_promise = get_active_promise()
-                loop = active_promise.get_loop()
                 executor = active_promise.get_thread_pool_executor()
                 # Copy the current context so that ContextVars (in particular
                 # Promise._current) are accessible inside the executor thread
                 ctx = contextvars.copy_context()
-                return await loop.run_in_executor(
+                return await active_promise.loop.run_in_executor(
                     executor,
                     functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )

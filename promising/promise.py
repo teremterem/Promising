@@ -256,7 +256,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        if self._ensure_full_unpacking_scheduled():
+        self._ensure_full_unpacking_scheduled()
+
+        if self._full_unpacking_task is not None:
             yield from self._full_unpacking_task
 
         return self.result()
@@ -293,7 +295,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        if self._ensure_single_unpacking_scheduled():
+        self._ensure_single_unpacking_scheduled()
+
+        if self._single_unpacking_task is not None:
             await self._single_unpacking_task
 
         return self.intermediate_promise()
@@ -519,7 +523,7 @@ class Promise(PromisingContext, Generic[T_co]):
         finally:
             self._state = _FINISHED
 
-    def _ensure_single_unpacking_scheduled(self) -> bool:
+    def _ensure_single_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
@@ -528,11 +532,8 @@ class Promise(PromisingContext, Generic[T_co]):
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
-            return True
 
-        return False
-
-    def _ensure_full_unpacking_scheduled(self) -> bool:
+    def _ensure_full_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
@@ -541,9 +542,6 @@ class Promise(PromisingContext, Generic[T_co]):
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
-            return True
-
-        return False
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:
         try:

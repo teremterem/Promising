@@ -18,7 +18,7 @@ from promising.sentinels import (
     Sentinel,
 )
 from promising.types import T_co
-from promising.utils import resolve_namespace
+from promising.utils import awaitable_as_coroutine, resolve_namespace
 
 
 def wrap_awaitable(
@@ -171,7 +171,17 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
-        self._state: Sentinel = _PENDING
+        self._awaitable = awaitable
+        if self._awaitable is None:
+            if prefilled_result is not UNCHANGED:
+                self._result = prefilled_result
+            else:
+                self._exception = prefilled_exception
+
+            self._state: Sentinel = _FINISHED
+        else:
+            self._state: Sentinel = _PENDING
+
         super().__init__(
             namespace=resolve_namespace(
                 provided_explicitly=namespace,
@@ -184,7 +194,6 @@ class Promise(PromisingContext, Generic[T_co]):
             start_soon_default=start_soon_default,
             close_context_immediately=awaitable is None,
         )
-        self._awaitable = awaitable
         self._start_soon = self._resolve_start_soon(start_soon)
 
         self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
@@ -194,13 +203,7 @@ class Promise(PromisingContext, Generic[T_co]):
         self._full_unpacking_task: Task[T_co] | None = None
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
 
-        if self._awaitable is None:
-            if prefilled_result is not UNCHANGED:
-                self._result = prefilled_result
-            else:
-                self._exception = prefilled_exception
-
-        elif self._start_soon:
+        if self._start_soon:
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
@@ -285,7 +288,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_no_sync_usage_deadlock()
 
-        concurrent_future = asyncio.run_coroutine_threadsafe(self, self.loop)
+        concurrent_future = asyncio.run_coroutine_threadsafe(awaitable_as_coroutine(self), self.loop)
         return concurrent_future.result(timeout=timeout)
 
     async def unpack_once(self) -> "T_co | Promise[Any]":

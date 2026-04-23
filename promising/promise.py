@@ -353,6 +353,9 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._exception is not None:
             raise self._exception
 
+        # TODO Raise a RuntimeError if self._result is UNCHANGED (this should
+        #  not be possible due to previous asserts)
+
         return self._result
 
     def intermediate_promise(self) -> "Promise[Any] | None":

@@ -171,16 +171,20 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
+        self._result: T_co | Sentinel = UNCHANGED
+        self._exception: BaseException | None = None
+        self._state: Sentinel = _PENDING
+
+        self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
         self._awaitable = awaitable
+
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED:
                 self._result = prefilled_result
             else:
                 self._exception = prefilled_exception
 
-            self._state: Sentinel = _FINISHED
-        else:
-            self._state: Sentinel = _PENDING
+            self._state = _FINISHED
 
         super().__init__(
             namespace=resolve_namespace(
@@ -195,10 +199,6 @@ class Promise(PromisingContext, Generic[T_co]):
             close_context_immediately=awaitable is None,
         )
         self._start_soon = self._resolve_start_soon(start_soon)
-
-        self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
-        self._result: T_co | Sentinel = UNCHANGED
-        self._exception: BaseException | None = None
 
         self._full_unpacking_task: Task[T_co] | None = None
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None

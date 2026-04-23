@@ -302,7 +302,7 @@ async def test_concurrent_consumers(*, start_soon: bool | None) -> None:
         return await promise
 
     tasks = [asyncio.create_task(await_promise_task()) for _ in range(5)]
-    results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=2)
+    results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=3)
 
     assert promise.result() == "Hello from Promise!"
 

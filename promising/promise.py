@@ -300,7 +300,11 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._single_unpacking_task is not None:
             await self._single_unpacking_task
 
-        return self.intermediate_promise()
+        intermediate_promise = self.intermediate_promise()
+
+        if intermediate_promise is None:
+            return self.result()
+        return intermediate_promise
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         """
@@ -377,7 +381,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if self.is_on_running_context_loop():
+        if self.is_on_correct_running_loop():
             # We are on the event loop of the Promise, so we can cancel it
             # directly
             return self._cancel_from_loop(msg)
@@ -481,7 +485,10 @@ class Promise(PromisingContext, Generic[T_co]):
             self._exception = exc
 
         finally:
-            self._state = _UNPACKED_ONCE
+            if self._result is UNCHANGED and self._exception is None:
+                self._state = _UNPACKED_ONCE
+            else:
+                self._state = _FINISHED
 
     async def _fully_unpack_from_loop(self) -> None:
         """

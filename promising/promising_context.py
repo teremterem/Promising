@@ -753,12 +753,12 @@ class PromisingContext:
             self._context_closed = True
         self._unregister_from_parent_if_time()
 
-    def is_on_running_context_loop(self) -> bool:
-        running_loop = get_running_asyncio_loop(raise_if_none=True)
+    def is_on_correct_running_loop(self, *, raise_if_no_running_loop: bool = False) -> bool:
+        running_loop = get_running_asyncio_loop(raise_if_none=raise_if_no_running_loop)
         return running_loop is self.loop
 
     def assert_no_sync_usage_deadlock(self) -> None:
-        if self.is_on_running_context_loop():
+        if self.is_on_correct_running_loop(raise_if_no_running_loop=False):
             raise SyncUsageError(
                 f"Synchronous operations of {self!r} cannot be performed on "
                 f"its own event loop thread, as that typically leads to a "
@@ -766,7 +766,7 @@ class PromisingContext:
             )
 
     def assert_awaiting_on_correct_event_loop(self) -> None:
-        if not self.is_on_running_context_loop():
+        if not self.is_on_correct_running_loop(raise_if_no_running_loop=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )

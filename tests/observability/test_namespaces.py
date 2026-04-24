@@ -152,7 +152,7 @@ async def test_promise_repr_with_explicit_namespace(*, use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x", namespace="MyOp")
 
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<'MyOp' Promise id=999>"
+    assert normalize_object_repr(result) == "<'MyOp' Promise id=999>._FINISHED"
     await promise
 
 
@@ -163,7 +163,7 @@ async def test_promise_repr_without_namespace(*, use_repr: bool) -> None:
     promise = promising.Promise(prefilled_result="x")
 
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<Promise id=999>"
+    assert normalize_object_repr(result) == "<Promise id=999>._FINISHED"
     await promise
 
 
@@ -185,7 +185,7 @@ async def test_promise_repr_auto_resolves_from_coroutine(*, use_repr: bool) -> N
     assert normalize_object_repr(result) == (
         "<'tests.observability.test_namespaces"
         "::test_promise_repr_auto_resolves_from_coroutine.<locals>.do_work'"
-        " Promise id=999>"
+        " Promise id=999>._PENDING"
     )
     await promise
 
@@ -200,7 +200,7 @@ async def test_promise_repr_explicit_overrides_coroutine_name(*, use_repr: bool)
 
     promise = promising.Promise(do_work(), namespace="Override")
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<'Override' Promise id=999>"
+    assert normalize_object_repr(result) == "<'Override' Promise id=999>._PENDING"
     await promise
 
 
@@ -243,7 +243,7 @@ async def test_promising_function_promise_inherits_namespace(*, use_repr: bool) 
 
     promise = fetch()
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<'FetchOp' Promise id=999>"
+    assert normalize_object_repr(result) == "<'FetchOp' Promise id=999>._PENDING"
     await promise
 
 
@@ -261,7 +261,7 @@ async def test_promising_function_auto_namespace_in_promise_repr(*, use_repr: bo
     assert normalize_object_repr(result) == (
         "<'tests.observability.test_namespaces"
         "::test_promising_function_auto_namespace_in_promise_repr.<locals>.compute'"
-        " Promise id=999>"
+        " Promise id=999>._PENDING"
     )
     await promise
 
@@ -277,7 +277,7 @@ async def test_promising_function_namespace_override_at_call_time(*, use_repr: b
 
     promise = work(namespace="PerCall")
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<'PerCall' Promise id=999>"
+    assert normalize_object_repr(result) == "<'PerCall' Promise id=999>._PENDING"
     await promise
 
 
@@ -294,7 +294,7 @@ async def test_promising_function_call_unchanged_namespace_uses_decorator_ns(*, 
 
     promise = work(namespace=UNCHANGED)
     result = repr(promise) if use_repr else str(promise)
-    assert normalize_object_repr(result) == "<'FromDecorator' Promise id=999>"
+    assert normalize_object_repr(result) == "<'FromDecorator' Promise id=999>._PENDING"
     await promise
 
 
@@ -393,7 +393,7 @@ async def test_promising_function_on_instance_method_qualname(*, use_promise_rep
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
             "<'tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
-            " Promise id=999>"
+            " Promise id=999>._PENDING"
         )
     assert await promise == "processed"
 
@@ -420,7 +420,7 @@ async def test_promising_function_on_static_method_qualname(*, use_promise_repr:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
             "<'tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
-            " Promise id=999>"
+            " Promise id=999>._PENDING"
         )
     assert await promise == "helped"
 
@@ -447,7 +447,7 @@ async def test_promising_function_on_class_method_qualname(*, use_promise_repr: 
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
             "<'tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
-            " Promise id=999>"
+            " Promise id=999>._PENDING"
         )
     assert await promise == "created"
 

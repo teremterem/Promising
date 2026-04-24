@@ -1,11 +1,13 @@
 import asyncio
 import concurrent.futures
 import inspect
+import logging
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
 from promising.errors import PromiseNotFoundError
+from promising.logging_utils import PromiseUnpackingLogger
 from promising.promising_context import PromisingContext
 from promising.sentinels import (
     _CANCELLED_AFTER_UNPACKED_ONCE,
@@ -19,6 +21,8 @@ from promising.sentinels import (
 )
 from promising.types import T_co
 from promising.utils import awaitable_as_coroutine, resolve_namespace
+
+_unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
 
 
 def wrap_awaitable(
@@ -471,10 +475,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        print()
-        print()
-        print("STARTED STARTED STARTED unpack_once_from_loop")
-        print()
+        _unpacking_logger.log_single_unpacking_started(promise=self)
         try:
             if self.unpacked_once_or_done():
                 # Should not happen
@@ -500,10 +501,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._state = _UNPACKED_ONCE
             else:
                 self._state = _FINISHED
-            print()
-            print()
-            print("FINISHED FINISHED FINISHED unpack_once_from_loop")
-            print()
+            _unpacking_logger.log_single_unpacking_finished(promise=self)
 
     async def _fully_unpack_from_loop(self) -> None:
         """
@@ -520,10 +518,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        print()
-        print()
-        print("STARTED STARTED STARTED fully_unpack_from_loop")
-        print()
+        _unpacking_logger.log_full_unpacking_started(promise=self)
         try:
             if self.done():
                 # When there are no more nested Promises to unpack, the Promise
@@ -544,46 +539,31 @@ class Promise(PromisingContext, Generic[T_co]):
 
         finally:
             self._state = _FINISHED
-            print()
-            print()
-            print("FINISHED FINISHED FINISHED fully_unpack_from_loop")
-            print()
+            _unpacking_logger.log_full_unpacking_finished(promise=self)
 
     def _ensure_single_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        print()
-        print()
-        print("ATTEMPTING TO SCHEDULE unpack_once_from_loop")
-        print()
+        _unpacking_logger.log_single_unpacking_scheduling(promise=self)
         if self._single_unpacking_task is None and not self.unpacked_once_or_done():
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
-            print()
-            print()
-            print("SCHEDULED SCHEDULED SCHEDULED unpack_once_from_loop")
-            print()
+            _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
     def _ensure_full_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        print()
-        print()
-        print("ATTEMPTING TO SCHEDULE fully_unpack_from_loop")
-        print()
+        _unpacking_logger.log_full_unpacking_scheduling(promise=self)
         if self._full_unpacking_task is None and not self.done():
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
-            print()
-            print()
-            print("SCHEDULED SCHEDULED SCHEDULED fully_unpack_from_loop")
-            print()
+            _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:
         try:

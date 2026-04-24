@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from promising.promise import Promise
     from promising.promising_context import PromisingContext
 
 
@@ -118,3 +119,40 @@ class PromisingHierarchyLogger:
                     )
         self.logger.warning("[MINOR] Failed to snapshot unsettled children for logging purposes after 10 attempts")
         return ()
+
+
+class PromiseUnpackingLogger:
+    def __init__(self, *, logger: logging.Logger | None = None, level: int) -> None:
+        self.logger = logger or logging.getLogger(type(self).__name__)
+        self.level = level
+
+    def log_single_unpacking_scheduling(self, *, promise: "Promise") -> None:
+        self._log("ATTEMPTING TO SCHEDULE unpack_once_from_loop", promise=promise)
+
+    def log_single_unpacking_scheduled(self, *, promise: "Promise") -> None:
+        self._log("SCHEDULED unpack_once_from_loop", promise=promise)
+
+    def log_single_unpacking_started(self, *, promise: "Promise") -> None:
+        self._log("STARTED unpack_once_from_loop", promise=promise)
+
+    def log_single_unpacking_finished(self, *, promise: "Promise") -> None:
+        self._log("FINISHED unpack_once_from_loop", promise=promise)
+
+    def log_full_unpacking_scheduling(self, *, promise: "Promise") -> None:
+        self._log("ATTEMPTING TO SCHEDULE fully_unpack_from_loop", promise=promise)
+
+    def log_full_unpacking_scheduled(self, *, promise: "Promise") -> None:
+        self._log("SCHEDULED fully_unpack_from_loop", promise=promise)
+
+    def log_full_unpacking_started(self, *, promise: "Promise") -> None:
+        self._log("STARTED fully_unpack_from_loop", promise=promise)
+
+    def log_full_unpacking_finished(self, *, promise: "Promise") -> None:
+        self._log("FINISHED fully_unpack_from_loop", promise=promise)
+
+    def _log(self, headline: str, *, promise: "Promise") -> None:
+        if not self.logger.isEnabledFor(self.level):
+            return
+
+        log_message = "\n".join([headline, f"  promise: {promise}"])
+        self.logger.log(self.level, f"\n{log_message}\n")

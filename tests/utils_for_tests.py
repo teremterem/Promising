@@ -1,3 +1,4 @@
+import asyncio
 import re
 import threading
 from collections.abc import Awaitable, Callable, Generator
@@ -70,14 +71,10 @@ class NonPromiseAwaitableContext(promising.PromisingContext):
         self._coro = coro
 
     def __await__(self) -> Generator[Any, None, Any]:
-        if not self.done():
-            # Here, a race condition is possible with multiple awaiters, but
-            # for the purposes of testing, we will ignore such a possibility
-            yield from self._fulfill().__await__()
-        return (yield from super().__await__())
-
-    async def _fulfill(self) -> None:
-        try:
-            self.set_result(await self._coro)
-        except BaseException as exc:
-            self.set_exception(exc)
+        # TODO There is a pitfall: should someone decide to extend their own
+        #  awaitable from PromisingContext and forget to use a with statement
+        #  like the one below,the  await_children will confusingly hang on such
+        #  an instance. How to hint at the need to enter and exit the context
+        #  for those who would want to extend PromisingContext ?
+        with self:
+            return (yield from asyncio.ensure_future(self._coro))

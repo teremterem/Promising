@@ -26,7 +26,7 @@ from promising.errors import (
 from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
-from promising.utils import awaitable_as_coroutine, get_running_asyncio_loop
+from promising.utils import get_running_asyncio_loop
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -578,9 +578,7 @@ class PromisingContext:
             #  context ?)
             await asyncio.gather(
                 *[
-                    child.unpack_once()
-                    if not fully_unpack_promises and isinstance(child, Promise)
-                    else awaitable_as_coroutine(child)
+                    child.unpack_once() if not fully_unpack_promises and isinstance(child, Promise) else child
                     for child in children
                 ],
                 # `return_exceptions` is set to True to make sure we wait for

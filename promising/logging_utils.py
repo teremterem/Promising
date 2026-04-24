@@ -127,16 +127,16 @@ class PromiseUnpackingLogger:
         self.level = level
 
     def log_single_unpacking_scheduling(self, *, promise: "Promise") -> None:
-        self._log("ATTEMPTING TO SCHEDULE unpack_once_from_loop", promise=promise)
+        self._log("ATTEMPTING TO SCHEDULE UNPACK_ONCE_FROM_LOOP", promise=promise)
 
     def log_single_unpacking_scheduled(self, *, promise: "Promise") -> None:
-        self._log("SCHEDULED unpack_once_from_loop", promise=promise)
+        self._log("SCHEDULED UNPACK_ONCE_FROM_LOOP", promise=promise)
 
     def log_single_unpacking_started(self, *, promise: "Promise") -> None:
-        self._log("STARTED unpack_once_from_loop", promise=promise)
+        self._log("STARTED UNPACK_ONCE_FROM_LOOP", promise=promise)
 
     def log_single_unpacking_finished(self, *, promise: "Promise") -> None:
-        self._log("FINISHED unpack_once_from_loop", promise=promise)
+        self._log("FINISHED UNPACK_ONCE_FROM_LOOP", promise=promise)
 
     def log_single_unpacking_result(self, *, promise: "Promise", result: Any) -> None:
         if not self.logger.isEnabledFor(self.level):
@@ -184,16 +184,16 @@ class PromiseUnpackingLogger:
         self.logger.log(self.level, f"\n{log_message}\n")
 
     def log_full_unpacking_scheduling(self, *, promise: "Promise") -> None:
-        self._log("ATTEMPTING TO SCHEDULE fully_unpack_from_loop", promise=promise)
+        self._log("ATTEMPTING TO SCHEDULE FULLY_UNPACK_FROM_LOOP", promise=promise)
 
     def log_full_unpacking_scheduled(self, *, promise: "Promise") -> None:
-        self._log("SCHEDULED fully_unpack_from_loop", promise=promise)
+        self._log("SCHEDULED FULLY_UNPACK_FROM_LOOP", promise=promise)
 
     def log_full_unpacking_started(self, *, promise: "Promise") -> None:
-        self._log("STARTED fully_unpack_from_loop", promise=promise)
+        self._log("STARTED FULLY_UNPACK_FROM_LOOP", promise=promise)
 
     def log_full_unpacking_finished(self, *, promise: "Promise") -> None:
-        self._log("FINISHED fully_unpack_from_loop", promise=promise)
+        self._log("FINISHED FULLY_UNPACK_FROM_LOOP", promise=promise)
 
     def _log(self, headline: str, *, promise: "Promise") -> None:
         if not self.logger.isEnabledFor(self.level):

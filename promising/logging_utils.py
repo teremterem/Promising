@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from promising.promise import Promise
@@ -137,6 +137,51 @@ class PromiseUnpackingLogger:
 
     def log_single_unpacking_finished(self, *, promise: "Promise") -> None:
         self._log("FINISHED unpack_once_from_loop", promise=promise)
+
+    def log_single_unpacking_result(self, *, promise: "Promise", result: Any) -> None:
+        if not self.logger.isEnabledFor(self.level):
+            return
+
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
+        kind = "INTERMEDIATE (Promise)" if isinstance(result, Promise) else "TERMINAL (non-Promise)"
+        log_message = "\n".join(
+            [
+                f"unpack_once_from_loop RESULT: {kind}",
+                f"  promise: {promise}",
+                f"  result type: {type(result).__name__}",
+            ]
+        )
+        self.logger.log(self.level, f"\n{log_message}\n")
+
+    def log_unwrap_step(self, *, promise: "Promise", depth: int, result: Any) -> None:
+        if not self.logger.isEnabledFor(self.level):
+            return
+
+        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+
+        kind = "Promise (continue unwrap)" if isinstance(result, Promise) else "non-Promise (stop)"
+        log_message = "\n".join(
+            [
+                f"fully_unpack_from_loop UNWRAP STEP depth={depth}: {kind}",
+                f"  promise: {promise}",
+                f"  result type: {type(result).__name__}",
+            ]
+        )
+        self.logger.log(self.level, f"\n{log_message}\n")
+
+    def log_unpacking_exception(self, *, promise: "Promise", stage: str, exc: BaseException) -> None:
+        if not self.logger.isEnabledFor(self.level):
+            return
+
+        log_message = "\n".join(
+            [
+                f"EXCEPTION in {stage}",
+                f"  promise: {promise}",
+                f"  exception: {type(exc).__name__}: {exc}",
+            ]
+        )
+        self.logger.log(self.level, f"\n{log_message}\n")
 
     def log_full_unpacking_scheduling(self, *, promise: "Promise") -> None:
         self._log("ATTEMPTING TO SCHEDULE fully_unpack_from_loop", promise=promise)

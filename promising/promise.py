@@ -487,12 +487,15 @@ class Promise(PromisingContext, Generic[T_co]):
             with self:
                 result = await self._awaitable
 
+            _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
+
             if isinstance(result, Promise):
                 self._intermediate_promise = result
             else:
                 self._result = result
 
         except BaseException as exc:
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
             self._attach_context_to_exception(exc)
             self._exception = exc
 
@@ -528,12 +531,17 @@ class Promise(PromisingContext, Generic[T_co]):
             # TODO What will cancelling do to this whole unpacking chain ?
             result = await self.unpack_once()
 
+            depth = 0
+            _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
             while isinstance(result, Promise):
                 result = await result
+                depth += 1
+                _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 
             self._result = result
 
         except BaseException as exc:
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
             self._attach_context_to_exception(exc)
             self._exception = exc
 

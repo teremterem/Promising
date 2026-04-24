@@ -383,7 +383,8 @@ async def test_promising_function_on_instance_method_qualname(*, use_promise_rep
 
     if use_promise_repr is None:
         assert Service.process.namespace == (
-            "tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
+            "tests.observability.test_namespaces"
+            "::test_promising_function_on_instance_method_qualname.<locals>.Service.process"
         )
 
     svc = Service()
@@ -392,7 +393,8 @@ async def test_promising_function_on_instance_method_qualname(*, use_promise_rep
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'tests.observability.test_namespaces::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
+            "<'tests.observability.test_namespaces"
+            "::test_promising_function_on_instance_method_qualname.<locals>.Service.process'"
             " Promise id=999>._PENDING"
         )
     assert await promise == "processed"
@@ -411,7 +413,8 @@ async def test_promising_function_on_static_method_qualname(*, use_promise_repr:
 
     if use_promise_repr is None:
         assert Service.helper.namespace == (
-            "tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
+            "tests.observability.test_namespaces"
+            "::test_promising_function_on_static_method_qualname.<locals>.Service.helper"
         )
 
     promise = Service.helper()
@@ -419,7 +422,8 @@ async def test_promising_function_on_static_method_qualname(*, use_promise_repr:
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'tests.observability.test_namespaces::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
+            "<'tests.observability.test_namespaces"
+            "::test_promising_function_on_static_method_qualname.<locals>.Service.helper'"
             " Promise id=999>._PENDING"
         )
     assert await promise == "helped"
@@ -438,7 +442,8 @@ async def test_promising_function_on_class_method_qualname(*, use_promise_repr: 
 
     if use_promise_repr is None:
         assert Service.create.namespace == (
-            "tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create"
+            "tests.observability.test_namespaces"
+            "::test_promising_function_on_class_method_qualname.<locals>.Service.create"
         )
 
     promise = Service.create()
@@ -446,7 +451,8 @@ async def test_promising_function_on_class_method_qualname(*, use_promise_repr: 
     if use_promise_repr is not None:
         result = repr(promise) if use_promise_repr else str(promise)
         assert normalize_object_repr(result) == (
-            "<'tests.observability.test_namespaces::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
+            "<'tests.observability.test_namespaces"
+            "::test_promising_function_on_class_method_qualname.<locals>.Service.create'"
             " Promise id=999>._PENDING"
         )
     assert await promise == "created"

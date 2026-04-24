@@ -335,6 +335,14 @@ class Promise(PromisingContext, Generic[T_co]):
         state = self._state
         return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
 
+    def unpacked_once_or_done(self) -> bool:
+        """
+        NOTE: This method is thread-safe, including from the event loop of the
+        Promise.
+        """
+        state = self._state
+        return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
+
     def cancelled(self) -> bool:
         """
         NOTE: This method is thread-safe, including from the event loop of the
@@ -463,19 +471,16 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
+        print()
+        print()
+        print("STARTED STARTED STARTED unpack_once_from_loop")
+        print()
         try:
-            if self._intermediate_promise is not None:
+            if self.unpacked_once_or_done():
                 # Should not happen
                 raise RuntimeError(
-                    f"An attempt was made to _unpack_once_from_loop a Promise that was already unpacked once: {self!r}"
-                )
-            if self.done():
-                # Should not happen
-                raise RuntimeError(f"An attempt was made to _unpack_once_from_loop a done Promise: {self!r}")
-            if self._awaitable is None:
-                # Should not happen
-                raise RuntimeError(
-                    f"An attempt was made to _unpack_once_from_loop a Promise with no awaitable: {self!r}"
+                    f"An attempt was made to _unpack_once_from_loop a Promise "
+                    f"that was already unpacked once or done: {self!r}"
                 )
 
             with self:
@@ -495,6 +500,10 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._state = _UNPACKED_ONCE
             else:
                 self._state = _FINISHED
+            print()
+            print()
+            print("FINISHED FINISHED FINISHED unpack_once_from_loop")
+            print()
 
     async def _fully_unpack_from_loop(self) -> None:
         """
@@ -511,15 +520,15 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
+        print()
+        print()
+        print("STARTED STARTED STARTED fully_unpack_from_loop")
+        print()
         try:
             if self.done():
-                # Should not happen
-                raise RuntimeError(f"An attempt was made to _fully_unpack_from_loop a done Promise: {self!r}")
-            if self._awaitable is None:
-                # Should not happen
-                raise RuntimeError(
-                    f"An attempt was made to _fully_unpack_from_loop a Promise with no awaitable: {self!r}"
-                )
+                # When there are no more nested Promises to unpack, the Promise
+                # becomes done already after unpack_once_from_loop completes
+                return
 
             # TODO What will cancelling do to this whole unpacking chain ?
             result = await self.unpack_once()
@@ -535,26 +544,46 @@ class Promise(PromisingContext, Generic[T_co]):
 
         finally:
             self._state = _FINISHED
+            print()
+            print()
+            print("FINISHED FINISHED FINISHED fully_unpack_from_loop")
+            print()
 
     def _ensure_single_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
-        if self._single_unpacking_task is None and not self.done() and not self.unpacked_once():
+        print()
+        print()
+        print("ATTEMPTING TO SCHEDULE unpack_once_from_loop")
+        print()
+        if self._single_unpacking_task is None and not self.unpacked_once_or_done():
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
+            print()
+            print()
+            print("SCHEDULED SCHEDULED SCHEDULED unpack_once_from_loop")
+            print()
 
     def _ensure_full_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
         Promise.
         """
+        print()
+        print()
+        print("ATTEMPTING TO SCHEDULE fully_unpack_from_loop")
+        print()
         if self._full_unpacking_task is None and not self.done():
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
+            print()
+            print()
+            print("SCHEDULED SCHEDULED SCHEDULED fully_unpack_from_loop")
+            print()
 
     def _attach_context_to_exception(self, exception: BaseException) -> None:
         try:

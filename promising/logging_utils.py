@@ -144,10 +144,10 @@ class PromiseUnpackingLogger:
 
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        kind = "INTERMEDIATE (Promise)" if isinstance(result, Promise) else "TERMINAL (non-Promise)"
+        kind = "Intermediate (Promise)" if isinstance(result, Promise) else "Final (non-Promise)"
         log_message = "\n".join(
             [
-                f"unpack_once_from_loop RESULT: {kind}",
+                f"UNPACK_ONCE_FROM_LOOP Result: {kind}",
                 f"  promise: {promise}",
                 f"  result type: {type(result).__name__}",
             ]
@@ -160,10 +160,10 @@ class PromiseUnpackingLogger:
 
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        kind = "Promise (continue unwrap)" if isinstance(result, Promise) else "non-Promise (stop)"
+        kind = "Promise (continue unwrap)" if isinstance(result, Promise) else "Non-Promise (stop)"
         log_message = "\n".join(
             [
-                f"fully_unpack_from_loop UNWRAP STEP depth={depth}: {kind}",
+                f"FULLY_UNPACK_FROM_LOOP Unwrap Step depth={depth}: {kind}",
                 f"  promise: {promise}",
                 f"  result type: {type(result).__name__}",
             ]

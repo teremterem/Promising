@@ -7,6 +7,7 @@ import pytest
 from promising import Promise, SyncUsageError
 
 
+@pytest.mark.feature_possibly_obsolete
 @pytest.mark.parametrize("method", ["result", "exception"])
 async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_result(*, method: str) -> None:
     """

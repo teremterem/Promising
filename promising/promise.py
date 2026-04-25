@@ -528,9 +528,11 @@ class Promise(PromisingContext, Generic[T_co]):
 
             # TODO What will cancelling do to this whole unpacking chain ?
             result = await self.unpack_once()
+            if self.done():
+                # Calling unpack_once alone was enough to finish the Promise
+                return
 
             depth = 0
-            _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
             while isinstance(result, Promise):
                 result = await result
                 depth += 1

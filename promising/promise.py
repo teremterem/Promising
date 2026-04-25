@@ -182,14 +182,6 @@ class Promise(PromisingContext, Generic[T_co]):
         self._intermediate_promise: Promise[T_co | Promise[Any]] | None = None
         self._awaitable = awaitable
 
-        if self._awaitable is None:
-            if prefilled_result is not UNCHANGED:
-                self._result = prefilled_result
-            else:
-                self._exception = prefilled_exception
-
-            self._state = _FINISHED
-
         super().__init__(
             namespace=resolve_namespace(
                 provided_explicitly=namespace,
@@ -206,6 +198,15 @@ class Promise(PromisingContext, Generic[T_co]):
 
         self._full_unpacking_task: Task[T_co] | None = None
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
+
+        self._asyncio_future: asyncio.Future[T_co] = self._loop.create_future()
+        self._concurrent_future: concurrent.futures.Future[T_co] = concurrent.futures.Future()
+
+        if self._awaitable is None:
+            if prefilled_result is not UNCHANGED:
+                self._set_result(prefilled_result)
+            else:
+                self._set_exception(prefilled_exception)
 
         if self._start_soon:
             # We don't know which thread the Promise is created in, so we
@@ -419,6 +420,85 @@ class Promise(PromisingContext, Generic[T_co]):
         self.loop.call_soon_threadsafe(callback)
         return future.result()
 
+    @property
+    def asyncio_future(self) -> "asyncio.Future[T_co]":
+        """
+        Return the ``asyncio.Future`` that mirrors this Promise's fully
+        unpacked result. The Future is created when the Promise is
+        constructed and is settled by ``_set_result`` / ``_set_exception``.
+
+        NOTE: The returned Future is bound to the Promise's event loop.
+        """
+        return self._asyncio_future
+
+    @property
+    def concurrent_future(self) -> "concurrent.futures.Future[T_co]":
+        """
+        Return the ``concurrent.futures.Future`` that mirrors this Promise's
+        fully unpacked result. The Future is created when the Promise is
+        constructed and is settled by ``_set_result`` / ``_set_exception``.
+
+        NOTE: This method is thread-safe.
+        """
+        return self._concurrent_future
+
+    def _set_result(self, result: T_co) -> None:
+        """
+        Store the fully unpacked result and settle both mirror Futures.
+        No-op if the Promise is already done (finished or cancelled).
+
+        NOTE: This method is thread-safe.
+        """
+        if self.done():
+            return
+        self._result = result
+        self._state = _FINISHED
+        if not self._concurrent_future.done():
+            self._concurrent_future.set_result(result)
+        self._propagate_to_asyncio_future()
+
+    def _set_exception(self, exception: BaseException) -> None:
+        """
+        Store the exception and settle both mirror Futures with it.
+        No-op if the Promise is already done (finished or cancelled).
+
+        NOTE: This method is thread-safe.
+        """
+        if self.done():
+            return
+        self._exception = exception
+        self._state = _FINISHED
+        if not self._concurrent_future.done():
+            self._concurrent_future.set_exception(exception)
+        self._propagate_to_asyncio_future()
+
+    def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
+        """
+        Record the intermediate Promise returned by a single unpacking step.
+        The mirror Futures intentionally stay pending — they only settle
+        once the Promise is fully unpacked. No-op if already unpacked once
+        or done.
+
+        NOTE: This method is thread-safe.
+        """
+        if self.unpacked_once_or_done():
+            return
+        self._intermediate_promise = promise
+        self._state = _UNPACKED_ONCE
+
+    def _propagate_to_asyncio_future(self) -> None:
+        """
+        Mirror ``self._result`` / ``self._exception`` onto
+        ``self._asyncio_future``. Scheduled via ``call_soon_threadsafe``
+        when called off the Promise's event loop thread.
+        """
+        if self._asyncio_future.done():
+            return
+        if self._exception is not None:
+            self._asyncio_future.set_exception(self._exception)
+        else:
+            self._asyncio_future.set_result(self._result)
+
     def _assert_done_and_not_cancelled(self) -> None:
         """
         NOTE: This method is thread-safe, including from the event loop of the
@@ -490,20 +570,16 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
 
             if isinstance(result, Promise):
-                self._intermediate_promise = result
+                self._set_intermediate_promise(result)
             else:
-                self._result = result
+                self._set_result(result)
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
             self._attach_context_to_exception(exc)
-            self._exception = exc
+            self._set_exception(exc)
 
         finally:
-            if self._result is UNCHANGED and self._exception is None:
-                self._state = _UNPACKED_ONCE
-            else:
-                self._state = _FINISHED
             _unpacking_logger.log_single_unpacking_finished(promise=self)
 
     async def _fully_unpack_from_loop(self) -> None:
@@ -538,15 +614,14 @@ class Promise(PromisingContext, Generic[T_co]):
                 depth += 1
                 _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 
-            self._result = result
+            self._set_result(result)
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
             self._attach_context_to_exception(exc)
-            self._exception = exc
+            self._set_exception(exc)
 
         finally:
-            self._state = _FINISHED
             _unpacking_logger.log_full_unpacking_finished(promise=self)
 
     def _ensure_single_unpacking_scheduled(self) -> None:

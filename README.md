@@ -355,7 +355,7 @@ import threading
 
 async def main():
     promise = fetch_data("https://example.com")
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
 
     def worker():
         # Blocks until the Promise resolves (thread-safe)
@@ -478,7 +478,7 @@ Wrapping every async (or sync) operation in a `Promise` gives you:
 - **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool (with `use_thread_pool=True`). Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children()`), inspect what's still running (`collect_unsettled_children`), or scope configuration to a subtree — all without manual bookkeeping.
-- **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`as_concurrent_future()`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
+- **Thread-safe synchronous access.** Every Promise has a `.sync()` method and a `concurrent.futures.Future` view (`concurrent_future`), so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
 - **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value, a coroutine, or another Promise. `await` and `.sync()` always return a concrete value. Non-Promise awaitables are auto-wrapped into child Promises, so every layer in the chain is a `Promise` with the same uniform interface.
 - **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
 
@@ -510,7 +510,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promise.unpack_once_sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and unpacks only one level. Returns either a concrete value or another `Promise`. Must not be called from the event loop thread. |
 | `promise.done()` | Whether the Promise has resolved (inherited from `asyncio.Future`). |
 | `promise.result()` | The resolved value (inherited from `asyncio.Future`). |
-| `promise.as_concurrent_future()` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |
+| `promise.concurrent_future` | Get a thread-safe `PromiseBackedConcurrentFuture` view. |
 
 ### PromisingFuture
 

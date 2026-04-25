@@ -111,9 +111,9 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(*, method: str) 
         if method == "sync":
             return child_promise.sync()
         elif method == "concurrent_future_result":
-            return child_promise.as_concurrent_future().result()
+            return child_promise.concurrent_future.result()
         else:
-            child_promise.as_concurrent_future().exception()
+            child_promise.concurrent_future.exception()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         await parent()
@@ -170,9 +170,9 @@ async def test_sync_works_with_thread_pool(*, method: str, start_soon: bool) -> 
         if method == "sync":
             return p.sync()
         elif method == "concurrent_future_result":
-            return p.as_concurrent_future().result()
+            return p.concurrent_future.result()
         else:
-            return p.as_concurrent_future().exception()
+            return p.concurrent_future.exception()
 
     result = await parent()
     if method == "concurrent_future_exception":

@@ -14,7 +14,7 @@ async def test_raises_sync_usage_error_from_event_loop_thread_with_prefilled_res
     thread raises SyncUsageError because it would deadlock.
     """
     promise = Promise(prefilled_result="hello")
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         if method == "result":
@@ -36,7 +36,7 @@ async def test_raises_sync_usage_error_even_when_done(*, method: str) -> None:
     promise = Promise(sample_coro(), start_soon=True)
     await promise
 
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
     assert concurrent_future.done()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
@@ -53,7 +53,7 @@ async def test_raises_sync_usage_error_with_prefilled_exception(*, method: str) 
     thread raises SyncUsageError, not the prefilled exception.
     """
     promise = Promise(prefilled_exception=ValueError("test error"))
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         if method == "result":
@@ -85,7 +85,7 @@ async def test_from_separate_thread(*, method: str, coro_sleep: float, timeout: 
         return "thread result"
 
     promise = Promise(sample_coro(), start_soon=True)
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
 
     def call_method() -> object:
         if method == "result":

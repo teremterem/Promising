@@ -19,11 +19,11 @@ async def test_promise_as_future(
     get_future_before_await: bool,
 ) -> None:
     """
-    Test Promise.as_concurrent_future() method's behavior under various timing
+    Test Promise.concurrent_future method's behavior under various timing
     and execution conditions.
 
     This test validates that the concurrent.futures.Future wrapper returned by
-    Promise.as_concurrent_future() correctly mirrors the Promise's state and
+    Promise.concurrent_future correctly mirrors the Promise's state and
     result. It tests different combinations of:
     - Promise creation modes (immediate start, lazy start, prefilled)
     - Promise awaiting behaviors (direct await, indirect await, no await)
@@ -114,7 +114,7 @@ async def test_promise_as_future(
 
     if get_future_before_await:
         # Get the concurrent future before we await for anything
-        concurrent_future = promise.as_concurrent_future()
+        concurrent_future = promise.concurrent_future
 
     if await_promise is True:
         await promise
@@ -126,7 +126,7 @@ async def test_promise_as_future(
 
     if not get_future_before_await:
         # Get the concurrent future after we await for anything
-        concurrent_future = promise.as_concurrent_future()
+        concurrent_future = promise.concurrent_future
 
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
@@ -174,11 +174,11 @@ async def test_promise_as_future_with_exception(
     get_future_before_await: bool,
 ) -> None:
     """
-    Test Promise.as_concurrent_future() method's exception handling across
+    Test Promise.concurrent_future method's exception handling across
     various timing conditions.
 
     This test verifies that the concurrent.futures.Future returned by
-    as_concurrent_future() correctly propagates exceptions from the underlying
+    concurrent_future correctly propagates exceptions from the underlying
     Promise. It mirrors test_promise_as_future but focuses on exception
     scenarios, ensuring that exceptions are properly handled whether the
     Promise is prefilled with an exception or raises during coroutine
@@ -276,7 +276,7 @@ async def test_promise_as_future_with_exception(
 
     if get_future_before_await:
         # Get the concurrent future before we await for anything
-        concurrent_future = promise.as_concurrent_future()
+        concurrent_future = promise.concurrent_future
 
     if await_promise is True:
         with pytest.raises(ValueError, match="Test error from Promise!"):
@@ -289,7 +289,7 @@ async def test_promise_as_future_with_exception(
 
     if not get_future_before_await:
         # Get the concurrent future after we await for anything
-        concurrent_future = promise.as_concurrent_future()
+        concurrent_future = promise.concurrent_future
 
     assert isinstance(concurrent_future, concurrent.futures.Future)
 
@@ -433,7 +433,7 @@ async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, awa
 
         promise = Promise(sample_coro(), start_soon=start_soon)
 
-    concurrent_future = promise.as_concurrent_future()
+    concurrent_future = promise.concurrent_future
 
     results = [None, None, None]
 

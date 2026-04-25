@@ -526,12 +526,17 @@ class Promise(PromisingContext, Generic[T_co]):
                 # becomes done already after unpack_once_from_loop completes
                 return
 
-            # TODO What will cancelling do to this whole unpacking chain ?
-            result = await self.unpack_once()
+            self._ensure_single_unpacking_scheduled()
+            if self._single_unpacking_task is not None:
+                await self._single_unpacking_task
+
             if self.done():
                 # Calling unpack_once alone was enough to finish the Promise
                 return
 
+            result = self._intermediate_promise
+
+            # TODO What will cancelling do to this whole unpacking chain ?
             depth = 0
             while isinstance(result, Promise):
                 result = await result

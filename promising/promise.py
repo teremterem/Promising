@@ -206,7 +206,7 @@ class Promise(PromisingContext, Generic[T_co]):
             if prefilled_result is not UNCHANGED:
                 self._set_result(prefilled_result)
             else:
-                self._set_exception(prefilled_exception)
+                self._set_exception(prefilled_exception, critical=False)
 
         if self._start_soon:
             # We don't know which thread the Promise is created in, so we
@@ -366,8 +366,11 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._exception is not None:
             raise self._exception
 
-        # TODO Raise a RuntimeError if self._result is UNCHANGED (this should
-        #  not be possible due to previous asserts)
+        if self._result is UNCHANGED:
+            # Should not happen
+            raise RuntimeError(
+                f"Promise result is UNCHANGED even though the promise is done and there is no exception: {self!r}"
+            )
 
         return self._result
 
@@ -376,14 +379,17 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if not self.unpacked_once():
+        if not self.unpacked_once_or_done():
             # TODO Introduce a PromisingError subclass for this ?
             #  Should it be specific to "unpacking once" ?
             #  Should it also inherit from asyncio.InvalidStateError AND
             #  concurrent.futures.InvalidStateError ?
             #  Isn't there a common builtin error for both - concurrent and
             #  asyncio - just like TimeoutError ?
-            raise asyncio.InvalidStateError(f"Promise is not unpacked even once: {self!r}")
+            raise asyncio.InvalidStateError(f"Promise is not unpacked even once yet: {self!r}")
+
+        if self._exception is not None and self._state is not _CANCELLED_AFTER_UNPACKED_ONCE:
+            raise self._exception
 
         return self._intermediate_promise
 
@@ -442,188 +448,6 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         return self._concurrent_future
 
-    def _set_result(self, result: T_co) -> None:
-        """
-        Store the fully unpacked result and settle both mirror Futures.
-        No-op if the Promise is already done (finished or cancelled).
-
-        NOTE: This method is thread-safe.
-        """
-        if self.done():
-            return
-        self._result = result
-        self._state = _FINISHED
-        if not self._concurrent_future.done():
-            self._concurrent_future.set_result(result)
-        self._propagate_to_asyncio_future()
-
-    def _set_exception(self, exception: BaseException) -> None:
-        """
-        Store the exception and settle both mirror Futures with it.
-        No-op if the Promise is already done (finished or cancelled).
-
-        NOTE: This method is thread-safe.
-        """
-        if self.done():
-            return
-        self._exception = exception
-        self._state = _FINISHED
-        if not self._concurrent_future.done():
-            self._concurrent_future.set_exception(exception)
-        self._propagate_to_asyncio_future()
-
-    def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
-        """
-        Record the intermediate Promise returned by a single unpacking step.
-        The mirror Futures intentionally stay pending — they only settle
-        once the Promise is fully unpacked. No-op if already unpacked once
-        or done.
-
-        NOTE: This method is thread-safe.
-        """
-        if self.unpacked_once_or_done():
-            return
-        self._intermediate_promise = promise
-        self._state = _UNPACKED_ONCE
-
-    def _propagate_to_asyncio_future(self) -> None:
-        """
-        Mirror ``self._result`` / ``self._exception`` onto
-        ``self._asyncio_future``. Scheduled via ``call_soon_threadsafe``
-        when called off the Promise's event loop thread.
-        """
-        if self._asyncio_future.done():
-            return
-        if self._exception is not None:
-            self._asyncio_future.set_exception(self._exception)
-        else:
-            self._asyncio_future.set_result(self._result)
-
-    def _assert_done_and_not_cancelled(self) -> None:
-        """
-        NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
-        """
-        if not self.done():
-            # TODO Introduce a PromisingError subclass for this ?
-            #  Should it be specific to "done" ?
-            #  Should it also inherit from asyncio.InvalidStateError AND
-            #  concurrent.futures.InvalidStateError ?
-            #  Isn't there a common builtin error for both - concurrent and
-            #  asyncio - just like TimeoutError ?
-            raise asyncio.InvalidStateError(f"Promise is not done: {self!r}")
-
-        if self.cancelled():
-            # TODO Introduce a PromisingError subclass for this ?
-            #  Should it be specific to "cancelled" ?
-            #  Should it also inherit from asyncio.CancelledError AND
-            #  concurrent.futures.CancelledError ?
-            #  Isn't there a common builtin error for both - concurrent and
-            #  asyncio - just like TimeoutError ?
-            raise asyncio.CancelledError(f"Promise is cancelled: {self!r}")
-
-    def _cancel_from_loop(self, msg: str | None = None) -> bool:
-        """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
-        """
-        # TODO Review this method once again - I'm not entirely sure the logic
-        #  is sound
-        if self.done():
-            return False
-
-        single_unpacking_cancelled = False
-        full_unpacking_cancelled = False
-        try:
-            if self._single_unpacking_task is not None and not self.unpacked_once():
-                single_unpacking_cancelled = self._single_unpacking_task.cancel(msg)
-
-                if single_unpacking_cancelled:
-                    self._state = _CANCELLED_BEFORE_UNPACKED_ONCE
-
-        finally:
-            if self._full_unpacking_task is not None:
-                full_unpacking_cancelled = self._full_unpacking_task.cancel(msg)
-
-                if full_unpacking_cancelled and not single_unpacking_cancelled:
-                    self._state = _CANCELLED_AFTER_UNPACKED_ONCE
-
-        return single_unpacking_cancelled or full_unpacking_cancelled
-
-    async def _unpack_once_from_loop(self) -> None:
-        """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
-        """
-        _unpacking_logger.log_single_unpacking_started(promise=self)
-        try:
-            if self.unpacked_once_or_done():
-                # Should not happen
-                raise RuntimeError(
-                    f"An attempt was made to _unpack_once_from_loop a Promise "
-                    f"that was already unpacked once or done: {self!r}"
-                )
-
-            with self:
-                result = await self._awaitable
-
-            _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
-
-            if isinstance(result, Promise):
-                self._set_intermediate_promise(result)
-            else:
-                self._set_result(result)
-
-        except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
-            self._attach_context_to_exception(exc)
-            self._set_exception(exc)
-
-        finally:
-            _unpacking_logger.log_single_unpacking_finished(promise=self)
-
-    async def _fully_unpack_from_loop(self) -> None:
-        """
-        Execute the Promise's awaitable and manage its lifecycle.
-
-        This method:
-        1. Activates the Promise as the current context
-        2. Executes the awaitable
-        3. Sets the result or exception
-
-        Raises:
-            RuntimeError: If the Promise is already done or has no awaitable.
-
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
-        """
-        _unpacking_logger.log_full_unpacking_started(promise=self)
-        try:
-            if self.done():
-                # When there are no more nested Promises to unpack, the Promise
-                # becomes done already after unpack_once_from_loop completes
-                return
-
-            # TODO What will cancelling do to this whole unpacking chain ?
-            result = await self.unpack_once()
-
-            depth = 0
-            _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
-            while isinstance(result, Promise):
-                result = await result
-                depth += 1
-                _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
-
-            self._set_result(result)
-
-        except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
-            self._attach_context_to_exception(exc)
-            self._set_exception(exc)
-
-        finally:
-            _unpacking_logger.log_full_unpacking_finished(promise=self)
-
     def _ensure_single_unpacking_scheduled(self) -> None:
         """
         NOTE: This method is only to be used from the event loop of the
@@ -648,20 +472,220 @@ class Promise(PromisingContext, Generic[T_co]):
             )
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
-    def _attach_context_to_exception(self, exception: BaseException) -> None:
+    async def _unpack_once_from_loop(self) -> None:
+        """
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
         try:
-            # TODO Make it possible to disable setting this trace ?
-            # TODO Borrow from MiniAgents the mechanism that logs this
-            #  "promising breadcrumb" together with the error tracebacks
-            if not hasattr(exception, "__promising_context__"):
-                # We only let it be set at the deepest level of the promise
-                # hierarchy
-                exception.__promising_context__ = self
-        except BaseException:
-            # Suppress the error if any - failure to store the trace should
-            # not affect the exception handling
-            # TODO Introduce a debug level log here
-            pass
+            _unpacking_logger.log_single_unpacking_started(promise=self)
+
+            if self.unpacked_once_or_done():
+                # Should not happen
+                raise RuntimeError(
+                    f"An attempt was made to _unpack_once_from_loop a Promise "
+                    f"that was already unpacked once or done: {self!r}"
+                )
+
+            with self:
+                result = await self._awaitable
+
+            _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
+
+        except BaseException as exc:
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
+            self._set_exception(exc)
+        else:
+            if isinstance(result, Promise):
+                self._set_intermediate_promise(result)
+            else:
+                self._set_result(result)
+
+        _unpacking_logger.log_single_unpacking_finished(promise=self)
+
+    async def _fully_unpack_from_loop(self) -> None:
+        """
+        Execute the Promise's awaitable and manage its lifecycle.
+
+        This method:
+        1. Activates the Promise as the current context
+        2. Executes the awaitable
+        3. Sets the result or exception
+
+        Raises:
+            RuntimeError: If the Promise is already done or has no awaitable.
+
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
+        try:
+            _unpacking_logger.log_full_unpacking_started(promise=self)
+
+            if self.done():
+                # When there are no more nested Promises to unpack, the Promise
+                # becomes done already after unpack_once_from_loop completes
+                return
+
+            # TODO What will cancelling do to this whole unpacking chain ?
+            result = await self.unpack_once()
+
+            depth = 0
+            _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
+            while isinstance(result, Promise):
+                result = await result
+                depth += 1
+                _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
+
+        except BaseException as exc:
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
+            self._set_exception(exc)
+        else:
+            self._set_result(result)
+
+        _unpacking_logger.log_full_unpacking_finished(promise=self)
+
+    def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
+        """
+        Record the intermediate Promise returned by a single unpacking step.
+        The mirror Futures intentionally stay pending — they only settle
+        once the Promise is fully unpacked. No-op if already unpacked once
+        or done.
+
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
+        try:
+            if self._state is not _PENDING:
+                # Should not happen
+                raise RuntimeError(
+                    f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
+                )
+            self._intermediate_promise = promise
+            self._state = _UNPACKED_ONCE
+
+        except BaseException as critical_error:
+            self._set_exception(critical_error, critical=True)
+
+    def _set_result(self, result: T_co) -> None:
+        """
+        Store the fully unpacked result and settle both mirror Futures.
+        No-op if the Promise is already done (finished or cancelled).
+
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
+        try:
+            if self._state not in (_PENDING, _UNPACKED_ONCE):
+                # Should not happen
+                raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
+            self._result = result
+            self._state = _FINISHED
+            try:
+                self._asyncio_future.set_result(result)
+            finally:
+                self._concurrent_future.set_result(result)
+
+        except BaseException as critical_error:
+            self._set_exception(critical_error, critical=True)
+
+    def _set_exception(self, exception: BaseException, *, critical: bool) -> None:
+        """
+        Store the exception and settle both mirror Futures with it.
+        No-op if the Promise is already done (finished or cancelled).
+
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
+        try:
+            # NOTE: In critical mode we do not validate the state. We want to
+            # treat the incoming error as critical, because critical mode
+            # signals that the error is due to a bug in the Promise class
+            # itself. For this reason we want to allow the incoming error to
+            # override whatever state the Promise is currently in.
+            if not critical and self._state not in (_PENDING, _UNPACKED_ONCE):
+                # Should not happen
+                raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
+
+            self.set_as_promising_context_on_exception(exception)
+            self._exception = exception
+            self._state = _FINISHED
+            try:
+                self._asyncio_future.set_exception(exception)
+            finally:
+                self._concurrent_future.set_exception(exception)
+
+        except BaseException as critical_error:
+            if critical:
+                # Critical mode implies that any of the two futures may already
+                # be in a wrong state - we did what we could and capturing any
+                # further errors is not reasonable anymore
+                pass  # TODO Add a debug log here ?
+            else:
+                # This is exactly the spot where we switch from non-critical to
+                # critical mode. Another error being raised during an attempt
+                # to set the original error usually means that there is a bug
+                # in the Promise class itself, so we enter critical mode
+                # specifically because we want to do our best to capture this
+                # new error and not let the bug go unnoticed.
+                try:
+                    critical_error.__context__ = self
+                except BaseException:
+                    pass  # TODO Add a debug log here ?
+                self._set_exception(critical_error, critical=True)
+
+    def _assert_done_and_not_cancelled(self) -> None:
+        """
+        NOTE: This method is thread-safe, including from the event loop of the
+        Promise.
+        """
+        if not self.done():
+            # TODO Introduce a PromisingError subclass for this ?
+            #  Should it be specific to "done" ?
+            #  Should it also inherit from asyncio.InvalidStateError AND
+            #  concurrent.futures.InvalidStateError ?
+            #  Isn't there a common builtin error for both - concurrent and
+            #  asyncio - just like TimeoutError ?
+            raise asyncio.InvalidStateError(f"Promise is not done: {self!r}")
+
+        if self.cancelled():
+            # TODO Shouldn't CancelledError end up in self._exception instead ?
+            # TODO Introduce a PromisingError subclass for this ?
+            #  Should it be specific to "cancelled" ?
+            #  Should it also inherit from asyncio.CancelledError AND
+            #  concurrent.futures.CancelledError ?
+            #  Isn't there a common builtin error for both - concurrent and
+            #  asyncio - just like TimeoutError ?
+            raise asyncio.CancelledError(f"Promise is cancelled: {self!r}")
+
+    def _cancel_from_loop(self, msg: str | None = None) -> bool:
+        """
+        NOTE: This method is only to be used from the event loop of the
+        Promise.
+        """
+        # TODO TODO TODO Review this method once again - I'm not entirely sure
+        #  the logic is sound
+        # TODO TODO TODO Plus asyncio_future and concurrent_future should be
+        #  cancelled too (and vice versa ?)
+        if self.done():
+            return False
+
+        single_unpacking_cancelled = False
+        full_unpacking_cancelled = False
+        try:
+            if self._single_unpacking_task is not None and not self.unpacked_once():
+                single_unpacking_cancelled = self._single_unpacking_task.cancel(msg)
+
+                if single_unpacking_cancelled:
+                    self._state = _CANCELLED_BEFORE_UNPACKED_ONCE
+
+        finally:
+            if self._full_unpacking_task is not None:
+                full_unpacking_cancelled = self._full_unpacking_task.cancel(msg)
+
+                if full_unpacking_cancelled and not single_unpacking_cancelled:
+                    self._state = _CANCELLED_AFTER_UNPACKED_ONCE
+
+        return single_unpacking_cancelled or full_unpacking_cancelled
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):

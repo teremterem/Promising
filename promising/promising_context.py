@@ -751,6 +751,20 @@ class PromisingContext:
             self._context_closed = True
         self._unregister_from_parent_if_time()
 
+    def set_as_promising_context_on_exception(self, exception: BaseException) -> None:
+        try:
+            # TODO Make it possible to disable setting this trace ?
+            # TODO Borrow from MiniAgents the mechanism that logs this
+            #  "promising breadcrumb" together with the error tracebacks
+            if not hasattr(exception, "__promising_context__"):
+                # We only let it be set at the deepest level of the promise
+                # hierarchy
+                exception.__promising_context__: PromisingContext = self
+        except BaseException:
+            # Suppress the error if any - failure to store the trace should
+            # not affect the exception handling
+            pass  # TODO Add a debug log here ?
+
     def is_on_correct_running_loop(self, *, raise_if_no_running_loop: bool = False) -> bool:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_if_no_running_loop)
         return running_loop is self.loop

@@ -494,7 +494,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
-            self._set_exception(exc)
+            self._set_exception(exc, critical=False)
         else:
             if isinstance(result, Promise):
                 self._set_intermediate_promise(result)
@@ -538,7 +538,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
-            self._set_exception(exc)
+            self._set_exception(exc, critical=False)
         else:
             self._set_result(result)
 
@@ -628,7 +628,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # specifically because we want to do our best to capture this
                 # new error and not let the bug go unnoticed.
                 try:
-                    critical_error.__context__ = self
+                    critical_error.__context__ = exception
                 except BaseException:
                     pass  # TODO Add a debug log here ?
                 self._set_exception(critical_error, critical=True)

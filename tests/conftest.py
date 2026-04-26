@@ -14,7 +14,7 @@ def _disable_qualnames_in_namespaces(request: pytest.FixtureRequest) -> Iterator
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    if "cycle_detection_github_issue_66" in item.keywords:
+    if "skip_cycle_detection_gh_issue_66" in item.keywords:
         pytest.skip("cycle detection not implemented yet (issue #66)")
-    if "feature_possibly_obsolete" in item.keywords:
+    if "skip_feature_possibly_obsolete" in item.keywords:
         pytest.skip("feature possibly obsolete")

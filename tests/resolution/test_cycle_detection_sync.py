@@ -18,7 +18,7 @@ from promising.promising_context import PromisingContext
 # ── Cyclic promise resolution ──────────────────────────────────
 
 
-@pytest.mark.cycle_detection_github_issue_66
+@pytest.mark.skip_cycle_detection_gh_issue_66
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
 async def test_promise_resolving_to_itself(*, await_before_return: bool) -> None:
     """
@@ -44,7 +44,7 @@ async def test_promise_resolving_to_itself(*, await_before_return: bool) -> None
     await caller()
 
 
-@pytest.mark.cycle_detection_github_issue_66
+@pytest.mark.skip_cycle_detection_gh_issue_66
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
 async def test_inner_returns_parent_promise(*, await_before_return: bool) -> None:
     """
@@ -74,7 +74,7 @@ async def test_inner_returns_parent_promise(*, await_before_return: bool) -> Non
     await caller()
 
 
-@pytest.mark.cycle_detection_github_issue_66
+@pytest.mark.skip_cycle_detection_gh_issue_66
 @pytest.mark.parametrize("await_before_return", [False, True], ids=["return_as_is", "await_first"])
 async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
     """
@@ -116,7 +116,7 @@ async def test_indirect_promise_cycle(*, await_before_return: bool) -> None:
 # that should be detected.
 
 
-@pytest.mark.cycle_detection_github_issue_66
+@pytest.mark.skip_cycle_detection_gh_issue_66
 async def test_self_cycle_on_bare_context() -> None:
     """
     ``await_children_sync`` on a bare PromisingContext that has Promise
@@ -145,7 +145,7 @@ async def test_self_cycle_on_bare_context() -> None:
             await sync_waiter()
 
 
-@pytest.mark.cycle_detection_github_issue_66
+@pytest.mark.skip_cycle_detection_gh_issue_66
 @pytest.mark.parametrize("whole_subtree", [True, False])
 async def test_self_cycle_on_bare_context_whole_subtree(*, whole_subtree: bool) -> None:
     """

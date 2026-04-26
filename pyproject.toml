@@ -50,9 +50,9 @@ asyncio_default_test_loop_scope = "function"
 addopts = "-n auto"
 timeout = 5
 markers = [
-    "cycle_detection_github_issue_66",
     "do_not_patch_qualnames",
-    "feature_possibly_obsolete",
+    "skip_cycle_detection_gh_issue_66",
+    "skip_feature_possibly_obsolete",
 ]
 
 [tool.coverage.run]

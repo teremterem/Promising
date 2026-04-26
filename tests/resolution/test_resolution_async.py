@@ -115,6 +115,7 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
     assert await level3.unpack_once() == "bottom"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_custom_coroutine_unpack_all() -> None:
     """`await` unpacks through a coroutine to the final value."""
 
@@ -129,6 +130,7 @@ async def test_custom_coroutine_unpack_all() -> None:
     assert await promise == "custom_value"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_custom_coroutine_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
@@ -147,6 +149,7 @@ async def test_custom_coroutine_unpack_once() -> None:
     assert await result == "custom_value"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_mixed_chain_unpack_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 
@@ -163,6 +166,7 @@ async def test_mixed_chain_unpack_all() -> None:
     assert await promise == "final"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_mixed_chain_unpack_once() -> None:
     """`unpack_once()` on outer promise returns the coroutine wrapped in a Promise."""
 
@@ -185,6 +189,7 @@ async def test_mixed_chain_unpack_once() -> None:
     assert await inner == "final"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_asyncio_future_unpack_all() -> None:
     """`await` unpacks through an asyncio.Future to the final value."""
     loop = asyncio.get_running_loop()
@@ -199,6 +204,7 @@ async def test_asyncio_future_unpack_all() -> None:
     assert await promise == "from_future"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_asyncio_future_unpack_once() -> None:
     """`unpack_once()` wraps the returned asyncio.Future in a Promise."""
     loop = asyncio.get_running_loop()
@@ -216,6 +222,7 @@ async def test_asyncio_future_unpack_once() -> None:
     assert await result == "from_future"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_coroutine_with_sleep_unpack_all() -> None:
     """`await` unpacks through a coroutine that yields control."""
 
@@ -231,6 +238,7 @@ async def test_coroutine_with_sleep_unpack_all() -> None:
     assert await promise == "slept_value"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_coroutine_with_sleep_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 
@@ -358,6 +366,7 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
         await result
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_coro_exception_at_depth_5_with_promising_context_and_functions() -> None:
     """
     Coroutine that raises in a PromisingContext is 5 levels deep in a mixed

@@ -293,6 +293,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self.assert_no_sync_usage_deadlock()
 
+        if self.done():
+            return self.result()
+
         concurrent_future = asyncio.run_coroutine_threadsafe(awaitable_as_coroutine(self), self.loop)
         return concurrent_future.result(timeout=timeout)
 
@@ -320,6 +323,13 @@ class Promise(PromisingContext, Generic[T_co]):
         loop of the Promise to avoid a deadlock.
         """
         self.assert_no_sync_usage_deadlock()
+
+        if self.unpacked_once_or_done():
+            intermediate_promise = self.intermediate_promise()
+
+            if intermediate_promise is None:
+                return self.result()
+            return intermediate_promise
 
         concurrent_future = asyncio.run_coroutine_threadsafe(self.unpack_once(), self.loop)
         return concurrent_future.result(timeout=timeout)

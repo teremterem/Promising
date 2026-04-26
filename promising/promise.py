@@ -388,7 +388,9 @@ class Promise(PromisingContext, Generic[T_co]):
             #  asyncio - just like TimeoutError ?
             raise asyncio.InvalidStateError(f"Promise is not unpacked even once yet: {self!r}")
 
-        if self._exception is not None and self._state is not _CANCELLED_AFTER_UNPACKED_ONCE:
+        if self._exception is not None and self._intermediate_promise is None:
+            # Exception happened before the first unpacking was completed
+            # TODO So, are we storing CancelledError in self._exception too ?
             raise self._exception
 
         return self._intermediate_promise

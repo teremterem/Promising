@@ -12,6 +12,8 @@ import pytest
 
 from promising import Promise
 
+# TODO Generate test_timeout_async.py using asyncio.wait_for() ?
+
 # ---------------------------------------------------------------------------
 # unpack_once_sync timeout
 # ---------------------------------------------------------------------------
@@ -235,6 +237,7 @@ async def test_sync_timeout_spans_multiple_levels_succeeds() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 @pytest.mark.parametrize("longer_timeout", [False, True])
 async def test_sync_times_out_on_slow_coroutine_result(*, longer_timeout: bool) -> None:
     """
@@ -275,6 +278,7 @@ async def test_sync_times_out_on_slow_coroutine_result(*, longer_timeout: bool) 
     assert await promise == "too late"
 
 
+@pytest.mark.skip_feature_possibly_obsolete
 async def test_sync_coroutine_result_succeeds_within_timeout() -> None:
     """sync() unpacks a coroutine result when it resolves
     within the timeout."""

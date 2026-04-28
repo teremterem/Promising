@@ -5,6 +5,7 @@ import time
 import pytest
 
 import promising
+from tests.utils_for_tests import potential_xfail
 
 
 @pytest.mark.parametrize("await_children", [True, False])
@@ -295,9 +296,11 @@ async def test_await_children_direct_only_but_fully_unpack_promises(
     returned Promise is recursively unpacked, so the grandchild still runs.
     When ``fully_unpack_promises=False``, the grandchild is never awaited.
     """
-    # TODO TODO TODO Is it time to lift this skip ?
     if sleep_in_root and fully_unpack_promises is not False:
-        pytest.skip("Known issue: grandchild not awaited when root sleeps with unpack_all")
+        potential_xfail(
+            "xfail_await_children_bug",
+            reason="grandchild not awaited when root sleeps with unpack_all",
+        )
 
     execution_order: list[str] = []
 

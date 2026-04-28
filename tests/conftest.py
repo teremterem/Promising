@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.utils_for_tests import potential_xfail
+
 
 @pytest.fixture(autouse=True)
 def _disable_qualnames_in_namespaces(request: pytest.FixtureRequest) -> Iterator[None]:
@@ -14,7 +16,4 @@ def _disable_qualnames_in_namespaces(request: pytest.FixtureRequest) -> Iterator
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    if "skip_cycle_detection_gh_issue_66" in item.keywords:
-        pytest.skip("cycle detection not implemented yet (issue #66)")
-    if "skip_feature_possibly_obsolete" in item.keywords:
-        pytest.skip("feature possibly obsolete")
+    potential_xfail(*item.iter_markers())

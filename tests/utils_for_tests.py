@@ -4,7 +4,48 @@ import threading
 from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 
+import pytest
+
 import promising
+
+MARKERS_TO_SKIP = [
+    "xfail_await_children_bug",
+    "xfail_cycle_detection_gh_issue_66",
+    "xfail_feature_possibly_obsolete",
+]
+
+
+def potential_xfail(*markers: str | pytest.Mark, reason: str | None = None) -> None:
+    marker_strings: list[str] = []
+    reason_strings: list[str] = [reason] if reason else []
+
+    for marker in markers:
+        if isinstance(marker, pytest.Mark):
+            if marker.name not in MARKERS_TO_SKIP:
+                continue
+            marker_strings.append(marker.name)
+
+            reason_string = marker.kwargs.get("reason", None)
+            if reason_string:
+                reason_strings.append(reason_string)
+
+        elif isinstance(marker, str):
+            if marker not in MARKERS_TO_SKIP:
+                continue
+            marker_strings.append(marker)
+
+        else:
+            raise ValueError(f"Unknown marker type: {type(marker)} ")
+
+    if not marker_strings:
+        # None of the markers are in the MARKERS_TO_SKIP list - nothing to skip!
+        return
+
+    final_reason = " | ".join(reason_strings)
+    if final_reason:
+        final_reason = f": {final_reason}"
+
+    pytest.xfail(reason=",".join(sorted(marker_strings)) + final_reason)
 
 
 def normalize_object_repr(s: str) -> str:

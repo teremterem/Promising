@@ -440,7 +440,7 @@ async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, awa
 
     def thread_function(idx: int, timeout: float) -> None:
         try:
-            results[idx] = concurrent_future.result(timeout=timeout, ensure_task_scheduled=False)
+            results[idx] = concurrent_future.result(timeout=timeout)  # TODO ensure_task_scheduled=False ?
         except TimeoutError as e:
             results[idx] = e
 

@@ -54,6 +54,7 @@ markers = [
     "xfail_await_children_bug",
     "xfail_cycle_detection_gh_issue_66",
     "xfail_feature_possibly_obsolete",
+    "xfail_possibly_rethink_test",
 ]
 
 [tool.coverage.run]

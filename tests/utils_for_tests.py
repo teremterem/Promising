@@ -8,20 +8,26 @@ import pytest
 
 import promising
 
-MARKERS_TO_SKIP = [
+MARKERS_TO_XFAIL = [
     "xfail_await_children_bug",
     "xfail_cycle_detection_gh_issue_66",
     "xfail_feature_possibly_obsolete",
+    "xfail_possibly_rethink_test",
 ]
 
 
-def potential_xfail(*markers: str | pytest.Mark, reason: str | None = None) -> None:
+def potential_xfail(
+    *markers: str | pytest.Mark,
+    reason: str | None = None,
+    item: pytest.Item | None = None,
+    skip_entirely: bool = False,
+) -> None:
     marker_strings: list[str] = []
     reason_strings: list[str] = [reason] if reason else []
 
     for marker in markers:
         if isinstance(marker, pytest.Mark):
-            if marker.name not in MARKERS_TO_SKIP:
+            if marker.name not in MARKERS_TO_XFAIL:
                 continue
             marker_strings.append(marker.name)
 
@@ -29,8 +35,10 @@ def potential_xfail(*markers: str | pytest.Mark, reason: str | None = None) -> N
             if reason_string:
                 reason_strings.append(reason_string)
 
+            skip_entirely = skip_entirely or marker.kwargs.get("skip_entirely", False)
+
         elif isinstance(marker, str):
-            if marker not in MARKERS_TO_SKIP:
+            if marker not in MARKERS_TO_XFAIL:
                 continue
             marker_strings.append(marker)
 
@@ -38,14 +46,24 @@ def potential_xfail(*markers: str | pytest.Mark, reason: str | None = None) -> N
             raise ValueError(f"Unknown marker type: {type(marker)} ")
 
     if not marker_strings:
-        # None of the markers are in the MARKERS_TO_SKIP list - nothing to skip!
+        # None of the markers are in the MARKERS_TO_XFAIL list - nothing to xfail!
         return
 
     final_reason = " | ".join(reason_strings)
     if final_reason:
         final_reason = f": {final_reason}"
+    final_reason = ",".join(sorted(marker_strings)) + final_reason
 
-    pytest.xfail(reason=",".join(sorted(marker_strings)) + final_reason)
+    if item is not None and not skip_entirely:
+        # This only works while still in pytest_runtest_setup - it will not
+        # work if called after the test has started
+        item.add_marker(pytest.mark.xfail(reason=final_reason))
+    else:
+        # This works at any time. Also, useful for tests that time out.
+        # `skip_entirely` parameter can be passed to the markers themselves to
+        # enforce skipping (by default skipping is disabled for decorator level
+        # markers but enabled for in-test calls to this function).
+        pytest.skip(reason=final_reason)
 
 
 def normalize_object_repr(s: str) -> str:

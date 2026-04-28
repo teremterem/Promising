@@ -16,4 +16,6 @@ def _disable_qualnames_in_namespaces(request: pytest.FixtureRequest) -> Iterator
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    potential_xfail(*item.iter_markers())
+    # At the setup stage it is still not too late to just mark the test as
+    # xfail rather than skipping the test entirely.
+    potential_xfail(*item.iter_markers(), item=item, skip_entirely=False)

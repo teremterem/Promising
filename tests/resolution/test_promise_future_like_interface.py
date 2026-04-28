@@ -14,7 +14,7 @@ from promising import Promise
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_promise_future_like_interface(*, start_soon: bool | None, await_promise: bool | None) -> None:
     """
     Test Promise's done() and result() behavior under various
     timing and execution conditions.
@@ -100,8 +100,6 @@ async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool
     # `await_promise=None` in our test means that we don't want to await for
     # anything at all (no task switching)
 
-    assert isinstance(promise, asyncio.Future)
-
     if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
@@ -131,7 +129,11 @@ async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_as_future_with_exception(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_promise_future_like_interface_with_exception(
+    *,
+    start_soon: bool | None,
+    await_promise: bool | None,
+) -> None:
     """
     Test Promise's exception handling across various timing conditions.
 

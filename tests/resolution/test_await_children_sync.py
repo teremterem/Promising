@@ -5,7 +5,7 @@ import time
 import pytest
 
 import promising
-from tests.utils_for_tests import potential_xfail
+from tests.utils_for_tests import possibly_xfail
 
 
 @pytest.mark.parametrize("await_children", [True, False])
@@ -297,7 +297,7 @@ async def test_await_children_direct_only_but_fully_unpack_promises(
     When ``fully_unpack_promises=False``, the grandchild is never awaited.
     """
     if sleep_in_root and fully_unpack_promises is not False:
-        potential_xfail(
+        possibly_xfail(
             "xfail_await_children_bug",
             reason="grandchild not awaited when root sleeps with unpack_all",
         )

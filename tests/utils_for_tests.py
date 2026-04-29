@@ -12,11 +12,10 @@ MARKERS_TO_XFAIL = [
     "xfail_await_children_bug",
     "xfail_cycle_detection_gh_issue_66",
     "xfail_feature_possibly_obsolete",
-    "xfail_possibly_rethink_test",
 ]
 
 
-def potential_xfail(
+def possibly_xfail(
     *markers: str | pytest.Mark,
     reason: str | None = None,
     item: pytest.Item | None = None,

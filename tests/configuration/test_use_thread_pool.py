@@ -6,7 +6,7 @@ import pytest
 
 import promising
 from promising import DecorationError, SyncUsageError, await_children_sync, get_active_promise
-from tests.utils_for_tests import potential_xfail
+from tests.utils_for_tests import possibly_xfail
 
 # ── use_thread_pool=True: sync function runs in a thread pool ──
 
@@ -101,7 +101,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(*, method: str) 
     """
     if method in ["concurrent_future_result", "concurrent_future_exception"]:
         # TODO Should concurrent_future still be safeguarded somehow ?
-        potential_xfail(
+        possibly_xfail(
             "xfail_feature_possibly_obsolete",
             reason="concurrent_future is now vanilla - only sync() raises SyncUsageError",
         )
@@ -169,7 +169,7 @@ async def test_sync_works_with_thread_pool(*, method: str, start_soon: bool) -> 
     """
     if start_soon is False and method in ["concurrent_future_result", "concurrent_future_exception"]:
         # TODO Should concurrent_future still be safeguarded somehow ?
-        potential_xfail(
+        possibly_xfail(
             "xfail_feature_possibly_obsolete",
             reason="concurrent_future is now vanilla - only sync() raises SyncUsageError",
         )

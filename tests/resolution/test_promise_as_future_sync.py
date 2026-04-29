@@ -330,7 +330,6 @@ async def test_promise_as_future_with_exception(
         assert coro_call_count == 1
 
 
-@pytest.mark.xfail_possibly_rethink_test
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
 async def test_concurrent_consumers_with_timeout(*, start_soon: bool | None, await_promise: bool | None) -> None:

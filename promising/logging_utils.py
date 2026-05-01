@@ -103,7 +103,7 @@ class PromisingHierarchyLogger:
 
     @staticmethod
     def _fmt(label: str, ctx: "PromisingContext") -> str:
-        status = "OPEN" if ctx.is_still_open() else "CLOSED"
+        status = "CLOSED" if ctx.closed() else "OPEN"
         return f"  {label}: [{status}] {ctx}"
 
     def _unsettled_children_snapshot(self, parent: "PromisingContext") -> tuple["PromisingContext", ...]:

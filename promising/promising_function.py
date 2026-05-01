@@ -387,7 +387,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         try:
             return await promise
         finally:
-            # TODO What about await_children's `fully_unpack_promises` ?
+            # TODO What about await_children's `unpack_promises_fully` ?
             if await_children is WHOLE_SUBTREE:
                 await promise.await_children(whole_subtree=True)
             elif await_children:

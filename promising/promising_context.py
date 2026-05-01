@@ -572,8 +572,17 @@ class PromisingContext:
             children = [
                 child
                 for child in children
-                if not child.done()
-                or (not unpack_promises_fully and isinstance(child, Promise) and not child.unpacked_once_or_done())
+                if not (
+                    # TODO Would such a nested if statement be confusing for
+                    # the reader to understand ? It seems to me that it is
+                    # still easier to understand than a complicated chain of
+                    # conditions that covers the same logic. Just leave a
+                    # comment here to help the reader notice the unconventional
+                    # approach to the condition checking ?
+                    child.done()
+                    if unpack_promises_fully or not isinstance(child, Promise)
+                    else child.unpacked_once_or_done()
+                )
             ]
             if not children:
                 # Additional checkpoint to break the await loop

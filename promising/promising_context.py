@@ -568,7 +568,6 @@ class PromisingContext:
             # We assume that if a context is already closed, then it also
             # finished already (either was explicitly awaited for or finished
             # in the background due to "start soon")
-            # TODO Try setting it to False, just for an experiment's sake
             open_contexts_only=True,
         ):
             _hierarchy_logger.log_awaiting_children(parent=self, children=children)

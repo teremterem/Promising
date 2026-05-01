@@ -312,8 +312,9 @@ async def test_await_children_direct_only_but_fully_unpack_promises(
 
     @promising.function(use_thread_pool=True)
     def child_func() -> str:
+        grandchild = grandchild_func()
         execution_order.append("child_done")
-        return grandchild_func()
+        return grandchild
 
     @promising.function(use_thread_pool=True)
     def root_func() -> str:
@@ -341,6 +342,7 @@ async def test_await_children_direct_only_but_fully_unpack_promises(
                 "root_coro_done",
             ]
         else:
+            # `fully_unpack_promises` is either True or None ("use default")
             assert execution_order == [
                 "child_done",
                 "root_coro_done",
@@ -352,6 +354,7 @@ async def test_await_children_direct_only_but_fully_unpack_promises(
             "child_done",
         ]
     else:
+        # `fully_unpack_promises` is either True or None ("use default")
         assert execution_order == [
             "root_coro_done",
             "child_done",

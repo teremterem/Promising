@@ -26,14 +26,13 @@ async def test_immediately_closed_child_not_in_parent_unsettled_children() -> No
 
 async def test_immediately_closed_child_not_in_collect_unsettled_children() -> None:
     """
-    ``collect_unsettled_children(open_contexts_only=False, awaitables_only=False)``
-    must not include an immediately-closed child that has no unsettled
-    descendants.
+    ``collect_unsettled_children(awaitables_only=False)`` must not include an
+    immediately-closed child that has no unsettled descendants.
     """
     with promising.context() as parent:
         promising.PromisingContext(parent=parent, close_context_immediately=True)
 
-        assert parent.collect_unsettled_children(open_contexts_only=False, awaitables_only=False) == set()
+        assert parent.collect_unsettled_children(awaitables_only=False) == set()
 
 
 async def test_immediately_closed_child_does_not_prevent_parent_cascade() -> None:

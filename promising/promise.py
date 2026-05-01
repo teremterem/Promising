@@ -22,7 +22,7 @@ from promising.sentinels import (
 from promising.types import T_co
 from promising.utils import awaitable_as_coroutine, resolve_namespace
 
-_unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
+_unpacking_logger = PromiseUnpackingLogger(level=logging.NOTSET)
 
 
 def wrap_awaitable(
@@ -212,7 +212,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
-            self._call_soon_threadsafe(self._ensure_full_unpacking_scheduled)
+            self._call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled)
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -259,12 +259,11 @@ class Promise(PromisingContext, Generic[T_co]):
             The fully unpacked result of the Promise (no remaining
             nested Promises).
 
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        self._ensure_full_unpacking_scheduled()
+        self._ensure_from_loop_full_unpacking_scheduled()
 
         if self._full_unpacking_task is not None:
             yield from self._full_unpacking_task
@@ -301,12 +300,11 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def unpack_once(self) -> "T_co | Promise[Any]":
         """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
 
-        self._ensure_single_unpacking_scheduled()
+        self._ensure_from_loop_single_unpacking_scheduled()
 
         if self._single_unpacking_task is not None:
             await self._single_unpacking_task
@@ -337,7 +335,8 @@ class Promise(PromisingContext, Generic[T_co]):
     def done(self) -> bool:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         state = self._state
         return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -345,7 +344,8 @@ class Promise(PromisingContext, Generic[T_co]):
     def unpacked_once(self) -> bool:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         state = self._state
         return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -353,7 +353,8 @@ class Promise(PromisingContext, Generic[T_co]):
     def unpacked_once_or_done(self) -> bool:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         state = self._state
         return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -361,7 +362,8 @@ class Promise(PromisingContext, Generic[T_co]):
     def cancelled(self) -> bool:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         state = self._state
         return state in (_CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -369,7 +371,9 @@ class Promise(PromisingContext, Generic[T_co]):
     def result(self) -> T_co:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
+        attributes that were set as part of the Promise's lifecycle.
         """
         self._assert_done_and_not_cancelled()
 
@@ -387,7 +391,9 @@ class Promise(PromisingContext, Generic[T_co]):
     def intermediate_promise(self) -> "Promise[Any] | None":
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
+        attributes that were set as part of the Promise's lifecycle.
         """
         if not self.unpacked_once_or_done():
             # TODO Introduce a PromisingError subclass for this ?
@@ -408,7 +414,9 @@ class Promise(PromisingContext, Generic[T_co]):
     def exception(self) -> BaseException | None:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
+        attributes that were set as part of the Promise's lifecycle.
         """
         self._assert_done_and_not_cancelled()
         return self._exception
@@ -460,10 +468,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         return self._concurrent_future
 
-    def _ensure_single_unpacking_scheduled(self) -> None:
+    def _ensure_from_loop_single_unpacking_scheduled(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         _unpacking_logger.log_single_unpacking_scheduling(promise=self)
         if self._single_unpacking_task is None and not self.unpacked_once_or_done():
@@ -472,10 +479,9 @@ class Promise(PromisingContext, Generic[T_co]):
             )
             _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
-    def _ensure_full_unpacking_scheduled(self) -> None:
+    def _ensure_from_loop_full_unpacking_scheduled(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         _unpacking_logger.log_full_unpacking_scheduling(promise=self)
         if self._full_unpacking_task is None and not self.done():
@@ -486,8 +492,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def _unpack_once_from_loop(self) -> None:
         """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
             _unpacking_logger.log_single_unpacking_started(promise=self)
@@ -527,8 +532,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Raises:
             RuntimeError: If the Promise is already done or has no awaitable.
 
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
             _unpacking_logger.log_full_unpacking_started(promise=self)
@@ -538,7 +542,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # becomes done already after unpack_once_from_loop completes
                 return
 
-            self._ensure_single_unpacking_scheduled()
+            self._ensure_from_loop_single_unpacking_scheduled()
             if self._single_unpacking_task is not None:
                 await self._single_unpacking_task
 
@@ -570,8 +574,7 @@ class Promise(PromisingContext, Generic[T_co]):
         once the Promise is fully unpacked. No-op if already unpacked once
         or done.
 
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
             if self._state is not _PENDING:
@@ -580,7 +583,7 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )
             self._intermediate_promise = promise
-            self._state = _UNPACKED_ONCE
+            self._set_state(_UNPACKED_ONCE)
 
         except BaseException as critical_error:
             self._set_exception(critical_error, critical=True)
@@ -590,15 +593,14 @@ class Promise(PromisingContext, Generic[T_co]):
         Store the fully unpacked result and settle both mirror Futures.
         No-op if the Promise is already done (finished or cancelled).
 
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
             if self._state not in (_PENDING, _UNPACKED_ONCE):
                 # Should not happen
                 raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
             self._result = result
-            self._state = _FINISHED
+            self._set_state(_FINISHED)
             try:
                 self._asyncio_future.set_result(result)
             finally:
@@ -612,8 +614,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Store the exception and settle both mirror Futures with it.
         No-op if the Promise is already done (finished or cancelled).
 
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
             # NOTE: In critical mode we do not validate the state. We want to
@@ -627,7 +628,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             self.set_as_promising_context_on_exception(exception)
             self._exception = exception
-            self._state = _FINISHED
+            self._set_state(_FINISHED)
             try:
                 self._asyncio_future.set_exception(exception)
             finally:
@@ -638,7 +639,10 @@ class Promise(PromisingContext, Generic[T_co]):
                 # Critical mode implies that any of the two futures may already
                 # be in a wrong state - we did what we could and capturing any
                 # further errors is not reasonable anymore
-                pass  # TODO Add a debug log here ?
+                # TODO Add a debug log here ?
+                # Make sure to set the state to _FINISHED if it wasn't
+                # successfully set before
+                self._set_state(_FINISHED)
             else:
                 # This is exactly the spot where we switch from non-critical to
                 # critical mode. Another error being raised during an attempt
@@ -655,7 +659,8 @@ class Promise(PromisingContext, Generic[T_co]):
     def _assert_done_and_not_cancelled(self) -> None:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        Promise, because the state cannot go backwards (e.g. from
+        _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         if not self.done():
             # TODO Introduce a PromisingError subclass for this ?
@@ -678,8 +683,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _cancel_from_loop(self, msg: str | None = None) -> bool:
         """
-        NOTE: This method is only to be used from the event loop of the
-        Promise.
+        NOTE: This method can only be used from the event loop of the Promise.
         """
         # TODO TODO TODO Review this method once again - I'm not entirely sure
         #  the logic is sound
@@ -695,16 +699,26 @@ class Promise(PromisingContext, Generic[T_co]):
                 single_unpacking_cancelled = self._single_unpacking_task.cancel(msg)
 
                 if single_unpacking_cancelled:
-                    self._state = _CANCELLED_BEFORE_UNPACKED_ONCE
+                    self._set_state(_CANCELLED_BEFORE_UNPACKED_ONCE)
 
         finally:
             if self._full_unpacking_task is not None:
                 full_unpacking_cancelled = self._full_unpacking_task.cancel(msg)
 
                 if full_unpacking_cancelled and not single_unpacking_cancelled:
-                    self._state = _CANCELLED_AFTER_UNPACKED_ONCE
+                    self._set_state(_CANCELLED_AFTER_UNPACKED_ONCE)
 
         return single_unpacking_cancelled or full_unpacking_cancelled
+
+    def _set_state(self, new_state: Sentinel) -> None:
+        self._state = new_state
+        self._unregister_from_parent_if_time()
+
+    def _unregister_from_parent_if_time(self) -> None:
+        # Do not unregister from parent unless the Promise is done (even if it
+        # is already closed)
+        if self.done():
+            super()._unregister_from_parent_if_time()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         if isinstance(start_soon, bool):

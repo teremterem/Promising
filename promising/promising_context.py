@@ -292,7 +292,6 @@ def collect_unsettled_children(
     *,
     whole_subtree: bool = True,
     awaitables_only: bool = True,
-    open_contexts_only: bool = True,
 ) -> set["PromisingContext"]:
     """
     Collect child contexts of the active context that are still being
@@ -308,11 +307,6 @@ def collect_unsettled_children(
         awaitables_only: If True (default), exclude children that are not
             ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
             nodes created via ``promising.context``).
-        open_contexts_only: If True (default), exclude children whose
-            ``with`` block has already exited (or whose ``set_result`` /
-            ``set_exception`` has been called, in the case of a
-            ``PromisingFuture``). Such children may still be tracked
-            because they themselves have unsettled descendants.
 
     Returns:
         Set of child PromisingContexts matching the filter criteria.
@@ -320,7 +314,6 @@ def collect_unsettled_children(
     return get_active_context().collect_unsettled_children(
         whole_subtree=whole_subtree,
         awaitables_only=awaitables_only,
-        open_contexts_only=open_contexts_only,
     )
 
 
@@ -565,10 +558,6 @@ class PromisingContext:
         while children := self.collect_unsettled_children(
             whole_subtree=whole_subtree,
             awaitables_only=True,
-            # We assume that if a context is already closed, then it also
-            # finished already (either was explicitly awaited for or finished
-            # in the background due to "start soon")
-            open_contexts_only=True,
         ):
             _hierarchy_logger.log_awaiting_children(parent=self, children=children)
 
@@ -634,7 +623,6 @@ class PromisingContext:
         *,
         whole_subtree: bool = True,
         awaitables_only: bool = True,
-        open_contexts_only: bool = True,
     ) -> set["PromisingContext"]:
         """
         Collect children that are still tracked by this context.
@@ -659,11 +647,6 @@ class PromisingContext:
                 ``PromisingFuture`` instances (i.e. plain
                 ``PromisingContext`` nodes created via
                 ``promising.context``).
-            open_contexts_only: If True (default), exclude children that
-                are already closed. Such children may still be tracked
-                because they themselves have unsettled descendants — recursive
-                traversal still walks through them so their open
-                descendants can be discovered.
 
         Returns:
             Set of child PromisingContexts matching the filter criteria.
@@ -671,25 +654,22 @@ class PromisingContext:
         with self._unsettled_children_lock:
             children = list[PromisingContext](self._unsettled_children)
 
-        result = {
-            child
-            for child in children
-            if (
-                (not awaitables_only or inspect.isawaitable(child))
-                and (not open_contexts_only or child.is_still_open())
-            )
-        }
+        if awaitables_only:
+            result = {child for child in children if inspect.isawaitable(child)}
+        else:
+            result = set[PromisingContext](children)
+
         if whole_subtree:
             # We are iterating over all the children, regardless of the
-            # awaitables_only and open_contexts_only settings, because some
-            # children may still be "unsettled" simply because they still have
-            # "unsettled" children of their own.
+            # `awaitables_only` parameter, because some children may be
+            # considered "unsettled" only because they still have "unsettled"
+            # children of their own (even if they themselves are already
+            # closed, done, etc.)
             for child in children:
                 result.update(
                     child.collect_unsettled_children(
                         whole_subtree=True,
                         awaitables_only=awaitables_only,
-                        open_contexts_only=open_contexts_only,
                     )
                 )
         return result

@@ -22,7 +22,7 @@ from promising.sentinels import (
 from promising.types import T_co
 from promising.utils import awaitable_as_coroutine, resolve_namespace
 
-_unpacking_logger = PromiseUnpackingLogger(level=logging.NOTSET)
+_unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
 
 
 def wrap_awaitable(

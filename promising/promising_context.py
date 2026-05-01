@@ -452,6 +452,17 @@ class PromisingContext:
         """
         return self._context_closed
 
+    def done(self) -> bool:
+        """
+        Child classes can override this method to redefine what "done" means
+        for them (see ``Promise.done()`` for an example).
+
+        Returns:
+            Whether this context is "done" (for vanilla ``PromisingContext``,
+            the same as ``closed()``).
+        """
+        return self.closed()
+
     def get_parent_context(self, *, raise_if_none: bool = True) -> "PromisingContext | None":
         """
         Get the immediate parent PromisingContext of this PromisingContext.
@@ -558,6 +569,16 @@ class PromisingContext:
             whole_subtree=whole_subtree,
             awaitables_only=True,
         ):
+            children = [
+                child
+                for child in children
+                if not child.done()
+                or (not unpack_promises_fully and isinstance(child, Promise) and not child.unpacked_once_or_done())
+            ]
+            if not children:
+                # Additional checkpoint to break the await loop
+                break
+
             _hierarchy_logger.log_awaiting_children(parent=self, children=children)
 
             # TODO Safeguard from awaiting a child that happens to be the
@@ -565,13 +586,8 @@ class PromisingContext:
             #  context ?)
             await asyncio.gather(
                 *[
-                    child.unpack_once() if not unpack_promises_fully and isinstance(child, Promise) else child
+                    child if unpack_promises_fully or not isinstance(child, Promise) else child.unpack_once()
                     for child in children
-                    # TODO TODO TODO Are we sure these conditions make sense ?
-                    if not (
-                        isinstance(child, Promise)
-                        and (child.done() if unpack_promises_fully else child.unpacked_once_or_done())
-                    )
                 ],
                 # `return_exceptions` is set to True to make sure we wait for
                 # ALL the children that are still in progress, regardless of

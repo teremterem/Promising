@@ -334,6 +334,14 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def done(self) -> bool:
         """
+        Whether this Promise is "done", i.e. either finished (successfully or
+        with an exception) or cancelled. Replaces the default behavior of the
+        ``PromisingContext`` parent class which simply checks if the context is
+        closed already.
+
+        Returns:
+            Whether this Promise is "done".
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.)

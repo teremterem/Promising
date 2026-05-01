@@ -199,14 +199,11 @@ class Promise(PromisingContext, Generic[T_co]):
         self._full_unpacking_task: Task[T_co] | None = None
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
 
-        self._asyncio_future: asyncio.Future[T_co] = self._loop.create_future()
-        self._concurrent_future: concurrent.futures.Future[T_co] = concurrent.futures.Future()
-
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED:
                 self._set_result(prefilled_result)
             else:
-                self._set_exception(prefilled_exception, critical=False)
+                self._set_exception(prefilled_exception)
 
         if self._start_soon:
             # We don't know which thread the Promise is created in, so we
@@ -454,28 +451,6 @@ class Promise(PromisingContext, Generic[T_co]):
         self.loop.call_soon_threadsafe(callback)
         return future.result()
 
-    @property
-    def asyncio_future(self) -> "asyncio.Future[T_co]":
-        """
-        Return the ``asyncio.Future`` that mirrors this Promise's fully
-        unpacked result. The Future is created when the Promise is
-        constructed and is settled by ``_set_result`` / ``_set_exception``.
-
-        NOTE: The returned Future is bound to the Promise's event loop.
-        """
-        return self._asyncio_future
-
-    @property
-    def concurrent_future(self) -> "concurrent.futures.Future[T_co]":
-        """
-        Return the ``concurrent.futures.Future`` that mirrors this Promise's
-        fully unpacked result. The Future is created when the Promise is
-        constructed and is settled by ``_set_result`` / ``_set_exception``.
-
-        NOTE: This method is thread-safe.
-        """
-        return self._concurrent_future
-
     def _ensure_from_loop_single_unpacking_scheduled(self) -> None:
         """
         NOTE: This method can only be used from the event loop of the Promise.
@@ -519,7 +494,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
-            self._set_exception(exc, critical=False)
+            self._set_exception(exc)
         else:
             if isinstance(result, Promise):
                 self._set_intermediate_promise(result)
@@ -569,7 +544,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
-            self._set_exception(exc, critical=False)
+            self._set_exception(exc)
         else:
             self._set_result(result)
 
@@ -578,9 +553,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
         """
         Record the intermediate Promise returned by a single unpacking step.
-        The mirror Futures intentionally stay pending — they only settle
-        once the Promise is fully unpacked. No-op if already unpacked once
-        or done.
+        No-op if already unpacked once or done.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -593,13 +566,13 @@ class Promise(PromisingContext, Generic[T_co]):
             self._intermediate_promise = promise
             self._set_state(_UNPACKED_ONCE)
 
-        except BaseException as critical_error:
-            self._set_exception(critical_error, critical=True)
+        except BaseException as internal_error:
+            self._force_finished_with_internal_error(internal_error)
 
     def _set_result(self, result: T_co) -> None:
         """
-        Store the fully unpacked result and settle both mirror Futures.
-        No-op if the Promise is already done (finished or cancelled).
+        Store the fully unpacked result. No-op if the Promise is already
+        done (finished or cancelled).
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -609,60 +582,68 @@ class Promise(PromisingContext, Generic[T_co]):
                 raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
             self._result = result
             self._set_state(_FINISHED)
-            try:
-                self._asyncio_future.set_result(result)
-            finally:
-                self._concurrent_future.set_result(result)
 
-        except BaseException as critical_error:
-            self._set_exception(critical_error, critical=True)
+        except BaseException as internal_error:
+            self._force_finished_with_internal_error(internal_error)
 
-    def _set_exception(self, exception: BaseException, *, critical: bool) -> None:
+    def _set_exception(self, exception: BaseException) -> None:
         """
-        Store the exception and settle both mirror Futures with it.
-        No-op if the Promise is already done (finished or cancelled).
+        Store the exception. No-op if the Promise is already done
+        (finished or cancelled).
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
-            # NOTE: In critical mode we do not validate the state. We want to
-            # treat the incoming error as critical, because critical mode
-            # signals that the error is due to a bug in the Promise class
-            # itself. For this reason we want to allow the incoming error to
-            # override whatever state the Promise is currently in.
-            if not critical and self._state not in (_PENDING, _UNPACKED_ONCE):
+            if self._state not in (_PENDING, _UNPACKED_ONCE):
                 # Should not happen
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
             self.set_as_promising_context_on_exception(exception)
             self._exception = exception
             self._set_state(_FINISHED)
-            try:
-                self._asyncio_future.set_exception(exception)
-            finally:
-                self._concurrent_future.set_exception(exception)
 
-        except BaseException as critical_error:
-            if critical:
-                # Critical mode implies that any of the two futures may already
-                # be in a wrong state - we did what we could and capturing any
-                # further errors is not reasonable anymore
-                # TODO Add a debug log here ?
-                # Make sure to set the state to _FINISHED if it wasn't
-                # successfully set before
-                self._set_state(_FINISHED)
-            else:
-                # This is exactly the spot where we switch from non-critical to
-                # critical mode. Another error being raised during an attempt
-                # to set the original error usually means that there is a bug
-                # in the Promise class itself, so we enter critical mode
-                # specifically because we want to do our best to capture this
-                # new error and not let the bug go unnoticed.
-                try:
-                    critical_error.__context__ = exception
-                except BaseException:
-                    pass  # TODO Add a debug log here ?
-                self._set_exception(critical_error, critical=True)
+        except BaseException as internal_error:
+            # Bug in the Promise class itself, or a misuse of the state
+            # machine. Chain the original exception so context is not lost,
+            # then force the Promise into a terminal state.
+            try:
+                internal_error.__context__ = exception
+            except BaseException:
+                pass  # TODO Add a debug log here ?
+            self._force_finished_with_internal_error(internal_error)
+
+    def _force_finished_with_internal_error(self, error: BaseException) -> None:
+        """
+        Last-resort recovery path. Force the Promise into _FINISHED with
+        the given error, bypassing state validation. Each step is wrapped
+        in try/except so a partial failure cannot leave the Promise stuck
+        in a non-terminal state.
+
+        Used when a regular ``_set_*`` call fails internally — typically
+        because the state machine was already in an unexpected state, or
+        because parent unregistration raised. Treating such failures as
+        bugs in the Promise class itself, this method prioritizes reaching
+        a terminal state over surfacing further errors.
+
+        NOTE: This method can only be used from the event loop of the Promise.
+        """
+        # TODO Add a debug log of `error` here ?
+        try:
+            self.set_as_promising_context_on_exception(error)
+        except BaseException:
+            pass
+        try:
+            self._exception = error
+        except BaseException:
+            pass
+        try:
+            self._state = _FINISHED
+        except BaseException:
+            pass
+        try:
+            self._unregister_from_parent_if_time()
+        except BaseException:
+            pass
 
     def _assert_done_and_not_cancelled(self) -> None:
         """

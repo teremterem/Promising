@@ -607,9 +607,12 @@ class Promise(PromisingContext, Generic[T_co]):
             # machine. Chain the original exception so context is not lost,
             # then force the Promise into a terminal state.
             try:
+                # TODO Only set it if it is not already set ? Or, maybe,
+                # navigate all the way up the chain to the root where it can be
+                # set ?
                 internal_error.__context__ = exception
             except BaseException:
-                pass  # TODO Add a debug log here ?
+                pass  # TODO Add a debug log here
             self._force_finished_with_internal_error(internal_error)
 
     def _force_finished_with_internal_error(self, error: BaseException) -> None:
@@ -627,23 +630,13 @@ class Promise(PromisingContext, Generic[T_co]):
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
-        # TODO Add a debug log of `error` here ?
         try:
+            # TODO Add a debug log of `error` here
             self.set_as_promising_context_on_exception(error)
-        except BaseException:
-            pass
-        try:
             self._exception = error
+            self._set_state(_FINISHED)
         except BaseException:
-            pass
-        try:
-            self._state = _FINISHED
-        except BaseException:
-            pass
-        try:
-            self._unregister_from_parent_if_time()
-        except BaseException:
-            pass
+            pass  # TODO Add a debug log of `error` here
 
     def _assert_done_and_not_cancelled(self) -> None:
         """

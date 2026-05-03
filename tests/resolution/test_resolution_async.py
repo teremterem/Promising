@@ -117,18 +117,29 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
 
 async def test_mixed_chain_unpack_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
+    custom_coro_call = None
+    inner_promise = None
 
     async def custom_coro() -> Promise[str]:
-        return Promise(prefilled_result="final")
+        nonlocal inner_promise
+        inner_promise = Promise(prefilled_result="final")
+        return inner_promise
 
     async def coro() -> Any:
-        return custom_coro()
+        nonlocal custom_coro_call
+        custom_coro_call = custom_coro()
+        return custom_coro_call
 
     promise = Promise(coro())
 
-    # coroutine wraps a Promise; `await promise` should unpack:
-    # promise → coroutine → inner Promise → "final"
-    assert await promise == "final"
+    result = await promise
+    assert result is custom_coro_call
+
+    result = await result
+    assert result is inner_promise
+
+    result = await result
+    assert result == "final"
 
 
 async def test_mixed_chain_unpack_once() -> None:

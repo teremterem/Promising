@@ -333,7 +333,8 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
         await result
 
 
-async def test_exception_at_depth_5_with_promising_context_and_functions() -> None:
+@pytest.mark.parametrize("raise_error", [True, False])
+async def test_unpack_all_at_depth_5_with_promising_context_and_functions(*, raise_error: bool) -> None:
     """
     Coroutine that raises in a PromisingContext is 5 levels
     deep in a mixed chain of sync and async
@@ -347,7 +348,10 @@ async def test_exception_at_depth_5_with_promising_context_and_functions() -> No
     @promising.function
     async def func5_failing_in_context() -> str:
         with promising.context():
-            raise ValueError("coro error at the end")
+            if raise_error:
+                raise ValueError("coro error at the end")
+            else:
+                return "coro result at the end"
 
     @promising.function
     async def func4() -> Any:
@@ -368,5 +372,8 @@ async def test_exception_at_depth_5_with_promising_context_and_functions() -> No
     promise = func1()
     loop = asyncio.get_running_loop()
 
-    with pytest.raises(ValueError, match="coro error at the end"):
-        await loop.run_in_executor(None, promise.sync)
+    if raise_error:
+        with pytest.raises(ValueError, match="coro error at the end"):
+            await loop.run_in_executor(None, promise.sync)
+    else:
+        assert await loop.run_in_executor(None, promise.sync) == "coro result at the end"

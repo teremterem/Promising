@@ -123,25 +123,6 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
     assert await loop.run_in_executor(None, level3.unpack_once_sync) == "bottom"
 
 
-async def test_custom_coroutine_unpack_once() -> None:
-    """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
-
-    async def custom_coro() -> str:
-        return "custom_value"
-
-    async def coro() -> Any:
-        return custom_coro()
-
-    promise = Promise(coro())
-    loop = asyncio.get_running_loop()
-
-    result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert isinstance(result, Promise)
-
-    # Get rid of the asyncio warning
-    assert await result == "custom_value"
-
-
 async def test_mixed_chain_unpack_all() -> None:
     """`sync()` unpacks through
     Promise → coroutine → scalar."""

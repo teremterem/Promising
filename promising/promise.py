@@ -667,9 +667,9 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         NOTE: This method can only be used from the event loop of the Promise.
         """
-        # TODO TODO TODO Review this method once again - I'm not entirely sure
-        #  the logic is sound
-        # TODO TODO TODO Plus asyncio_future and concurrent_future should be
+        # TODO [P1] Review this method once again - I'm not entirely sure the
+        #  logic is sound
+        # TODO [P1] Plus asyncio_future and concurrent_future should be
         #  cancelled too (and vice versa ?)
         if self.done():
             return False

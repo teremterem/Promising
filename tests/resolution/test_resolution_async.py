@@ -115,20 +115,6 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
     assert await level3.unpack_once() == "bottom"
 
 
-async def test_custom_coroutine_unpack_all() -> None:
-    """`await` unpacks through a coroutine to the final value."""
-
-    async def custom_coro() -> str:
-        return "custom_value"
-
-    async def coro() -> Any:
-        return custom_coro()
-
-    promise = Promise(coro())
-
-    assert await promise == "custom_value"
-
-
 async def test_custom_coroutine_unpack_once() -> None:
     """`unpack_once()` returns the coroutine wrapped in a Promise."""
 

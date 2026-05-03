@@ -155,6 +155,7 @@ async def test_mixed_chain_unpack_once() -> None:
     inner = None
 
     async def custom_coro() -> Promise[str]:
+        await asyncio.sleep(0.1)
         return inner
 
     async def coro() -> Any:
@@ -211,43 +212,6 @@ async def test_asyncio_future_unpack_once() -> None:
     assert isinstance(result, asyncio.Future)
 
     assert await result == "from_future"
-
-
-async def test_coroutine_with_sleep_unpack_all() -> None:
-    """`sync()` unpacks through a coroutine that yields
-    control."""
-
-    async def sleeping_coro() -> str:
-        await asyncio.sleep(0.1)
-        return "slept_value"
-
-    async def coro() -> Any:
-        return sleeping_coro()
-
-    promise = Promise(coro())
-    loop = asyncio.get_running_loop()
-
-    assert await loop.run_in_executor(None, promise.sync) == "slept_value"
-
-
-async def test_coroutine_with_sleep_unpack_once() -> None:
-    """`unpack_once_sync()` returns the coroutine wrapped in a Promise."""
-
-    async def sleeping_coro() -> str:
-        await asyncio.sleep(0.1)
-        return "slept_value"
-
-    async def coro() -> Any:
-        return sleeping_coro()
-
-    promise = Promise(coro())
-    loop = asyncio.get_running_loop()
-
-    result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert isinstance(result, Promise)
-
-    # Get rid of the asyncio warning
-    assert await result == "slept_value"
 
 
 async def test_five_levels_unpack_all() -> None:

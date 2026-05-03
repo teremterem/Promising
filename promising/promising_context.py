@@ -371,9 +371,9 @@ class PromisingContext:
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
         # TODO Introduce inheritable promise_class parameter
-        #  (and promise_class_default ?)
+        #  (and promise_class_default) ?
         # TODO Introduce inheritable wrap_coroutines parameter
-        #  (and wrap_coroutines_default ?)
+        #  (and wrap_coroutines_default) ?
         close_context_immediately: bool = False,
     ) -> None:
         self.namespace = namespace

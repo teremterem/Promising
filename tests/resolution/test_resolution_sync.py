@@ -388,7 +388,7 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
         await result
 
 
-async def test_coro_exception_at_depth_5_with_promising_context_and_functions() -> None:
+async def test_exception_at_depth_5_with_promising_context_and_functions() -> None:
     """
     Coroutine that raises in a PromisingContext is 5 levels
     deep in a mixed chain of sync and async
@@ -399,24 +399,26 @@ async def test_coro_exception_at_depth_5_with_promising_context_and_functions() 
         → PromisingFunction → PromisingContext(coro[raises])
     """
 
-    @promising.context
-    async def coro5_failing_in_context() -> str:
-        raise ValueError("coro error at the end")
+    @promising.function
+    async def func5_failing_in_context() -> str:
+        with promising.context():
+            raise ValueError("coro error at the end")
 
     @promising.function
     async def func4() -> Any:
-        return coro5_failing_in_context()
+        return func5_failing_in_context()
 
     @promising.function(use_thread_pool=True)
     def func3() -> Any:
         return func4()
 
-    async def coro2() -> Any:
+    @promising.function
+    async def func2() -> Any:
         return func3()
 
     @promising.function
     async def func1() -> Any:
-        return coro2()
+        return func2()
 
     promise = func1()
     loop = asyncio.get_running_loop()

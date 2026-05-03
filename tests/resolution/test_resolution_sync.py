@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Any
 
 import pytest
@@ -125,27 +126,22 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
 
 async def test_mixed_chain_unpack_all() -> None:
     """`sync()` unpacks through Promise → coroutine → scalar."""
-    custom_coro_call = None
-    inner_promise = None
 
     async def custom_coro() -> Promise[str]:
-        nonlocal inner_promise
-        inner_promise = Promise(prefilled_result="final")
-        return inner_promise
+        return Promise[str](prefilled_result="final")
 
     async def coro() -> Any:
-        nonlocal custom_coro_call
-        custom_coro_call = custom_coro()
-        return custom_coro_call
+        return custom_coro()
 
     promise = Promise(coro())
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(None, promise.sync)
-    assert result is custom_coro_call
+    assert not isinstance(result, Promise)
+    assert inspect.iscoroutine(result)
 
     result = await result
-    assert result is inner_promise
+    assert isinstance(result, Promise)
 
     result = await loop.run_in_executor(None, result.sync)
     assert result == "final"

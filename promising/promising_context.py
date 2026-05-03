@@ -110,7 +110,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        # TODO Use a more self-explanatory sentinel as `parent`'s default value ?
+        # TODO [P2] Use a more self-explanatory sentinel as `parent`'s default value ?
         parent: "PromisingContext | None | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -573,7 +573,7 @@ class PromisingContext:
                 child
                 for child in children
                 if not (
-                    # TODO Would such a nested if statement be confusing for
+                    # TODO [P2] Would such a nested if statement be confusing for
                     # the reader to understand ? It seems to me that it is
                     # still easier to understand than a complicated chain of
                     # conditions that covers the same logic. Just leave a
@@ -762,7 +762,7 @@ class PromisingContext:
     def set_as_promising_context_on_exception(self, exception: BaseException) -> None:
         try:
             # TODO Make it possible to disable setting this trace ?
-            # TODO Borrow from MiniAgents the mechanism that logs this
+            # TODO [P1] Borrow from MiniAgents the mechanism that logs this
             #  "promising breadcrumb" together with the error tracebacks
             if not hasattr(exception, "__promising_context__"):
                 # We only let it be set at the deepest level of the promise
@@ -771,7 +771,7 @@ class PromisingContext:
         except BaseException:
             # Suppress the error if any - failure to store the trace should
             # not affect the exception handling
-            pass  # TODO Add a debug log here
+            pass  # TODO [P2] Add a debug log here
 
     def is_on_correct_running_loop(self, *, raise_if_no_running_loop: bool = False) -> bool:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_if_no_running_loop)

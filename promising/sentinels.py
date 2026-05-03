@@ -18,7 +18,7 @@ class Sentinel:
         return self._name
 
     def __bool__(self) -> bool:
-        # TODO Should any other magic methods be defined like this to prevent
+        # TODO [P2] Should any other magic methods be defined like this to prevent
         #  reliance on Sentinel's truthiness ? We need to come up with a list
         #  of such magic methods.
         raise SentinelUsageError(

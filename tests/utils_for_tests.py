@@ -82,7 +82,7 @@ def run_in_thread(fn: Callable[[], None], timeout: float | None = None) -> None:
     Useful for tests that call .run() (which needs asyncio.run()) without
     interfering with the pytest-asyncio event loop.
     """
-    # TODO Add a test for this utility function - we want to make sure errors
+    # TODO [P2] Add a test for this utility function - we want to make sure errors
     # that assertion failures inside it actually propagate to the test
     error = None
 
@@ -129,9 +129,9 @@ class NonPromiseAwaitableContext(promising.PromisingContext):
         self._coro = coro
 
     def __await__(self) -> Generator[Any, None, Any]:
-        # TODO There is a pitfall: should someone decide to extend their own
+        # TODO [P2] There is a pitfall: should someone decide to extend their own
         #  awaitable from PromisingContext and forget to use a with statement
-        #  like the one below,the  await_children will confusingly hang on such
+        #  like the one below, the await_children will confusingly hang on such
         #  an instance. How to hint at the need to enter and exit the context
         #  for those who would want to extend PromisingContext ?
         with self:

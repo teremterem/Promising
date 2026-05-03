@@ -38,8 +38,6 @@ def wrap_awaitable(
     prefilled_result: T_co | Sentinel = UNCHANGED,
     prefilled_exception: BaseException | None = None,
 ) -> "Promise[Any]":
-    # TODO Make it possible change the default Promise class in parent
-    #  PromisingContexts
     return Promise(
         awaitable=awaitable,
         namespace=namespace,
@@ -401,7 +399,7 @@ class Promise(PromisingContext, Generic[T_co]):
         attributes that were set as part of the Promise's lifecycle.
         """
         if not self.unpacked_once_or_done():
-            # TODO Introduce a PromisingError subclass for this ?
+            # TODO [P2] Introduce a PromisingError subclass for this ?
             #  Should it be specific to "unpacking once" ?
             #  Should it also inherit from asyncio.InvalidStateError AND
             #  concurrent.futures.InvalidStateError ?
@@ -411,7 +409,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._exception is not None and self._intermediate_promise is None:
             # Exception happened before the first unpacking was completed
-            # TODO So, are we storing CancelledError in self._exception too ?
+            # TODO [P1] So, are we storing CancelledError in self._exception too ?
             raise self._exception
 
         return self._intermediate_promise
@@ -535,7 +533,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             result = self._intermediate_promise
 
-            # TODO What will cancelling do to this whole unpacking chain ?
+            # TODO [P1] What will cancelling do to this whole unpacking chain ?
             depth = 0
             while isinstance(result, Promise):
                 result = await result
@@ -607,12 +605,12 @@ class Promise(PromisingContext, Generic[T_co]):
             # machine. Chain the original exception so context is not lost,
             # then force the Promise into a terminal state.
             try:
-                # TODO Only set it if it is not already set ? Or, maybe,
+                # TODO [P2] Only set it if it is not already set ? Or, maybe,
                 # navigate all the way up the chain to the root where it can be
                 # set ?
                 internal_error.__context__ = exception
             except BaseException:
-                pass  # TODO Add a debug log here
+                pass  # TODO [P2] Add a debug log here
             self._force_finished_with_internal_error(internal_error)
 
     def _force_finished_with_internal_error(self, error: BaseException) -> None:
@@ -631,12 +629,12 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
-            # TODO Add a debug log of `error` here
+            # TODO [P2] Add a debug log of `error` here
             self.set_as_promising_context_on_exception(error)
             self._exception = error
             self._set_state(_FINISHED)
         except BaseException:
-            pass  # TODO Add a debug log of `error` here
+            pass  # TODO [P2] Add a debug log of `error` here
 
     def _assert_done_and_not_cancelled(self) -> None:
         """
@@ -645,7 +643,7 @@ class Promise(PromisingContext, Generic[T_co]):
         _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         if not self.done():
-            # TODO Introduce a PromisingError subclass for this ?
+            # TODO [P2] Introduce a PromisingError subclass for this ?
             #  Should it be specific to "done" ?
             #  Should it also inherit from asyncio.InvalidStateError AND
             #  concurrent.futures.InvalidStateError ?
@@ -654,8 +652,8 @@ class Promise(PromisingContext, Generic[T_co]):
             raise asyncio.InvalidStateError(f"Promise is not done: {self!r}")
 
         if self.cancelled():
-            # TODO Shouldn't CancelledError end up in self._exception instead ?
-            # TODO Introduce a PromisingError subclass for this ?
+            # TODO [P1] Shouldn't CancelledError end up in self._exception instead ?
+            # TODO [P2] Introduce a PromisingError subclass for this ?
             #  Should it be specific to "cancelled" ?
             #  Should it also inherit from asyncio.CancelledError AND
             #  concurrent.futures.CancelledError ?

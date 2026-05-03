@@ -120,7 +120,7 @@ async def test_mixed_chain_unpack_all() -> None:
     """`await` unpacks through Promise → coroutine → scalar."""
 
     async def custom_coro() -> Promise[str]:
-        return Promise[str](prefilled_result="final")
+        return Promise(prefilled_result="final")
 
     async def coro() -> Any:
         return custom_coro()
@@ -134,8 +134,7 @@ async def test_mixed_chain_unpack_all() -> None:
     result = await result
     assert isinstance(result, Promise)
 
-    result = await result
-    assert result == "final"
+    assert await result == "final"
 
 
 async def test_mixed_chain_unpack_once() -> None:
@@ -159,8 +158,10 @@ async def test_mixed_chain_unpack_once() -> None:
     assert not isinstance(result, Promise)
     assert inspect.iscoroutine(result)
 
-    # Awaiting the inner promise separately should work
-    assert await inner == "final"
+    result = await result
+    assert isinstance(result, Promise)
+
+    assert await result.unpack_once() == "final"
 
 
 async def test_asyncio_future_unpack_all() -> None:
@@ -174,7 +175,11 @@ async def test_asyncio_future_unpack_all() -> None:
 
     promise = Promise(coro())
 
-    assert await promise == "from_future"
+    result = await promise
+    assert not isinstance(result, Promise)
+    assert isinstance(result, asyncio.Future)
+
+    assert await result == "from_future"
 
 
 async def test_asyncio_future_unpack_once() -> None:

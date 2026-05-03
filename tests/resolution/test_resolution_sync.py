@@ -148,9 +148,10 @@ async def test_mixed_chain_unpack_all() -> None:
 
 
 async def test_mixed_chain_unpack_once() -> None:
-    """`unpack_once_sync()` on outer promise returns the
-    coroutine wrapped in a Promise."""
-
+    """
+    `unpack_once_sync()` on outer promise returns the coroutine wrapped in a
+    Promise.
+    """
     inner = None
 
     async def custom_coro() -> Promise[str]:
@@ -165,7 +166,8 @@ async def test_mixed_chain_unpack_once() -> None:
     loop = asyncio.get_running_loop()
 
     result = await loop.run_in_executor(None, promise.unpack_once_sync)
-    assert isinstance(result, Promise)
+    assert not isinstance(result, Promise)
+    assert inspect.iscoroutine(result)
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"

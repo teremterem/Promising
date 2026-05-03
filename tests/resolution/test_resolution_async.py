@@ -139,8 +139,10 @@ async def test_mixed_chain_unpack_all() -> None:
 
 
 async def test_mixed_chain_unpack_once() -> None:
-    """`unpack_once()` on outer promise returns the coroutine wrapped in a Promise."""
-
+    """
+    `unpack_once()` on outer promise returns the coroutine wrapped in a
+    Promise.
+    """
     inner = None
 
     async def custom_coro() -> Promise[str]:
@@ -154,7 +156,8 @@ async def test_mixed_chain_unpack_once() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, Promise)
+    assert not isinstance(result, Promise)
+    assert inspect.iscoroutine(result)
 
     # Awaiting the inner promise separately should work
     assert await inner == "final"

@@ -273,7 +273,7 @@ async def test_await_children_module_level_on_bare_context() -> None:
 @pytest.mark.parametrize(
     "unpack_promises_fully",
     [
-        pytest.param(True, id="unpack_all"),
+        pytest.param(True, id="unpack_fully"),
         pytest.param(False, id="unpack_once"),
         pytest.param(None, id="unpack_default"),
     ],
@@ -299,7 +299,7 @@ async def test_await_children_direct_only_but_unpack_promises_fully(
     if sleep_in_root and unpack_promises_fully is not False:
         possibly_xfail(
             "xfail_await_children_bug",
-            reason="grandchild not awaited when root sleeps with unpack_all",
+            reason="grandchild not awaited when root sleeps with unpack_fully",
         )
 
     execution_order: list[str] = []

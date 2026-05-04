@@ -36,7 +36,7 @@ async def test_prefilled_promise_no_nesting() -> None:
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == 42
 
 
-async def test_two_levels_unpack_all() -> None:
+async def test_two_levels_unpack_fully() -> None:
     """`sync()` should unpack both levels and return the
     final value."""
 
@@ -78,7 +78,7 @@ async def test_two_levels_unpack_once_stop_at_inner() -> None:
     assert await result == "deep value"
 
 
-async def test_three_levels_unpack_all() -> None:
+async def test_three_levels_unpack_fully() -> None:
     """`sync()` on a triply-nested promise returns the
     deepest value."""
 
@@ -124,7 +124,7 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
     assert await loop.run_in_executor(None, level3.unpack_once_sync) == "bottom"
 
 
-async def test_mixed_chain_unpack_all() -> None:
+async def test_mixed_chain_unpack_fully() -> None:
     """`sync()` unpacks through Promise → coroutine → scalar."""
 
     async def custom_coro() -> Promise[str]:
@@ -177,7 +177,7 @@ async def test_mixed_chain_unpack_once() -> None:
     assert result == "final"
 
 
-async def test_asyncio_future_unpack_all() -> None:
+async def test_asyncio_future_unpack_fully() -> None:
     """`sync()` unpacks through an asyncio.Future to the
     final value."""
     loop = asyncio.get_running_loop()
@@ -214,7 +214,7 @@ async def test_asyncio_future_unpack_once() -> None:
     assert await result == "from_future"
 
 
-async def test_five_levels_unpack_all() -> None:
+async def test_five_levels_unpack_fully() -> None:
     """`sync()` flattens 5 levels of promise nesting."""
 
     async def make_chain(depth: int) -> Any:
@@ -297,7 +297,7 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     assert await loop.run_in_executor(None, promise.unpack_once_sync) == value
 
 
-async def test_exception_in_inner_promise_unpack_all() -> None:
+async def test_exception_in_inner_promise_unpack_fully() -> None:
     """`sync()` on outer propagates exception from inner
     promise."""
 
@@ -334,7 +334,7 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
 
 
 @pytest.mark.parametrize("raise_error", [True, False])
-async def test_unpack_all_at_depth_5_with_promising_context_and_functions(*, raise_error: bool) -> None:
+async def test_unpack_fully_at_depth_5_with_promising_context_and_functions(*, raise_error: bool) -> None:
     """
     Coroutine that raises in a PromisingContext is 5 levels
     deep in a mixed chain of sync and async

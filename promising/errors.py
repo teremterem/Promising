@@ -1,3 +1,7 @@
+import asyncio
+import concurrent.futures
+
+
 class PromisingError(Exception):
     """A base class for all promising errors."""
 
@@ -8,6 +12,22 @@ class DecorationError(PromisingError):
 
 class PromiseNotFoundError(PromisingError):
     pass
+
+
+class PromiseNotDoneError(
+    PromisingError,
+    asyncio.InvalidStateError,
+    concurrent.futures.InvalidStateError,
+):
+    """Raised when a Promise is queried for a result/exception before it is done."""
+
+
+class PromiseNotUnpackedError(
+    PromisingError,
+    asyncio.InvalidStateError,
+    concurrent.futures.InvalidStateError,
+):
+    """Raised when a Promise's intermediate_promise is queried before the first unpacking."""
 
 
 class SentinelUsageError(PromisingError):

@@ -6,7 +6,7 @@ from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
-from promising.errors import PromiseNotFoundError
+from promising.errors import PromiseNotDoneError, PromiseNotFoundError, PromiseNotUnpackedError
 from promising.logging_utils import PromiseUnpackingLogger
 from promising.promising_context import PromisingContext
 from promising.sentinels import (
@@ -399,13 +399,7 @@ class Promise(PromisingContext, Generic[T_co]):
         attributes that were set as part of the Promise's lifecycle.
         """
         if not self.unpacked_once_or_done():
-            # TODO [P2] Introduce a PromisingError subclass for this ?
-            #  Should it be specific to "unpacking once" ?
-            #  Should it also inherit from asyncio.InvalidStateError AND
-            #  concurrent.futures.InvalidStateError ?
-            #  Isn't there a common builtin error for both - concurrent and
-            #  asyncio - just like TimeoutError ?
-            raise asyncio.InvalidStateError(f"Promise is not unpacked even once yet: {self!r}")
+            raise PromiseNotUnpackedError(f"Promise is not unpacked even once yet: {self!r}")
 
         if self._exception is not None and self._intermediate_promise is None:
             # Exception happened before the first unpacking was completed
@@ -643,13 +637,7 @@ class Promise(PromisingContext, Generic[T_co]):
         _CANCELLED_XX or _FINISHED to _PENDING etc.)
         """
         if not self.done():
-            # TODO [P2] Introduce a PromisingError subclass for this ?
-            #  Should it be specific to "done" ?
-            #  Should it also inherit from asyncio.InvalidStateError AND
-            #  concurrent.futures.InvalidStateError ?
-            #  Isn't there a common builtin error for both - concurrent and
-            #  asyncio - just like TimeoutError ?
-            raise asyncio.InvalidStateError(f"Promise is not done: {self!r}")
+            raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
         if self.cancelled():
             # TODO [P1] Shouldn't CancelledError end up in self._exception instead ?

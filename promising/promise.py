@@ -20,7 +20,7 @@ from promising.sentinels import (
     Sentinel,
 )
 from promising.types import T_co
-from promising.utils import awaitable_as_coroutine, resolve_namespace
+from promising.utils import attach_context_to_error_chain_root, awaitable_as_coroutine, resolve_namespace
 
 _logger = logging.getLogger(__name__)
 _unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
@@ -600,10 +600,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # machine. Chain the original exception so context is not lost,
             # then force the Promise into a terminal state.
             try:
-                # TODO [P2] Only set it if it is not already set ? Or, maybe,
-                # navigate all the way up the chain to the root where it can be
-                # set ?
-                internal_error.__context__ = exception
+                attach_context_to_error_chain_root(internal_error, context=exception)
             except BaseException:
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_finished_with_internal_error(internal_error)

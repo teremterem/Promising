@@ -76,3 +76,23 @@ def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback:
 
 async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
     return await awaitable
+
+
+def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:
+    """
+    Walk the ``__context__`` chain starting at ``error`` and attach
+    ``context`` at the root (the deepest exception with no ``__context__``).
+    No-op if ``context`` is already somewhere in the chain. Cycle-safe.
+
+    Returns the exception that ``context`` was attached to, or ``None`` if
+    no attachment happened.
+    """
+    root = error
+    seen: set[int] = {id(root)}
+    while root.__context__ is not None and id(root.__context__) not in seen:
+        root = root.__context__
+        seen.add(id(root))
+    if id(context) in seen:
+        return None
+    root.__context__ = context
+    return root

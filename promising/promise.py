@@ -452,7 +452,8 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Raises:
             PromiseNotDoneError: If the Promise is not done yet.
-            asyncio.CancelledError: If the Promise was cancelled.
+            asyncio.CancelledError: If the Promise was cancelled (re-raised
+                from the ``CancelledError`` stored at cancellation time).
             BaseException: Re-raises whatever exception the Promise finished
                 with (if any).
 
@@ -461,7 +462,7 @@ class Promise(PromisingContext, Generic[T_co]):
         _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
         attributes that were set as part of the Promise's lifecycle.
         """
-        self._assert_done_and_not_cancelled()
+        self._assert_done()
 
         if self._exception is not None:
             raise self._exception
@@ -496,8 +497,10 @@ class Promise(PromisingContext, Generic[T_co]):
             raise PromiseNotUnpackedError(f"Promise is not unpacked even once yet: {self!r}")
 
         if self._exception is not None and self._intermediate_promise is None:
-            # Exception happened before the first unpacking was completed
-            # TODO [P1] So, are we storing CancelledError in self._exception too ?
+            # Exception (including CancelledError) happened before the first
+            # unpacking step produced an intermediate Promise — re-raise it.
+            # When the cancellation arrived AFTER the first unpacking step,
+            # `_intermediate_promise` is still set, so we return it as usual.
             raise self._exception
 
         return self._intermediate_promise
@@ -506,6 +509,10 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         Return the exception the Promise finished with, or ``None`` if it
         finished successfully.
+
+        Mirrors ``asyncio.Future.exception()``: when the Promise was
+        cancelled, the stored ``CancelledError`` is re-raised rather than
+        returned.
 
         Raises:
             PromiseNotDoneError: If the Promise is not done yet.
@@ -516,22 +523,43 @@ class Promise(PromisingContext, Generic[T_co]):
         _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
         attributes that were set as part of the Promise's lifecycle.
         """
-        self._assert_done_and_not_cancelled()
+        self._assert_done()
+
+        if self.cancelled():
+            # Match asyncio.Future.exception() semantics: raise the
+            # CancelledError instead of returning it.
+            raise self._exception
+
         return self._exception
 
     def cancel(self, msg: str | None = None) -> bool:
         """
-        Cancel the Promise.
+        Request cancellation of the Promise.
 
-        When called from the Promise's own event loop thread, cancels the
-        underlying unpacking task(s) directly. When called from any other
-        thread, the cancellation is dispatched onto the Promise's event loop
-        via ``call_soon_threadsafe`` and the call blocks until that
-        scheduled cancellation completes.
+        Mirrors ``asyncio.Future.cancel()`` / ``asyncio.Task.cancel()``: the
+        return value reports whether cancellation was *requested* — the
+        Promise's terminal cancelled state is reached only once the
+        ``CancelledError`` actually propagates through the underlying
+        unpacking task and is stored via ``_set_exception``. Until then,
+        ``cancelled()`` may still return ``False``.
+
+        For a Promise whose underlying task hasn't been scheduled yet (e.g.
+        ``start_soon=False`` and never awaited), the cancellation is
+        synthesized as a ``CancelledError`` stored directly via
+        ``_set_exception``, with no task involvement — analogous to
+        ``Future.cancel()`` on a not-yet-running future.
+
+        When called from the Promise's own event loop thread the cancellation
+        is dispatched directly. When called from any other thread it is
+        scheduled onto the Promise's event loop via
+        ``call_soon_threadsafe`` and the call blocks only long enough for the
+        scheduled dispatch to finish (it does not wait for the cancellation
+        itself to land).
 
         Returns:
-            ``True`` if at least one underlying task was successfully
-            cancelled, ``False`` if the Promise was already done.
+            ``True`` if cancellation was requested for at least one
+            underlying task, or synthesized for a not-yet-started Promise;
+            ``False`` if the Promise was already done.
 
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
@@ -653,7 +681,12 @@ class Promise(PromisingContext, Generic[T_co]):
 
             result = self._intermediate_promise
 
-            # TODO [P1] What will cancelling do to this whole unpacking chain ?
+            # Cancelling this Promise propagates ``CancelledError`` into the
+            # ``await result`` below; ``except BaseException`` catches it and
+            # stores it via ``_set_exception``, which moves the state to
+            # ``_CANCELLED_AFTER_UNPACKED_ONCE``. Cancelling the *nested*
+            # intermediate Promises is a separate concern (subtree
+            # cancellation — see PromisingContext TODOs).
             depth = 0
             while isinstance(result, Promise):
                 result = await result
@@ -706,19 +739,34 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _set_exception(self, exception: BaseException) -> None:
         """
-        Store the exception. No-op if the Promise is already done
-        (finished or cancelled).
+        Store the exception and move the Promise into a terminal state.
+
+        For a regular exception the Promise transitions to ``_FINISHED``.
+        For an ``asyncio.CancelledError`` (which deliberately extends
+        ``BaseException`` rather than ``Exception``) the Promise transitions
+        to ``_CANCELLED_BEFORE_UNPACKED_ONCE`` or
+        ``_CANCELLED_AFTER_UNPACKED_ONCE`` depending on whether the first
+        unpacking step had completed — the cancelled state is therefore an
+        *effect* of the stored exception, not a precondition for it.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
-            if self._state not in (_PENDING, _UNPACKED_ONCE):
+            if self._state is _PENDING:
+                terminal_state = (
+                    _CANCELLED_BEFORE_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
+                )
+            elif self._state is _UNPACKED_ONCE:
+                terminal_state = (
+                    _CANCELLED_AFTER_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
+                )
+            else:
                 # Should not happen
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
             self.set_as_promising_context_on_exception(exception)
             self._exception = exception
-            self._set_state(_FINISHED)
+            self._set_state(terminal_state)
 
         except BaseException as internal_error:
             # Bug in the Promise class itself, or a misuse of the state
@@ -753,7 +801,7 @@ class Promise(PromisingContext, Generic[T_co]):
         except BaseException:
             _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)
 
-    def _assert_done_and_not_cancelled(self) -> None:
+    def _assert_done(self) -> None:
         """
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
@@ -762,42 +810,70 @@ class Promise(PromisingContext, Generic[T_co]):
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
-        if self.cancelled():
-            # TODO [P1] Shouldn't CancelledError end up in self._exception instead ?
-            # TODO [P2] Introduce a PromisingError subclass for this ?
-            #  Should it be specific to "cancelled" ?
-            #  Should it also inherit from asyncio.CancelledError AND
-            #  concurrent.futures.CancelledError ?
-            #  Isn't there a common builtin error for both - concurrent and
-            #  asyncio - just like TimeoutError ?
-            raise asyncio.CancelledError(f"Promise is cancelled: {self!r}")
+    # TODO [P2] Should we introduce a dedicated CancelledError subclass for
+    #  Promises? It would have to subclass asyncio.CancelledError ONLY (so it
+    #  stays BaseException-derived rather than Exception-derived, preserving
+    #  the asyncio invariant that cancellations are not caught by
+    #  ``except Exception``). Mixing in PromisingError or
+    #  concurrent.futures.CancelledError would re-introduce Exception into
+    #  the MRO and break that invariant — a dedicated marker class without
+    #  a PromisingError mixin is the only way out, and it is unclear yet
+    #  whether the marker is worth the extra type.
 
     def _cancel_from_loop(self, msg: str | None = None) -> bool:
         """
+        Request cancellation of the underlying unpacking task(s) — or, when
+        no task has been scheduled yet, synthesize a ``CancelledError``
+        and route it through ``_set_exception`` (mirroring
+        ``Future.cancel()`` on a not-yet-running future).
+
+        The state machine is *not* moved here. Instead, the ``CancelledError``
+        propagates through ``_unpack_once_from_loop`` /
+        ``_fully_unpack_from_loop`` (``except BaseException`` catches it) and
+        is stored via ``_set_exception``, which is responsible for picking
+        the appropriate ``_CANCELLED_*`` terminal state. Cause-and-effect
+        order: stored exception → state transition.
+
+        Note: subtree cancellation (cascading the cancel into nested
+        Promises produced by intermediate unpacking) is intentionally out of
+        scope here — see ``PromisingContext`` TODOs.
+
         NOTE: This method can only be used from the event loop of the Promise.
         """
-        # TODO [P1] Review this method and make sure it is in compliance with
-        #  the way cancellations are done in asyncio
         if self.done():
             return False
 
-        single_unpacking_cancelled = False
-        full_unpacking_cancelled = False
-        try:
-            if self._single_unpacking_task is not None and not self.unpacked_once():
-                single_unpacking_cancelled = self._single_unpacking_task.cancel(msg)
+        cancellation_requested = False
+        if self._single_unpacking_task is not None and not self._single_unpacking_task.done():
+            cancellation_requested |= self._single_unpacking_task.cancel(msg)
+        if self._full_unpacking_task is not None and not self._full_unpacking_task.done():
+            cancellation_requested |= self._full_unpacking_task.cancel(msg)
 
-                if single_unpacking_cancelled:
-                    self._set_state(_CANCELLED_BEFORE_UNPACKED_ONCE)
+        if cancellation_requested:
+            return True
 
-        finally:
-            if self._full_unpacking_task is not None:
-                full_unpacking_cancelled = self._full_unpacking_task.cancel(msg)
+        # No task is currently running cancellation through — synthesize the
+        # CancelledError and store it directly. Covers the
+        # `start_soon=False`/never-awaited case as well as the rare race
+        # where every task has finished but the Promise hasn't transitioned
+        # to a terminal state yet.
+        self._set_exception(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
-                if full_unpacking_cancelled and not single_unpacking_cancelled:
-                    self._set_state(_CANCELLED_AFTER_UNPACKED_ONCE)
+        # An awaitable that never got driven (typical for the
+        # `start_soon=False`/never-awaited path) would otherwise trigger a
+        # "coroutine was never awaited" warning at GC time. Closing it here
+        # is the asyncio-equivalent of letting a cancelled Task clean up its
+        # own coroutine.
+        awaitable = self._awaitable
+        if awaitable is not None:
+            close = getattr(awaitable, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except BaseException:
+                    _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
-        return single_unpacking_cancelled or full_unpacking_cancelled
+        return self.cancelled()
 
     def _set_state(self, new_state: Sentinel) -> None:
         self._state = new_state

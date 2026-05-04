@@ -574,12 +574,11 @@ class PromisingContext:
                 child
                 for child in children
                 if not (
-                    # TODO [P2] Would such a nested if statement be confusing for
-                    # the reader to understand ? It seems to me that it is
-                    # still easier to understand than a complicated chain of
-                    # conditions that covers the same logic. Just leave a
-                    # comment here to help the reader notice the unconventional
-                    # approach to the condition checking ?
+                    # The nested conditional expression below is intentional:
+                    # it picks which "doneness" check to apply per child based
+                    # on the unpacking mode. A flatter chain of boolean
+                    # conditions covering the same logic would be harder to
+                    # follow.
                     child.done()
                     if unpack_promises_fully or not isinstance(child, Promise)
                     else child.unpacked_once_or_done()

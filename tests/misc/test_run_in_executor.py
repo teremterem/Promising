@@ -86,15 +86,15 @@ async def test_run_in_executor_does_not_block_event_loop() -> None:
 
     def _blocking() -> str:
         started.set()
-        release.wait(timeout=5.0)
+        release.wait(timeout=2)
         return "released"
 
     loop = asyncio.get_running_loop()
     fut = loop.run_in_executor(None, _blocking)
 
     # The event loop must remain responsive while the worker is blocked.
-    await asyncio.sleep(0)
-    assert started.wait(timeout=1.0)
+    await asyncio.sleep(0.1)
+    assert started.wait(timeout=0.1)
     assert not fut.done()
 
     release.set()
@@ -114,7 +114,7 @@ async def test_run_in_executor_cancellation_does_not_stop_worker() -> None:
 
     def _worker() -> None:
         started.set()
-        release.wait(timeout=5.0)
+        release.wait(timeout=2)
         finished.set()
 
     loop = asyncio.get_running_loop()
@@ -124,7 +124,7 @@ async def test_run_in_executor_cancellation_does_not_stop_worker() -> None:
         await fut
 
     task = asyncio.create_task(_await_it())
-    assert started.wait(timeout=1.0)
+    assert started.wait(timeout=0.1)
 
     task.cancel()
     with pytest.raises(asyncio.CancelledError):

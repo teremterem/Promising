@@ -46,11 +46,11 @@ def test_run_in_thread_timeout_raises_when_thread_hangs() -> None:
     release = threading.Event()
 
     def _hang() -> None:
-        release.wait(timeout=5.0)
+        release.wait(timeout=2)
 
     try:
         with pytest.raises(AssertionError, match="Thread did not finish in time"):
-            run_in_thread(_hang, timeout=0.05)
+            run_in_thread(_hang, timeout=0.1)
     finally:
         release.set()
 
@@ -59,4 +59,4 @@ def test_run_in_thread_timeout_does_not_raise_when_fast_enough() -> None:
     def _fast() -> None:
         pass
 
-    run_in_thread(_fast, timeout=5.0)
+    run_in_thread(_fast, timeout=2)

@@ -51,7 +51,7 @@ async def test_nested_context_managers() -> None:
 async def test_nested_context_parent_relationship() -> None:
     """
     When nesting contexts, the inner context's parent is the
-    outer context (because parent defaults to INHERIT).
+    outer context (because parent defaults to AUTO).
     """
     with promising.context() as outer:
         with promising.context() as inner:

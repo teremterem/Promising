@@ -44,7 +44,7 @@ async def test_call_start_soon_none_overrides_constructor() -> None:
     """
     Explicitly passing None at call time overrides the constructor's
     concrete bool value (in this particular case, falling back to the global
-    Defaults.START_SOON_DEFAULT, as there is no context hierarchy and no
+    Defaults.START_SOON, as there is no context hierarchy and no
     intermediate defaults).
     """
 

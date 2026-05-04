@@ -152,7 +152,7 @@ class Promise(PromisingContext, Generic[T_co]):
             run_in_executor, letting the event loop use its own default
             executor. A concrete ThreadPoolExecutor instance can also be
             provided.
-        start_soon_default: Local override for the global START_SOON_DEFAULT.
+        start_soon_default: Local override for the global Defaults.START_SOON.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
         prefilled_result: Pre-set result value. Cannot be an awaitable (pass

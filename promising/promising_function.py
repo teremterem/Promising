@@ -225,7 +225,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                   enforced on child ``Promise`` objects created during
                   this ``Promise``'s execution.
                 - **start_soon_default** — Local override for the global
-                  ``START_SOON_DEFAULT``.
+                  ``Defaults.START_SOON``.
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
                 - **use_thread_pool** — Whether to run a sync function

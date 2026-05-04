@@ -82,8 +82,6 @@ def run_in_thread(fn: Callable[[], None], timeout: float | None = None) -> None:
     Useful for tests that call .run() (which needs asyncio.run()) without
     interfering with the pytest-asyncio event loop.
     """
-    # TODO [P2] Add a test for this utility function - we want to make sure errors
-    # that assertion failures inside it actually propagate to the test
     error = None
 
     def _target():

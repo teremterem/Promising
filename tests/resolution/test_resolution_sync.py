@@ -125,7 +125,13 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
 
 
 async def test_mixed_chain_unpack_fully() -> None:
-    """`sync()` unpacks through Promise → coroutine → scalar."""
+    """
+    `sync()` on a Promise whose coroutine returns another (bare) coroutine
+    yields that inner coroutine as-is — unpacking stops at the coroutine
+    boundary and does NOT auto-await it. The caller must await the
+    coroutine explicitly to reach the inner Promise, then `sync()` again
+    on that Promise to reach the final scalar.
+    """
 
     async def custom_coro() -> Promise[str]:
         return Promise(prefilled_result="final")
@@ -149,8 +155,8 @@ async def test_mixed_chain_unpack_fully() -> None:
 
 async def test_mixed_chain_unpack_once() -> None:
     """
-    `unpack_once_sync()` on outer promise returns the coroutine wrapped in a
-    Promise.
+    `unpack_once_sync()` on a promise whose coroutine returns another (bare)
+    coroutine yields that inner coroutine as-is (NOT wrapped in a Promise).
     """
     inner = None
 
@@ -178,8 +184,11 @@ async def test_mixed_chain_unpack_once() -> None:
 
 
 async def test_asyncio_future_unpack_fully() -> None:
-    """`sync()` unpacks through an asyncio.Future to the
-    final value."""
+    """
+    `sync()` on a Promise whose coroutine returns an asyncio.Future yields
+    that Future as-is — unpacking does NOT continue through asyncio.Future
+    objects. The caller must await the Future to reach its result.
+    """
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
     fut.set_result("from_future")
@@ -197,7 +206,10 @@ async def test_asyncio_future_unpack_fully() -> None:
 
 
 async def test_asyncio_future_unpack_once() -> None:
-    """`unpack_once_sync()` wraps the returned asyncio.Future in a Promise."""
+    """
+    `unpack_once_sync()` on a promise whose coroutine returns an
+    asyncio.Future yields that Future as-is (NOT wrapped in a Promise).
+    """
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
     fut.set_result("from_future")
@@ -336,13 +348,23 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
 @pytest.mark.parametrize("raise_error", [True, False])
 async def test_unpack_fully_at_depth_5_with_promising_context_and_functions(*, raise_error: bool) -> None:
     """
-    Coroutine that raises in a PromisingContext is 5 levels
-    deep in a mixed chain of sync and async
-    PromisingFunctions.
+    A 5-level chain of PromisingFunctions (mixing async and sync), with the
+    deepest one running its body inside a ``with promising.context():``
+    block, is unpacked end-to-end by a single ``sync()`` call on the
+    outermost promise.
 
-    Chain: PromisingFunction → coroutine →
-        PromisingFunction[sync] →
-        → PromisingFunction → PromisingContext(coro[raises])
+    Chain (outer → inner):
+        func1 [PromisingFunction async]
+          → func2 [PromisingFunction async]
+            → func3 [PromisingFunction sync, use_thread_pool=True]
+              → func4 [PromisingFunction async]
+                → func5 [PromisingFunction async] with PromisingContext
+
+    Parametrized over ``raise_error``:
+        - True:  the innermost body raises ValueError, which propagates
+          all the way up and is observed at the outer ``sync()`` call.
+        - False: the innermost body returns a string, which is unpacked
+          all the way up and returned by the outer ``sync()`` call.
     """
 
     @promising.function

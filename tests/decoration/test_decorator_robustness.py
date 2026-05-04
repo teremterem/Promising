@@ -51,7 +51,7 @@ from typing import get_type_hints
 import pytest
 
 import promising
-from promising import INHERIT
+from promising import AUTO
 
 # ── Baselines (no decorator stacking) ────────────────────────────
 
@@ -764,7 +764,7 @@ async def test_double_context_decorator_attrs_stay_independent() -> None:
     assert inner.children_start_soon is False
     assert inner.start_soon_default is False
     assert inner.thread_pool is inner_pool
-    assert inner.parent is INHERIT
+    assert inner.parent is AUTO
 
     # -- Standard functools.update_wrapper attrs must propagate from the
     #    original function through both layers --------------------------------

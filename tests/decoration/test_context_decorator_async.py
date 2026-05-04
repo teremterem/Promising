@@ -111,13 +111,13 @@ async def test_context_decorator_each_call_gets_fresh_context() -> None:
     assert contexts[0] is not contexts[1]
 
 
-@pytest.mark.parametrize("parent", [None, promising.INHERIT])
+@pytest.mark.parametrize("parent", [None, promising.AUTO])
 async def test_context_decorator_with_explicit_parent(*, parent: promising.Sentinel | None) -> None:
     """
     `@promising.context`(parent=...) with explicit parent parameter:
     - parent=None creates a root context (no parent) even when called inside
       another context.
-    - parent=INHERIT (default) captures the outer context as parent.
+    - parent=AUTO (default) captures the outer context as parent.
     """
 
     @promising.context(parent=parent)

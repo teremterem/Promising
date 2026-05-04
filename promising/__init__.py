@@ -30,6 +30,7 @@ from promising.promising_context import (
 from promising.promising_function import PromisingFunction, function
 from promising.sentinels import (
     ASYNCIO_DEFAULT,
+    AUTO,
     INHERIT,
     PROMISING_DEFAULT,
     UNCHANGED,
@@ -62,6 +63,7 @@ class Defaults:
 
 __all__ = [
     "ASYNCIO_DEFAULT",
+    "AUTO",
     "ContextAlreadyActiveError",
     "ContextAlreadyClosedError",
     "ContextError",

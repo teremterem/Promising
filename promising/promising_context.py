@@ -24,7 +24,7 @@ from promising.errors import (
     PromiseNotFoundError,
 )
 from promising.logging_utils import PromisingHierarchyLogger
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
+from promising.sentinels import ASYNCIO_DEFAULT, AUTO, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel
 from promising.types import DecoratableFunctionType
 from promising.utils import get_running_asyncio_loop
 
@@ -82,7 +82,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         loop: Event loop to use. None (default) inherits from the parent
             context, or uses the currently running event loop at the root
             (raises ``NoRunningEventLoopError`` if no loop is running).
-        parent: Parent ``PromisingContext``. ``INHERIT`` (default) uses the
+        parent: Parent ``PromisingContext``. ``AUTO`` (default) uses the
             currently active context. ``None`` creates a root context with no
             parent.
         thread_pool: Thread pool executor used to run sync promising functions.
@@ -111,8 +111,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        # TODO [P2] Use a more self-explanatory sentinel as `parent`'s default value ?
-        parent: "PromisingContext | None | Sentinel" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = AUTO,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
@@ -367,7 +366,7 @@ class PromisingContext:
         *,
         namespace: str | None = None,
         loop: AbstractEventLoop | None = None,
-        parent: "PromisingContext | None | Sentinel" = INHERIT,
+        parent: "PromisingContext | None | Sentinel" = AUTO,
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
@@ -380,13 +379,13 @@ class PromisingContext:
         self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
 
-        if parent is INHERIT:
+        if parent is AUTO:
             self._parent = self.get_active_context(raise_if_none=False)
         elif parent is None or isinstance(parent, PromisingContext):
             self._parent = parent
         else:
             raise ValueError(
-                f"`parent` must be either INHERIT, another PromisingContext "
+                f"`parent` must be either AUTO, another PromisingContext "
                 f"or None, but `{type(parent)}` was given for {self!r} instead"
             )
 

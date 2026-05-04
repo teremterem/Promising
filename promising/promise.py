@@ -40,6 +40,14 @@ def wrap_awaitable(
     prefilled_result: T_co | Sentinel = UNCHANGED,
     prefilled_exception: BaseException | None = None,
 ) -> "Promise[Any]":
+    """
+    Wrap an arbitrary awaitable (typically a bare coroutine that wasn't
+    decorated with ``@promising.function``) in a ``Promise`` so it
+    participates in the ``PromisingContext`` hierarchy.
+
+    Thin convenience over the ``Promise`` constructor; accepts the same
+    keyword arguments. See :class:`Promise` for parameter semantics.
+    """
     return Promise(
         awaitable=awaitable,
         namespace=namespace,

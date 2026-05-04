@@ -3,7 +3,9 @@ import concurrent.futures
 
 
 class PromisingError(Exception):
-    """A base class for all promising errors."""
+    """
+    A base class for all promising errors.
+    """
 
 
 class DecorationError(PromisingError):
@@ -19,7 +21,9 @@ class PromiseNotDoneError(
     asyncio.InvalidStateError,
     concurrent.futures.InvalidStateError,
 ):
-    """Raised when a Promise is queried for a result/exception before it is done."""
+    """
+    Raised when a Promise is queried for a result/exception before it is done.
+    """
 
 
 class PromiseNotUnpackedError(
@@ -27,7 +31,10 @@ class PromiseNotUnpackedError(
     asyncio.InvalidStateError,
     concurrent.futures.InvalidStateError,
 ):
-    """Raised when a Promise's intermediate_promise is queried before the first unpacking."""
+    """
+    Raised when a Promise's intermediate_promise is queried before the first
+    unpacking.
+    """
 
 
 class SentinelUsageError(PromisingError):
@@ -42,7 +49,9 @@ class SyncUsageError(PromisingError):
 
 
 class ContextError(PromisingError):
-    """A base class for all context-related errors."""
+    """
+    A base class for all context-related errors.
+    """
 
 
 class ContextAlreadyActiveError(ContextError):
@@ -65,7 +74,9 @@ class ContextNotFoundError(ContextError):
 
 
 class EventLoopError(PromisingError):
-    """A base class for all event loop-related errors."""
+    """
+    A base class for all event loop-related errors.
+    """
 
 
 class EventLoopMismatchError(EventLoopError, ValueError):

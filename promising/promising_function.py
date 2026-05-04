@@ -336,8 +336,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         Returns a **coroutine** (not a ``Promise``), making it
         safe to pass to ``asyncio.run()`` — unlike calling the
         decorated function directly, which would construct a
-        ``Promise`` (an ``asyncio.Future`` subclass) before the
-        event loop exists and fail.
+        root ``Promise`` before the event loop exists and fail
+        (a root ``PromisingContext`` requires a running loop).
 
         Inside, the coroutine calls the decorated function,
         awaits the resulting ``Promise``, and by default recursively

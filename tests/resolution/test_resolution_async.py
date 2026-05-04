@@ -345,7 +345,7 @@ async def test_unpack_fully_at_depth_5_with_promising_context_and_functions(*, r
     """
 
     @promising.function
-    async def func5_failing_in_context() -> str:
+    async def func5_in_context() -> str:
         with promising.context():
             if raise_error:
                 raise ValueError("coro error at the end")
@@ -354,7 +354,7 @@ async def test_unpack_fully_at_depth_5_with_promising_context_and_functions(*, r
 
     @promising.function
     async def func4() -> Any:
-        return func5_failing_in_context()
+        return func5_in_context()
 
     @promising.function(use_thread_pool=True)
     def func3() -> Any:

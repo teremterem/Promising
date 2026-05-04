@@ -14,7 +14,7 @@ from promising import Promise
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_future_like_interface(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_promise_future_like_api(*, start_soon: bool | None, await_promise: bool | None) -> None:
     """
     Test Promise's done() and result() behavior under various
     timing and execution conditions.
@@ -57,7 +57,6 @@ async def test_promise_future_like_interface(*, start_soon: bool | None, await_p
            - If None: Skip all awaiting (no task switching)
 
         3. Verify the Promise's state:
-           - Check that it's a proper asyncio.Future instance
            - Verify that done() status matches expected state
              based on parameters
               - Expected not to be done: Promise doesn't
@@ -129,7 +128,7 @@ async def test_promise_future_like_interface(*, start_soon: bool | None, await_p
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_future_like_interface_with_exception(
+async def test_promise_future_like_api_with_exception(
     *,
     start_soon: bool | None,
     await_promise: bool | None,
@@ -138,9 +137,9 @@ async def test_promise_future_like_interface_with_exception(
     Test Promise's exception handling across various timing conditions.
 
     This test verifies that Promise correctly propagates exceptions. It mirrors
-    test_promise_as_future but focuses on exception scenarios, ensuring that
-    exceptions are properly handled whether the Promise is prefilled with an
-    exception or raises during coroutine execution.
+    test_promise_future_like_api but focuses on exception scenarios,
+    ensuring that exceptions are properly handled whether the Promise is
+    prefilled with an exception or raises during coroutine execution.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:

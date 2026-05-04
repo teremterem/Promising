@@ -76,16 +76,23 @@ def get_active_promise(*, raise_if_none: bool = True) -> "Promise[Any] | None":
 
 class Promise(PromisingContext, Generic[T_co]):
     """
-    A Promise combines PromisingContext's hierarchical context management
-    with asyncio Future functionality.
+    A first-class awaitable that runs a coroutine, caches its result, and
+    plugs into the ``PromisingContext`` hierarchy as an awaitable child.
 
-    Promise extends ``PromisingFuture`` — which itself combines
-    ``PromisingContext`` and ``asyncio.Future`` — to provide:
+    Promise implements:
     - Asynchronous computation backed by an awaitable
-    - Result/exception propagation via the Future interface
-    - Thread-safe synchronous access via concurrent.futures compatibility
-    - Hierarchical parent-child relationships (inherited from
-      PromisingContext)
+    - Result/exception caching, with both async (``await``, ``unpack_once``)
+      and thread-safe sync (``sync``, ``unpack_once_sync``) consumption
+    - A two-step unpacking model: a single unpacking step that produces an
+      intermediate Promise (if the awaitable returned one), and a full
+      unpacking that recursively chases nested Promises down to a concrete
+      value
+    - Cancellation that is safe to invoke from any thread
+
+    From ``PromisingContext`` it inherits the hierarchical parent-child
+    machinery — automatic registration as a child of the currently active
+    context, propagation of configuration through the tree, and
+    ``await_children()`` / ``collect_unsettled_children()``.
 
     Parent-child relationships (inherited from PromisingContext):
     - If a Promise's awaitable creates other Promises or
@@ -242,15 +249,13 @@ class Promise(PromisingContext, Generic[T_co]):
         Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via
-        _fully_unpack_from_loop(). If already started via start_soon,
+        ``_fully_unpack_from_loop()``. If already started via start_soon,
         waits for the existing task to complete. Once the Promise resolves,
-        recursively awaits the result as long as it is itself a Promise
-        (non-Promise awaitables are auto-wrapped into Promises by
-        ``set_result``), returning the final non-Promise value.
+        recursively awaits the result as long as it is itself a Promise,
+        returning the final non-Promise value.
 
         Note that unpacking only traverses ``Promise`` instances specifically
-        — it does not unpack arbitrary awaitables or ``PromisingFuture``
-        objects in general.
+        — it does not unpack arbitrary awaitables in general.
 
         Returns:
             The fully unpacked result of the Promise (no remaining
@@ -269,8 +274,14 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def sync(self, *, timeout: float | None = None) -> T_co:
         """
-        An alias for ``unpack_all_sync()`` — blocks the calling thread until
-        all nested Promises are fully unpacked.
+        Synchronous counterpart of ``await promise`` — blocks the calling
+        thread until all nested Promises are fully unpacked, then returns
+        the concrete (non-Promise) result.
+
+        Internally this dispatches the awaiting onto the Promise's own event
+        loop via ``asyncio.run_coroutine_threadsafe`` (so the Promise still
+        gets driven from its own loop) and blocks the calling thread on the
+        resulting ``concurrent.futures.Future``.
 
         Args:
             timeout: Maximum time to wait for the result in seconds.
@@ -297,6 +308,22 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def unpack_once(self) -> "T_co | Promise[Any]":
         """
+        Resolve the Promise's awaitable one level only.
+
+        If the awaitable resolved to another Promise, return that
+        intermediate Promise. Otherwise return the final concrete value.
+        Use ``await promise`` (or ``promise.sync()``) when you want the fully
+        unpacked value instead.
+
+        Returns:
+            Either the intermediate ``Promise`` produced by the first
+            unpacking step, or the final concrete value if no nested
+            Promise was returned.
+
+        Raises:
+            EventLoopMismatchError: If awaited from a different event loop
+                than the one this Promise belongs to.
+
         NOTE: This method can only be used from the event loop of the Promise.
         """
         self.assert_awaiting_on_correct_event_loop()
@@ -314,6 +341,29 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def unpack_once_sync(self, *, timeout: float | None = None) -> "T_co | Promise[Any]":
         """
+        Synchronous counterpart of ``unpack_once()`` — blocks the calling
+        thread until the Promise has been unpacked at least one level, then
+        returns either the intermediate ``Promise`` or the final concrete
+        value.
+
+        If the Promise has already been unpacked once (or finished), returns
+        the cached value directly without dispatching anything onto the event
+        loop. Otherwise schedules ``unpack_once()`` on the Promise's own
+        event loop via ``asyncio.run_coroutine_threadsafe`` and waits.
+
+        Args:
+            timeout: Maximum time to wait for one unpacking step in seconds.
+
+        Returns:
+            Either the intermediate ``Promise`` produced by the first
+            unpacking step, or the final concrete value if no nested
+            Promise was returned.
+
+        Raises:
+            SyncUsageError: If called from the same thread as the event loop,
+                which would deadlock.
+            TimeoutError: If timeout expires before completion.
+
         NOTE: This method is thread-safe, but it is unavailable from the event
         loop of the Promise to avoid a deadlock.
         """
@@ -332,9 +382,12 @@ class Promise(PromisingContext, Generic[T_co]):
     def done(self) -> bool:
         """
         Whether this Promise is "done", i.e. either finished (successfully or
-        with an exception) or cancelled. Replaces the default behavior of the
-        ``PromisingContext`` parent class which simply checks if the context is
-        closed already.
+        with an exception) or cancelled. Overrides ``PromisingContext.done()``,
+        which by default just tracks the context-manager lifecycle (``closed()``)
+        — for a Promise, "done" is tied to the result lifecycle instead, so
+        that a parent's ``await_children()`` waits for the actual computation
+        (which may be prolonged due to the "full unpacking" behavior) rather
+        than just for the ``with`` block exit.
 
         Returns:
             Whether this Promise is "done".
@@ -348,6 +401,11 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def unpacked_once(self) -> bool:
         """
+        Whether the Promise's awaitable has produced its first result —
+        either an intermediate Promise (which means a further unpacking
+        step is still pending) or a final concrete value (in which case
+        the Promise is also ``done()``).
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.)
@@ -357,6 +415,10 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def unpacked_once_or_done(self) -> bool:
         """
+        Convenience predicate: True if the Promise is at least one-level
+        unpacked, fully done, or cancelled. Used internally as the readiness
+        check for one-level (non-recursive) consumers.
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.)
@@ -366,6 +428,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def cancelled(self) -> bool:
         """
+        Whether the Promise has been cancelled (either before or after the
+        first unpacking step).
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.)
@@ -375,6 +440,14 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def result(self) -> T_co:
         """
+        Return the fully unpacked result of the Promise.
+
+        Raises:
+            PromiseNotDoneError: If the Promise is not done yet.
+            asyncio.CancelledError: If the Promise was cancelled.
+            BaseException: Re-raises whatever exception the Promise finished
+                with (if any).
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
@@ -395,6 +468,17 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def intermediate_promise(self) -> "Promise[Any] | None":
         """
+        Return the intermediate ``Promise`` produced by the first unpacking
+        step, or ``None`` if the awaitable's first result was already a
+        non-Promise value.
+
+        Raises:
+            PromiseNotUnpackedError: If the Promise has not yet been unpacked
+                even one level.
+            BaseException: Re-raises the underlying exception if the first
+                unpacking step itself failed before producing an intermediate
+                Promise.
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
@@ -412,6 +496,13 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def exception(self) -> BaseException | None:
         """
+        Return the exception the Promise finished with, or ``None`` if it
+        finished successfully.
+
+        Raises:
+            PromiseNotDoneError: If the Promise is not done yet.
+            asyncio.CancelledError: If the Promise was cancelled.
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise, because the state cannot go backwards (e.g. from
         _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
@@ -422,6 +513,18 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def cancel(self, msg: str | None = None) -> bool:
         """
+        Cancel the Promise.
+
+        When called from the Promise's own event loop thread, cancels the
+        underlying unpacking task(s) directly. When called from any other
+        thread, the cancellation is dispatched onto the Promise's event loop
+        via ``call_soon_threadsafe`` and the call blocks until that
+        scheduled cancellation completes.
+
+        Returns:
+            ``True`` if at least one underlying task was successfully
+            cancelled, ``False`` if the Promise was already done.
+
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
@@ -469,6 +572,18 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def _unpack_once_from_loop(self) -> None:
         """
+        Drive a single unpacking step on the event loop.
+
+        Activates the Promise as the current ``PromisingContext`` (so that
+        promises created during this step are registered as its children),
+        awaits the wrapped awaitable, and stores either an intermediate
+        Promise or a final value/exception. The state machine is moved
+        forward via ``_set_intermediate_promise`` / ``_set_result`` /
+        ``_set_exception``.
+
+        Backs ``unpack_once()`` (and the first leg of
+        ``_fully_unpack_from_loop``).
+
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
@@ -499,15 +614,16 @@ class Promise(PromisingContext, Generic[T_co]):
 
     async def _fully_unpack_from_loop(self) -> None:
         """
-        Execute the Promise's awaitable and manage its lifecycle.
+        Drive the Promise to completion on the event loop, recursively
+        unpacking nested Promises.
 
-        This method:
-        1. Activates the Promise as the current context
-        2. Executes the awaitable
-        3. Sets the result or exception
+        Ensures the single-unpacking task is scheduled and awaits it. If
+        that produced an intermediate Promise, awaits it (and any further
+        nested Promises) until a non-Promise value is reached, then stores
+        that value as the final result. Any exception from the chain is
+        captured via ``_set_exception``.
 
-        Raises:
-            RuntimeError: If the Promise is already done or has no awaitable.
+        Backs ``__await__`` (and, indirectly, ``sync()``).
 
         NOTE: This method can only be used from the event loop of the Promise.
         """

@@ -305,8 +305,8 @@ def collect_unsettled_children(
         whole_subtree: If True (default), include descendants at all levels,
             not just direct children.
         awaitables_only: If True (default), exclude children that are not
-            ``PromisingFuture`` instances (i.e. plain ``PromisingContext``
-            nodes created via ``promising.context``).
+            awaitable (i.e. plain ``PromisingContext`` nodes created via
+            ``promising.context``, which do not implement ``__await__``).
 
     Returns:
         Set of child PromisingContexts matching the filter criteria.
@@ -477,7 +477,7 @@ class PromisingContext:
               ``tests/utils_for_tests.py::NonPromiseAwaitableContext``.
            2. Override ``done()`` to track a condition independent of
               the context-manager lifecycle (see ``Promise.done()``,
-              which ties it to a ``PromisingFuture``).
+              which ties it to its own result/cancellation state machine).
 
            Otherwise ``closed()`` stays ``False`` forever, ``done()``
            stays ``False``, and any parent's ``await_children()`` will
@@ -686,20 +686,17 @@ class PromisingContext:
         themselves once they are closed *and* have no unsettled descendants
         of their own. Filtering options allow narrowing the set further.
 
-        A child is considered a "future" if it is an instance of
-        ``PromisingFuture`` (i.e. anything awaitable that lives in the
-        hierarchy — registering a non-``PromisingFuture`` awaitable as a
-        child raises ``TypeError``). A child is considered "open" until
-        either its ``with`` block exits (``close_context_threadsafe()``
-        runs) or, for ``PromisingFuture`` subclasses, its ``set_result()``
-        / ``set_exception()`` is called.
+        A child is considered "awaitable" if it implements ``__await__``
+        (e.g. a ``Promise``, or any custom ``PromisingContext`` subclass that
+        defines ``__await__``). Plain ``PromisingContext`` nodes — typically
+        created via ``promising.context`` — are not awaitable on their own
+        and are excluded by default.
 
         Args:
             whole_subtree: If True (default), include descendants at all
                 levels, not just direct children.
             awaitables_only: If True (default), exclude children that are not
-                ``PromisingFuture`` instances (i.e. plain
-                ``PromisingContext`` nodes created via
+                awaitable (i.e. plain ``PromisingContext`` nodes created via
                 ``promising.context``).
 
         Returns:
@@ -773,12 +770,12 @@ class PromisingContext:
         no unsettled descendants remain. Safe to call from any thread.
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
-        always closes the context) and by ``PromisingFuture.set_result``
-        / ``PromisingFuture.set_exception`` (so a future-backed context
-        is also closed the moment its result is set, even if no ``with``
-        block was used). After this runs, any further attempt to enter
-        the context or to register children on it raises
-        ``ContextAlreadyClosedError``.
+        always closes the context). For a ``Promise``, the context is
+        also entered and exited from inside ``_unpack_once_from_loop``
+        around the awaiting of the wrapped awaitable, so the close happens
+        in lockstep with the unpacking step that produced its first
+        result. After this runs, any further attempt to enter the context
+        or to register children on it raises ``ContextAlreadyClosedError``.
         """
         with self._unsettled_children_lock:
             self._context_closed = True

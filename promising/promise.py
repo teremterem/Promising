@@ -22,6 +22,7 @@ from promising.sentinels import (
 from promising.types import T_co
 from promising.utils import awaitable_as_coroutine, resolve_namespace
 
+_logger = logging.getLogger(__name__)
 _unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
 
 
@@ -604,7 +605,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # set ?
                 internal_error.__context__ = exception
             except BaseException:
-                pass  # TODO [P2] Add a debug log here
+                _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_finished_with_internal_error(internal_error)
 
     def _force_finished_with_internal_error(self, error: BaseException) -> None:
@@ -623,12 +624,12 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
-            # TODO [P2] Add a debug log of `error` here
+            _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
             self.set_as_promising_context_on_exception(error)
             self._exception = error
             self._set_state(_FINISHED)
         except BaseException:
-            pass  # TODO [P2] Add a debug log of `error` here
+            _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)
 
     def _assert_done_and_not_cancelled(self) -> None:
         """

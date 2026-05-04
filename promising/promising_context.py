@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from promising.promise import Promise
 
 
+_logger = logging.getLogger(__name__)
 _hierarchy_logger = PromisingHierarchyLogger(level=logging.DEBUG)
 
 
@@ -771,7 +772,9 @@ class PromisingContext:
         except BaseException:
             # Suppress the error if any - failure to store the trace should
             # not affect the exception handling
-            pass  # TODO [P2] Add a debug log here
+            _logger.debug(
+                "Failed to attach __promising_context__ to exception %r on %r", exception, self, exc_info=True
+            )
 
     def is_on_correct_running_loop(self, *, raise_if_no_running_loop: bool = False) -> bool:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_if_no_running_loop)

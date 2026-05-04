@@ -127,10 +127,6 @@ class NonPromiseAwaitableContext(promising.PromisingContext):
         self._coro = coro
 
     def __await__(self) -> Generator[Any, None, Any]:
-        # TODO [P2] There is a pitfall: should someone decide to extend their own
-        #  awaitable from PromisingContext and forget to use a with statement
-        #  like the one below, the await_children will confusingly hang on such
-        #  an instance. How to hint at the need to enter and exit the context
-        #  for those who would want to extend PromisingContext ?
+        # See PromisingContext.done() for why `with self:` is required here.
         with self:
             return (yield from asyncio.ensure_future(self._coro))

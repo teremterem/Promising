@@ -352,6 +352,14 @@ class PromisingContext:
     Hierarchical context node that tracks parent-child relationships between
     promises. Usually created via ``promising.context``; see
     :class:`promising.context` for usage details and parameter descriptions.
+
+    .. note::
+       **Extending as an awaitable.** If you subclass ``PromisingContext``
+       and define ``__await__``, see the warning on :meth:`done` — you must
+       either enter the context inside ``__await__`` (``with self: ...``)
+       or override :meth:`done` to track a non-lifecycle condition.
+       Otherwise ``await_children()`` will silently hang on instances of
+       your subclass.
     """
 
     namespace: str | None
@@ -454,8 +462,26 @@ class PromisingContext:
 
     def done(self) -> bool:
         """
+        Whether this context is "done". For vanilla ``PromisingContext``,
+        same as ``closed()`` — i.e. flips ``True`` on ``__exit__``.
+
         Child classes can override this method to redefine what "done" means
         for them (see ``Promise.done()`` for an example).
+
+        .. warning::
+           If you make a ``PromisingContext`` subclass awaitable (define
+           ``__await__``), you MUST do one of the following:
+
+           1. Enter and exit the context inside ``__await__``
+              (``with self: ...``). See
+              ``tests/utils_for_tests.py::NonPromiseAwaitableContext``.
+           2. Override ``done()`` to track a condition independent of
+              the context-manager lifecycle (see ``Promise.done()``,
+              which ties it to a ``PromisingFuture``).
+
+           Otherwise ``closed()`` stays ``False`` forever, ``done()``
+           stays ``False``, and any parent's ``await_children()`` will
+           hang on this instance with no error.
 
         Returns:
             Whether this context is "done" (for vanilla ``PromisingContext``,

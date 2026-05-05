@@ -539,8 +539,8 @@ class Promise(PromisingContext, Generic[T_co]):
         return value reports whether cancellation was *requested* — the
         Promise's terminal cancelled state is reached only once the
         ``CancelledError`` actually propagates through the underlying
-        unpacking task and is stored via ``_set_exception_from_loop``. Until then,
-        ``cancelled()`` may still return ``False``.
+        unpacking task and is stored via ``_set_exception_from_loop``. Until
+        then, ``cancelled()`` may still return ``False``.
 
         For a Promise whose underlying task hasn't been scheduled yet (e.g.
         ``start_soon=False`` and never awaited), the cancellation is
@@ -613,8 +613,8 @@ class Promise(PromisingContext, Generic[T_co]):
         promises created during this step are registered as its children),
         awaits the wrapped awaitable, and stores either an intermediate
         Promise or a final value/exception. The state machine is moved
-        forward via ``_set_intermediate_promise_from_loop`` / ``_set_result_from_loop`` /
-        ``_set_exception_from_loop``.
+        forward via ``_set_intermediate_promise_from_loop`` /
+        ``_set_result_from_loop`` / ``_set_exception_from_loop``.
 
         Backs ``unpack_once()`` (and the first leg of
         ``_fully_unpack_from_loop``).
@@ -680,10 +680,15 @@ class Promise(PromisingContext, Generic[T_co]):
 
             result = self._intermediate_promise
 
+            # TODO [CANCELLATION] Verify the AI explanation below and decide
+            #  for yourself is subtree cancellation and cancellation of nested
+            #  (returned) Promises are supposed to be treated as is those are
+            #  the same thing.
+            #
             # Cancelling this Promise propagates ``CancelledError`` into the
             # ``await result`` below; ``except BaseException`` catches it and
-            # stores it via ``_set_exception_from_loop``, which moves the state to
-            # ``_CANCELLED_AFTER_UNPACKED_ONCE``. Cancelling the *nested*
+            # stores it via ``_set_exception_from_loop``, which moves the state
+            # to ``_CANCELLED_AFTER_UNPACKED_ONCE``. Cancelling the *nested*
             # intermediate Promises is a separate concern (subtree
             # cancellation — see PromisingContext TODOs).
             depth = 0
@@ -760,7 +765,8 @@ class Promise(PromisingContext, Generic[T_co]):
                     _CANCELLED_AFTER_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
                 )
             else:
-                # Should not happen
+                # TODO [CANCELLATION] Introduce one more
+                #  InvalidStateError-based PromisingError class for this
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
             self.set_as_promising_context_on_exception(exception)
@@ -822,10 +828,6 @@ class Promise(PromisingContext, Generic[T_co]):
         is stored via ``_set_exception_from_loop``, which is responsible for picking
         the appropriate ``_CANCELLED_*`` terminal state. Cause-and-effect
         order: stored exception → state transition.
-
-        Note: subtree cancellation (cascading the cancel into nested
-        Promises produced by intermediate unpacking) is intentionally out of
-        scope here — see ``PromisingContext`` TODOs.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """

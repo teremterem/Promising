@@ -366,8 +366,8 @@ class PromisingContext:
 
     __active_context = ContextVar["PromisingContext | None"]("PromisingContext.__active_context", default=None)
 
-    # TODO [P1] Support cancellation of the whole PromisingContext tree
-    # TODO [P1] Offer a setting to cancel children when parent task fails ?
+    # TODO [CANCELLATION] Support cancellation of the whole PromisingContext tree
+    # TODO [CANCELLATION] Offer a setting to cancel children when parent task fails ?
 
     def __init__(
         self,

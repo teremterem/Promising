@@ -216,9 +216,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._awaitable is None:
             if prefilled_result is not UNCHANGED:
-                self._set_result(prefilled_result)
+                self._set_result_from_loop(prefilled_result)
             else:
-                self._set_exception(prefilled_exception)
+                self._set_exception_from_loop(prefilled_exception)
 
         if self._start_soon:
             # We don't know which thread the Promise is created in, so we
@@ -452,8 +452,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Raises:
             PromiseNotDoneError: If the Promise is not done yet.
-            asyncio.CancelledError: If the Promise was cancelled (re-raised
-                from the ``CancelledError`` stored at cancellation time).
+            asyncio.CancelledError: If the Promise was cancelled.
             BaseException: Re-raises whatever exception the Promise finished
                 with (if any).
 
@@ -540,13 +539,13 @@ class Promise(PromisingContext, Generic[T_co]):
         return value reports whether cancellation was *requested* — the
         Promise's terminal cancelled state is reached only once the
         ``CancelledError`` actually propagates through the underlying
-        unpacking task and is stored via ``_set_exception``. Until then,
+        unpacking task and is stored via ``_set_exception_from_loop``. Until then,
         ``cancelled()`` may still return ``False``.
 
         For a Promise whose underlying task hasn't been scheduled yet (e.g.
         ``start_soon=False`` and never awaited), the cancellation is
         synthesized as a ``CancelledError`` stored directly via
-        ``_set_exception``, with no task involvement — analogous to
+        ``_set_exception_from_loop``, with no task involvement — analogous to
         ``Future.cancel()`` on a not-yet-running future.
 
         When called from the Promise's own event loop thread the cancellation
@@ -614,8 +613,8 @@ class Promise(PromisingContext, Generic[T_co]):
         promises created during this step are registered as its children),
         awaits the wrapped awaitable, and stores either an intermediate
         Promise or a final value/exception. The state machine is moved
-        forward via ``_set_intermediate_promise`` / ``_set_result`` /
-        ``_set_exception``.
+        forward via ``_set_intermediate_promise_from_loop`` / ``_set_result_from_loop`` /
+        ``_set_exception_from_loop``.
 
         Backs ``unpack_once()`` (and the first leg of
         ``_fully_unpack_from_loop``).
@@ -639,12 +638,12 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
-            self._set_exception(exc)
+            self._set_exception_from_loop(exc)
         else:
             if isinstance(result, Promise):
-                self._set_intermediate_promise(result)
+                self._set_intermediate_promise_from_loop(result)
             else:
-                self._set_result(result)
+                self._set_result_from_loop(result)
 
         _unpacking_logger.log_single_unpacking_finished(promise=self)
 
@@ -657,7 +656,7 @@ class Promise(PromisingContext, Generic[T_co]):
         that produced an intermediate Promise, awaits it (and any further
         nested Promises) until a non-Promise value is reached, then stores
         that value as the final result. Any exception from the chain is
-        captured via ``_set_exception``.
+        captured via ``_set_exception_from_loop``.
 
         Backs ``__await__`` (and, indirectly, ``sync()``).
 
@@ -683,7 +682,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             # Cancelling this Promise propagates ``CancelledError`` into the
             # ``await result`` below; ``except BaseException`` catches it and
-            # stores it via ``_set_exception``, which moves the state to
+            # stores it via ``_set_exception_from_loop``, which moves the state to
             # ``_CANCELLED_AFTER_UNPACKED_ONCE``. Cancelling the *nested*
             # intermediate Promises is a separate concern (subtree
             # cancellation — see PromisingContext TODOs).
@@ -695,13 +694,13 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
-            self._set_exception(exc)
+            self._set_exception_from_loop(exc)
         else:
-            self._set_result(result)
+            self._set_result_from_loop(result)
 
         _unpacking_logger.log_full_unpacking_finished(promise=self)
 
-    def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
+    def _set_intermediate_promise_from_loop(self, promise: "Promise[Any]") -> None:
         """
         Record the intermediate Promise returned by a single unpacking step.
         No-op if already unpacked once or done.
@@ -718,9 +717,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state(_UNPACKED_ONCE)
 
         except BaseException as internal_error:
-            self._force_finished_with_internal_error(internal_error)
+            self._force_internal_error_finish_from_loop(internal_error)
 
-    def _set_result(self, result: T_co) -> None:
+    def _set_result_from_loop(self, result: T_co) -> None:
         """
         Store the fully unpacked result. No-op if the Promise is already
         done (finished or cancelled).
@@ -735,9 +734,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state(_FINISHED)
 
         except BaseException as internal_error:
-            self._force_finished_with_internal_error(internal_error)
+            self._force_internal_error_finish_from_loop(internal_error)
 
-    def _set_exception(self, exception: BaseException) -> None:
+    def _set_exception_from_loop(self, exception: BaseException) -> None:
         """
         Store the exception and move the Promise into a terminal state.
 
@@ -776,9 +775,9 @@ class Promise(PromisingContext, Generic[T_co]):
                 attach_context_to_error_chain_root(internal_error, context=exception)
             except BaseException:
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
-            self._force_finished_with_internal_error(internal_error)
+            self._force_internal_error_finish_from_loop(internal_error)
 
-    def _force_finished_with_internal_error(self, error: BaseException) -> None:
+    def _force_internal_error_finish_from_loop(self, error: BaseException) -> None:
         """
         Last-resort recovery path. Force the Promise into _FINISHED with
         the given error, bypassing state validation. Each step is wrapped
@@ -810,27 +809,17 @@ class Promise(PromisingContext, Generic[T_co]):
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
-    # TODO [P2] Should we introduce a dedicated CancelledError subclass for
-    #  Promises? It would have to subclass asyncio.CancelledError ONLY (so it
-    #  stays BaseException-derived rather than Exception-derived, preserving
-    #  the asyncio invariant that cancellations are not caught by
-    #  ``except Exception``). Mixing in PromisingError or
-    #  concurrent.futures.CancelledError would re-introduce Exception into
-    #  the MRO and break that invariant — a dedicated marker class without
-    #  a PromisingError mixin is the only way out, and it is unclear yet
-    #  whether the marker is worth the extra type.
-
     def _cancel_from_loop(self, msg: str | None = None) -> bool:
         """
         Request cancellation of the underlying unpacking task(s) — or, when
         no task has been scheduled yet, synthesize a ``CancelledError``
-        and route it through ``_set_exception`` (mirroring
+        and route it through ``_set_exception_from_loop`` (mirroring
         ``Future.cancel()`` on a not-yet-running future).
 
         The state machine is *not* moved here. Instead, the ``CancelledError``
         propagates through ``_unpack_once_from_loop`` /
         ``_fully_unpack_from_loop`` (``except BaseException`` catches it) and
-        is stored via ``_set_exception``, which is responsible for picking
+        is stored via ``_set_exception_from_loop``, which is responsible for picking
         the appropriate ``_CANCELLED_*`` terminal state. Cause-and-effect
         order: stored exception → state transition.
 
@@ -857,7 +846,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
-        self._set_exception(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
+        self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
         # An awaitable that never got driven (typical for the
         # `start_soon=False`/never-awaited path) would otherwise trigger a

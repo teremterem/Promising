@@ -65,7 +65,7 @@ This file also contains the `context` class — a context manager / decorator th
 
 **Two-step unpacking on the loop.** Resolution is split into two cooperating tasks, both pinned to `self.loop`:
 
-- `_unpack_once_from_loop()` — drives a single unpacking step. It enters the `with self:` block, awaits the wrapped `_awaitable`, and either records an intermediate `Promise` (via `_set_intermediate_promise`, transition to `_UNPACKED_ONCE`) or stores the final value/exception (via `_set_result` / `_set_exception`, transition to `_FINISHED`). This is the task `unpack_once()` waits on.
+- `_unpack_once_from_loop()` — drives a single unpacking step. It enters the `with self:` block, awaits the wrapped `_awaitable`, and either records an intermediate `Promise` (via `_set_intermediate_promise_from_loop`, transition to `_UNPACKED_ONCE`) or stores the final value/exception (via `_set_result_from_loop` / `_set_exception_from_loop`, transition to `_FINISHED`). This is the task `unpack_once()` waits on.
 - `_fully_unpack_from_loop()` — drives the Promise to completion. It ensures the single-unpacking task is scheduled, awaits it, then walks the chain of intermediate Promises (`while isinstance(result, Promise): result = await result`) until a non-Promise value is reached, and records that value as the final result. This is the task `__await__` (and, indirectly, `sync()`) waits on.
 
 Scheduling is driven by `_ensure_from_loop_single_unpacking_scheduled()` and `_ensure_from_loop_full_unpacking_scheduled()`, both of which create the underlying `loop.create_task(...)` lazily on first need. `__init__` schedules `_fully_unpack_from_loop` via `call_soon_threadsafe` when `start_soon` is `True`, so eager Promises start as soon as the loop is reachable; deferred Promises (`start_soon=False`) are scheduled the first time anyone consumes them (`__await__`, `sync()`, `unpack_once()`, `unpack_once_sync()`).
@@ -74,7 +74,7 @@ Scheduling is driven by `_ensure_from_loop_single_unpacking_scheduled()` and `_e
 
 **Prefilled Promises.** A Promise constructed without an `awaitable` (using `prefilled_result` or `prefilled_exception`) passes `close_context_immediately=True` to `PromisingContext.__init__`, so it is born already closed and immediately set to `_FINISHED` — there is no coroutine to run inside a `with self:` block, and no parent registration happens.
 
-**Exception breadcrumbs.** When `_set_exception` (or the last-resort `_force_finished_with_internal_error`) records an exception, `set_as_promising_context_on_exception` attaches the Promise to the exception as `__promising_context__`, but only at the deepest level (i.e. only if the attribute isn't already set). Intended for future error-tracing features.
+**Exception breadcrumbs.** When `_set_exception_from_loop` (or the last-resort `_force_internal_error_finish_from_loop`) records an exception, `set_as_promising_context_on_exception` attaches the Promise to the exception as `__promising_context__`, but only at the deepest level (i.e. only if the attribute isn't already set). Intended for future error-tracing features.
 
 **Unpacking semantics.** A `PromisingFunction` always returns a `Promise`, regardless of whether the underlying function returns a concrete value or another `Promise`. `await promise` and `promise.sync()` recursively chase nested `Promise`s until a non-`Promise` value is reached. `promise.unpack_once()` and `promise.unpack_once_sync()` unpack a single level — they return either a concrete value or the intermediate `Promise`.
 

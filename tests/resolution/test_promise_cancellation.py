@@ -21,8 +21,11 @@ async def test_cancel_pending_promise_with_no_task() -> None:
     underlying task; cancel() should still synthesize CancelledError and
     move the Promise into the cancelled state immediately.
     """
+    coro_ran = False
 
     async def coro() -> str:
+        nonlocal coro_ran
+        coro_ran = True
         return "never reached"
 
     promise = Promise(coro(), start_soon=False)
@@ -41,11 +44,16 @@ async def test_cancel_pending_promise_with_no_task() -> None:
     with pytest.raises(asyncio.CancelledError):
         await promise
 
+    assert not coro_ran
+
 
 async def test_cancel_pending_promise_with_message() -> None:
     """The cancel message is preserved on the stored CancelledError."""
+    coro_ran = False
 
     async def coro() -> str:
+        nonlocal coro_ran
+        coro_ran = True
         return "x"
 
     promise = Promise(coro(), start_soon=False)
@@ -54,6 +62,8 @@ async def test_cancel_pending_promise_with_message() -> None:
     with pytest.raises(asyncio.CancelledError) as exc_info:
         promise.result()
     assert exc_info.value.args == ("custom reason",)
+
+    assert not coro_ran
 
 
 # ── Cancel while task is running ─────────────────────────────────
@@ -65,16 +75,19 @@ async def test_cancel_running_promise() -> None:
     propagated CancelledError is stored and the Promise transitions to a
     cancelled terminal state.
     """
-
-    started = asyncio.Event()
+    coro_started = asyncio.Event()
+    coro_finished = False
 
     async def coro() -> str:
-        started.set()
-        await asyncio.sleep(10)
+        coro_started.set()
+        await asyncio.sleep(2)
+
+        nonlocal coro_finished
+        coro_finished = True
         return "unreachable"
 
     promise = Promise(coro(), start_soon=True)
-    await started.wait()
+    await coro_started.wait()
 
     assert promise.cancel() is True
 
@@ -83,12 +96,13 @@ async def test_cancel_running_promise() -> None:
 
     assert promise.cancelled() is True
     assert promise.done() is True
+    assert not coro_finished
 
 
 async def test_cancel_already_done_promise_returns_false() -> None:
     """A Promise that already finished cannot be cancelled."""
-
     promise = Promise(prefilled_result=42)
+
     assert promise.cancel() is False
     assert promise.cancelled() is False
     assert promise.result() == 42
@@ -103,12 +117,13 @@ async def test_cancel_twice_idempotent() -> None:
     promise = Promise(coro(), start_soon=False)
     assert promise.cancel() is True
     assert promise.cancel() is False
+    assert promise.cancel() is False
 
 
 # ── Coroutine raising CancelledError counts as cancellation ──────
 
 
-async def test_coroutine_raising_cancellederror_marks_promise_cancelled() -> None:
+async def test_coroutine_raising_cancelled_error_marks_promise_cancelled() -> None:
     """
     A coroutine that raises ``CancelledError`` itself transitions the
     Promise to a cancelled state — same as how ``asyncio.Task`` treats
@@ -128,7 +143,7 @@ async def test_coroutine_raising_cancellederror_marks_promise_cancelled() -> Non
 # ── CancelledError stays BaseException-derived ───────────────────
 
 
-async def test_cancellederror_not_caught_by_except_exception() -> None:
+async def test_cancelled_error_not_caught_as_exception() -> None:
     """
     The CancelledError stored on the Promise is the asyncio one (which
     deliberately inherits from BaseException, not Exception), so a plain
@@ -141,7 +156,7 @@ async def test_cancellederror_not_caught_by_except_exception() -> None:
     promise = Promise(coro(), start_soon=False)
     promise.cancel()
 
-    caught_as_exception = False
+    caught_as_exception = None
     try:
         promise.result()
     except Exception:  # noqa: BLE001
@@ -161,16 +176,15 @@ async def test_result_raises_not_done_before_cancel_propagates() -> None:
     CancelledError lands and is stored via ``_set_exception_from_loop``, ``done()``
     stays False and ``result()`` raises ``PromiseNotDoneError``.
     """
-
-    started = asyncio.Event()
+    coro_started = asyncio.Event()
 
     async def coro() -> str:
-        started.set()
-        await asyncio.sleep(10)
+        coro_started.set()
+        await asyncio.sleep(2)
         return "unreachable"
 
     promise = Promise(coro(), start_soon=True)
-    await started.wait()
+    await coro_started.wait()
 
     promise.cancel()
     # Cancellation hasn't been observed by the task yet
@@ -183,6 +197,8 @@ async def test_result_raises_not_done_before_cancel_propagates() -> None:
     with pytest.raises(asyncio.CancelledError):
         await promise
 
+    assert promise.done() is True
+
 
 # ── Thread-safe cancel() ─────────────────────────────────────────
 
@@ -193,16 +209,19 @@ async def test_cancel_from_another_thread() -> None:
     dispatches via call_soon_threadsafe and reports True once the
     cancellation request was scheduled.
     """
-
-    started = asyncio.Event()
+    coro_started = asyncio.Event()
+    coro_finished = False
 
     async def coro() -> str:
-        started.set()
-        await asyncio.sleep(10)
+        coro_started.set()
+        await asyncio.sleep(2)
+
+        nonlocal coro_finished
+        coro_finished = True
         return "unreachable"
 
     promise = Promise(coro(), start_soon=True)
-    await started.wait()
+    await coro_started.wait()
 
     cancel_result: list[bool] = []
 
@@ -218,6 +237,7 @@ async def test_cancel_from_another_thread() -> None:
 
     assert cancel_result == [True]
     assert promise.cancelled() is True
+    assert not coro_finished
 
 
 # ── intermediate_promise() behavior under cancellation ───────────
@@ -231,7 +251,7 @@ async def test_intermediate_promise_raises_when_cancelled_before_unpack() -> Non
     """
 
     async def coro() -> str:
-        await asyncio.sleep(10)
+        await asyncio.sleep(2)
         return "unreachable"
 
     promise = Promise(coro(), start_soon=False)

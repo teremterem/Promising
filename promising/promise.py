@@ -619,14 +619,24 @@ class Promise(PromisingContext, Generic[T_co]):
         without entering the ``try/except BaseException`` inside
         ``_unpack_once_from_loop`` / ``_fully_unpack_from_loop``, leaving
         the Promise non-terminal even though the Task ended cancelled.
-        Mirrors the synthesize path in ``_cancel_from_loop``: close the
-        context (``with self:`` never ran) and store the
-        ``CancelledError`` so the state machine reaches a terminal state.
         """
+        # Early return if the task wasn't cancelled, or if the Promise (self)
+        # is already done
         if not task.cancelled() or self.done():
             return
-        self.close_context_threadsafe()
-        self._set_exception_from_loop(asyncio.CancelledError())
+
+        # Recover the original cancel message from the Task by inspecting the
+        # ``CancelledError`` re-raised by ``task.result()``
+        msg: str | None = None
+        try:
+            task.result()
+        except asyncio.CancelledError as exc:
+            # Using ``exc.args[0]`` (rather than ``str(exc)``) preserves the
+            # distinction between an empty-string msg and no msg at all
+            if exc.args:
+                msg = exc.args[0]
+
+        self._synthesize_cancellation_from_loop(msg)
 
     async def _unpack_once_from_loop(self) -> None:
         """
@@ -634,10 +644,10 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Activates the Promise as the current ``PromisingContext`` (so that
         promises created during this step are registered as its children),
-        awaits the wrapped awaitable, and stores either an intermediate
-        Promise or a final value/exception. The state machine is moved
-        forward via ``_set_intermediate_promise_from_loop`` /
-        ``_set_result_from_loop`` / ``_set_exception_from_loop``.
+        awaits the wrapped awaitable, and stores either an intermediate Promise
+        or a final value/exception. The state machine is moved forward via
+        ``_set_intermediate_promise_from_loop`` / ``_set_result_from_loop`` /
+        ``_set_exception_from_loop``.
 
         Backs ``unpack_once()`` (and the first leg of
         ``_fully_unpack_from_loop``).
@@ -841,16 +851,13 @@ class Promise(PromisingContext, Generic[T_co]):
     def _cancel_from_loop(self, msg: str | None = None) -> bool:
         """
         Request cancellation of the underlying unpacking task(s) — or, when
-        no task has been scheduled yet, synthesize a ``CancelledError``
-        and route it through ``_set_exception_from_loop`` (mirroring
-        ``Future.cancel()`` on a not-yet-running future).
+        no task has been scheduled yet, synthesize the cancellation directly
+        (see ``_synthesize_cancellation_from_loop``).
 
         The state machine is *not* moved here. Instead, the ``CancelledError``
         propagates through ``_unpack_once_from_loop`` /
         ``_fully_unpack_from_loop`` (``except BaseException`` catches it) and
-        is stored via ``_set_exception_from_loop``, which is responsible for picking
-        the appropriate ``_CANCELLED_*`` terminal state. Cause-and-effect
-        order: stored exception → state transition.
+        is stored via ``_set_exception_from_loop``.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -871,18 +878,36 @@ class Promise(PromisingContext, Generic[T_co]):
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
-        # Close the context here because `_unpack_once_from_loop` (which
-        # would normally do it via `with self:`) never ran — without this,
-        # `_context_closed` stays False and the child never unregisters
-        # from its parent.
+        self._synthesize_cancellation_from_loop(msg)
+
+        return self.cancelled()
+
+    def _synthesize_cancellation_from_loop(self, msg: str | None = None) -> None:
+        """
+        Drive the Promise into a cancelled terminal state without relying
+        on a running unpacking task to surface the ``CancelledError``.
+        Mirrors ``Future.cancel()`` on a not-yet-running future.
+
+        Close the context (``_unpack_once_from_loop`` would normally do
+        it via ``with self:``) — without this, ``_context_closed`` stays
+        False and the child never unregisters from its parent. Then
+        store the synthesized ``CancelledError`` via
+        ``_set_exception_from_loop``. Finally, close the wrapped
+        awaitable so a never-driven coroutine doesn't trigger a
+        "coroutine was never awaited" warning at GC time — the
+        asyncio-equivalent of letting a cancelled Task clean up its own
+        coroutine.
+
+        Shared by ``_cancel_from_loop`` (synthesize path, no task ever
+        scheduled) and ``_unpacking_task_done_callback`` (task cancelled
+        between ``create_task`` and its first ``__step``, so the body's
+        ``except BaseException`` never saw the ``CancelledError``).
+
+        NOTE: This method can only be used from the event loop of the Promise.
+        """
         self.close_context_threadsafe()
         self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
-        # An awaitable that never got driven (typical for the
-        # `start_soon=False`/never-awaited path) would otherwise trigger a
-        # "coroutine was never awaited" warning at GC time. Closing it here
-        # is the asyncio-equivalent of letting a cancelled Task clean up its
-        # own coroutine.
         awaitable = self._awaitable
         if awaitable is not None:
             close = getattr(awaitable, "close", None)
@@ -891,8 +916,6 @@ class Promise(PromisingContext, Generic[T_co]):
                     close()
                 except BaseException:
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
-
-        return self.cancelled()
 
     def _set_state(self, new_state: Sentinel) -> None:
         self._state = new_state

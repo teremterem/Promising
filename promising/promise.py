@@ -848,6 +848,11 @@ class Promise(PromisingContext, Generic[T_co]):
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
+        # Close the context here because `_unpack_once_from_loop` (which
+        # would normally do it via `with self:`) never ran — without this,
+        # `_context_closed` stays False and the child never unregisters
+        # from its parent.
+        self.close_context_threadsafe()
         self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
         # An awaitable that never got driven (typical for the

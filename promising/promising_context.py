@@ -586,6 +586,8 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
+        self.assert_awaiting_on_correct_event_loop()
+
         _hierarchy_logger.log_awaiting_children_started(parent=self)
 
         # The loop is needed because, in case of recursive awaiting, new

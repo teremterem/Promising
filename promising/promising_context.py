@@ -803,6 +803,14 @@ class PromisingContext:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_thread_loop_not_running)
         return running_loop is self.loop
 
+    def __repr__(self) -> str:
+        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
+        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
+
+    def _assert_event_loop_running(self) -> None:
+        if not self.loop.is_running():
+            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
+
     def _assert_no_sync_usage_deadlock(self) -> None:
         if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
             raise SyncUsageError(
@@ -816,14 +824,6 @@ class PromisingContext:
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )
-
-    def _assert_event_loop_running(self) -> None:
-        if not self.loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
-
-    def __repr__(self) -> str:
-        namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
-        return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._unsettled_children:

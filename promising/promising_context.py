@@ -6,7 +6,6 @@ import inspect
 import logging
 import threading
 from asyncio import AbstractEventLoop
-from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
@@ -586,7 +585,7 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        self.assert_awaiting_on_correct_event_loop()
+        self._assert_awaiting_on_correct_event_loop()
 
         _hierarchy_logger.log_awaiting_children_started(parent=self)
 
@@ -663,7 +662,8 @@ class PromisingContext:
             TimeoutError: If timeout expires before
                 completion.
         """
-        self.assert_no_sync_usage_deadlock()
+        self._assert_event_loop_running()
+        self._assert_no_sync_usage_deadlock()
 
         concurrent_future = asyncio.run_coroutine_threadsafe(
             self.await_children(
@@ -799,23 +799,27 @@ class PromisingContext:
                 "Failed to attach __promising_context__ to exception %r on %r", exception, self, exc_info=True
             )
 
-    def is_on_correct_running_loop(self, *, raise_if_no_running_loop: bool = False) -> bool:
-        running_loop = get_running_asyncio_loop(raise_if_none=raise_if_no_running_loop)
+    def is_on_correct_running_loop(self, *, raise_thread_loop_not_running: bool = False) -> bool:
+        running_loop = get_running_asyncio_loop(raise_if_none=raise_thread_loop_not_running)
         return running_loop is self.loop
 
-    def assert_no_sync_usage_deadlock(self) -> None:
-        if self.is_on_correct_running_loop(raise_if_no_running_loop=False):
+    def _assert_no_sync_usage_deadlock(self) -> None:
+        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
             raise SyncUsageError(
                 f"Synchronous operations of {self!r} cannot be performed on "
                 f"its own event loop thread, as that typically leads to a "
                 f"deadlock. Use awaitable operations instead."
             )
 
-    def assert_awaiting_on_correct_event_loop(self) -> None:
-        if not self.is_on_correct_running_loop(raise_if_no_running_loop=True):
+    def _assert_awaiting_on_correct_event_loop(self) -> None:
+        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )
+
+    def _assert_event_loop_running(self) -> None:
+        if not self.loop.is_running():
+            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
 
     def __repr__(self) -> str:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
@@ -852,12 +856,6 @@ class PromisingContext:
             _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
         self._unregister_from_parent_if_time()
-
-    def _call_soon_threadsafe(self, callback: Callable[[], Any]) -> None:
-        if not self.loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
-
-        self.loop.call_soon_threadsafe(callback)
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)

@@ -777,14 +777,11 @@ class Promise(PromisingContext, Generic[T_co]):
     def _set_exception_from_loop(self, exception: BaseException) -> None:
         """
         Store the exception and move the Promise into a terminal state.
-
-        For a regular exception the Promise transitions to ``_FINISHED``.
-        For an ``asyncio.CancelledError`` (which deliberately extends
-        ``BaseException`` rather than ``Exception``) the Promise transitions
-        to ``_CANCELLED_BEFORE_UNPACKED_ONCE`` or
-        ``_CANCELLED_AFTER_UNPACKED_ONCE`` depending on whether the first
-        unpacking step had completed — the cancelled state is therefore an
-        *effect* of the stored exception, not a precondition for it.
+        The cancelled state is an *effect* of storing a ``CancelledError``,
+        not a precondition for it — ``CancelledError`` deliberately extends
+        ``BaseException`` rather than ``Exception``, so it flows through
+        this method like any other exception, and the terminal state is
+        chosen based on whether the first unpacking step had completed.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -888,16 +885,6 @@ class Promise(PromisingContext, Generic[T_co]):
         on a running unpacking task to surface the ``CancelledError``.
         Mirrors ``Future.cancel()`` on a not-yet-running future.
 
-        Close the context (``_unpack_once_from_loop`` would normally do
-        it via ``with self:``) — without this, ``_context_closed`` stays
-        False and the child never unregisters from its parent. Then
-        store the synthesized ``CancelledError`` via
-        ``_set_exception_from_loop``. Finally, close the wrapped
-        awaitable so a never-driven coroutine doesn't trigger a
-        "coroutine was never awaited" warning at GC time — the
-        asyncio-equivalent of letting a cancelled Task clean up its own
-        coroutine.
-
         Shared by ``_cancel_from_loop`` (synthesize path, no task ever
         scheduled) and ``_unpacking_task_done_callback`` (task cancelled
         between ``create_task`` and its first ``__step``, so the body's
@@ -905,9 +892,17 @@ class Promise(PromisingContext, Generic[T_co]):
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
+        # `_unpack_once_from_loop` would normally close the context via
+        # `with self:`. Without this, `_context_closed` stays False and the
+        # child never unregisters from its parent.
         self.close_context_threadsafe()
+
         self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
+        # Close the wrapped awaitable so a never-driven coroutine doesn't
+        # trigger a "coroutine was never awaited" warning at GC time —
+        # asyncio-equivalent of letting a cancelled Task clean up its own
+        # coroutine.
         awaitable = self._awaitable
         if awaitable is not None:
             close = getattr(awaitable, "close", None)
@@ -928,6 +923,13 @@ class Promise(PromisingContext, Generic[T_co]):
             super()._unregister_from_parent_if_time()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
+        """
+        Resolve the effective ``start_soon`` for this Promise.
+
+        Precedence: concrete bool > parent's ``children_start_soon`` (when
+        the parent is enforcing one) > ``start_soon_default``. ``INHERIT``
+        copies the parent Promise's own ``start_soon`` directly.
+        """
         if isinstance(start_soon, bool):
             # Concrete value was provided
             return start_soon

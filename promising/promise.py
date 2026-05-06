@@ -713,17 +713,14 @@ class Promise(PromisingContext, Generic[T_co]):
 
             result = self._intermediate_promise
 
-            # TODO [CANCELLATION] Verify the AI explanation below and decide
-            #  for yourself is subtree cancellation and cancellation of nested
-            #  (returned) Promises are supposed to be treated as is those are
-            #  the same thing.
-            #
-            # Cancelling this Promise propagates ``CancelledError`` into the
-            # ``await result`` below; ``except BaseException`` catches it and
-            # stores it via ``_set_exception_from_loop``, which moves the state
-            # to ``_CANCELLED_AFTER_UNPACKED_ONCE``. Cancelling the *nested*
-            # intermediate Promises is a separate concern (subtree
-            # cancellation — see PromisingContext TODOs).
+            # Note: cancelling this Promise does NOT propagate cancellation
+            # into the nested Promise being awaited below — asyncio's
+            # task-cancellation lands on this task and unwinds upward; the
+            # inner Promise's own task keeps running independently.
+            # TODO [CANCELLATION] Decide the philosophy on hierarchical
+            #  promises vs. "promises that return other promises" — should
+            #  subtree cancellation and cancellation of nested (returned)
+            #  Promises be treated as the same thing?
             depth = 0
             while isinstance(result, Promise):
                 result = await result

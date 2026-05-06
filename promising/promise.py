@@ -753,9 +753,10 @@ class Promise(PromisingContext, Generic[T_co]):
         try:
             if self._state is not _PENDING:
                 # Should not happen: only called from _unpack_once_from_loop
-                # when the awaitable resolved to a Promise — state is still
-                # _PENDING at that point (no awaits between the result and
-                # this call).
+                # when the awaitable resolved to a Promise. The only steps
+                # between the awaitable resolving and this call are the
+                # synchronous `with self:` exit and a logger call —
+                # neither yields, so state stays _PENDING.
                 raise RuntimeError(
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )

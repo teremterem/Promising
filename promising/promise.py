@@ -224,7 +224,7 @@ class Promise(PromisingContext, Generic[T_co]):
             else:
                 self._set_exception_from_loop(prefilled_exception)
 
-        if self._start_soon:
+        if self._start_soon and self._awaitable is not None:
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
@@ -405,8 +405,29 @@ class Promise(PromisingContext, Generic[T_co]):
             Whether this Promise is "done".
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.)
+        Promise.
+
+        Thread-safety contract for ``Promise`` state-reading methods (this
+        method and the ones below referencing it):
+
+        The Promise state machine is monotonic — once advanced past
+        ``_PENDING`` (to ``_UNPACKED_ONCE``, ``_FINISHED``, or one of the
+        ``_CANCELLED_XX`` states), the state never moves backwards. The
+        writers (``_set_intermediate_promise_from_loop`` /
+        ``_set_result_from_loop`` / ``_set_exception_from_loop``) write the
+        corresponding attribute (``_intermediate_promise``, ``_result``,
+        ``_exception``) *before* advancing the state via ``_set_state``, so a
+        reader that observes a state past ``_PENDING`` is guaranteed to also
+        observe the matching attribute.
+
+        This relies on single-attribute reads and writes being atomic across
+        threads — which holds under CPython's reference (GIL-backed)
+        interpreter. Under a free-threaded CPython build the GIL no longer
+        provides that guarantee, and the reader/writer pair would need
+        explicit synchronization (e.g. a lock or memory fence) to remain
+        correct. Promising does not currently target free-threaded
+        interpreters.
+        # TODO Future-proof it ?
         """
         state = self._state
         return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -419,8 +440,7 @@ class Promise(PromisingContext, Generic[T_co]):
         the Promise is also ``done()``).
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.)
+        Promise — see ``done()`` for the thread-safety contract.
         """
         state = self._state
         return state in (_FINISHED, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -432,8 +452,7 @@ class Promise(PromisingContext, Generic[T_co]):
         check for one-level (non-recursive) consumers.
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.)
+        Promise — see ``done()`` for the thread-safety contract.
         """
         state = self._state
         return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -444,8 +463,7 @@ class Promise(PromisingContext, Generic[T_co]):
         first unpacking step).
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.)
+        Promise — see ``done()`` for the thread-safety contract.
         """
         state = self._state
         return state in (_CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)
@@ -461,9 +479,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 with (if any).
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
-        attributes that were set as part of the Promise's lifecycle.
+        Promise — see ``done()`` for the thread-safety contract.
         """
         self._assert_done()
 
@@ -494,9 +510,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 Promise.
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
-        attributes that were set as part of the Promise's lifecycle.
+        Promise — see ``done()`` for the thread-safety contract.
         """
         if not self.unpacked_once_or_done():
             raise PromiseNotUnpackedError(f"Promise is not unpacked even once yet: {self!r}")
@@ -524,9 +538,7 @@ class Promise(PromisingContext, Generic[T_co]):
             asyncio.CancelledError: If the Promise was cancelled.
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.), and neither other
-        attributes that were set as part of the Promise's lifecycle.
+        Promise — see ``done()`` for the thread-safety contract.
         """
         self._assert_done()
 
@@ -865,8 +877,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def _assert_done(self) -> None:
         """
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise, because the state cannot go backwards (e.g. from
-        _CANCELLED_XX or _FINISHED to _PENDING etc.)
+        Promise — see ``done()`` for the thread-safety contract.
         """
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")

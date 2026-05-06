@@ -504,7 +504,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 | `promise.result()` | The resolved value. Raises the underlying exception if the Promise finished with one, `PromiseNotDoneError` if it is not done yet, or `asyncio.CancelledError` if it was cancelled. Thread-safe. |
 | `promise.exception()` | The exception that the Promise finished with, or `None`. Same readiness/cancellation rules as `result()`. Thread-safe. |
 | `promise.intermediate_promise()` | The intermediate `Promise` produced by the first unpacking step, or `None` if the awaitable's result was already a non-Promise value. Raises `PromiseNotUnpackedError` if the Promise has not yet been unpacked once. Thread-safe. |
-| `promise.cancel(msg=None)` | Cancel the Promise. Thread-safe — when called from outside the Promise's event loop, the cancellation is dispatched onto that loop. |
+| `promise.cancel(msg=None)` | Request cancellation of the Promise. Mirrors `asyncio.Future.cancel()` / `asyncio.Task.cancel()`: the return value reports whether cancellation was *requested* — the Promise's terminal cancelled state is reached only once the `CancelledError` actually propagates through the underlying unpacking task(s). Thread-safe — when called from outside the Promise's event loop, the cancellation is dispatched onto that loop. |
 | `promise.loop` | The event loop this Promise is bound to (inherited from `PromisingContext`). |
 
 ### `wrap_awaitable`
@@ -578,8 +578,9 @@ All sentinels raise `SentinelUsageError` on boolean coercion to prevent misuse.
 | `promising.EventLoopMismatchError` | Awaiting a `Promise` from a different event loop than the one it belongs to. Inherits from both `EventLoopError` and `ValueError`. |
 | `promising.NoRunningEventLoopError` | No running event loop found when one is required (e.g. creating a root `PromisingContext` outside an async context, awaiting a `Promise` without a running event loop, or scheduling work on a context whose event loop has stopped). Inherits from both `EventLoopError` and `RuntimeError`. |
 | `promising.PromiseNotFoundError` | No active `Promise` is found (e.g. calling `get_active_promise()` when the active context is not a `Promise`). |
-| `promising.PromiseNotDoneError` | `Promise.result()` or `Promise.exception()` is called before the Promise is done. Inherits from `PromisingError`, `asyncio.InvalidStateError`, and `concurrent.futures.InvalidStateError`. |
-| `promising.PromiseNotUnpackedError` | `Promise.intermediate_promise()` is called before the Promise has been unpacked at least once. Inherits from `PromisingError`, `asyncio.InvalidStateError`, and `concurrent.futures.InvalidStateError`. |
+| `promising.PromiseInvalidStateError` | Base class for Promise state-related errors (`PromiseNotDoneError`, `PromiseNotUnpackedError`). Inherits from `PromisingError`, `asyncio.InvalidStateError`, and `concurrent.futures.InvalidStateError`. |
+| `promising.PromiseNotDoneError` | `Promise.result()` or `Promise.exception()` is called before the Promise is done. Inherits from `PromiseInvalidStateError`. |
+| `promising.PromiseNotUnpackedError` | `Promise.intermediate_promise()` is called before the Promise has been unpacked at least once. Inherits from `PromiseInvalidStateError`. |
 | `promising.SentinelUsageError` | A `Sentinel` was used in a boolean context (e.g. `if INHERIT:`). Use `is` / `is not` identity comparisons instead. |
 | `promising.SyncUsageError` | A sync method (`promise.sync()`, `promise.unpack_once_sync()`, `await_children_sync()`) is called from the event loop thread, which would deadlock. |
 

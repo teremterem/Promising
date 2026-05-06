@@ -10,7 +10,6 @@ from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
-from promising import SyncUsageError
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import (
     ContextAlreadyActiveError,
@@ -21,6 +20,7 @@ from promising.errors import (
     EventLoopMismatchError,
     NoRunningEventLoopError,
     PromiseNotFoundError,
+    SyncUsageError,
 )
 from promising.logging_utils import PromisingHierarchyLogger
 from promising.sentinels import ASYNCIO_DEFAULT, AUTO, INHERIT, PROMISING_DEFAULT, UNCHANGED, Sentinel

@@ -790,17 +790,16 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _set_exception_from_loop(self, exception: BaseException) -> None:
         """
-        Store the exception and move the Promise into a terminal state.
-        The cancelled state is an *effect* of storing a ``CancelledError``,
-        not a precondition for it — ``CancelledError`` deliberately extends
-        ``BaseException`` rather than ``Exception``, so it flows through
-        this method like any other exception, and the terminal state is
-        chosen based on whether the first unpacking step had completed.
+        Store the exception and move the Promise into a terminal state. The
+        cancelled state is an *effect* of storing a ``CancelledError``, not a
+        precondition for it — ``CancelledError`` deliberately extends
+        ``BaseException`` rather than ``Exception``, so it flows through this
+        method like any other exception, and the terminal state is chosen based
+        on whether the first unpacking step had completed.
 
         A ``CancelledError`` arriving on an already-terminal Promise is
-        silently dropped — see the elif branch below for the race that
-        guards against. Any other exception arriving in that state is
-        treated as a framework bug and raises ``PromiseInvalidStateError``.
+        silently dropped. Any other exception arriving in that state is treated
+        as a framework bug and raises ``PromiseInvalidStateError``.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """

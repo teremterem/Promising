@@ -267,17 +267,9 @@ async def test_intermediate_promise_raises_when_cancelled_before_unpack() -> Non
 async def test_cancel_from_within_sync_returning_awaitable_with_intermediate_promise() -> None:
     """
     The awaitable cancels its own Promise from inside its body and then
-    returns synchronously with an intermediate Promise. asyncio sets
-    ``_must_cancel`` on both unpacking tasks; the single task ends up in
-    the CANCELLED state via the StopIteration handler (no CancelledError
-    was ever thrown into its body, since the awaitable returned without
-    yielding). ``_unpacking_task_done_callback`` synthesizes the
-    cancellation, moving the Promise to ``_CANCELLED_AFTER_UNPACKED_ONCE``.
-    The full task then resumes with ``_must_cancel=True``, gets a
-    ``CancelledError`` thrown at its ``await self._single_unpacking_task``,
-    and reaches ``_set_exception_from_loop`` on an already-terminal
-    Promise — which must be a silent no-op rather than corrupt the state
-    into ``_FINISHED`` with a ``PromiseInvalidStateError``.
+    synchronously returns an intermediate Promise (without ever yielding
+    to the event loop). The outer Promise must end up cleanly cancelled,
+    with the cancellation message preserved.
     """
     inner: Promise[int] = Promise(prefilled_result=42)
 

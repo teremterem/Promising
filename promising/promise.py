@@ -6,7 +6,12 @@ from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
-from promising.errors import PromiseNotDoneError, PromiseNotFoundError, PromiseNotUnpackedError
+from promising.errors import (
+    PromiseInvalidStateError,
+    PromiseNotDoneError,
+    PromiseNotFoundError,
+    PromiseNotUnpackedError,
+)
 from promising.logging_utils import PromiseUnpackingLogger
 from promising.promising_context import PromisingContext
 from promising.sentinels import (
@@ -468,7 +473,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._result is UNCHANGED:
             # Should not happen
-            raise RuntimeError(
+            raise PromiseInvalidStateError(
                 f"Promise result is UNCHANGED even though the promise is done and there is no exception: {self!r}"
             )
 
@@ -659,7 +664,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             if self.unpacked_once_or_done():
                 # Should not happen
-                raise RuntimeError(
+                raise PromiseInvalidStateError(
                     f"An attempt was made to _unpack_once_from_loop a Promise "
                     f"that was already unpacked once or done: {self!r}"
                 )
@@ -745,7 +750,7 @@ class Promise(PromisingContext, Generic[T_co]):
         try:
             if self._state is not _PENDING:
                 # Should not happen
-                raise RuntimeError(
+                raise PromiseInvalidStateError(
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )
             self._intermediate_promise = promise
@@ -764,7 +769,9 @@ class Promise(PromisingContext, Generic[T_co]):
         try:
             if self._state not in (_PENDING, _UNPACKED_ONCE):
                 # Should not happen
-                raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
+                raise PromiseInvalidStateError(
+                    f"Cannot set result on a promise because of its current state: {self!r}"
+                )
             self._result = result
             self._set_state(_FINISHED)
 
@@ -792,9 +799,9 @@ class Promise(PromisingContext, Generic[T_co]):
                     _CANCELLED_AFTER_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
                 )
             else:
-                # TODO [CANCELLATION] Introduce one more
-                #  InvalidStateError-based PromisingError class for this
-                raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
+                raise PromiseInvalidStateError(
+                    f"Cannot set exception on a promise because of its current state: {self!r}"
+                )
 
             self.set_as_promising_context_on_exception(exception)
             self._exception = exception

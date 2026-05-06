@@ -16,21 +16,26 @@ class PromiseNotFoundError(PromisingError):
     pass
 
 
-class PromiseNotDoneError(
+class PromiseInvalidStateError(
     PromisingError,
     asyncio.InvalidStateError,
     concurrent.futures.InvalidStateError,
 ):
+    """
+    Raised when an operation is not allowed in the Promise's current state
+    — covers both queries (e.g. asking for a result before the Promise is
+    done) and transitions (e.g. trying to set a result on one that is
+    already terminal). Base class for the more specific state errors below.
+    """
+
+
+class PromiseNotDoneError(PromiseInvalidStateError):
     """
     Raised when a Promise is queried for a result/exception before it is done.
     """
 
 
-class PromiseNotUnpackedError(
-    PromisingError,
-    asyncio.InvalidStateError,
-    concurrent.futures.InvalidStateError,
-):
+class PromiseNotUnpackedError(PromiseInvalidStateError):
     """
     Raised when a Promise's intermediate_promise is queried before the first
     unpacking.

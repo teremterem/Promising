@@ -75,21 +75,17 @@ class PromiseInvalidStateError(
     concurrent.futures.InvalidStateError,
 ):
     """
-    Raised when an operation is not allowed in the Promise's current state
-    — covers both queries (e.g. asking for a result before the Promise is
-    done) and transitions (e.g. trying to set a result on one that is
-    already terminal). Base class for the more specific state errors below.
+    A base class for all promise state-related errors.
     """
 
 
 class PromiseNotDoneError(PromiseInvalidStateError):
     """
-    Raised when a Promise is queried for a result/exception before it is done.
+    A promise is queried for a result/exception before it is done.
     """
 
 
 class PromiseNotUnpackedError(PromiseInvalidStateError):
     """
-    Raised when a Promise's intermediate_promise is queried before the first
-    unpacking.
+    A promise's intermediate_promise is queried before the first unpacking.
     """

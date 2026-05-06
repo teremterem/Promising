@@ -7,7 +7,6 @@ from collections.abc import Awaitable, Generator
 from typing import Any, Generic
 
 from promising.errors import (
-    PromiseInvalidStateError,
     PromiseNotDoneError,
     PromiseNotFoundError,
     PromiseNotUnpackedError,
@@ -475,7 +474,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # Should not happen: _assert_done() above guarantees a terminal
             # state, and the only way to reach _FINISHED without an
             # exception is via _set_result_from_loop (which sets _result).
-            raise PromiseInvalidStateError(
+            raise RuntimeError(
                 f"Promise result is UNCHANGED even though the promise is done and there is no exception: {self!r}"
             )
 
@@ -668,7 +667,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # Should not happen: this method is only scheduled by
                 # _ensure_from_loop_single_unpacking_scheduled, which guards
                 # on `not unpacked_once_or_done()`.
-                raise PromiseInvalidStateError(
+                raise RuntimeError(
                     f"An attempt was made to _unpack_once_from_loop a Promise "
                     f"that was already unpacked once or done: {self!r}"
                 )
@@ -757,7 +756,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # when the awaitable resolved to a Promise — state is still
                 # _PENDING at that point (no awaits between the result and
                 # this call).
-                raise PromiseInvalidStateError(
+                raise RuntimeError(
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )
             self._intermediate_promise = promise
@@ -779,9 +778,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # (_PENDING, _UNPACKED_ONCE) — prefill in __init__, the
                 # non-Promise branch of _unpack_once_from_loop, or the end
                 # of _fully_unpack_from_loop's unwrap chain.
-                raise PromiseInvalidStateError(
-                    f"Cannot set result on a promise because of its current state: {self!r}"
-                )
+                raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
             self._result = result
             self._set_state(_FINISHED)
 
@@ -799,7 +796,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         A ``CancelledError`` arriving on an already-terminal Promise is
         silently dropped. Any other exception arriving in that state is treated
-        as a framework bug and raises ``PromiseInvalidStateError``.
+        as a framework bug and raises ``RuntimeError``.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -824,9 +821,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # implies the framework's state machine is broken
                 # (legitimate user-triggered cancellation races are
                 # caught by the elif above).
-                raise PromiseInvalidStateError(
-                    f"Cannot set exception on a promise because of its current state: {self!r}"
-                )
+                raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
             self.set_as_promising_context_on_exception(exception)
             self._exception = exception

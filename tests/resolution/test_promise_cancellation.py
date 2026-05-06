@@ -284,9 +284,6 @@ async def test_cancel_from_within_sync_returning_awaitable_with_intermediate_pro
     with pytest.raises(asyncio.CancelledError) as exc_info:
         await promise
 
-    # If the second _set_exception_from_loop call from the full task
-    # had overwritten the cancelled state, this would surface as a
-    # PromiseInvalidStateError instead.
-    assert exc_info.value.args == ("from-within",)
+    assert str(exc_info.value) == "from-within"
     assert promise.cancelled() is True
     assert promise.done() is True

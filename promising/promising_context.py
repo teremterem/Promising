@@ -662,7 +662,6 @@ class PromisingContext:
             TimeoutError: If timeout expires before
                 completion.
         """
-        self._assert_event_loop_running()
         self._assert_no_sync_usage_deadlock()
 
         concurrent_future = asyncio.run_coroutine_threadsafe(
@@ -807,9 +806,20 @@ class PromisingContext:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _assert_event_loop_running(self) -> None:
+    def _assert_event_loop_running_for_sync(self) -> None:
+        """
+        Assert that the event loop of the PromisingContext itself is running
+        (regardless of whether we are on the same thread or not).
+        """
         if not self.loop.is_running():
-            raise NoRunningEventLoopError(f"The event loop of {self!r} is not running")
+            # TODO Are we sure we need to worry about this at all ? The loop can
+            # start later (if it is on a different thread indeed), and then all the
+            # scheduled callbacks and tasks will run and the synchronous operations
+            # will be unblocked. Maybe it should be just a warning ? Or maybe even
+            # nothing at all ?
+            raise NoRunningEventLoopError(
+                f"Synchronous operations on {self!r} can only be performed if its event loop is running"
+            )
 
     def _assert_no_sync_usage_deadlock(self) -> None:
         if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
@@ -818,6 +828,10 @@ class PromisingContext:
                 f"its own event loop thread, as that typically leads to a "
                 f"deadlock. Use awaitable operations instead."
             )
+        # If we are on a different thread indeed, then let's make sure the event
+        # loop of the PromisingContext itself is running, so we don't end up
+        # waiting for something that might not happen at all
+        self._assert_event_loop_running_for_sync()
 
     def _assert_awaiting_on_correct_event_loop(self) -> None:
         if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):

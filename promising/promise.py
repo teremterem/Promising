@@ -228,7 +228,6 @@ class Promise(PromisingContext, Generic[T_co]):
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
-            self._assert_event_loop_running()
             self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled)
 
     @classmethod
@@ -311,7 +310,6 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, but it is unavailable from the event
         loop of the Promise to avoid a deadlock.
         """
-        self._assert_event_loop_running()
         self._assert_no_sync_usage_deadlock()
 
         if self.done():
@@ -381,7 +379,6 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, but it is unavailable from the event
         loop of the Promise to avoid a deadlock.
         """
-        self._assert_event_loop_running()
         self._assert_no_sync_usage_deadlock()
 
         if self.unpacked_once_or_done():
@@ -577,9 +574,9 @@ class Promise(PromisingContext, Generic[T_co]):
             # directly
             return self._cancel_from_loop(msg)
 
-        self._assert_event_loop_running()
         # We are on a different thread, so we need to use a thread-safe
         # mechanism to cancel the Promise
+        self._assert_event_loop_running_for_sync()
         future = concurrent.futures.Future()
 
         def callback():

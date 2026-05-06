@@ -472,7 +472,9 @@ class Promise(PromisingContext, Generic[T_co]):
             raise self._exception
 
         if self._result is UNCHANGED:
-            # Should not happen
+            # Should not happen: _assert_done() above guarantees a terminal
+            # state, and the only way to reach _FINISHED without an
+            # exception is via _set_result_from_loop (which sets _result).
             raise PromiseInvalidStateError(
                 f"Promise result is UNCHANGED even though the promise is done and there is no exception: {self!r}"
             )
@@ -663,7 +665,9 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_single_unpacking_started(promise=self)
 
             if self.unpacked_once_or_done():
-                # Should not happen
+                # Should not happen: this method is only scheduled by
+                # _ensure_from_loop_single_unpacking_scheduled, which guards
+                # on `not unpacked_once_or_done()`.
                 raise PromiseInvalidStateError(
                     f"An attempt was made to _unpack_once_from_loop a Promise "
                     f"that was already unpacked once or done: {self!r}"
@@ -749,7 +753,10 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             if self._state is not _PENDING:
-                # Should not happen
+                # Should not happen: only called from _unpack_once_from_loop
+                # when the awaitable resolved to a Promise — state is still
+                # _PENDING at that point (no awaits between the result and
+                # this call).
                 raise PromiseInvalidStateError(
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )
@@ -768,7 +775,10 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             if self._state not in (_PENDING, _UNPACKED_ONCE):
-                # Should not happen
+                # Should not happen: all callsites reach this with state in
+                # (_PENDING, _UNPACKED_ONCE) — prefill in __init__, the
+                # non-Promise branch of _unpack_once_from_loop, or the end
+                # of _fully_unpack_from_loop's unwrap chain.
                 raise PromiseInvalidStateError(
                     f"Cannot set result on a promise because of its current state: {self!r}"
                 )
@@ -787,6 +797,11 @@ class Promise(PromisingContext, Generic[T_co]):
         this method like any other exception, and the terminal state is
         chosen based on whether the first unpacking step had completed.
 
+        A ``CancelledError`` arriving on an already-terminal Promise is
+        silently dropped — see the elif branch below for the race that
+        guards against. Any other exception arriving in that state is
+        treated as a framework bug and raises ``PromiseInvalidStateError``.
+
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
@@ -798,7 +813,18 @@ class Promise(PromisingContext, Generic[T_co]):
                 terminal_state = (
                     _CANCELLED_AFTER_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
                 )
+            elif self.done() and isinstance(exception, asyncio.CancelledError):
+                # Cancellation can land on both the single and full
+                # unpacking tasks, so the same CancelledError can reach
+                # this method twice — the second arrival sees a Promise
+                # that's already cancelled. Drop it; the original wins.
+                return
             else:
+                # Should not happen: any non-CancelledError exception
+                # arriving on a non-_PENDING / non-_UNPACKED_ONCE Promise
+                # implies the framework's state machine is broken
+                # (legitimate user-triggered cancellation races are
+                # caught by the elif above).
                 raise PromiseInvalidStateError(
                     f"Cannot set exception on a promise because of its current state: {self!r}"
                 )

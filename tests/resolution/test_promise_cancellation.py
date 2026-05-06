@@ -10,7 +10,7 @@ import threading
 
 import pytest
 
-from promising import Promise, PromiseNotDoneError
+from promising import Promise, PromiseNotDoneError, get_active_promise
 
 # ── Cancel before any task is scheduled ──────────────────────────
 
@@ -259,3 +259,42 @@ async def test_intermediate_promise_raises_when_cancelled_before_unpack() -> Non
 
     with pytest.raises(asyncio.CancelledError):
         promise.intermediate_promise()
+
+
+# ── Cancellation race: cancel from within a sync-returning awaitable ─
+
+
+async def test_cancel_from_within_sync_returning_awaitable_with_intermediate_promise() -> None:
+    """
+    The awaitable cancels its own Promise from inside its body and then
+    returns synchronously with an intermediate Promise. asyncio sets
+    ``_must_cancel`` on both unpacking tasks; the single task ends up in
+    the CANCELLED state via the StopIteration handler (no CancelledError
+    was ever thrown into its body, since the awaitable returned without
+    yielding). ``_unpacking_task_done_callback`` synthesizes the
+    cancellation, moving the Promise to ``_CANCELLED_AFTER_UNPACKED_ONCE``.
+    The full task then resumes with ``_must_cancel=True``, gets a
+    ``CancelledError`` thrown at its ``await self._single_unpacking_task``,
+    and reaches ``_set_exception_from_loop`` on an already-terminal
+    Promise — which must be a silent no-op rather than corrupt the state
+    into ``_FINISHED`` with a ``PromiseInvalidStateError``.
+    """
+    inner: Promise[int] = Promise(prefilled_result=42)
+
+    async def awaitable_body() -> "Promise[int]":
+        active = get_active_promise()
+        assert active is not None
+        active.cancel("from-within")
+        return inner
+
+    promise: Promise[int] = Promise(awaitable_body(), start_soon=False)
+
+    with pytest.raises(asyncio.CancelledError) as exc_info:
+        await promise
+
+    # If the second _set_exception_from_loop call from the full task
+    # had overwritten the cancelled state, this would surface as a
+    # PromiseInvalidStateError instead.
+    assert exc_info.value.args == ("from-within",)
+    assert promise.cancelled() is True
+    assert promise.done() is True

@@ -588,10 +588,13 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method can only be used from the event loop of the Promise.
         """
         _unpacking_logger.log_single_unpacking_scheduling(promise=self)
+
         if self._single_unpacking_task is None and not self.unpacked_once_or_done():
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
             )
+            self._single_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
+
             _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
     def _ensure_from_loop_full_unpacking_scheduled(self) -> None:
@@ -599,11 +602,31 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method can only be used from the event loop of the Promise.
         """
         _unpacking_logger.log_full_unpacking_scheduling(promise=self)
+
         if self._full_unpacking_task is None and not self.done():
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
             )
+            self._full_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
+
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
+
+    def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
+        """
+        Bridge the case where ``task.cancel()`` lands between
+        ``create_task`` and the first ``__step``: ``CancelledError`` is
+        thrown into a not-yet-started coroutine and propagates out
+        without entering the ``try/except BaseException`` inside
+        ``_unpack_once_from_loop`` / ``_fully_unpack_from_loop``, leaving
+        the Promise non-terminal even though the Task ended cancelled.
+        Mirrors the synthesize path in ``_cancel_from_loop``: close the
+        context (``with self:`` never ran) and store the
+        ``CancelledError`` so the state machine reaches a terminal state.
+        """
+        if not task.cancelled() or self.done():
+            return
+        self.close_context_threadsafe()
+        self._set_exception_from_loop(asyncio.CancelledError())
 
     async def _unpack_once_from_loop(self) -> None:
         """

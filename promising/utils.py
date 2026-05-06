@@ -80,19 +80,31 @@ async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
 
 def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:
     """
-    Walk the ``__context__`` chain starting at ``error`` and attach
-    ``context`` at the root (the deepest exception with no ``__context__``).
-    No-op if ``context`` is already somewhere in the chain. Cycle-safe.
+    Walk ``error``'s ``__context__`` chain to its root (the deepest
+    exception with no ``__context__``) and attach ``context`` there.
 
-    Returns the exception that ``context`` was attached to, or ``None`` if
-    no attachment happened.
+    No-op if attaching would create a cycle — i.e. if ``context`` or any
+    exception reachable from it via ``__context__`` already appears in
+    ``error``'s chain.
+
+    Returns the exception that ``context`` was attached to, or ``None``
+    if no attachment happened.
     """
+    # Walk to the root of error's chain, recording every node so we can
+    # check for overlap below.
     root = error
     seen: set[int] = {id(root)}
-    while root.__context__ is not None and id(root.__context__) not in seen:
+    while root.__context__ is not None:
         root = root.__context__
         seen.add(id(root))
-    if id(context) in seen:
-        return None
+
+    # If context's own chain shares any node with error's chain, attaching
+    # to root would loop back to root through that shared node.
+    node: BaseException | None = context
+    while node is not None:
+        if id(node) in seen:
+            return None
+        node = node.__context__
+
     root.__context__ = context
     return root

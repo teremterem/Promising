@@ -134,7 +134,7 @@ async def test_await_children_whole_subtree_non_promise_grandchildren() -> None:
         return result
 
     promise = root_func()
-    result = await asyncio.wait_for(promise.unpack_all(), timeout=5)
+    result = await asyncio.wait_for(promise, timeout=3)
 
     assert result == "grandchild"
     assert execution_order == [

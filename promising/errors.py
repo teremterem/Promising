@@ -1,5 +1,11 @@
+import asyncio
+import concurrent.futures
+
+
 class PromisingError(Exception):
-    """A base class for all promising errors."""
+    """
+    A base class for all promising errors.
+    """
 
 
 class DecorationError(PromisingError):
@@ -22,7 +28,9 @@ class SyncUsageError(PromisingError):
 
 
 class ContextError(PromisingError):
-    """A base class for all context-related errors."""
+    """
+    A base class for all context-related errors.
+    """
 
 
 class ContextAlreadyActiveError(ContextError):
@@ -45,7 +53,9 @@ class ContextNotFoundError(ContextError):
 
 
 class EventLoopError(PromisingError):
-    """A base class for all event loop-related errors."""
+    """
+    A base class for all event loop-related errors.
+    """
 
 
 class EventLoopMismatchError(EventLoopError, ValueError):
@@ -54,3 +64,28 @@ class EventLoopMismatchError(EventLoopError, ValueError):
 
 class NoRunningEventLoopError(EventLoopError, RuntimeError):
     pass
+
+
+# Promise state errors
+
+
+class PromiseInvalidStateError(
+    PromisingError,
+    asyncio.InvalidStateError,
+    concurrent.futures.InvalidStateError,
+):
+    """
+    A base class for all promise state-related errors.
+    """
+
+
+class PromiseNotDoneError(PromiseInvalidStateError):
+    """
+    A promise is queried for a result/exception before it is done.
+    """
+
+
+class PromiseNotUnpackedError(PromiseInvalidStateError):
+    """
+    A promise's intermediate_promise is queried before the first unpacking.
+    """

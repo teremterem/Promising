@@ -7,7 +7,7 @@ from typing import Any, Generic
 
 from promising.decorator_support import _SETTINGS_AS_DICT_KEY, PromisingDecorator
 from promising.errors import DecorationError
-from promising.promise import Promise, get_active_promise
+from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.sentinels import INHERIT, UNCHANGED, WHOLE_SUBTREE, Sentinel
 from promising.types import DecoratableFunctionType, T_co
 
@@ -41,17 +41,12 @@ def function(
     Works as a method decorator for instance methods, ``@classmethod``, and
     ``@staticmethod``.
 
-    Decorated functions may return other awaitables or ``Promise`` objects
-    (e.g. by calling other decorated functions) instead of concrete values. If
-    the return value is an awaitable that is not already a ``Promise``, it is
-    automatically wrapped in a child ``Promise`` of the current one, inheriting
-    settings (``thread_pool``, ``start_soon_default``, etc.) through the
-    standard ``Promise`` inheritance mechanism. When the resulting ``Promise``
-    is awaited (or resolved via ``.sync()``), nested Promises (non-Promise
-    awaitables are auto-wrapped into Promises by ``set_result``) are
-    automatically unpacked recursively until a concrete, non-Promise value is
-    reached. To unpack only one level, use ``unpack_once()`` or
-    ``unpack_once_sync()`` instead.
+    Decorated functions may return ``Promise`` objects (e.g. by calling
+    other decorated functions) instead of concrete values. When the
+    resulting ``Promise`` is awaited (or resolved via ``.sync()``), nested
+    Promises are automatically unpacked recursively until a concrete,
+    non-Promise value is reached. To unpack only one level, use
+    ``unpack_once()`` or ``unpack_once_sync()`` instead.
 
     Inside a decorated function body, the following utilities are available:
 
@@ -230,7 +225,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                   enforced on child ``Promise`` objects created during
                   this ``Promise``'s execution.
                 - **start_soon_default** — Local override for the global
-                  ``START_SOON_DEFAULT``.
+                  ``Defaults.START_SOON``.
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
                 - **use_thread_pool** — Whether to run a sync function
@@ -341,8 +336,8 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         Returns a **coroutine** (not a ``Promise``), making it
         safe to pass to ``asyncio.run()`` — unlike calling the
         decorated function directly, which would construct a
-        ``Promise`` (an ``asyncio.Future`` subclass) before the
-        event loop exists and fail.
+        root ``Promise`` before the event loop exists and fail
+        (a root ``PromisingContext`` requires a running loop).
 
         Inside, the coroutine calls the decorated function,
         awaits the resulting ``Promise``, and by default recursively
@@ -387,6 +382,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         try:
             return await promise
         finally:
+            # TODO What about await_children's `unpack_promises_fully` ?
             if await_children is WHOLE_SUBTREE:
                 await promise.await_children(whole_subtree=True)
             elif await_children:
@@ -409,12 +405,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 # Get the event loop from the active promise that is running
                 # this async wrapper function
                 active_promise = get_active_promise()
-                loop = active_promise.get_loop()
                 executor = active_promise.get_thread_pool_executor()
                 # Copy the current context so that ContextVars (in particular
                 # Promise._current) are accessible inside the executor thread
                 ctx = contextvars.copy_context()
-                return await loop.run_in_executor(
+                return await active_promise.loop.run_in_executor(
                     executor,
                     functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
                 )
@@ -429,7 +424,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
 
             coro = _sync_inline()
 
-        return Promise[T_co](
+        return wrap_awaitable(
             namespace=settings_as_dict.get("namespace", self.namespace),
             awaitable=coro,
             start_soon=settings_as_dict.get("start_soon", self.start_soon),
@@ -455,6 +450,6 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 f"`use_thread_pool` setting. Set `use_thread_pool=True` "
                 f"(recommended for most cases, so CPU-heavy workloads "
                 f"don't block the event loop thread) or "
-                f"`use_thread_pool=False`."
+                f"`use_thread_pool=False` on the decorator."
             )
         return use_thread_pool

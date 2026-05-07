@@ -88,14 +88,9 @@ async def test_use_thread_pool_false_context_propagation() -> None:
 # ── SyncUsageError when calling sync() from use_thread_pool=False ──
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["sync", "concurrent_future_result", "concurrent_future_exception"],
-)
-async def test_sync_raises_sync_usage_error_with_no_thread_pool(*, method: str) -> None:
+async def test_sync_raises_sync_usage_error_with_no_thread_pool() -> None:
     """
-    Calling promise.sync(), concurrent_future.result(), or
-    concurrent_future.exception() inside a use_thread_pool=False
+    Calling promise.sync() inside a use_thread_pool=False
     function raises SyncUsageError because it would deadlock.
     """
     child_promise = None
@@ -108,12 +103,7 @@ async def test_sync_raises_sync_usage_error_with_no_thread_pool(*, method: str) 
     def parent() -> str | None:
         nonlocal child_promise
         child_promise = child(start_soon=False)
-        if method == "sync":
-            return child_promise.sync()
-        elif method == "concurrent_future_result":
-            return child_promise.as_concurrent_future().result()
-        else:
-            child_promise.as_concurrent_future().exception()
+        return child_promise.sync()
 
     with pytest.raises(SyncUsageError, match="deadlock"):
         await parent()
@@ -147,15 +137,10 @@ async def test_await_children_raises_sync_usage_error_with_no_thread_pool() -> N
 # ── Verify that sync() works fine with use_thread_pool=True ──
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["sync", "concurrent_future_result", "concurrent_future_exception"],
-)
 @pytest.mark.parametrize("start_soon", [True, False])
-async def test_sync_works_with_thread_pool(*, method: str, start_soon: bool) -> None:
+async def test_sync_works_with_thread_pool(*, start_soon: bool) -> None:
     """
-    Calling promise.sync(), concurrent_future.result(), or
-    concurrent_future.exception() inside a use_thread_pool=True
+    Calling promise.sync() inside a use_thread_pool=True
     function works fine because the function runs in a
     separate thread.
     """
@@ -167,18 +152,10 @@ async def test_sync_works_with_thread_pool(*, method: str, start_soon: bool) -> 
     @promising.function(use_thread_pool=True)
     def parent() -> str | None:
         p = child(start_soon=start_soon)
-        if method == "sync":
-            return p.sync()
-        elif method == "concurrent_future_result":
-            return p.as_concurrent_future().result()
-        else:
-            return p.as_concurrent_future().exception()
+        return p.sync()
 
     result = await parent()
-    if method == "concurrent_future_exception":
-        assert result is None
-    else:
-        assert result == "child result"
+    assert result == "child result"
 
 
 async def test_await_children_works_with_thread_pool() -> None:

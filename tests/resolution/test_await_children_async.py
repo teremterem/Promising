@@ -266,9 +266,9 @@ async def test_await_children_module_level_on_bare_context() -> None:
 
 
 @pytest.mark.parametrize(
-    "unpack_all_promises",
+    "unpack_promises_fully",
     [
-        pytest.param(True, id="unpack_all"),
+        pytest.param(True, id="unpack_fully"),
         pytest.param(False, id="unpack_once"),
         pytest.param(None, id="unpack_default"),
     ],
@@ -280,20 +280,17 @@ async def test_await_children_module_level_on_bare_context() -> None:
         pytest.param(False, id="root_nosleep"),
     ],
 )
-async def test_await_children_direct_only_but_unpack_all_promises(
+async def test_await_children_direct_only_but_unpack_promises_fully(
     *,
     sleep_in_root: bool,
-    unpack_all_promises: bool | None,
+    unpack_promises_fully: bool | None,
 ) -> None:
     """
     With ``whole_subtree=False``, ``await_children`` waits only for direct
-    children.  When ``unpack_all_promises`` is True (or default), the child's
+    children.  When ``unpack_promises_fully`` is True (or default), the child's
     returned Promise is recursively unpacked, so the grandchild still runs.
-    When ``unpack_all_promises=False``, the grandchild is never awaited.
+    When ``unpack_promises_fully=False``, the grandchild is never awaited.
     """
-    if sleep_in_root and unpack_all_promises is not False:
-        pytest.skip("Known issue: grandchild not awaited when root sleeps with unpack_all")
-
     execution_order: list[str] = []
 
     @promising.function
@@ -304,8 +301,9 @@ async def test_await_children_direct_only_but_unpack_all_promises(
 
     @promising.function
     async def child_func() -> str:
+        grandchild = grandchild_func()
         execution_order.append("child_done")
-        return grandchild_func()
+        return grandchild
 
     @promising.function
     async def root_func() -> str:
@@ -317,8 +315,8 @@ async def test_await_children_direct_only_but_unpack_all_promises(
         # TODO Parametrize and check with and without await_children() to
         #  ensure it has effect ?
         kwargs = {}
-        if unpack_all_promises is not None:  # We use None to test the default
-            kwargs["unpack_all_promises"] = unpack_all_promises
+        if unpack_promises_fully is not None:  # We use None to test the default
+            kwargs["unpack_promises_fully"] = unpack_promises_fully
         await promising.await_children(whole_subtree=False, **kwargs)
 
         return "root"
@@ -327,23 +325,25 @@ async def test_await_children_direct_only_but_unpack_all_promises(
     assert await promise == "root"
 
     if sleep_in_root:
-        if unpack_all_promises is False:
+        if unpack_promises_fully is False:
             assert execution_order == [
                 "child_done",
                 "root_coro_done",
             ]
         else:
+            # `unpack_promises_fully` is either True or None ("use default")
             assert execution_order == [
                 "child_done",
                 "root_coro_done",
                 "grandchild_done",
             ]
-    elif unpack_all_promises is False:
+    elif unpack_promises_fully is False:
         assert execution_order == [
             "root_coro_done",
             "child_done",
         ]
     else:
+        # `unpack_promises_fully` is either True or None ("use default")
         assert execution_order == [
             "root_coro_done",
             "child_done",

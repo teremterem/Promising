@@ -48,9 +48,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_default_test_loop_scope = "function"
 addopts = "-n auto"
-timeout = 10
+timeout = 5
 markers = [
     "do_not_patch_qualnames",
+    "xfail_cycle_detection_gh_issue_66",
 ]
 
 [tool.coverage.run]

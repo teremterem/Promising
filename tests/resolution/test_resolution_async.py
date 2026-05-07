@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Any
 
 import pytest
@@ -33,7 +34,7 @@ async def test_prefilled_promise_no_nesting() -> None:
     assert await promise.unpack_once() == 42
 
 
-async def test_two_levels_unpack_all() -> None:
+async def test_two_levels_unpack_fully() -> None:
     """`await outer` should unpack both levels and return the final value."""
 
     async def inner_coro() -> str:
@@ -72,7 +73,7 @@ async def test_two_levels_unpack_once_stop_at_inner() -> None:
     assert await result == "deep value"
 
 
-async def test_three_levels_unpack_all() -> None:
+async def test_three_levels_unpack_fully() -> None:
     """`await` on a triply-nested promise returns the deepest value."""
 
     async def mid_coro() -> str:
@@ -115,40 +116,14 @@ async def test_three_levels_unpack_once_return_second_level() -> None:
     assert await level3.unpack_once() == "bottom"
 
 
-async def test_custom_coroutine_unpack_all() -> None:
-    """`await` unpacks through a coroutine to the final value."""
-
-    async def custom_coro() -> str:
-        return "custom_value"
-
-    async def coro() -> Any:
-        return custom_coro()
-
-    promise = Promise(coro())
-
-    assert await promise == "custom_value"
-
-
-async def test_custom_coroutine_unpack_once() -> None:
-    """`unpack_once()` returns the coroutine wrapped in a Promise."""
-
-    async def custom_coro() -> str:
-        return "custom_value"
-
-    async def coro() -> Any:
-        return custom_coro()
-
-    promise = Promise(coro())
-
-    result = await promise.unpack_once()
-    assert isinstance(result, Promise)
-
-    # Get rid of the asyncio warning
-    assert await result == "custom_value"
-
-
-async def test_mixed_chain_unpack_all() -> None:
-    """`await` unpacks through Promise → coroutine → scalar."""
+async def test_mixed_chain_unpack_fully() -> None:
+    """
+    `await` on a Promise whose coroutine returns another (bare) coroutine
+    yields that inner coroutine as-is — unpacking stops at the coroutine
+    boundary and does NOT auto-await it. The caller must await the
+    coroutine explicitly to reach the inner Promise, then await the
+    Promise to reach the final scalar.
+    """
 
     async def custom_coro() -> Promise[str]:
         return Promise(prefilled_result="final")
@@ -158,17 +133,25 @@ async def test_mixed_chain_unpack_all() -> None:
 
     promise = Promise(coro())
 
-    # coroutine wraps a Promise; `await promise` should unpack:
-    # promise → coroutine → inner Promise → "final"
-    assert await promise == "final"
+    result = await promise
+    assert not isinstance(result, Promise)
+    assert inspect.iscoroutine(result)
+
+    result = await result
+    assert isinstance(result, Promise)
+
+    assert await result == "final"
 
 
 async def test_mixed_chain_unpack_once() -> None:
-    """`unpack_once()` on outer promise returns the coroutine wrapped in a Promise."""
-
+    """
+    `unpack_once()` on a promise whose coroutine returns another (bare)
+    coroutine yields that inner coroutine as-is (NOT wrapped in a Promise).
+    """
     inner = None
 
     async def custom_coro() -> Promise[str]:
+        await asyncio.sleep(0.1)
         return inner
 
     async def coro() -> Any:
@@ -179,14 +162,21 @@ async def test_mixed_chain_unpack_once() -> None:
     promise = Promise(coro())
 
     result = await promise.unpack_once()
+    assert not isinstance(result, Promise)
+    assert inspect.iscoroutine(result)
+
+    result = await result
     assert isinstance(result, Promise)
 
-    # Awaiting the inner promise separately should work
-    assert await inner == "final"
+    assert await result.unpack_once() == "final"
 
 
-async def test_asyncio_future_unpack_all() -> None:
-    """`await` unpacks through an asyncio.Future to the final value."""
+async def test_asyncio_future_unpack_fully() -> None:
+    """
+    `await` on a Promise whose coroutine returns an asyncio.Future yields
+    that Future as-is — unpacking does NOT continue through asyncio.Future
+    objects. The caller must await the Future to reach its result.
+    """
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
     fut.set_result("from_future")
@@ -196,61 +186,35 @@ async def test_asyncio_future_unpack_all() -> None:
 
     promise = Promise(coro())
 
-    assert await promise == "from_future"
+    result = await promise
+    assert not isinstance(result, Promise)
+    assert isinstance(result, asyncio.Future)
 
-
-async def test_asyncio_future_unpack_once() -> None:
-    """`unpack_once()` wraps the returned asyncio.Future in a Promise."""
-    loop = asyncio.get_running_loop()
-    fut: asyncio.Future[str] = loop.create_future()
-    fut.set_result("from_future")
-
-    async def coro() -> asyncio.Future[str]:
-        return fut
-
-    promise = Promise(coro())
-
-    result = await promise.unpack_once()
-    assert isinstance(result, Promise)
-    assert result.get_parent_context() is promise
     assert await result == "from_future"
 
 
-async def test_coroutine_with_sleep_unpack_all() -> None:
-    """`await` unpacks through a coroutine that yields control."""
+async def test_asyncio_future_unpack_once() -> None:
+    """
+    `unpack_once()` on a promise whose coroutine returns an asyncio.Future
+    yields that Future as-is (NOT wrapped in a Promise).
+    """
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[str] = loop.create_future()
+    fut.set_result("from_future")
 
-    async def sleeping_coro() -> str:
-        await asyncio.sleep(0.1)
-        return "slept_value"
-
-    async def coro() -> Any:
-        return sleeping_coro()
-
-    promise = Promise(coro())
-
-    assert await promise == "slept_value"
-
-
-async def test_coroutine_with_sleep_unpack_once() -> None:
-    """`unpack_once()` returns the coroutine wrapped in a Promise."""
-
-    async def sleeping_coro() -> str:
-        await asyncio.sleep(0.1)
-        return "slept_value"
-
-    async def coro() -> Any:
-        return sleeping_coro()
+    async def coro() -> asyncio.Future[str]:
+        return fut
 
     promise = Promise(coro())
 
     result = await promise.unpack_once()
-    assert isinstance(result, Promise)
+    assert not isinstance(result, Promise)
+    assert isinstance(result, asyncio.Future)
 
-    # Get rid of the asyncio warning
-    assert await result == "slept_value"
+    assert await result == "from_future"
 
 
-async def test_five_levels_unpack_all() -> None:
+async def test_five_levels_unpack_fully() -> None:
     """`await` flattens 5 levels of promise nesting."""
 
     async def make_chain(depth: int) -> Any:
@@ -326,7 +290,7 @@ async def test_non_awaitable_returned_as_is(*, value: Any) -> None:
     assert await promise.unpack_once() == value
 
 
-async def test_exception_in_inner_promise_unpack_all() -> None:
+async def test_exception_in_inner_promise_unpack_fully() -> None:
     """`await` on outer propagates exception from inner promise."""
 
     async def outer_coro() -> str:
@@ -358,33 +322,54 @@ async def test_exception_in_inner_promise_unpack_once() -> None:
         await result
 
 
-async def test_coro_exception_at_depth_5_with_promising_context_and_functions() -> None:
+@pytest.mark.parametrize("raise_error", [True, False])
+async def test_unpack_fully_at_depth_5_with_promising_context_and_functions(*, raise_error: bool) -> None:
     """
-    Coroutine that raises in a PromisingContext is 5 levels deep in a mixed
-    chain of sync and async PromisingFunctions.
+    A 5-level chain of PromisingFunctions (mixing async and sync), with the
+    deepest one running its body inside a ``with promising.context():``
+    block, is unpacked end-to-end by a single ``await`` on the outermost
+    promise.
 
-    Chain: PromisingFunction → coroutine → PromisingFunction[sync] →
-        → PromisingFunction → PromisingContext(coroutine[raises])
+    Chain (outer → inner):
+        func1 [PromisingFunction async]
+          → func2 [PromisingFunction async]
+            → func3 [PromisingFunction sync, use_thread_pool=True]
+              → func4 [PromisingFunction async]
+                → func5 [PromisingFunction async] with PromisingContext
+
+    Parametrized over ``raise_error``:
+        - True:  the innermost body raises ValueError, which propagates
+          all the way up and is observed at the outer ``await``.
+        - False: the innermost body returns a string, which is unpacked
+          all the way up and returned by the outer ``await``.
     """
 
-    @promising.context
-    async def coro5_failing_in_context() -> str:
-        raise ValueError("coro error at the end")
+    @promising.function
+    async def func5_in_context() -> str:
+        with promising.context():
+            if raise_error:
+                raise ValueError("coro error at the end")
+            else:
+                return "coro result at the end"
 
     @promising.function
     async def func4() -> Any:
-        return coro5_failing_in_context()
+        return func5_in_context()
 
     @promising.function(use_thread_pool=True)
     def func3() -> Any:
         return func4()
 
-    async def coro2() -> Any:
+    @promising.function
+    async def func2() -> Any:
         return func3()
 
     @promising.function
     async def func1() -> Any:
-        return coro2()
+        return func2()
 
-    with pytest.raises(ValueError, match="coro error at the end"):
-        await func1()
+    if raise_error:
+        with pytest.raises(ValueError, match="coro error at the end"):
+            await func1()
+    else:
+        assert await func1() == "coro result at the end"

@@ -4,7 +4,7 @@ from asyncio import AbstractEventLoop
 from collections.abc import Awaitable
 from typing import Any
 
-from promising.errors import NoRunningEventLoopError, SyncUsageError
+from promising.errors import NoRunningEventLoopError
 from promising.types import DecoratableFunctionType
 
 
@@ -74,15 +74,37 @@ def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback:
     return f"{prefix}{named_object_fallback}"
 
 
-def assert_no_sync_usage_deadlock(loop_of_future: AbstractEventLoop, message: str) -> None:
-    try:
-        running_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        running_loop = None
-
-    if running_loop is loop_of_future:
-        raise SyncUsageError(message)
-
-
 async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
     return await awaitable
+
+
+def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:
+    """
+    Walk ``error``'s ``__context__`` chain to its root (the deepest
+    exception with no ``__context__``) and attach ``context`` there.
+
+    No-op if attaching would create a cycle — i.e. if ``context`` or any
+    exception reachable from it via ``__context__`` already appears in
+    ``error``'s chain.
+
+    Returns the exception that ``context`` was attached to, or ``None``
+    if no attachment happened.
+    """
+    # Walk to the root of error's chain, recording every node so we can
+    # check for overlap below.
+    root = error
+    seen: set[int] = {id(root)}
+    while root.__context__ is not None:
+        root = root.__context__
+        seen.add(id(root))
+
+    # If context's own chain shares any node with error's chain, attaching
+    # to root would loop back to root through that shared node.
+    node: BaseException | None = context
+    while node is not None:
+        if id(node) in seen:
+            return None
+        node = node.__context__
+
+    root.__context__ = context
+    return root

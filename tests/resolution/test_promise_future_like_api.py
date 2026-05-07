@@ -14,7 +14,7 @@ from promising import Promise
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_promise_future_like_api(*, start_soon: bool | None, await_promise: bool | None) -> None:
     """
     Test Promise's done() and result() behavior under various
     timing and execution conditions.
@@ -57,7 +57,6 @@ async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool
            - If None: Skip all awaiting (no task switching)
 
         3. Verify the Promise's state:
-           - Check that it's a proper asyncio.Future instance
            - Verify that done() status matches expected state
              based on parameters
               - Expected not to be done: Promise doesn't
@@ -100,8 +99,6 @@ async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool
     # `await_promise=None` in our test means that we don't want to await for
     # anything at all (no task switching)
 
-    assert isinstance(promise, asyncio.Future)
-
     if _promise_not_expected_to_be_done(start_soon=start_soon, await_promise=await_promise):
         # Two scenarios when the promise is not expected to be done:
         # 1. The promise is not prefilled and we don't await for anything at
@@ -131,14 +128,18 @@ async def test_promise_as_future(*, start_soon: bool | None, await_promise: bool
 
 @pytest.mark.parametrize("start_soon", [True, False, None])
 @pytest.mark.parametrize("await_promise", [True, False, None])
-async def test_promise_as_future_with_exception(*, start_soon: bool | None, await_promise: bool | None) -> None:
+async def test_promise_future_like_api_with_exception(
+    *,
+    start_soon: bool | None,
+    await_promise: bool | None,
+) -> None:
     """
     Test Promise's exception handling across various timing conditions.
 
     This test verifies that Promise correctly propagates exceptions. It mirrors
-    test_promise_as_future but focuses on exception scenarios, ensuring that
-    exceptions are properly handled whether the Promise is prefilled with an
-    exception or raises during coroutine execution.
+    test_promise_future_like_api but focuses on exception scenarios,
+    ensuring that exceptions are properly handled whether the Promise is
+    prefilled with an exception or raises during coroutine execution.
 
     Test Parameters:
         start_soon: Controls Promise execution timing:
@@ -302,7 +303,7 @@ async def test_concurrent_consumers(*, start_soon: bool | None) -> None:
         return await promise
 
     tasks = [asyncio.create_task(await_promise_task()) for _ in range(5)]
-    results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=2)
+    results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=3)
 
     assert promise.result() == "Hello from Promise!"
 

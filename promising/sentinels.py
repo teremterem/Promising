@@ -18,9 +18,6 @@ class Sentinel:
         return self._name
 
     def __bool__(self) -> bool:
-        # TODO Should any other magic methods be defined like this to prevent
-        #  reliance on Sentinel's truthiness ? We need to come up with a list
-        #  of such magic methods.
         raise SentinelUsageError(
             f"Sentinel {self._name} cannot be cast to boolean. "
             f"Use `is` / `is not` identity comparisons instead (e.g. `value is {self._name}`)."
@@ -28,7 +25,14 @@ class Sentinel:
 
 
 ASYNCIO_DEFAULT = Sentinel("ASYNCIO_DEFAULT")
+AUTO = Sentinel("AUTO")
 INHERIT = Sentinel("INHERIT")
 PROMISING_DEFAULT = Sentinel("PROMISING_DEFAULT")
 WHOLE_SUBTREE = Sentinel("WHOLE_SUBTREE")
 UNCHANGED = Sentinel("UNCHANGED")
+
+_PENDING = Sentinel("_PENDING")
+_CANCELLED_BEFORE_UNPACKED_ONCE = Sentinel("_CANCELLED_BEFORE_UNPACKED_ONCE")
+_UNPACKED_ONCE = Sentinel("_UNPACKED_ONCE")
+_CANCELLED_AFTER_UNPACKED_ONCE = Sentinel("_CANCELLED_AFTER_UNPACKED_ONCE")
+_FINISHED = Sentinel("_FINISHED")

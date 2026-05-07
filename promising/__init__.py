@@ -10,15 +10,17 @@ from promising.errors import (
     EventLoopError,
     EventLoopMismatchError,
     NoRunningEventLoopError,
+    PromiseInvalidStateError,
+    PromiseNotDoneError,
     PromiseNotFoundError,
+    PromiseNotUnpackedError,
     PromisingError,
     SentinelUsageError,
     SyncUsageError,
 )
-from promising.promise import Promise, PromiseBackedConcurrentFuture, get_active_promise
+from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.promising_context import (
     PromisingContext,
-    PromisingFuture,
     await_children,
     await_children_sync,
     collect_unsettled_children,
@@ -29,7 +31,15 @@ from promising.promising_context import (
     print_trace,
 )
 from promising.promising_function import PromisingFunction, function
-from promising.sentinels import ASYNCIO_DEFAULT, INHERIT, PROMISING_DEFAULT, UNCHANGED, WHOLE_SUBTREE, Sentinel
+from promising.sentinels import (
+    ASYNCIO_DEFAULT,
+    AUTO,
+    INHERIT,
+    PROMISING_DEFAULT,
+    UNCHANGED,
+    WHOLE_SUBTREE,
+    Sentinel,
+)
 
 
 class Defaults:
@@ -56,6 +66,7 @@ class Defaults:
 
 __all__ = [
     "ASYNCIO_DEFAULT",
+    "AUTO",
     "ContextAlreadyActiveError",
     "ContextAlreadyClosedError",
     "ContextError",
@@ -69,12 +80,13 @@ __all__ = [
     "NoRunningEventLoopError",
     "PROMISING_DEFAULT",
     "Promise",
-    "PromiseBackedConcurrentFuture",
+    "PromiseInvalidStateError",
+    "PromiseNotDoneError",
     "PromiseNotFoundError",
+    "PromiseNotUnpackedError",
     "PromisingContext",
     "PromisingError",
     "PromisingFunction",
-    "PromisingFuture",
     "Sentinel",
     "SentinelUsageError",
     "SyncUsageError",
@@ -90,4 +102,5 @@ __all__ = [
     "get_active_promise",
     "get_trace",
     "print_trace",
+    "wrap_awaitable",
 ]

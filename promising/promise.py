@@ -428,6 +428,7 @@ class Promise(PromisingContext, Generic[T_co]):
         correct. Promising does not currently target free-threaded
         interpreters.
         # TODO Future-proof it ?
+        #  https://github.com/teremterem/Promising/pull/102#discussion_r3197680342
         """
         state = self._state
         return state in (_FINISHED, _CANCELLED_BEFORE_UNPACKED_ONCE, _CANCELLED_AFTER_UNPACKED_ONCE)

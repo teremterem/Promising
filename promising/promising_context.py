@@ -249,9 +249,6 @@ async def await_children(*, whole_subtree: bool = True, unpack_promises_fully: b
             is fully awaited. If False, Promise children are only unpacked
             one level (via ``unpack_once()``).
     """
-    # TODO Do we need a check that ensures that this function was called in a
-    #  thread that contains the event loop of this particular
-    #  PromisingContext ? What other functions or methods might we need it in ?
     return await get_active_context().await_children(
         whole_subtree=whole_subtree,
         unpack_promises_fully=unpack_promises_fully,

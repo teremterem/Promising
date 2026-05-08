@@ -2,7 +2,7 @@ import promising
 
 
 def agent3_non_promise2() -> None:
-    raise ValueError("Agent 3 sub-function 2 error")
+    raise ValueError("Agent 3 non-promise 2 error")
 
 
 async def agent3_non_promise1() -> None:

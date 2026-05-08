@@ -1,4 +1,18 @@
+import sys
+import traceback
+
 import promising
+
+
+def my_excepthook(exc_type, exc_value, exc_tb):
+    print("━" * 60)
+    print(f"💥  {exc_type.__name__}: {exc_value}")
+    print("━" * 60)
+    traceback.print_tb(exc_tb)
+    print("━" * 60)
+
+
+sys.excepthook = my_excepthook
 
 
 def agent3_plain_func2() -> None:

@@ -175,6 +175,8 @@ class Promise(PromisingContext, Generic[T_co]):
     # TODO [P1] Make sure there is a clear mechanism of avoiding memory leaks,
     #  though, when sequences are enormously long and are not meant to be
     #  revisited by the user (e.g. a stream of events etc.)
+    # TODO Do we want to implement _add_done_callback() and
+    #  _add_unpacked_once_callback() ? Any other callbacks ?
 
     def __init__(
         self,

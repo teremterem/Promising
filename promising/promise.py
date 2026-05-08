@@ -744,10 +744,13 @@ class Promise(PromisingContext, Generic[T_co]):
             # TODO [CANCELLATION] Decide the philosophy on hierarchical
             #  promises vs. "promises that return other promises" — should
             #  subtree cancellation and cancellation of nested (returned)
-            #  Promises be treated as the same thing?
+            #  Promises be treated as the same thing ?
             depth = 0
             while isinstance(result, Promise):
                 result = await result
+                # TODO I suspect that logging of `depth` is currently broken -
+                #  full unpacking happens recursively, and this loop
+                #  (supposedly) always runs only once
                 depth += 1
                 _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 

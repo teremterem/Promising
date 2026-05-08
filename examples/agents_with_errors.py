@@ -1,17 +1,17 @@
 import promising
 
 
-def agent3_non_promise2() -> None:
-    raise ValueError("Agent 3 non-promise 2 error")
+def agent3_plain_func2() -> None:
+    raise ValueError("Agent 3 plain function 2 error")
 
 
-async def agent3_non_promise1() -> None:
-    return agent3_non_promise2()
+async def agent3_plain_coro1() -> None:
+    return agent3_plain_func2()
 
 
 @promising.function
 async def agent3() -> None:
-    return await agent3_non_promise1()
+    return await agent3_plain_coro1()
 
 
 @promising.function
@@ -19,9 +19,17 @@ async def agent2() -> None:
     return agent3()
 
 
+def agent1_plain_func2() -> None:
+    return agent2()
+
+
+async def agent1_plain_coro1() -> None:
+    return agent1_plain_func2()
+
+
 @promising.function
 async def agent1() -> None:
-    return agent2()
+    return await agent1_plain_coro1()
 
 
 @promising.function

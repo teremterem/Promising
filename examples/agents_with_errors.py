@@ -8,6 +8,8 @@ import promising
 def my_excepthook(exc_type, exc_value, exc_tb):
     # TODO Fallback to default printing behavior if the exception does not have
     #  __promising_context__  attribute at all
+    # TODO Is it possible to fetch the width of the terminal and use it for the
+    #  horizontal line length ?
     print("━" * 60)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print("━" * 60)

@@ -25,7 +25,12 @@ from promising.sentinels import (
     Sentinel,
 )
 from promising.types import T_co
-from promising.utils import attach_context_to_error_chain_root, awaitable_as_coroutine, resolve_namespace
+from promising.utils import (
+    attach_context_to_error_chain_root,
+    awaitable_as_coroutine,
+    capture_user_stack_summary,
+    resolve_namespace,
+)
 
 _logger = logging.getLogger(__name__)
 _unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
@@ -195,6 +200,8 @@ class Promise(PromisingContext, Generic[T_co]):
         # Validate before super().__init__ to avoid registering an unsettled
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
+
+        self._creation_stack_summary = capture_user_stack_summary()
 
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None

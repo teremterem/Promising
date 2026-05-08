@@ -781,9 +781,6 @@ class PromisingContext:
 
     def set_as_promising_context_on_exception(self, exception: BaseException) -> None:
         try:
-            # TODO Make it possible to disable setting this trace ?
-            # TODO [P1] Borrow from MiniAgents the mechanism that logs this
-            #  "promising breadcrumb" together with the error tracebacks
             if not hasattr(exception, "__promising_context__"):
                 # We only let it be set at the deepest level of the promise
                 # hierarchy

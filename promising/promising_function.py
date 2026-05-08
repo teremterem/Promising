@@ -306,6 +306,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             RuntimeError: If called from within an already-running event
                 loop (e.g., inside another async function).
         """
+        # TODO Would be nice to have a StackSummary from here too
         return asyncio.run(
             self.protected_run(
                 *args,

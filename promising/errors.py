@@ -3,6 +3,7 @@ import concurrent.futures
 import sys
 import threading
 import traceback
+from types import TracebackType
 
 
 class PromisingError(Exception):
@@ -94,7 +95,42 @@ class PromiseNotUnpackedError(PromiseInvalidStateError):
     """
 
 
-def _format_promising_exception(exc_type, exc_value, exc_tb) -> bool:
+def _promising_sys_excepthook(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType,
+) -> None:
+    if hasattr(exc_value, "__promising_context__") and _print_exception_with_promising_context(
+        exc_type,
+        exc_value,
+        exc_tb,
+    ):
+        return
+    _previous_sys_excepthook(exc_type, exc_value, exc_tb)
+
+
+def _promising_threading_excepthook(args: threading.excepthook_args) -> None:
+    if hasattr(args.exc_value, "__promising_context__") and _print_exception_with_promising_context(
+        args.exc_type,
+        args.exc_value,
+        args.exc_traceback,
+    ):
+        return
+    _previous_threading_excepthook(args)
+
+
+_previous_sys_excepthook = sys.excepthook
+_previous_threading_excepthook = threading.excepthook
+sys.excepthook = _promising_sys_excepthook
+threading.excepthook = _promising_threading_excepthook
+# TODO [TRACES] How to offer the same feature for the loggers ?
+
+
+def _print_exception_with_promising_context(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType,
+) -> bool:
     """Caller must have verified `exc_value` carries `__promising_context__`.
 
     Returns True if printed successfully, False if formatting itself raised —
@@ -140,33 +176,3 @@ def _format_promising_exception(exc_type, exc_value, exc_tb) -> bool:
         print(f"(promising traceback formatter failed: {fmt_err!r}; falling back)")
         return False
     return True
-
-
-# TODO [TRACES] Give this function a better name and add type hints
-def my_excepthook(exc_type, exc_value, exc_tb):
-    if hasattr(exc_value, "__promising_context__") and _format_promising_exception(
-        exc_type,
-        exc_value,
-        exc_tb,
-    ):
-        return
-    _previous_sys_excepthook(exc_type, exc_value, exc_tb)
-
-
-# TODO [TRACES] Give this function a better name and add type hints
-def my_threading_excepthook(args):
-    if hasattr(args.exc_value, "__promising_context__") and _format_promising_exception(
-        args.exc_type,
-        args.exc_value,
-        args.exc_traceback,
-    ):
-        return
-    _previous_threading_excepthook(args)
-
-
-# TODO [TRACES] What about formatting it for the loggers, and not just
-#  stderr/stdout ?
-_previous_sys_excepthook = sys.excepthook
-_previous_threading_excepthook = threading.excepthook
-sys.excepthook = my_excepthook
-threading.excepthook = my_threading_excepthook

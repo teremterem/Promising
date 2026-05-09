@@ -172,7 +172,7 @@ def _print_exception_with_promising_context(
         #  `... (`promising` internals omitted) ...`
         # TODO [TRACES] Do the same with `asyncio` and simplify skipping logic
         #  (process whole trace - don't stop at framework frames)
-    except BaseException as fmt_err:  # noqa: BLE001
+    except BaseException as fmt_err:
         print(f"(promising traceback formatter failed: {fmt_err!r}; falling back)")
         return False
     return True

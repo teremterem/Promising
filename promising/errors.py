@@ -93,6 +93,7 @@ class PromiseNotUnpackedError(PromiseInvalidStateError):
     """
 
 
+# TODO [TRACES] Give this function a better name and add type hints
 def my_excepthook(exc_type, exc_value, exc_tb):
     from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 

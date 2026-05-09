@@ -109,7 +109,7 @@ def _promising_sys_excepthook(
     _previous_sys_excepthook(exc_type, exc_value, exc_tb)
 
 
-def _promising_threading_excepthook(args: threading.excepthook_args) -> None:
+def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
     if hasattr(args.exc_value, "__promising_context__") and _print_exception_with_promising_context(
         args.exc_type,
         args.exc_value,

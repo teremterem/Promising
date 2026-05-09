@@ -71,7 +71,11 @@ async def agent1_plain_coro1() -> None:
 
 @promising.function
 async def agent1() -> None:
-    return await agent1_plain_coro1()
+    try:
+        return await agent1_plain_coro1()
+    except Exception as e:
+        # Let's see how the traceback changes upon re-raising
+        raise e
 
 
 @promising.function
@@ -79,4 +83,8 @@ async def main() -> None:
     return agent1()
 
 
-main.run()
+try:
+    main.run()
+except Exception as e:
+    # Let's see how the traceback changes upon re-raising
+    raise e

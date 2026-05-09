@@ -306,7 +306,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             RuntimeError: If called from within an already-running event
                 loop (e.g., inside another async function).
         """
-        # TODO Would be nice to have a StackSummary from here too
+        # TODO [TRACES] Would be nice to have a StackSummary from here too
         return asyncio.run(
             self.protected_run(
                 *args,
@@ -390,7 +390,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 await promise.await_children(whole_subtree=False)
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
-        # TODO Develop a convenient and idiomatic way (whatever that would
+        # TODO Develop a convenient and idiomatic way (whatever that might
         #  mean) of serializing/deserializing the arguments and ensuring
         #  immutability
 

@@ -4,11 +4,11 @@ import traceback
 import promising
 
 
-# TODO Move this hook somewhere in the promising framework itself
+# TODO [TRACES] Move this hook somewhere in the promising framework itself
 def my_excepthook(exc_type, exc_value, exc_tb):
-    # TODO Fallback to default printing behavior if the exception does not have
+    # TODO [TRACES] Fallback to default printing behavior if the exception does not have
     #  __promising_context__  attribute at all
-    # TODO Is it possible to fetch the width of the terminal and use it for the
+    # TODO [TRACES] Is it possible to fetch the width of the terminal and use it for the
     #  horizontal line length ?
     print("━" * 60)
     print(f"💥  {exc_type.__name__}: {exc_value}")
@@ -32,14 +32,18 @@ def my_excepthook(exc_type, exc_value, exc_tb):
         for line in stack_summary.format():
             print(line, end="")
         print("━" * 60)
-    # TODO At the very end the final traceback should be printed in the same
-    #  filtered fashion - the actual traceback of the exception that was raised
-    # TODO Make sure something like this is printed everytime framework frames
-    #  are omitted ?
+    # TODO [TRACES] At the very end the final traceback should be printed in
+    #  the same filtered fashion - the actual traceback of the exception that
+    #  was raised
+    # TODO [TRACES] Make sure something like this is printed everytime
+    #  framework frames are omitted ?
     #  `... (`promising` internals omitted) ...`
+    # TODO [TRACES] Do the same with `asyncio` and simplify skipping logic
+    #  (process whole trace - don't stop at framework frames)
 
 
-# TODO What about formatting it for the loggers, and not just stderr/stdout ?
+# TODO [TRACES] What about formatting it for the loggers, and not just
+#  stderr/stdout ?
 sys.excepthook = my_excepthook
 
 

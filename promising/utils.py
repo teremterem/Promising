@@ -94,12 +94,12 @@ def capture_user_stack_summary() -> traceback.StackSummary:
     returned ``StackSummary`` preserve the standard order — oldest first,
     most recent last.
     """
-    # TODO Can we be certain that this method does not load source code lines
-    #  eagerly ?
+    # TODO [TRACES] Can we be certain that this method does not load source
+    #  code lines eagerly ?
     full_stack = traceback.extract_stack()
 
-    # TODO Do this filtering upon exception printing instead
-    # TODO Any memory leaks here (`locals`` per frame etc.) ?
+    # TODO [TRACES] Do this filtering upon exception printing instead
+    # TODO [TRACES] Any memory leaks here (`locals`` per frame etc.) ?
     kept_reversed: list[traceback.FrameSummary] = []
     skipping_framework = True
     for frame in reversed(full_stack):

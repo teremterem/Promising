@@ -41,6 +41,7 @@ async def main() -> None:
     return agent1()
 
 
+# raise RuntimeError("Test error")
 try:
     main.run()
 except Exception as e:

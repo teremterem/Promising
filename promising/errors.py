@@ -191,10 +191,13 @@ def _print_exception_with_promising_context(
     print(separator)
 
 
-def _format_frames_with_collapses(frames: Iterable[traceback.FrameSummary]) -> list[str]:
-    result = traceback.StackSummary.from_list(frames).format()
-
-    return result
+def _format_frames_with_collapses(
+    frames: Iterable[traceback.FrameSummary],
+    *,
+    never_collapse_beginning: bool = False,
+) -> list[str]:
+    lines = traceback.StackSummary.from_list(frames).format()
+    return lines
 
 
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:

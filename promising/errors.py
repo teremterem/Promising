@@ -163,7 +163,7 @@ def _print_exception_with_promising_context(
     exc_value: BaseException,
     exc_tb: TracebackType,
     *,
-    collapse: bool = False,
+    collapse: bool = True,  # TODO [TRACES] Turn into a flag on exception
 ) -> None:
     """Caller must have verified `exc_value` carries `__promising_context__`.
 
@@ -178,7 +178,7 @@ def _print_exception_with_promising_context(
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
     if promising_context is not None:
-        collapse_ending = False
+        collapse_top = False
 
         for ctx in promising_context.get_trace(parents_first=True):
             if not isinstance(ctx, Promise):
@@ -187,13 +187,13 @@ def _print_exception_with_promising_context(
             for line in reversed(
                 _format_frames_with_collapses(
                     ctx.frame_summary_tuple,
-                    collapse_beginning=collapse,
-                    collapse_ending=collapse_ending,
+                    collapse_bottom=collapse,
+                    collapse_top=collapse_top,
                 )
             ):
                 print(line, end="")
 
-            collapse_ending = collapse
+            collapse_top = collapse
 
             print(separator)
             print(repr(ctx))
@@ -201,8 +201,8 @@ def _print_exception_with_promising_context(
 
     lines = _format_frames_with_collapses(
         reversed(traceback.extract_tb(exc_tb)),
-        collapse_beginning=False,
-        collapse_ending=collapse,
+        collapse_bottom=False,
+        collapse_top=collapse,
     )
     lines.reverse()
     for line in lines:
@@ -216,17 +216,17 @@ def _print_exception_with_promising_context(
 def _format_frames_with_collapses(
     frames: Iterable[traceback.FrameSummary],
     *,
-    collapse_beginning: bool,
-    collapse_ending: bool,
+    collapse_bottom: bool,
+    collapse_top: bool,
 ) -> list[str]:
     frame_list = list(frames)
     start = 0
-    if collapse_beginning:
+    if collapse_bottom:
         while start < len(frame_list) and _is_promising_or_asyncio_frame(frame_list[start]):
             start += 1
     end = len(frame_list)
     trailing_collapse = False
-    if collapse_ending:
+    if collapse_top:
         for i in range(start, len(frame_list)):
             if _is_promising_or_asyncio_frame(frame_list[i]):
                 end = i

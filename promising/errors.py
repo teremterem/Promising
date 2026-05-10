@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import logging
+import shutil
 import sys
 import threading
 import traceback
@@ -158,9 +159,9 @@ def _print_exception_with_promising_context(
     """
     from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-    # TODO [TRACES] Is it possible to fetch the width of the terminal
-    #  and use it for the horizontal line length ?
-    print("━" * 60)
+    separator = "━" * shutil.get_terminal_size().columns
+
+    print(separator)
 
     promising_context = getattr(exc_value, "__promising_context__", None)
     if promising_context is not None:
@@ -172,12 +173,12 @@ def _print_exception_with_promising_context(
             stack_summary = traceback.StackSummary.from_list(reversed(ctx.frame_summary_tuple))
             for line in stack_summary.format():
                 print(line, end="")
-            print("━" * 60)
+            print(separator)
 
     traceback.print_tb(exc_tb)
-    print("━" * 60)
+    print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
-    print("━" * 60)
+    print(separator)
 
     # TODO [TRACES] Make sure something like this is printed everytime
     #  promising/asyncio frames are omitted ?

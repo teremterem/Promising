@@ -170,6 +170,10 @@ def _print_exception_with_promising_context(
                 continue
 
             print(f"{ctx!r}")
+            # TODO [TRACES] Skip frames from promising or asyncio and print
+            #  something like this instead:
+            #  `... (promising/asyncio internals omitted) ...`
+            #  Above is just an example, you can come up with a better message.
             stack_summary = traceback.StackSummary.from_list(reversed(ctx.frame_summary_tuple))
             for line in stack_summary.format():
                 print(line, end="")
@@ -179,9 +183,3 @@ def _print_exception_with_promising_context(
     print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print(separator)
-
-    # TODO [TRACES] Make sure something like this is printed everytime
-    #  promising/asyncio frames are omitted ?
-    #  `... (promising/asyncio internals omitted) ...`
-    # TODO [TRACES] Do the same with `asyncio` and simplify skipping logic
-    #  (process whole trace - don't stop at framework frames)

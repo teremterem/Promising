@@ -853,9 +853,12 @@ class Promise(PromisingContext, Generic[T_co]):
                 # caught by the elif above).
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
-            # TODO [TRACES] Set context on the exception upon the promising
-            #  context manager exit instead ?
-            self.set_as_promising_context_on_exception(exception)
+            # The context was probably already attached to the exception by the
+            # ``with self:`` block of ``_unpack_once_from_loop``, but it is
+            # also possible that the exception occurred outside the
+            # ``with self:`` block (e.g. a framework bug), so lets try to
+            # attach it here too.
+            self.try_to_link_exception(exception)
             self._exception = exception
             self._set_state(terminal_state)
 
@@ -886,9 +889,11 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
-            # TODO [TRACES] Set context on the exception upon the promising
-            #  context manager exit instead ?
-            self.set_as_promising_context_on_exception(error)
+            # ``error`` is synthesized in the framework's except handlers
+            # after ``with self:`` has already exited, so it never passes
+            # through ``__exit__``'s attribution. Attach the context
+            # explicitly here.
+            self.try_to_link_exception(error)
             self._exception = error
             self._set_state(_FINISHED)
         except BaseException:

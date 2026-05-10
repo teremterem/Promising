@@ -744,6 +744,11 @@ class PromisingContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
+        if exc_value is not None:
+            # Attach this context to the in-flight exception as it leaves
+            # the ``with`` block.
+            self.try_to_link_exception(exc_value)
+
         try:
             if self._previous_token is None:
                 raise ContextNotActiveError(f"{self!r} is not active")
@@ -779,7 +784,12 @@ class PromisingContext:
             self._context_closed = True
         self._unregister_from_parent_if_time()
 
-    def set_as_promising_context_on_exception(self, exception: BaseException) -> None:
+    def try_to_link_exception(self, exception: BaseException) -> None:
+        """
+        Attach this context to the given exception. Idempotent (deepest
+        level wins), so a nested context that already attributed itself
+        is preserved.
+        """
         if hasattr(exception, "__promising_context__"):
             # We only let it be set at the deepest level of the promise
             # hierarchy

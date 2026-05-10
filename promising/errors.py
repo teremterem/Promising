@@ -6,6 +6,7 @@ import shutil
 import sys
 import threading
 import traceback
+from collections.abc import Collection
 from types import TracebackType
 
 _logger = logging.getLogger(__name__)
@@ -166,8 +167,7 @@ def _print_exception_with_promising_context(
     """
     from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-    separator = "━" * shutil.get_terminal_size().columns
-
+    separator = "-" * shutil.get_terminal_size().columns
     print(separator)
 
     promising_context = getattr(exc_value, "__promising_context__", None)
@@ -176,24 +176,27 @@ def _print_exception_with_promising_context(
             if not isinstance(ctx, Promise):
                 continue
 
-            print(f"{ctx!r}\n")
             _print_frames_collapsing_internals(list(reversed(ctx.frame_summary_tuple)))
+
+            print(separator)
+            print(repr(ctx))
             print(separator)
 
     _print_frames_collapsing_internals(list(traceback.extract_tb(exc_tb)))
+
     print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print(separator)
 
 
-def _print_frames_collapsing_internals(frames: list[traceback.FrameSummary]) -> None:
+def _print_frames_collapsing_internals(frames: Collection[traceback.FrameSummary]) -> None:
     i = 0
     n = len(frames)
     while i < n:
         if _is_promising_or_asyncio_frame(frames[i]):
             while i < n and _is_promising_or_asyncio_frame(frames[i]):
                 i += 1
-            print("\n  ... (promising/asyncio internals omitted) ...\n")
+            print("  ...")
         else:
             start = i
             while i < n and not _is_promising_or_asyncio_frame(frames[i]):

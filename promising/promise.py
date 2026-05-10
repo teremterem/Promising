@@ -202,7 +202,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
-        self._stack_summary = tuple[FrameSummary, ...](
+        self.frame_summary_tuple = tuple[FrameSummary, ...](
             traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)
         )
 

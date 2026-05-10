@@ -166,17 +166,16 @@ def _print_exception_with_promising_context(
         for ctx in promising_context.get_trace(parents_first=True):
             if not isinstance(ctx, Promise):
                 continue
-            stack_summary = getattr(ctx, "_stack_summary", None)
-            if stack_summary is None:
-                continue
+
             print(f"{ctx!r}")
+            stack_summary = traceback.StackSummary.from_list(reversed(ctx.frame_summary_tuple))
             for line in stack_summary.format():
                 print(line, end="")
 
     print("━" * 60)
     traceback.print_tb(exc_tb)
     print("━" * 60)
-    print(f"💥 {exc_type.__name__}: {exc_value}")
+    print(f"💥  {exc_type.__name__}: {exc_value}")
     print("━" * 60)
 
     # TODO [TRACES] Make sure something like this is printed everytime

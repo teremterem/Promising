@@ -145,11 +145,6 @@ def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
         _previous_threading_excepthook(args)
 
 
-def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
-    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
-    _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)
-
-
 _previous_sys_excepthook = sys.excepthook
 _previous_threading_excepthook = threading.excepthook
 # TODO [TRACES] This feature needs to be unit-tested somehow
@@ -162,10 +157,9 @@ def _print_exception_with_promising_context(
     exc_type: type[BaseException],
     exc_value: BaseException,
     exc_tb: TracebackType,
-    *,
-    collapse: bool = True,  # TODO [TRACES] Turn into a flag on exception
 ) -> None:
-    """Caller must have verified `exc_value` carries `__promising_context__`.
+    """
+    Caller must have verified ``exc_value`` carries ``__promising_context__``.
 
     Returns True if printed successfully, False if formatting itself raised —
     in which case the caller should fall back to the previous hook so the user
@@ -177,6 +171,8 @@ def _print_exception_with_promising_context(
     print(separator)
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
+    collapse = getattr(exc_value, "__promising_collapse_traceback__", False)
+
     if promising_context is not None:
         collapse_top = False
 
@@ -241,7 +237,12 @@ def _format_frames_with_collapses(
 
 
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
-    # TODO [TRACES] Don't just collapse frames for entire packages, identify
-    #  "anchoring" frames instead to decide which parts of the traceback to
-    #  collapse
+    # TODO [TRACES] Don't just collapse frames from promising and asyncio
+    #  entirely, identify "anchoring" frames instead to decide which part(s) of
+    #  the traceback to collapse
     return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)
+
+
+def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
+    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
+    _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)

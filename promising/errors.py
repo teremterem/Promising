@@ -176,14 +176,14 @@ def _print_exception_with_promising_context(
             if not isinstance(ctx, Promise):
                 continue
 
-            for line in _format_frames_with_collapses(ctx.frame_summary_tuple, reverse=True):
+            for line in reversed(_format_frames_with_collapses(ctx.frame_summary_tuple)):
                 print(line, end="")
 
             print(separator)
             print(repr(ctx))
             print(separator)
 
-    for line in _format_frames_with_collapses(reversed(traceback.extract_tb(exc_tb)), reverse=True):
+    for line in reversed(_format_frames_with_collapses(reversed(traceback.extract_tb(exc_tb)))):
         print(line, end="")
 
     print(separator)
@@ -191,15 +191,9 @@ def _print_exception_with_promising_context(
     print(separator)
 
 
-def _format_frames_with_collapses(
-    frames: Iterable[traceback.FrameSummary],
-    *,
-    reverse: bool,
-) -> list[str]:
+def _format_frames_with_collapses(frames: Iterable[traceback.FrameSummary]) -> list[str]:
     result = traceback.StackSummary.from_list(frames).format()
 
-    if reverse:
-        result.reverse()
     return result
 
 

@@ -203,7 +203,7 @@ class Promise(PromisingContext, Generic[T_co]):
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
         self.frame_summary_tuple = tuple[FrameSummary, ...](
-            traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)
+            traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)[1:]
         )
 
         self._result: T_co | Sentinel = UNCHANGED

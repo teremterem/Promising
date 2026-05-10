@@ -158,11 +158,12 @@ def _print_exception_with_promising_context(
     """
     from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
+    # TODO [TRACES] Is it possible to fetch the width of the terminal
+    #  and use it for the horizontal line length ?
+    print("━" * 60)
+
     promising_context = getattr(exc_value, "__promising_context__", None)
     if promising_context is not None:
-        # TODO [TRACES] Is it possible to fetch the width of the terminal
-        #  and use it for the horizontal line length ?
-        print("━" * 60)
         for ctx in promising_context.get_trace(parents_first=True):
             if not isinstance(ctx, Promise):
                 continue
@@ -171,8 +172,8 @@ def _print_exception_with_promising_context(
             stack_summary = traceback.StackSummary.from_list(reversed(ctx.frame_summary_tuple))
             for line in stack_summary.format():
                 print(line, end="")
+            print("━" * 60)
 
-    print("━" * 60)
     traceback.print_tb(exc_tb)
     print("━" * 60)
     print(f"💥  {exc_type.__name__}: {exc_value}")

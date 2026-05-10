@@ -169,6 +169,9 @@ def _print_exception_with_promising_context(
 
     separator = "-" * shutil.get_terminal_size().columns
     print(separator)
+    print("  Traceback")
+    print(separator)
+    print()
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
     collapse = getattr(exc_value, "__promising_collapse_traceback__", False)
@@ -191,9 +194,11 @@ def _print_exception_with_promising_context(
 
             collapse_top = collapse
 
+            print()
             print(separator)
             print(repr(ctx))
             print(separator)
+            print()
 
     lines = _format_frames_with_collapses(
         reversed(traceback.extract_tb(exc_tb)),
@@ -204,6 +209,7 @@ def _print_exception_with_promising_context(
     for line in lines:
         print(line, end="")
 
+    print()
     print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print(separator)
@@ -230,11 +236,10 @@ def _format_frames_with_collapses(
                 break
     lines = traceback.StackSummary.from_list(frame_list[start:end]).format()
 
-    filler = "\n  ... (collapsed frames)\n\n"
     if start > 0:
-        lines.insert(0, filler)
+        lines.insert(0, "\n  ... (collapsed frames)\n")
     if trailing_collapse:
-        lines.append(filler)
+        lines.append("  ... (collapsed frames)\n\n")
     return lines
 
 

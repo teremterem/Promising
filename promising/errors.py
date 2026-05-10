@@ -211,6 +211,7 @@ def _format_frames_with_collapses(
     collapse_bottom: bool,
     collapse_top: bool,
 ) -> list[str]:
+    # TODO [TRACES] Revise this function - it might be slightly broken
     frame_list = list(frames)
     start = 0
     if collapse_bottom:

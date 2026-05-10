@@ -6,7 +6,7 @@ import shutil
 import sys
 import threading
 import traceback
-from collections.abc import Collection
+from collections.abc import Iterable
 from types import TracebackType
 
 _logger = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
 
 
 def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
-    print("\nWARNING: FAILED TO PRINT PROMISING TRACE\n")
+    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
     _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)
 
 
@@ -176,33 +176,31 @@ def _print_exception_with_promising_context(
             if not isinstance(ctx, Promise):
                 continue
 
-            _print_frames_collapsing_internals(list(reversed(ctx.frame_summary_tuple)))
+            for line in _format_frames_with_collapses(ctx.frame_summary_tuple, reverse=True):
+                print(line, end="")
 
             print(separator)
             print(repr(ctx))
             print(separator)
 
-    _print_frames_collapsing_internals(list(traceback.extract_tb(exc_tb)))
+    for line in _format_frames_with_collapses(reversed(traceback.extract_tb(exc_tb)), reverse=True):
+        print(line, end="")
 
     print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print(separator)
 
 
-def _print_frames_collapsing_internals(frames: Collection[traceback.FrameSummary]) -> None:
-    i = 0
-    n = len(frames)
-    while i < n:
-        if _is_promising_or_asyncio_frame(frames[i]):
-            while i < n and _is_promising_or_asyncio_frame(frames[i]):
-                i += 1
-            print("  ...")
-        else:
-            start = i
-            while i < n and not _is_promising_or_asyncio_frame(frames[i]):
-                i += 1
-            for line in traceback.StackSummary.from_list(frames[start:i]).format():
-                print(line, end="")
+def _format_frames_with_collapses(
+    frames: Iterable[traceback.FrameSummary],
+    *,
+    reverse: bool,
+) -> list[str]:
+    result = traceback.StackSummary.from_list(frames).format()
+
+    if reverse:
+        result.reverse()
+    return result
 
 
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:

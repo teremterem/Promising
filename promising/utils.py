@@ -9,7 +9,11 @@ from typing import Any
 from promising.errors import NoRunningEventLoopError
 from promising.types import DecoratableFunctionType
 
-_FRAMEWORK_DIR = os.path.dirname(os.path.abspath(__file__))
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to verify that these directories are
+#  correct
+_FRAMEWORK_DIR: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
+_ASYNCIO_DIR: str = os.path.dirname(os.path.abspath(asyncio.__file__)) + os.sep
 
 
 def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
@@ -82,44 +86,8 @@ async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
     return await awaitable
 
 
-def capture_user_stack_summary() -> traceback.StackSummary:
-    """
-    Capture the current call stack as a ``traceback.StackSummary``,
-    keeping only the user-code frames immediately above the most recent
-    run of promising-framework frames.
-
-    Walking from the most recent frame upward, the function first skips
-    over framework frames, then keeps non-framework frames, and stops as
-    soon as framework frames are encountered again. Frames in the
-    returned ``StackSummary`` preserve the standard order — oldest first,
-    most recent last.
-    """
-    # TODO [TRACES] Can we be certain that this method does not load source
-    #  code lines eagerly ?
-    full_stack = traceback.extract_stack()
-
-    # TODO [TRACES] Do this filtering upon exception printing instead
-    # TODO [TRACES] Any memory leaks here (`locals`` per frame etc.) ?
-    kept_reversed: list[traceback.FrameSummary] = []
-    skipping_framework = True
-    for frame in reversed(full_stack):
-        is_framework = _is_framework_frame(frame)
-        if skipping_framework:
-            if is_framework:
-                continue
-            skipping_framework = False
-            kept_reversed.append(frame)
-        else:
-            if is_framework:
-                break
-            kept_reversed.append(frame)
-
-    kept_reversed.reverse()
-    return traceback.StackSummary.from_list(kept_reversed)
-
-
-def _is_framework_frame(frame: traceback.FrameSummary) -> bool:
-    return frame.filename.startswith(_FRAMEWORK_DIR + os.sep)
+def is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
+    return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)
 
 
 def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:

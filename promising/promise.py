@@ -2,8 +2,10 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
+import traceback
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
+from traceback import FrameSummary
 from typing import Any, Generic
 
 from promising.errors import (
@@ -28,7 +30,6 @@ from promising.types import T_co
 from promising.utils import (
     attach_context_to_error_chain_root,
     awaitable_as_coroutine,
-    capture_user_stack_summary,
     resolve_namespace,
 )
 
@@ -201,7 +202,9 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
-        self._creation_stack_summary = capture_user_stack_summary()
+        self._creation_stack_summary = tuple[FrameSummary, ...](
+            traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)
+        )
 
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None

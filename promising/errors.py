@@ -168,10 +168,7 @@ def _print_exception_with_promising_context(
     from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
     separator = "-" * shutil.get_terminal_size().columns
-    print(separator)
-    print("  Traceback")
-    print(separator)
-    print()
+    print(f"{separator}\n  Traceback\n{separator}\n")
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
     collapse = getattr(exc_value, "__promising_collapse_traceback__", False)
@@ -194,11 +191,7 @@ def _print_exception_with_promising_context(
 
             collapse_top = collapse
 
-            print()
-            print(separator)
-            print(repr(ctx))
-            print(separator)
-            print()
+            print(f"\n{separator}\n{ctx!r}\n{separator}\n")
 
     lines = _format_frames_with_collapses(
         reversed(traceback.extract_tb(exc_tb)),
@@ -209,10 +202,7 @@ def _print_exception_with_promising_context(
     for line in lines:
         print(line, end="")
 
-    print()
-    print(separator)
-    print(f"💥  {exc_type.__name__}: {exc_value}")
-    print(separator)
+    print(f"\n{separator}\n💥  {exc_type.__name__}: {exc_value}\n{separator}")
 
 
 def _format_frames_with_collapses(

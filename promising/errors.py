@@ -230,7 +230,7 @@ def _format_frames_with_collapses(
                 break
     lines = traceback.StackSummary.from_list(frame_list[start:end]).format()
 
-    filler = "\n  ... (omitted for brevity)\n\n"
+    filler = "\n  ... (collapsed frames)\n\n"
     if start > 0:
         lines.insert(0, filler)
     if trailing_collapse:

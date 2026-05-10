@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import logging
+import os
 import shutil
 import sys
 import threading
@@ -8,6 +9,12 @@ import traceback
 from types import TracebackType
 
 _logger = logging.getLogger(__name__)
+
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to verify that these directories are
+#  correct
+_FRAMEWORK_DIR: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
+_ASYNCIO_DIR: str = os.path.dirname(os.path.abspath(asyncio.__file__)) + os.sep
 
 
 class PromisingError(Exception):
@@ -169,17 +176,31 @@ def _print_exception_with_promising_context(
             if not isinstance(ctx, Promise):
                 continue
 
-            print(f"{ctx!r}")
-            # TODO [TRACES] Skip frames from promising or asyncio and print
-            #  something like this instead:
-            #  `... (promising/asyncio internals omitted) ...`
-            #  Above is just an example, you can come up with a better message.
-            stack_summary = traceback.StackSummary.from_list(reversed(ctx.frame_summary_tuple))
-            for line in stack_summary.format():
-                print(line, end="")
+            print(f"{ctx!r}\n")
+            _print_frames_collapsing_internals(list(reversed(ctx.frame_summary_tuple)))
             print(separator)
 
-    traceback.print_tb(exc_tb)
+    _print_frames_collapsing_internals(list(traceback.extract_tb(exc_tb)))
     print(separator)
     print(f"💥  {exc_type.__name__}: {exc_value}")
     print(separator)
+
+
+def _print_frames_collapsing_internals(frames: list[traceback.FrameSummary]) -> None:
+    i = 0
+    n = len(frames)
+    while i < n:
+        if _is_promising_or_asyncio_frame(frames[i]):
+            while i < n and _is_promising_or_asyncio_frame(frames[i]):
+                i += 1
+            print("\n  ... (promising/asyncio internals omitted) ...\n")
+        else:
+            start = i
+            while i < n and not _is_promising_or_asyncio_frame(frames[i]):
+                i += 1
+            for line in traceback.StackSummary.from_list(frames[start:i]).format():
+                print(line, end="")
+
+
+def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
+    return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)

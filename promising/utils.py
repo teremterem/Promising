@@ -1,19 +1,11 @@
 import asyncio
 import inspect
-import os
-import traceback
 from asyncio import AbstractEventLoop
 from collections.abc import Awaitable
 from typing import Any
 
 from promising.errors import NoRunningEventLoopError
 from promising.types import DecoratableFunctionType
-
-# TODO [TRACES] Is it ok that we are not using Pathlib here ?
-# TODO [TRACES] A unit test is needed to verify that these directories are
-#  correct
-_FRAMEWORK_DIR: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
-_ASYNCIO_DIR: str = os.path.dirname(os.path.abspath(asyncio.__file__)) + os.sep
 
 
 def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
@@ -84,10 +76,6 @@ def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback:
 
 async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
     return await awaitable
-
-
-def is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
-    return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)
 
 
 def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:

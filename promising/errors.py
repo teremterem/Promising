@@ -241,7 +241,7 @@ def _format_frames_with_collapses(
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
     # TODO [TRACES] Don't just collapse frames from promising and asyncio
     #  entirely, identify "anchoring" frames instead to decide which part(s) of
-    #  the traceback to collapse
+    #  the traceback to collapse based on those "anchors" ?
     return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)
 
 

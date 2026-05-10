@@ -8,6 +8,10 @@ import threading
 import traceback
 from collections.abc import Iterable
 from types import TracebackType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from promising.promising_context import PromisingContext
 
 _logger = logging.getLogger(__name__)
 
@@ -158,6 +162,8 @@ def _print_exception_with_promising_context(
     exc_type: type[BaseException],
     exc_value: BaseException,
     exc_tb: TracebackType,
+    *,
+    collapse: bool = False,
 ) -> None:
     """Caller must have verified `exc_value` carries `__promising_context__`.
 
@@ -170,20 +176,36 @@ def _print_exception_with_promising_context(
     separator = "-" * shutil.get_terminal_size().columns
     print(separator)
 
-    promising_context = getattr(exc_value, "__promising_context__", None)
+    promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
     if promising_context is not None:
+        collapse_ending = False
+
         for ctx in promising_context.get_trace(parents_first=True):
             if not isinstance(ctx, Promise):
                 continue
 
-            for line in reversed(_format_frames_with_collapses(ctx.frame_summary_tuple)):
+            for line in reversed(
+                _format_frames_with_collapses(
+                    ctx.frame_summary_tuple,
+                    collapse_beginning=collapse,
+                    collapse_ending=collapse_ending,
+                )
+            ):
                 print(line, end="")
+
+            collapse_ending = collapse
 
             print(separator)
             print(repr(ctx))
             print(separator)
 
-    for line in reversed(_format_frames_with_collapses(reversed(traceback.extract_tb(exc_tb)))):
+    lines = _format_frames_with_collapses(
+        reversed(traceback.extract_tb(exc_tb)),
+        collapse_beginning=False,
+        collapse_ending=collapse,
+    )
+    lines.reverse()
+    for line in lines:
         print(line, end="")
 
     print(separator)
@@ -194,11 +216,32 @@ def _print_exception_with_promising_context(
 def _format_frames_with_collapses(
     frames: Iterable[traceback.FrameSummary],
     *,
-    never_collapse_beginning: bool = False,
+    collapse_beginning: bool,
+    collapse_ending: bool,
 ) -> list[str]:
-    lines = traceback.StackSummary.from_list(frames).format()
+    frame_list = list(frames)
+    start = 0
+    if collapse_beginning:
+        while start < len(frame_list) and _is_promising_or_asyncio_frame(frame_list[start]):
+            start += 1
+    end = len(frame_list)
+    trailing_collapse = False
+    if collapse_ending:
+        for i in range(start, len(frame_list)):
+            if _is_promising_or_asyncio_frame(frame_list[i]):
+                end = i
+                trailing_collapse = True
+                break
+    lines = traceback.StackSummary.from_list(frame_list[start:end]).format()
+    if start > 0:
+        lines.insert(0, "  ...\n")
+    if trailing_collapse:
+        lines.append("  ...\n")
     return lines
 
 
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
+    # TODO [TRACES] Don't just collapse frames for entire packages, identify
+    #  "anchoring" frames instead to decide which parts of the traceback to
+    #  collapse
     return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)

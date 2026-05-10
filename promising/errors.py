@@ -1,9 +1,12 @@
 import asyncio
 import concurrent.futures
+import logging
 import sys
 import threading
 import traceback
 from types import TracebackType
+
+_logger = logging.getLogger(__name__)
 
 
 class PromisingError(Exception):
@@ -100,23 +103,38 @@ def _promising_sys_excepthook(
     exc_value: BaseException,
     exc_tb: TracebackType,
 ) -> None:
-    if hasattr(exc_value, "__promising_context__") and _print_exception_with_promising_context(
-        exc_type,
-        exc_value,
-        exc_tb,
-    ):
-        return
-    _previous_sys_excepthook(exc_type, exc_value, exc_tb)
+    if hasattr(exc_value, "__promising_context__"):
+        try:
+            _print_exception_with_promising_context(
+                exc_type,
+                exc_value,
+                exc_tb,
+            )
+        except BaseException as e:
+            _previous_sys_excepthook(exc_type, exc_value, exc_tb)
+            _report_failure_to_print_promising_trace(e)
+    else:
+        _previous_sys_excepthook(exc_type, exc_value, exc_tb)
 
 
 def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
-    if hasattr(args.exc_value, "__promising_context__") and _print_exception_with_promising_context(
-        args.exc_type,
-        args.exc_value,
-        args.exc_traceback,
-    ):
-        return
-    _previous_threading_excepthook(args)
+    if hasattr(args.exc_value, "__promising_context__"):
+        try:
+            _print_exception_with_promising_context(
+                args.exc_type,
+                args.exc_value,
+                args.exc_traceback,
+            )
+        except BaseException as e:
+            _previous_threading_excepthook(args)
+            _report_failure_to_print_promising_trace(e)
+    else:
+        _previous_threading_excepthook(args)
+
+
+def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
+    print("\nWARNING: FAILED TO PRINT PROMISING TRACE\n")
+    _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)
 
 
 _previous_sys_excepthook = sys.excepthook
@@ -131,43 +149,38 @@ def _print_exception_with_promising_context(
     exc_type: type[BaseException],
     exc_value: BaseException,
     exc_tb: TracebackType,
-) -> bool:
+) -> None:
     """Caller must have verified `exc_value` carries `__promising_context__`.
 
     Returns True if printed successfully, False if formatting itself raised —
     in which case the caller should fall back to the previous hook so the user
     still sees their traceback.
     """
-    try:
-        from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
+    from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        pc = getattr(exc_value, "__promising_context__", None)
-        if pc is not None:
-            # TODO [TRACES] Is it possible to fetch the width of the terminal
-            #  and use it for the horizontal line length ?
-            print("━" * 60)
-            for ctx in pc.get_trace(parents_first=True):
-                if not isinstance(ctx, Promise):
-                    continue
-                stack_summary = getattr(ctx, "_creation_stack_summary", None)
-                if stack_summary is None:
-                    continue
-                print(f"{ctx!r}")
-                for line in stack_summary.format():
-                    print(line, end="")
+    promising_context = getattr(exc_value, "__promising_context__", None)
+    if promising_context is not None:
+        # TODO [TRACES] Is it possible to fetch the width of the terminal
+        #  and use it for the horizontal line length ?
+        print("━" * 60)
+        for ctx in promising_context.get_trace(parents_first=True):
+            if not isinstance(ctx, Promise):
+                continue
+            stack_summary = getattr(ctx, "_stack_summary", None)
+            if stack_summary is None:
+                continue
+            print(f"{ctx!r}")
+            for line in stack_summary.format():
+                print(line, end="")
 
-        print("━" * 60)
-        traceback.print_tb(exc_tb)
-        print("━" * 60)
-        print(f"💥  {exc_type.__name__}: {exc_value}")
-        print("━" * 60)
+    print("━" * 60)
+    traceback.print_tb(exc_tb)
+    print("━" * 60)
+    print(f"💥 {exc_type.__name__}: {exc_value}")
+    print("━" * 60)
 
-        # TODO [TRACES] Make sure something like this is printed everytime
-        #  promising/asyncio frames are omitted ?
-        #  `... (promising/asyncio internals omitted) ...`
-        # TODO [TRACES] Do the same with `asyncio` and simplify skipping logic
-        #  (process whole trace - don't stop at framework frames)
-    except BaseException as fmt_err:
-        print(f"(promising traceback formatter failed: {fmt_err!r}; falling back)")
-        return False
-    return True
+    # TODO [TRACES] Make sure something like this is printed everytime
+    #  promising/asyncio frames are omitted ?
+    #  `... (promising/asyncio internals omitted) ...`
+    # TODO [TRACES] Do the same with `asyncio` and simplify skipping logic
+    #  (process whole trace - don't stop at framework frames)

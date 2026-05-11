@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from promising.errors import (
@@ -40,6 +41,10 @@ from promising.sentinels import (
     WHOLE_SUBTREE,
     Sentinel,
 )
+
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to check that the path is correct
+_PACKAGE_ABS_PATH: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
 
 
 class Defaults:

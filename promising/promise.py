@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
+import os
 import traceback
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
@@ -35,6 +36,10 @@ from promising.utils import (
 
 _logger = logging.getLogger(__name__)
 _unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
+
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to check that the path is correct
+_MODULE_ABS_PATH: str = os.path.abspath(__file__) + os.sep
 
 
 def wrap_awaitable(

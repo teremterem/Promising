@@ -1,7 +1,6 @@
 import asyncio
 import concurrent.futures
 import logging
-import os
 import shutil
 import sys
 import threading
@@ -14,12 +13,6 @@ if TYPE_CHECKING:
     from promising.promising_context import PromisingContext
 
 _logger = logging.getLogger(__name__)
-
-# TODO [TRACES] Is it ok that we are not using Pathlib here ?
-# TODO [TRACES] A unit test is needed to verify that these directories are
-#  correct
-_FRAMEWORK_DIR: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
-_ASYNCIO_DIR: str = os.path.dirname(os.path.abspath(asyncio.__file__)) + os.sep
 
 
 class PromisingError(Exception):
@@ -236,10 +229,9 @@ def _format_frames_with_collapses(
 
 
 def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
-    # TODO [TRACES] Don't just collapse frames from promising and asyncio
-    #  entirely, identify "anchoring" frames instead to decide which part(s) of
-    #  the traceback to collapse based on those "anchors" ?
-    return frame.filename.startswith(_FRAMEWORK_DIR) or frame.filename.startswith(_ASYNCIO_DIR)
+    from promising import _PACKAGE_ABS_PATH  # noqa: PLC0415 (import-outside-top-level)
+
+    return frame.filename.startswith(_PACKAGE_ABS_PATH)
 
 
 def _report_failure_to_print_promising_trace(failure: BaseException) -> None:

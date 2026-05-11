@@ -165,8 +165,6 @@ def _print_exception_with_promising_context(
     in which case the caller should fall back to the previous hook so the user
     still sees their traceback.
     """
-    from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
-
     separator = "-" * shutil.get_terminal_size().columns
     print(f"{separator}\n  Traceback\n{separator}\n")
 
@@ -177,7 +175,10 @@ def _print_exception_with_promising_context(
         collapse_top = False
 
         for ctx in promising_context.get_trace(parents_first=True):
-            if not isinstance(ctx, Promise):
+            frame_summary_tuple = getattr(ctx, "frame_summary_tuple", None)
+            if frame_summary_tuple is None:
+                # This is not a Promise instance (or any other [hypothetical]
+                # context supporting this attribute)
                 continue
 
             for line in reversed(

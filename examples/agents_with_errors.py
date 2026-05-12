@@ -2,7 +2,8 @@ import promising
 
 
 def agent3_plain_func2() -> None:
-    raise ValueError("Agent 3 plain function 2 error")
+    with promising.context(start_soon_default="This should fail"):
+        print("It did not fail =/")
 
 
 async def agent3_plain_coro1() -> None:
@@ -11,7 +12,11 @@ async def agent3_plain_coro1() -> None:
 
 @promising.function
 async def agent3() -> None:
-    return await agent3_plain_coro1()
+    try:
+        return await agent3_plain_coro1()
+    except Exception as e:
+        # Let's see how the traceback changes upon re-raising
+        raise e
 
 
 @promising.function
@@ -29,11 +34,7 @@ async def agent1_plain_coro1() -> None:
 
 @promising.function
 async def agent1() -> None:
-    # try:
     return await agent1_plain_coro1()
-    # except Exception as e:
-    #     # Let's see how the traceback changes upon re-raising
-    #     raise e
 
 
 @promising.function
@@ -41,9 +42,8 @@ async def main() -> None:
     return agent1()
 
 
-# # raise RuntimeError("Test error")
-# try:
-main.run()
-# except Exception as e:
-#     # Let's see how the traceback changes upon re-raising
-#     raise e
+try:
+    main.run(collapse_tracebacks=True)
+except Exception as e:
+    # Let's see how the traceback changes upon re-raising
+    raise e

@@ -205,13 +205,14 @@ def _format_frames_with_collapses(
     collapse_bottom: bool,
     collapse_top: bool,
 ) -> list[str]:
-    # TODO [TRACES] Revise this function - it might be slightly broken
+    # TODO [TRACES] Revise this function - it might be somewhat broken
     frame_list = list(frames)
     start = 0
     if collapse_bottom:
         while start < len(frame_list) and _is_promising_or_asyncio_frame(frame_list[start]):
             start += 1
     end = len(frame_list)
+
     trailing_collapse = False
     if collapse_top:
         for i in range(start, len(frame_list)):
@@ -219,8 +220,14 @@ def _format_frames_with_collapses(
                 end = i
                 trailing_collapse = True
                 break
-    lines = traceback.StackSummary.from_list(frame_list[start:end]).format()
 
+    filtered_frames = frame_list[start:end]
+    if not filtered_frames:
+        start = 0
+        trailing_collapse = False
+        filtered_frames = frame_list
+
+    lines = traceback.StackSummary.from_list(filtered_frames).format()
     if start > 0:
         lines.insert(0, "\n  ... (collapsed frames)\n")
     if trailing_collapse:

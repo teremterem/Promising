@@ -244,6 +244,9 @@ class Promise(PromisingContext, Generic[T_co]):
             collapse_tracebacks=collapse_tracebacks,
             close_context_immediately=awaitable is None,
         )
+        # TODO [P1] Validations (or any other exceptions) that happen after
+        #  super().__init__() forever leaves the Promise registered as an
+        #  unsettled child with the parent
         self._start_soon = self._resolve_start_soon(start_soon)
 
         self._full_unpacking_task: Task[T_co] | None = None

@@ -102,6 +102,16 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
+        collapse_tracebacks: When True (the default), tracebacks of
+            exceptions that propagate out of this context (or its subtree)
+            are rendered without the noisy promising-internal frames, so the
+            user sees only the application-level frames that actually
+            originated the failure. Set to False to keep the full,
+            uncollapsed traceback (useful when debugging the promising
+            library itself). Local override for the global
+            ``Defaults.COLLAPSE_TRACEBACKS``, effective in the whole subtree
+            of this context. ``INHERIT`` (default) propagates from the
+            parent.
     """
 
     def __init__(
@@ -113,6 +123,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = AUTO,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
         super().__init__(
@@ -120,6 +131,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
         )
         self.ctx_loop = loop
@@ -147,6 +159,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
                 thread_pool=self.thread_pool,
                 children_start_soon=self.children_start_soon,
                 start_soon_default=self.start_soon_default,
+                collapse_tracebacks=self.collapse_tracebacks,
             )
         return self._promising_context.__enter__()
 
@@ -171,6 +184,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        collapse_tracebacks: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
@@ -186,6 +200,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
             **kwargs,
             **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
@@ -199,6 +214,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
             start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
+            collapse_tracebacks=settings_as_dict.get("collapse_tracebacks", self.collapse_tracebacks),
         )
 
         if self._is_wrapped_async:
@@ -374,6 +390,7 @@ class PromisingContext:
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         # TODO Introduce inheritable promise_class parameter
         #  (and promise_class_default) ?
         # TODO Introduce inheritable wrap_coroutines parameter
@@ -395,6 +412,7 @@ class PromisingContext:
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
+        self._collapse_tracebacks = self._resolve_collapse_tracebacks(collapse_tracebacks)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
 
         if loop is None:
@@ -796,8 +814,7 @@ class PromisingContext:
             return
         try:
             exception.__promising_context__: PromisingContext = self
-            # TODO [TRACES] Make this configurable on the PromisingContext
-            exception.__promising_collapse_traceback__: bool = True
+            exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
         except BaseException:
             _logger.debug(
                 "Failed to attach either __promising_context__ or "
@@ -906,6 +923,26 @@ class PromisingContext:
         raise ValueError(
             f"`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
             f"but `{type(start_soon_default)}` was given for {self!r} instead"
+        )
+
+    def _resolve_collapse_tracebacks(self, collapse_tracebacks: bool | Sentinel) -> bool:
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
+        if isinstance(collapse_tracebacks, bool):
+            return collapse_tracebacks
+
+        if collapse_tracebacks is PROMISING_DEFAULT:
+            return Defaults.COLLAPSE_TRACEBACKS
+
+        if collapse_tracebacks is INHERIT:
+            if self._parent is None:
+                return Defaults.COLLAPSE_TRACEBACKS
+
+            return self._parent._collapse_tracebacks
+
+        raise ValueError(
+            f"`collapse_tracebacks` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(collapse_tracebacks)}` was given for {self!r} instead"
         )
 
     def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:

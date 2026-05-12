@@ -19,6 +19,7 @@ def function(
     start_soon: bool | None | Sentinel = None,
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
+    collapse_tracebacks: bool | Sentinel = INHERIT,
     thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     use_thread_pool: bool | None = None,
 ) -> "PromisingFunction[T_co] | Callable[Callable[..., T_co], PromisingFunction[T_co]]":
@@ -80,6 +81,15 @@ def function(
         start_soon_default: Default ``start_soon`` value propagated to child
             promises. Defaults to ``INHERIT``, meaning the value is inherited
             from the parent ``Promise``.
+        collapse_tracebacks: When True (the default), tracebacks of
+            exceptions that propagate out of this ``Promise`` (or its
+            subtree) are rendered without the noisy promising-internal
+            frames, so the user sees only the application-level frames that
+            actually originated the failure. Set to False to keep the full,
+            uncollapsed traceback (useful when debugging the promising
+            library itself). Local override for the global
+            ``Defaults.COLLAPSE_TRACEBACKS``. ``INHERIT`` (default)
+            propagates from the parent.
         thread_pool: Thread pool executor used to run sync promising functions.
             ``INHERIT`` (default) inherits from the parent context, falling
             back to ``PROMISING_DEFAULT`` at the root. ``PROMISING_DEFAULT``
@@ -123,6 +133,7 @@ def function(
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
+                collapse_tracebacks=collapse_tracebacks,
                 thread_pool=thread_pool,
                 use_thread_pool=use_thread_pool,
             )
@@ -137,6 +148,7 @@ def function(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        collapse_tracebacks=collapse_tracebacks,
         thread_pool=thread_pool,
         use_thread_pool=use_thread_pool,
     )
@@ -161,6 +173,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
         use_thread_pool: bool | None = None,
     ) -> None:
@@ -169,6 +182,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
         )
         self.start_soon = start_soon
@@ -188,6 +202,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon: bool | None | Sentinel = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        collapse_tracebacks: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
         **kwargs: Any,
@@ -199,7 +214,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         sync functions in a thread pool automatically).
 
         The ``namespace``, ``start_soon``, ``children_start_soon``,
-        ``start_soon_default``, and ``thread_pool``
+        ``start_soon_default``, ``collapse_tracebacks``, and ``thread_pool``
         parameters can be passed as keyword arguments to override the
         values set on the ``PromisingFunction`` at decoration time. To
         use the decorator-level values, simply omit these keyword
@@ -226,6 +241,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                   this ``Promise``'s execution.
                 - **start_soon_default** — Local override for the global
                   ``Defaults.START_SOON``.
+                - **collapse_tracebacks** — Whether tracebacks of
+                  exceptions that propagate out of this ``Promise`` (or
+                  its subtree) are rendered without the noisy
+                  promising-internal frames (True, the default) or with
+                  the full uncollapsed traceback (False).
                 - **thread_pool** — Thread pool executor for sync
                   functions. See ``promising.function`` for details.
                 - **use_thread_pool** — Whether to run a sync function
@@ -248,6 +268,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
             **kwargs,
             **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
@@ -260,6 +281,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon: bool | None | Sentinel = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        collapse_tracebacks: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
         await_children: bool | Sentinel = WHOLE_SUBTREE,
@@ -290,6 +312,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 policy.
             start_soon_default: Override for the global
                 ``start_soon`` default.
+            collapse_tracebacks: Override for whether tracebacks of
+                exceptions that propagate out of this ``Promise`` (or
+                its subtree) are rendered without the noisy
+                promising-internal frames (True) or with the full
+                uncollapsed traceback (False).
             thread_pool: Override for the thread pool executor.
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
@@ -313,6 +340,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 start_soon=start_soon,
                 children_start_soon=children_start_soon,
                 start_soon_default=start_soon_default,
+                collapse_tracebacks=collapse_tracebacks,
                 thread_pool=thread_pool,
                 use_thread_pool=use_thread_pool,
                 await_children=await_children,
@@ -327,6 +355,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         start_soon: bool | None | Sentinel = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        collapse_tracebacks: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         use_thread_pool: bool | Sentinel = UNCHANGED,
         await_children: bool | Sentinel = WHOLE_SUBTREE,
@@ -354,6 +383,11 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 policy.
             start_soon_default: Override for the global
                 ``start_soon`` default.
+            collapse_tracebacks: Override for whether tracebacks of
+                exceptions that propagate out of this ``Promise`` (or
+                its subtree) are rendered without the noisy
+                promising-internal frames (True) or with the full
+                uncollapsed traceback (False).
             thread_pool: Override for the thread pool executor.
             use_thread_pool: Override for thread pool usage
                 (sync functions only).
@@ -375,6 +409,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             start_soon=start_soon,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
             use_thread_pool=use_thread_pool,
             **kwargs,
@@ -430,6 +465,7 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
             start_soon=settings_as_dict.get("start_soon", self.start_soon),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
             start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
+            collapse_tracebacks=settings_as_dict.get("collapse_tracebacks", self.collapse_tracebacks),
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
         )
 

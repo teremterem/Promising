@@ -52,6 +52,7 @@ def wrap_awaitable(
     start_soon: bool | None | Sentinel = None,
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
+    collapse_tracebacks: bool | Sentinel = INHERIT,
     prefilled_result: T_co | Sentinel = UNCHANGED,
     prefilled_exception: BaseException | None = None,
 ) -> "Promise[Any]":
@@ -72,6 +73,7 @@ def wrap_awaitable(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        collapse_tracebacks=collapse_tracebacks,
         prefilled_result=prefilled_result,
         prefilled_exception=prefilled_exception,
     )
@@ -170,6 +172,16 @@ class Promise(PromisingContext, Generic[T_co]):
         start_soon_default: Local override for the global Defaults.START_SOON.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
+        collapse_tracebacks: When True (the default), tracebacks of
+            exceptions that propagate out of this Promise (or its subtree)
+            are rendered without the noisy promising-internal frames, so the
+            user sees only the application-level frames that actually
+            originated the failure. Set to False to keep the full,
+            uncollapsed traceback (useful when debugging the promising
+            library itself). Local override for the global
+            Defaults.COLLAPSE_TRACEBACKS. INHERIT (default) propagates from
+            the parent. PROMISING_DEFAULT reads the current global setting
+            without inheriting.
         prefilled_result: Pre-set result value. Cannot be an awaitable (pass
             awaitables as the first positional argument instead). Cannot be
             combined with awaitable or prefilled_exception.
@@ -200,6 +212,7 @@ class Promise(PromisingContext, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         prefilled_result: T_co | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
@@ -228,6 +241,7 @@ class Promise(PromisingContext, Generic[T_co]):
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             close_context_immediately=awaitable is None,
         )
         self._start_soon = self._resolve_start_soon(start_soon)

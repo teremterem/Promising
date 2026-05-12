@@ -56,6 +56,8 @@ class Defaults:
     ``Defaults.X`` always reads the current value from a single source.
     """
 
+    # TODO Make these configurable via environment variables
+
     START_SOON = True
     COLLAPSE_TRACEBACKS = True
     PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)

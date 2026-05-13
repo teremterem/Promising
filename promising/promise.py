@@ -262,7 +262,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
-            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled)
+            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -664,6 +664,26 @@ class Promise(PromisingContext, Generic[T_co]):
             self._full_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
+
+    def _ensure_from_loop_full_unpacking_scheduled_wrapper(self) -> None:
+        """
+        ``call_soon_threadsafe``-safe wrapper around
+        ``_ensure_from_loop_full_unpacking_scheduled``.
+
+        Used by the ``start_soon=True`` path in ``__init__``, where scheduling
+        is deferred to the event loop via ``call_soon_threadsafe``. Any
+        exception raised from that callback would otherwise propagate to the
+        loop's default exception handler and leave the Promise stuck in a
+        non-terminal state. This wrapper instead routes the exception through
+        ``_force_internal_error_finish_from_loop`` so the Promise is settled
+        as an internal error.
+
+        NOTE: This method can only be used from the event loop of the Promise.
+        """
+        try:
+            self._ensure_from_loop_full_unpacking_scheduled()
+        except BaseException as exc:
+            self._force_internal_error_finish_from_loop(exc)
 
     def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
         """

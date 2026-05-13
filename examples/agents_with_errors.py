@@ -11,6 +11,7 @@ def agent3_plain_func2() -> None:
     return unreachable_agent(start_soon="This call should fail")
 
 
+@promising.context
 async def agent3_plain_coro1() -> None:
     with promising.context():
         return agent3_plain_func2()
@@ -30,6 +31,7 @@ async def agent2() -> None:
     return agent3()
 
 
+@promising.context
 def agent1_plain_func2() -> None:
     return agent2()
 

@@ -243,6 +243,10 @@ class Promise(PromisingContext, Generic[T_co]):
             start_soon_default=start_soon_default,
             collapse_tracebacks=collapse_tracebacks,
             close_context_immediately=awaitable is None,
+            # We will do the registering with parent at the very end, to make
+            # sure any construction errors happen before the Promise is
+            # registered with the parent
+            register_with_parent=False,
         )
         # TODO [P1] Validations (or any other exceptions) that happen after
         #  super().__init__() forever leaves the Promise registered as an
@@ -253,16 +257,21 @@ class Promise(PromisingContext, Generic[T_co]):
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
 
         if self._awaitable is None:
+            # No outside code has any reference to this Promise yet, so we can
+            # set the result/exception directly, no matter which thread the
+            # constructor is currently running in
             if prefilled_result is not UNCHANGED:
                 self._set_result_from_loop(prefilled_result)
             else:
                 self._set_exception_from_loop(prefilled_exception)
 
-        if self._start_soon and self._awaitable is not None:
-            # We don't know which thread the Promise is created in, so we
-            # use the event loop's `call_soon_threadsafe` to "stay on the
-            # safe side"
-            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
+        # Here we will also potentially schedule the full unpacking task, if
+        # the Promise is not deferred. This introduces potential race
+        # conditions with the remainder of the construction steps, should the
+        # construction be happening in a thread parallel to the event loop
+        # thread. To avoid this, we schedule the remainder of the construction
+        # steps to be done on the event loop.
+        self.loop.call_soon_threadsafe(self._finish_construction_from_loop)
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -665,26 +674,6 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
-    def _ensure_from_loop_full_unpacking_scheduled_wrapper(self) -> None:
-        """
-        ``call_soon_threadsafe``-safe wrapper around
-        ``_ensure_from_loop_full_unpacking_scheduled``.
-
-        Used by the ``start_soon=True`` path in ``__init__``, where scheduling
-        is deferred to the event loop via ``call_soon_threadsafe``. Any
-        exception raised from that callback would otherwise propagate to the
-        loop's default exception handler and leave the Promise stuck in a
-        non-terminal state. This wrapper instead routes the exception through
-        ``_force_internal_error_finish_from_loop`` so the Promise is settled
-        as an internal error.
-
-        NOTE: This method can only be used from the event loop of the Promise.
-        """
-        try:
-            self._ensure_from_loop_full_unpacking_scheduled()
-        except BaseException as exc:
-            self._force_internal_error_finish_from_loop(exc)
-
     def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
         """
         Bridge the case where ``task.cancel()`` lands between
@@ -903,6 +892,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self.try_to_link_exception(exception)
             self._exception = exception
             self._set_state(terminal_state)
+            # TODO The fact that we have no "exception was never fetched"
+            #  warning might be a problem. (What about "result was never
+            #  fetched", is it a thing too ?)
 
         except BaseException as internal_error:
             # Bug in the Promise class itself, or a misuse of the state
@@ -938,6 +930,10 @@ class Promise(PromisingContext, Generic[T_co]):
             self.try_to_link_exception(error)
             self._exception = error
             self._set_state(_FINISHED)
+            # TODO The fact that we have no "exception was never fetched"
+            #  warning might be a problem. (What about "result was never
+            #  fetched", is it a thing too ?)
+
         except BaseException:
             _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)
 
@@ -1025,6 +1021,16 @@ class Promise(PromisingContext, Generic[T_co]):
         # is already closed)
         if self.done():
             super()._unregister_from_parent_if_time()
+
+    def _finish_construction_from_loop(self) -> None:
+        try:
+            if self._start_soon and self._awaitable is not None:
+                self._ensure_from_loop_full_unpacking_scheduled()
+
+            # TODO activate the threading lock ?
+            self._register_with_parent_thread_unsafe()
+        except BaseException as exc:
+            self._force_internal_error_finish_from_loop(exc)
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         """

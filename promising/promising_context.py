@@ -396,6 +396,7 @@ class PromisingContext:
         # TODO Introduce inheritable wrap_coroutines parameter
         #  (and wrap_coroutines_default) ?
         close_context_immediately: bool = False,
+        register_with_parent: bool = True,
     ) -> None:
         self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
@@ -431,10 +432,23 @@ class PromisingContext:
 
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
+        # TODO To simplify safe-guarding against race conditions, do EVERYTHING
+        #  on the event loop, instead of using threading locks or any other
+        #  kinds of synchronization techniques (except for the ones that are
+        #  designed for operation within the same async event loop). For any
+        #  public method that can be invoked both, from the event loop and from
+        #  a different thread, just check what thread we are in and either do
+        #  the operation directly or schedule it with
+        #  `asyncio.run_coroutine_threadsafe` and read the concurrent future
+        #  result instead. Do all this after you take care of the following
+        #  issue:
+        #  https://github.com/teremterem/Promising/issues/104
         self._unsettled_children_lock = threading.Lock()
 
-        if self._parent is not None and not self._context_closed:
-            self._parent._register_children_threadsafe(self)
+        if register_with_parent:
+            # No other code has a reference to this PromisingContext yet, so we
+            # can just register it with the parent in a thread-unsafe manner
+            self._register_with_parent_thread_unsafe()
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -808,11 +822,11 @@ class PromisingContext:
         level wins), so a nested context that already attributed itself
         is preserved.
         """
-        if hasattr(exception, "__promising_context__"):
-            # We only let it be set at the deepest level of the promise
-            # hierarchy
-            return
         try:
+            if hasattr(exception, "__promising_context__"):
+                # We only let it be set at the deepest level of the promise
+                # hierarchy
+                return
             exception.__promising_context__: PromisingContext = self
             exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
         except BaseException:
@@ -834,40 +848,10 @@ class PromisingContext:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _assert_event_loop_running_for_sync(self) -> None:
-        """
-        Assert that the event loop of the PromisingContext itself is running
-        (regardless of whether we are on the same thread or not).
-        """
-        if not self.loop.is_running():
-            # TODO Are we sure we need to worry about this at all ? The loop
-            #  can start later (if it is on a different thread indeed), and
-            #  then all the scheduled callbacks and tasks will run and the
-            #  synchronous operations will be unblocked. Maybe it should be
-            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
-            #  against a stopped loop ?
-            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
-            raise NoRunningEventLoopError(
-                f"Synchronous operations on {self!r} can only be performed if its event loop is running"
-            )
-
-    def _assert_no_sync_usage_deadlock(self) -> None:
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            raise SyncUsageError(
-                f"Synchronous operations of {self!r} cannot be performed on "
-                f"its own event loop thread, as that typically leads to a "
-                f"deadlock. Use awaitable operations instead."
-            )
-        # If we are on a different thread indeed, then let's make sure the event
-        # loop of the PromisingContext itself is running, so we don't end up
-        # waiting for something that might not happen at all
-        self._assert_event_loop_running_for_sync()
-
-    def _assert_awaiting_on_correct_event_loop(self) -> None:
-        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
-            raise EventLoopMismatchError(
-                f"Cannot await {self!r} from a different event loop than the one it belongs to."
-            )
+    def _register_with_parent_thread_unsafe(self) -> None:
+        # It is thread-safe for the parent but is unsafe for the child itself
+        if self._parent is not None and not self._context_closed:
+            self._parent._register_children_threadsafe(self)
 
     def _unregister_from_parent_if_time(self) -> None:
         if self._context_closed and self._parent is not None and not self._unsettled_children:
@@ -994,3 +978,38 @@ class PromisingContext:
             f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
+
+    def _assert_event_loop_running_for_sync(self) -> None:
+        """
+        Assert that the event loop of the PromisingContext itself is running
+        (regardless of whether we are on the same thread or not).
+        """
+        if not self.loop.is_running():
+            # TODO Are we sure we need to worry about this at all ? The loop
+            #  can start later (if it is on a different thread indeed), and
+            #  then all the scheduled callbacks and tasks will run and the
+            #  synchronous operations will be unblocked. Maybe it should be
+            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
+            #  against a stopped loop ?
+            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
+            raise NoRunningEventLoopError(
+                f"Synchronous operations on {self!r} can only be performed if its event loop is running"
+            )
+
+    def _assert_no_sync_usage_deadlock(self) -> None:
+        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
+            raise SyncUsageError(
+                f"Synchronous operations of {self!r} cannot be performed on "
+                f"its own event loop thread, as that typically leads to a "
+                f"deadlock. Use awaitable operations instead."
+            )
+        # If we are on a different thread indeed, then let's make sure the event
+        # loop of the PromisingContext itself is running, so we don't end up
+        # waiting for something that might not happen at all
+        self._assert_event_loop_running_for_sync()
+
+    def _assert_awaiting_on_correct_event_loop(self) -> None:
+        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
+            raise EventLoopMismatchError(
+                f"Cannot await {self!r} from a different event loop than the one it belongs to."
+            )

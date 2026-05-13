@@ -329,34 +329,34 @@ def collect_unsettled_children(
     )
 
 
-def get_trace(*, parents_first: bool = True) -> "list[PromisingContext]":
+def get_trace(*, ancestors_first: bool = True) -> "list[PromisingContext]":
     """
     Return a list of PromisingContext objects in the trace of the active
-    context. If *parents_first* is True (the default), the list is ordered
+    context. If *ancestors_first* is True (the default), the list is ordered
     from the topmost parent down to the active context; otherwise from the
     active context up.
     """
-    return get_active_context().get_trace(parents_first=parents_first)
+    return get_active_context().get_trace(ancestors_first=ancestors_first)
 
 
-def format_trace(*, parents_first: bool = True) -> "list[str]":
+def format_trace(*, ancestors_first: bool = True) -> "list[str]":
     """
     Return a list of string representations of each PromisingContext
-    in the trace of the active context. If *parents_first* is True (the
+    in the trace of the active context. If *ancestors_first* is True (the
     default), the list is ordered from the topmost parent down to the active
     context; otherwise from the active context up.
     """
-    return get_active_context().format_trace(parents_first=parents_first)
+    return get_active_context().format_trace(ancestors_first=ancestors_first)
 
 
-def print_trace(*, parents_first: bool = True) -> None:
+def print_trace(*, ancestors_first: bool = True) -> None:
     """
     Print each PromisingContext in the trace of the active context on a
-    separate line. If *parents_first* is True (the default), the list is
+    separate line. If *ancestors_first* is True (the default), the list is
     ordered from the topmost parent down to the active context; otherwise
     from the active context up.
     """
-    get_active_context().print_trace(parents_first=parents_first)
+    get_active_context().print_trace(ancestors_first=ancestors_first)
 
 
 class PromisingContext:
@@ -563,10 +563,10 @@ class PromisingContext:
             raise PromiseNotFoundError(f"No parent Promise found for {self!r}")
         return parent
 
-    def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
+    def get_trace(self, *, ancestors_first: bool = True) -> "list[PromisingContext]":
         """
         Return a list of PromisingContext objects in the trace. If
-        *parents_first* is True (the default), the list is ordered from the
+        *ancestors_first* is True (the default), the list is ordered from the
         topmost parent down to this context; otherwise from this context up.
         """
         trace = []
@@ -576,26 +576,26 @@ class PromisingContext:
             trace.append(current)
             current = current._parent
 
-        if parents_first:
+        if ancestors_first:
             trace.reverse()
         return trace
 
-    def format_trace(self, *, parents_first: bool = True) -> "list[str]":
+    def format_trace(self, *, ancestors_first: bool = True) -> "list[str]":
         """
         Return a list of string representations of each
-        PromisingContext in the trace. If *parents_first* is True (the
+        PromisingContext in the trace. If *ancestors_first* is True (the
         default), the list is ordered from the topmost parent down to this
         context; otherwise from this context up.
         """
-        return [str(ctx) for ctx in self.get_trace(parents_first=parents_first)]
+        return [str(ctx) for ctx in self.get_trace(ancestors_first=ancestors_first)]
 
-    def print_trace(self, *, parents_first: bool = True) -> None:
+    def print_trace(self, *, ancestors_first: bool = True) -> None:
         """
         Print each PromisingContext in the trace on a separate line. If
-        *parents_first* is True (the default), the list is ordered from the
+        *ancestors_first* is True (the default), the list is ordered from the
         topmost parent down to this context; otherwise from this context up.
         """
-        for line in self.format_trace(parents_first=parents_first):
+        for line in self.format_trace(ancestors_first=ancestors_first):
             print(line)
 
     async def await_children(self, *, whole_subtree: bool = True, unpack_promises_fully: bool = True) -> None:

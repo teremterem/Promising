@@ -167,7 +167,7 @@ def _print_exception_with_promising_context(
     is_first_stack = True
 
     if promising_context is not None:
-        for ctx in promising_context.get_trace(parents_first=True):
+        for ctx in promising_context.get_trace(ancestors_first=True):
             frame_summary_tuple = getattr(ctx, "frame_summary_tuple", None)
             if frame_summary_tuple is None:
                 # This is not a Promise instance (or any other [hypothetical]

@@ -266,25 +266,42 @@ def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
 
     pos = len(frames) - 1
     # If the error originated from the framework itself (an input validation
-    # error etc.), we want to see those frames as well, so let's skip them to
-    # make sure they are preserved
+    # error etc.), we want to see those frames as well
+    stack_portion = []
     while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
+        stack_portion.append(frames[pos])
         pos -= 1
 
-    # Now, let's move from here upwards to the nearest `promising/promise.py`
-    # frame - that frame and everything above it are the only parts that need
-    # to be collapsed
-    # TODO [TRACES] Don't cut off everything above like that ! There might
-    #  still be user frames, that were captured as the error was bubbling up !
-    while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
-        pos -= 1
+    lines = []
+    if stack_portion:
+        lines.extend(traceback.StackSummary.from_list(stack_portion).format())
 
-    if -1 < pos < len(frames) - 1:
-        return ["  ... (collapsed frames)\n\n", *traceback.StackSummary.from_list(frames[pos + 1 :]).format()]
+    while pos > -1:
+        stack_portion = []
+        while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
+            stack_portion.append(frames[pos])
+            pos -= 1
 
-    # Either there was nothing to collapse at all or everything was going to be
-    # collapsed => let's show the full traceback in both cases
-    return traceback.StackSummary.from_list(frames).format()
+        if stack_portion:
+            lines.extend(traceback.StackSummary.from_list(stack_portion).format())
+
+        collapsed = False
+        while pos > -1 and frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
+            collapsed = True
+            pos -= 1
+
+        if not collapsed:
+            continue
+
+        collapsed_line = "  ... (collapsed frames)\n"
+        if stack_portion:
+            collapsed_line = "\n" + collapsed_line
+        if pos > -1:
+            collapsed_line += "\n"
+        lines.append(collapsed_line)
+
+    lines.reverse()
+    return lines
 
 
 def _report_failure_to_print_promising_trace(failure: BaseException) -> None:

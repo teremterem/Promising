@@ -5,7 +5,6 @@ import shutil
 import sys
 import threading
 import traceback
-from collections.abc import Iterable
 from types import TracebackType
 from typing import TYPE_CHECKING
 
@@ -165,7 +164,7 @@ def _print_exception_with_promising_context(
     collapse = getattr(exc_value, "__promising_collapse_traceback__", False)
 
     if promising_context is not None:
-        collapse_top = False
+        # TODO collapse_top = False
 
         for ctx in promising_context.get_trace(parents_first=True):
             frame_summary_tuple = getattr(ctx, "frame_summary_tuple", None)
@@ -174,71 +173,50 @@ def _print_exception_with_promising_context(
                 # context supporting this attribute)
                 continue
 
-            for line in reversed(
-                _format_frames_with_collapses(
-                    ctx.frame_summary_tuple,
-                    collapse_bottom=collapse,
-                    collapse_top=collapse_top,
-                )
-            ):
+            for line in reversed(traceback.StackSummary.from_list(ctx.frame_summary_tuple).format()):
                 print(line, end="")
 
-            collapse_top = collapse
+            # TODO collapse_top = collapse
 
             print(f"\n{separator}\n{ctx!r}\n{separator}\n")
 
-    lines = _format_frames_with_collapses(
-        reversed(traceback.extract_tb(exc_tb)),
-        collapse_bottom=False,
-        collapse_top=collapse,
-    )
-    lines.reverse()
+    final_frames = traceback.extract_tb(exc_tb)
+
+    if collapse:
+        lines = _format_final_traceback(final_frames)
+    else:
+        lines = traceback.StackSummary.from_list(final_frames).format()
+
     for line in lines:
         print(line, end="")
 
     print(f"\n{separator}\n💥  {exc_type.__name__}: {exc_value}\n{separator}")
 
 
-def _format_frames_with_collapses(
-    frames: Iterable[traceback.FrameSummary],
-    *,
-    collapse_bottom: bool,
-    collapse_top: bool,
-) -> list[str]:
-    # TODO [TRACES] Revise this function - it might be somewhat broken
-    frame_list = list(frames)
-    start = 0
-    if collapse_bottom:
-        while start < len(frame_list) and _is_promising_or_asyncio_frame(frame_list[start]):
-            start += 1
-    end = len(frame_list)
+def _format_final_traceback(frames: list[traceback.FrameSummary]) -> list[str]:
+    # ruff: noqa: PLC0415 (import-outside-top-level)
+    from promising import _PACKAGE_ABS_PATH
+    from promising.promise import _MODULE_ABS_PATH
 
-    trailing_collapse = False
-    if collapse_top:
-        for i in range(start, len(frame_list)):
-            if _is_promising_or_asyncio_frame(frame_list[i]):
-                end = i
-                trailing_collapse = True
-                break
+    pos = len(frames) - 1
+    # If the error originated from the framework itself (an input validation
+    # error etc.), we want to see those frames as well, so let's skip them to
+    # make sure they are preserved
+    while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
+        pos -= 1
 
-    filtered_frames = frame_list[start:end]
-    if not filtered_frames:
-        start = 0
-        trailing_collapse = False
-        filtered_frames = frame_list
+    # Now, let's move all the way to the first `promising/promise.py` frame
+    # (the plan is to collapse everything from there on)
+    while pos > -1 and not frames[pos].filename.startswith(_MODULE_ABS_PATH):
+        pos -= 1
 
-    lines = traceback.StackSummary.from_list(filtered_frames).format()
-    if start > 0:
-        lines.insert(0, "\n  ... (collapsed frames)\n")
-    if trailing_collapse:
-        lines.append("  ... (collapsed frames)\n\n")
-    return lines
+    if -1 < pos < len(frames) - 1:
+        return ["  ... (collapsed frames)\n\n", *traceback.StackSummary.from_list(frames[pos + 1 :]).format()]
 
-
-def _is_promising_or_asyncio_frame(frame: traceback.FrameSummary) -> bool:
-    from promising import _PACKAGE_ABS_PATH  # noqa: PLC0415 (import-outside-top-level)
-
-    return frame.filename.startswith(_PACKAGE_ABS_PATH)
+    # Either there is nothing to collapse at all or everything should be
+    # collapsed (in the latter case we also resort to showing the full
+    # traceback, because we don't want to end up showing nothing)
+    return traceback.StackSummary.from_list(frames).format()
 
 
 def _report_failure_to_print_promising_trace(failure: BaseException) -> None:

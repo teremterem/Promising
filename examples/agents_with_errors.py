@@ -43,7 +43,7 @@ async def main() -> None:
 
 
 try:
-    main.run(collapse_tracebacks=True)
+    main.run(collapse_tracebacks=False)
 except Exception as e:
     # Let's see how the traceback changes upon re-raising
     raise e

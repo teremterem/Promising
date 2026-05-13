@@ -1,13 +1,18 @@
 import promising
 
 
+@promising.function
+async def unreachable_agent() -> None:
+    print("Unreachable agent has been reached (and it shouldn't have been)")
+
+
 def agent3_plain_func2() -> None:
-    with promising.context(start_soon_default="This should fail"):
-        print("It did not fail =/")
+    return unreachable_agent(start_soon="This call should fail")
 
 
 async def agent3_plain_coro1() -> None:
-    return agent3_plain_func2()
+    with promising.context():
+        return agent3_plain_func2()
 
 
 @promising.function

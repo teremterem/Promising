@@ -1,4 +1,5 @@
 import promising
+from promising import Promise
 
 
 @promising.function
@@ -43,8 +44,14 @@ async def agent1() -> None:
 
 
 @promising.function
+async def agent0(promise: Promise[None]) -> None:
+    return await promise
+
+
+@promising.function
 async def main() -> None:
-    return agent1()
+    promise: Promise[None] = agent1()
+    return agent0(promise)
 
 
 try:

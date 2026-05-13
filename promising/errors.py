@@ -274,6 +274,8 @@ def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     # Now, let's move from here upwards to the nearest `promising/promise.py`
     # frame - that frame and everything above it are the only parts that need
     # to be collapsed
+    # TODO [TRACES] Don't cut off everything above like that ! There might
+    #  still be user frames, that were captured as the error was bubbling up !
     while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
         pos -= 1
 

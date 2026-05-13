@@ -5,6 +5,7 @@ import shutil
 import sys
 import threading
 import traceback
+from collections.abc import Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING
 
@@ -161,11 +162,11 @@ def _print_exception_with_promising_context(
     print(f"{separator}\n  Traceback\n{separator}\n")
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
-    collapse = getattr(exc_value, "__promising_collapse_traceback__", False)
+    collapse: bool = getattr(exc_value, "__promising_collapse_traceback__", False)
+
+    is_first_stack = True
 
     if promising_context is not None:
-        # TODO collapse_top = False
-
         for ctx in promising_context.get_trace(parents_first=True):
             frame_summary_tuple = getattr(ctx, "frame_summary_tuple", None)
             if frame_summary_tuple is None:
@@ -173,19 +174,30 @@ def _print_exception_with_promising_context(
                 # context supporting this attribute)
                 continue
 
-            for line in reversed(traceback.StackSummary.from_list(ctx.frame_summary_tuple).format()):
+            stack = list(frame_summary_tuple)
+            stack.reverse()
+
+            if collapse:
+                if is_first_stack:
+                    lines = _format_first_stack(stack)
+                else:
+                    lines = traceback.StackSummary.from_list(stack).format()
+            else:
+                lines = traceback.StackSummary.from_list(stack).format()
+
+            for line in lines:
                 print(line, end="")
 
-            # TODO collapse_top = collapse
+            is_first_stack = False
 
             print(f"\n{separator}\n{ctx!r}\n{separator}\n")
 
-    final_frames = traceback.extract_tb(exc_tb)
+    last_stack = traceback.extract_tb(exc_tb)
 
-    if collapse:
-        lines = _format_final_traceback(final_frames)
+    if collapse and not is_first_stack:
+        lines = _format_last_stack(last_stack)
     else:
-        lines = traceback.StackSummary.from_list(final_frames).format()
+        lines = traceback.StackSummary.from_list(last_stack).format()
 
     for line in lines:
         print(line, end="")
@@ -193,7 +205,29 @@ def _print_exception_with_promising_context(
     print(f"\n{separator}\n💥  {exc_type.__name__}: {exc_value}\n{separator}")
 
 
-def _format_final_traceback(frames: list[traceback.FrameSummary]) -> list[str]:
+def _format_first_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
+    # ruff: noqa: PLC0415 (import-outside-top-level)
+    from promising import _PACKAGE_ABS_PATH
+
+    pos = len(frames) - 1
+    while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
+        pos -= 1
+
+    if -1 < pos < len(frames) - 1:
+        return [*traceback.StackSummary.from_list(frames[: pos + 1]).format(), "\n  ... (collapsed frames)\n"]
+
+    # Either there is nothing to collapse at all or everything should be
+    # collapsed (in the latter case we also resort to showing the full
+    # traceback, because we don't want to end up showing nothing)
+    return traceback.StackSummary.from_list(frames).format()
+
+
+def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
+    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
+    _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)
+
+
+def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     # ruff: noqa: PLC0415 (import-outside-top-level)
     from promising import _PACKAGE_ABS_PATH
     from promising.promise import _MODULE_ABS_PATH

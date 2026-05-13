@@ -181,7 +181,7 @@ def _print_exception_with_promising_context(
                 if is_first_stack:
                     lines = _format_first_stack(stack)
                 else:
-                    lines = traceback.StackSummary.from_list(stack).format()
+                    lines = _format_middle_stack(stack)
             else:
                 lines = traceback.StackSummary.from_list(stack).format()
 
@@ -210,27 +210,56 @@ def _format_first_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     from promising import _PACKAGE_ABS_PATH
 
     pos = len(frames) - 1
+    # TODO Add a comment here
     while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
         pos -= 1
 
     if -1 < pos < len(frames) - 1:
         return [*traceback.StackSummary.from_list(frames[: pos + 1]).format(), "\n  ... (collapsed frames)\n"]
 
-    # Either there is nothing to collapse at all or everything should be
-    # collapsed (in the latter case we also resort to showing the full
-    # traceback, because we don't want to end up showing nothing)
+    # Either there was nothing to collapse at all or everything was going to be
+    # collapsed => let's show the full traceback in both cases
     return traceback.StackSummary.from_list(frames).format()
 
 
-def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
-    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
-    _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)
+def _format_middle_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
+    # ruff: noqa: PLC0415 (import-outside-top-level)
+    from promising import _PACKAGE_ABS_PATH
+    from promising.promise import _MODULE_ABS_PATH as _CORE_MODULE_ABS_PATH
+
+    pos = len(frames) - 1
+    # TODO Add a comment here
+    while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
+        pos -= 1
+    bottom_pos = pos
+
+    # Now, let's move all the way to the first `promising/promise.py` frame
+    # (the plan is to collapse everything from there on)
+    while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
+        pos -= 1
+    top_pos = pos
+
+    collapse_top: bool = -1 < top_pos < len(frames) - 1
+    collapse_bottom: bool = -1 < bottom_pos < len(frames) - 1
+
+    collapsed_frames = frames[top_pos + 1 : bottom_pos + 1]
+    if not collapsed_frames:
+        # Everything was collapsed => let's show the full traceback, because
+        # we don't want to show nothing
+        collapsed_frames = frames
+
+    lines = traceback.StackSummary.from_list(collapsed_frames).format()
+    if collapse_top:
+        lines.insert(0, "  ... (collapsed frames)\n\n")
+    if collapse_bottom:
+        lines.append("\n  ... (collapsed frames)\n")
+    return lines
 
 
 def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     # ruff: noqa: PLC0415 (import-outside-top-level)
     from promising import _PACKAGE_ABS_PATH
-    from promising.promise import _MODULE_ABS_PATH
+    from promising.promise import _MODULE_ABS_PATH as _CORE_MODULE_ABS_PATH
 
     pos = len(frames) - 1
     # If the error originated from the framework itself (an input validation
@@ -241,15 +270,14 @@ def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
 
     # Now, let's move all the way to the first `promising/promise.py` frame
     # (the plan is to collapse everything from there on)
-    while pos > -1 and not frames[pos].filename.startswith(_MODULE_ABS_PATH):
+    while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
         pos -= 1
 
     if -1 < pos < len(frames) - 1:
         return ["  ... (collapsed frames)\n\n", *traceback.StackSummary.from_list(frames[pos + 1 :]).format()]
 
-    # Either there is nothing to collapse at all or everything should be
-    # collapsed (in the latter case we also resort to showing the full
-    # traceback, because we don't want to end up showing nothing)
+    # Either there was nothing to collapse at all or everything was going to be
+    # collapsed => let's show the full traceback in both cases
     return traceback.StackSummary.from_list(frames).format()
 
 

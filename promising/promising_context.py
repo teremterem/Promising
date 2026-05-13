@@ -850,11 +850,11 @@ class PromisingContext:
 
     def _register_with_parent_thread_unsafe(self) -> None:
         # It is thread-safe for the parent but is unsafe for the child itself
-        if self._parent is not None and not self._context_closed:
+        if self._parent is not None and not self.done():
             self._parent._register_children_threadsafe(self)
 
     def _unregister_from_parent_if_time(self) -> None:
-        if self._context_closed and self._parent is not None and not self._unsettled_children:
+        if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
             self._parent._unregister_children_threadsafe(self)
@@ -868,7 +868,7 @@ class PromisingContext:
                 )
 
         with self._unsettled_children_lock:
-            if self._context_closed:
+            if self.closed():
                 raise ContextAlreadyClosedError(
                     f"Cannot register children in a context that has already been closed.\n"
                     f"Context: {self!r}\nChildren: {children!r}"

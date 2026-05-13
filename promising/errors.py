@@ -210,7 +210,8 @@ def _format_first_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     from promising import _PACKAGE_ABS_PATH
 
     pos = len(frames) - 1
-    # TODO Add a comment here
+    # Skip over the trailing framework frames - they are part of the plumbing
+    # that leads into the next promise, not something the user needs to see
     while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
         pos -= 1
 
@@ -228,13 +229,15 @@ def _format_middle_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     from promising.promise import _MODULE_ABS_PATH as _CORE_MODULE_ABS_PATH
 
     pos = len(frames) - 1
-    # TODO Add a comment here
+    # Skip over the trailing framework frames - they are part of the plumbing
+    # that leads into the next promise, not something the user needs to see
     while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
         pos -= 1
     bottom_pos = pos
 
-    # Now, let's move all the way to the first `promising/promise.py` frame
-    # (the plan is to collapse everything from there on)
+    # Walk back to the nearest `promising/promise.py` frame - that frame and
+    # everything above it also going to be collapsed, leaving only the user
+    # code between `top_pos` and `bottom_pos`
     while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
         pos -= 1
     top_pos = pos
@@ -268,8 +271,9 @@ def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
     while pos > -1 and frames[pos].filename.startswith(_PACKAGE_ABS_PATH):
         pos -= 1
 
-    # Now, let's move all the way to the first `promising/promise.py` frame
-    # (the plan is to collapse everything from there on)
+    # Now, let's move from here upwards to the nearest `promising/promise.py`
+    # frame - that frame and everything above it are the only parts that need
+    # to be collapsed
     while pos > -1 and not frames[pos].filename.startswith(_CORE_MODULE_ABS_PATH):
         pos -= 1
 

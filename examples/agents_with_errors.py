@@ -12,36 +12,37 @@ def agent3_plain_func2() -> None:
 
 
 @promising.context
-async def agent3_plain_coro1() -> None:
+async def agent3_plain_coro1() -> Promise[None]:
     with promising.context():
         return agent3_plain_func2()
 
 
 @promising.function
-async def agent3() -> None:
+async def agent3() -> Promise[None]:
     try:
         return await agent3_plain_coro1()
     except Exception as e:
-        # Let's see how the traceback changes upon re-raising
+        # The error will NOT go through here - it will be raised later, when
+        # the promise is unpacked
         raise e
 
 
 @promising.function
-async def agent2() -> None:
+async def agent2() -> Promise[None]:
     return agent3()
 
 
 @promising.context
-def agent1_plain_func2() -> None:
+def agent1_plain_func2() -> Promise[None]:
     return agent2()
 
 
-async def agent1_plain_coro1() -> None:
+async def agent1_plain_coro1() -> Promise[None]:
     return agent1_plain_func2()
 
 
 @promising.function
-async def agent1() -> None:
+async def agent1() -> Promise[None]:
     return await agent1_plain_coro1()
 
 
@@ -51,7 +52,7 @@ async def agent0(promise: Promise[None]) -> None:
 
 
 @promising.function
-async def main() -> None:
+async def main() -> Promise[None]:
     promise: Promise[None] = agent1()
     return agent0(promise)
 

@@ -146,12 +146,43 @@ def _print_exception_with_promising_context(
     exc_tb: TracebackType,
 ) -> None:
     """
-    Caller must have verified ``exc_value`` carries ``__promising_context__``.
-
-    Returns True if printed successfully, False if formatting itself raised —
-    in which case the caller should fall back to the previous hook so the user
-    still sees their traceback.
+    Print ``exc_value`` along with its ``__cause__`` / ``__context__`` chain,
+    mirroring the default interpreter behavior (respecting
+    ``__suppress_context__``), while enriching each link in the chain with
+    its own promising context (if any).
     """
+    _print_exception_chain(exc_type, exc_value, exc_tb, seen=set())
+
+
+def _print_exception_chain(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType | None,
+    seen: set[int],
+) -> None:
+    if exc_value is None or id(exc_value) in seen:
+        return
+    seen.add(id(exc_value))
+
+    cause = exc_value.__cause__
+    context = exc_value.__context__
+    suppress_context = exc_value.__suppress_context__
+
+    if cause is not None:
+        _print_exception_chain(type(cause), cause, cause.__traceback__, seen)
+        print("\nThe above exception was the direct cause of the following exception:\n")
+    elif context is not None and not suppress_context:
+        _print_exception_chain(type(context), context, context.__traceback__, seen)
+        print("\nDuring handling of the above exception, another exception occurred:\n")
+
+    _print_single_exception(exc_type, exc_value, exc_tb)
+
+
+def _print_single_exception(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType | None,
+) -> None:
     separator = "-" * shutil.get_terminal_size().columns
     print(f"{separator}\n  Traceback\n{separator}\n")
 

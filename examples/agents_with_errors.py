@@ -60,5 +60,13 @@ async def main() -> Promise[None]:
 try:
     main.run(collapse_tracebacks=True)
 except Exception as e:
-    # Let's see how the traceback changes upon re-raising
-    raise e
+    try:
+        try:
+            # Let's see how the traceback changes upon re-raising
+            raise e
+        except Exception:
+            # Test Exception.__context__
+            raise RuntimeError("Unrelated error")  # noqa: B904 (raise-without-from-inside-except)
+    except Exception as e:
+        # Test Exception.__cause__
+        raise ValueError("This is a test error") from e

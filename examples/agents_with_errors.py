@@ -7,7 +7,7 @@ async def unreachable_agent() -> None:
     print("Unreachable agent has been reached (and it shouldn't have been)")
 
 
-def agent3_plain_func2() -> None:
+def agent3_plain_func2() -> Promise[None]:
     return unreachable_agent(start_soon="This call should fail")
 
 

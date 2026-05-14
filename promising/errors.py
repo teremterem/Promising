@@ -109,33 +109,27 @@ def _promising_sys_excepthook(
     exc_value: BaseException,
     exc_tb: TracebackType,
 ) -> None:
-    if hasattr(exc_value, "__promising_context__"):
-        try:
-            _print_exception_with_promising_context(
-                exc_type,
-                exc_value,
-                exc_tb,
-            )
-        except BaseException as e:
-            _previous_sys_excepthook(exc_type, exc_value, exc_tb)
-            _report_failure_to_print_promising_trace(e)
-    else:
+    try:
+        _print_exception_with_promising_context(
+            exc_type,
+            exc_value,
+            exc_tb,
+        )
+    except BaseException as e:
         _previous_sys_excepthook(exc_type, exc_value, exc_tb)
+        _report_failure_to_print_promising_trace(e)
 
 
 def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
-    if hasattr(args.exc_value, "__promising_context__"):
-        try:
-            _print_exception_with_promising_context(
-                args.exc_type,
-                args.exc_value,
-                args.exc_traceback,
-            )
-        except BaseException as e:
-            _previous_threading_excepthook(args)
-            _report_failure_to_print_promising_trace(e)
-    else:
+    try:
+        _print_exception_with_promising_context(
+            args.exc_type,
+            args.exc_value,
+            args.exc_traceback,
+        )
+    except BaseException as e:
         _previous_threading_excepthook(args)
+        _report_failure_to_print_promising_trace(e)
 
 
 _previous_sys_excepthook = sys.excepthook

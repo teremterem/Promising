@@ -122,6 +122,8 @@ def _promising_sys_excepthook(
 
 def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
     try:
+        if args.thread is not None:
+            print(f"Exception in thread {args.thread.name}:", file=sys.stderr)
         _print_exception_with_promising_context(
             args.exc_type,
             args.exc_value,

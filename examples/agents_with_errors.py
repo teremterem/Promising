@@ -57,16 +57,17 @@ async def main() -> Promise[None]:
     return agent0(promise)
 
 
-try:
-    main.run(collapse_tracebacks=True)
-except Exception as e:
+if __name__ == "__main__":
     try:
-        try:
-            # Let's see how the traceback changes upon re-raising
-            raise e
-        except Exception:
-            # Test Exception.__context__
-            raise RuntimeError("Unrelated error")  # noqa: B904 (raise-without-from-inside-except)
+        main.run(collapse_tracebacks=True)
     except Exception as e:
-        # Test Exception.__cause__
-        raise ValueError("This is a test error") from e
+        try:
+            try:
+                # Let's see how the traceback changes upon re-raising
+                raise e
+            except Exception:
+                # Test Exception.__context__
+                raise RuntimeError("Unrelated error")  # noqa: B904 (raise-without-from-inside-except)
+        except Exception as e:
+            # Test Exception.__cause__
+            raise ValueError("This is a test error") from e

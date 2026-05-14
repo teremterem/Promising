@@ -220,6 +220,13 @@ class Promise(PromisingContext, Generic[T_co]):
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
 
+        # TODO [TRACES] Introduce some sort of `DEBUG` boolean flag (like in
+        #  Django) to avoid extracting the stack trace in production due to
+        #  performance reasons
+        # TODO [TRACES] Modify excepthooks accordingly: when the
+        #  frame_summary_tuple is None, just print the list of promises one
+        #  after another and then the final traceback. (Keep collapsing
+        #  framework frames, though ?)
         self.frame_summary_tuple = tuple[FrameSummary, ...](
             traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)[1:]
         )

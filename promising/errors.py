@@ -170,10 +170,10 @@ def _print_exception_chain(
 
     if cause is not None:
         _print_exception_chain(type(cause), cause, cause.__traceback__, seen)
-        print("\nThe above exception was the direct cause of the following exception:\n")
+        print("\nThe above exception was the direct cause of the following exception:\n", file=sys.stderr)
     elif context is not None and not suppress_context:
         _print_exception_chain(type(context), context, context.__traceback__, seen)
-        print("\nDuring handling of the above exception, another exception occurred:\n")
+        print("\nDuring handling of the above exception, another exception occurred:\n", file=sys.stderr)
 
     _print_single_exception(exc_type, exc_value, exc_tb)
 
@@ -184,7 +184,7 @@ def _print_single_exception(
     exc_tb: TracebackType | None,
 ) -> None:
     separator = "-" * shutil.get_terminal_size().columns
-    print(f"{separator}\n  Traceback\n{separator}\n")
+    print(f"{separator}\n  Traceback\n{separator}\n", file=sys.stderr)
 
     promising_context: PromisingContext | None = getattr(exc_value, "__promising_context__", None)
     collapse: bool = getattr(exc_value, "__promising_collapse_traceback__", False)
@@ -211,11 +211,11 @@ def _print_single_exception(
                 lines = traceback.StackSummary.from_list(stack).format()
 
             for line in lines:
-                print(line, end="")
+                print(line, end="", file=sys.stderr)
 
             is_first_stack = False
 
-            print(f"\n{separator}\n{ctx!r}\n{separator}\n")
+            print(f"\n{separator}\n{ctx!r}\n{separator}\n", file=sys.stderr)
 
     last_stack = traceback.extract_tb(exc_tb)
 
@@ -225,9 +225,9 @@ def _print_single_exception(
         lines = traceback.StackSummary.from_list(last_stack).format()
 
     for line in lines:
-        print(line, end="")
+        print(line, end="", file=sys.stderr)
 
-    print(f"\n{separator}\n💥  {exc_type.__name__}: {exc_value}\n{separator}")
+    print(f"\n{separator}\n💥  {exc_type.__name__}: {exc_value}\n{separator}", file=sys.stderr)
 
 
 def _format_first_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
@@ -330,5 +330,5 @@ def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
 
 
 def _report_failure_to_print_promising_trace(failure: BaseException) -> None:
-    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n")
+    print(f"\nWARNING: FAILED TO PRINT PROMISING TRACE: {failure}\n", file=sys.stderr)
     _logger.debug("FAILED TO PRINT PROMISING TRACE", exc_info=failure)

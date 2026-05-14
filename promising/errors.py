@@ -107,7 +107,7 @@ class PromiseNotUnpackedError(PromiseInvalidStateError):
 def _promising_sys_excepthook(
     exc_type: type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: TracebackType | None,
 ) -> None:
     try:
         _print_exception_with_promising_context(
@@ -145,7 +145,7 @@ threading.excepthook = _promising_threading_excepthook
 def _print_exception_with_promising_context(
     exc_type: type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: TracebackType | None,
 ) -> None:
     """
     Print ``exc_value`` along with its ``__cause__`` / ``__context__`` chain,

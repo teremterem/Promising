@@ -256,9 +256,6 @@ class Promise(PromisingContext, Generic[T_co]):
             # registered with the parent
             register_with_parent=False,
         )
-        # TODO [P1] Validations (or any other exceptions) that happen after
-        #  super().__init__() forever leaves the Promise registered as an
-        #  unsettled child with the parent
         self._start_soon = self._resolve_start_soon(start_soon)
 
         self._full_unpacking_task: Task[T_co] | None = None
@@ -279,7 +276,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # safe side"
             self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
 
-        # TODO activate the threading lock ?
+        # TODO Activate the threading lock ?
         self._register_with_parent_thread_unsafe()
 
     @classmethod
@@ -1048,7 +1045,11 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _set_state(self, new_state: Sentinel) -> None:
         self._state = new_state
-        self._unregister_from_parent_if_time()
+        # Force-close the context just in case (it was most likely closed by
+        # the `with` block already, but it might also have been
+        # `_force_internal_error_finish_from_loop`) and unregister from parent
+        # "if time":
+        self.close_context_threadsafe()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         """

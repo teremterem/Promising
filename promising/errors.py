@@ -310,6 +310,13 @@ def _format_middle_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
 
 
 def _format_last_stack(frames: Sequence[traceback.FrameSummary]) -> list[str]:
+    # We walk `frames` innermost-to-outermost, appending each formatted group
+    # to `lines`, then reverse `lines` at the end to restore the conventional
+    # outermost-to-innermost order. This relies on `StackSummary.format()`
+    # producing one string per frame so that reversing the list of strings is
+    # equivalent to reversing the list of frames. (How reliable is one string
+    # per frame assumption versus future versions of Python ?)
+    # TODO [TRACES] Change approach and stop reversing ?
     # ruff: noqa: PLC0415 (import-outside-top-level)
     from promising import _PACKAGE_ABS_PATH
     from promising.promise import _MODULE_ABS_PATH as _CORE_MODULE_ABS_PATH

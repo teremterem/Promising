@@ -18,6 +18,7 @@ from promising.errors import (
     PromisingError,
     SentinelUsageError,
     SyncUsageError,
+    install_promising_tracebacks,
 )
 from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.promising_context import (
@@ -109,6 +110,7 @@ __all__ = [
     "get_active_context",
     "get_active_promise",
     "get_trace",
+    "install_promising_tracebacks",
     "print_trace",
     "wrap_awaitable",
 ]

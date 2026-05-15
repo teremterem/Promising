@@ -587,6 +587,7 @@ class PromisingContext:
         default), the list is ordered from the topmost parent down to this
         context; otherwise from this context up.
         """
+        # TODO [TRACES] Reconcile this with the excepthooks in errors.py ?
         return [str(ctx) for ctx in self.get_trace(ancestors_first=ancestors_first)]
 
     def print_trace(self, *, ancestors_first: bool = True) -> None:
@@ -595,6 +596,7 @@ class PromisingContext:
         *ancestors_first* is True (the default), the list is ordered from the
         topmost parent down to this context; otherwise from this context up.
         """
+        # TODO [TRACES] Reconcile this with the excepthooks in errors.py ?
         for line in self.format_trace(ancestors_first=ancestors_first):
             print(line)
 

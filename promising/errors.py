@@ -6,7 +6,7 @@ import sys
 import threading
 import traceback
 from collections.abc import Sequence
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -104,6 +104,37 @@ class PromiseNotUnpackedError(PromiseInvalidStateError):
     """
 
 
+def install_promising_tracebacks() -> bool:
+    replaced = False
+    if sys.excepthook is _promising_sys_excepthook and threading.excepthook is _promising_threading_excepthook:
+        return replaced
+
+    with _excepthooks_lock:
+        if sys.excepthook is not _promising_sys_excepthook:
+            _excepthook_state.previous_sys = sys.excepthook
+            sys.excepthook = _promising_sys_excepthook
+            _logger.debug(
+                "Installed promising sys.excepthook (previous=%r)",
+                _excepthook_state.previous_sys,
+            )
+            replaced = True
+
+        if threading.excepthook is not _promising_threading_excepthook:
+            _excepthook_state.previous_threading = threading.excepthook
+            threading.excepthook = _promising_threading_excepthook
+            _logger.debug(
+                "Installed promising threading.excepthook (previous=%r)",
+                _excepthook_state.previous_threading,
+            )
+            replaced = True
+
+    return replaced
+
+
+_excepthooks_lock = threading.Lock()
+_excepthook_state = SimpleNamespace(previous_sys=None, previous_threading=None)
+
+
 def _promising_sys_excepthook(
     exc_type: type[BaseException],
     exc_value: BaseException,
@@ -116,7 +147,7 @@ def _promising_sys_excepthook(
             exc_tb,
         )
     except BaseException as e:
-        _previous_sys_excepthook(exc_type, exc_value, exc_tb)
+        _excepthook_state.previous_sys(exc_type, exc_value, exc_tb)
         _report_failure_to_print_promising_trace(e)
 
 
@@ -130,16 +161,8 @@ def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
             args.exc_traceback,
         )
     except BaseException as e:
-        _previous_threading_excepthook(args)
+        _excepthook_state.previous_threading(args)
         _report_failure_to_print_promising_trace(e)
-
-
-_previous_sys_excepthook = sys.excepthook
-_previous_threading_excepthook = threading.excepthook
-# TODO [TRACES] This feature needs to be unit-tested somehow
-sys.excepthook = _promising_sys_excepthook
-threading.excepthook = _promising_threading_excepthook
-# TODO [TRACES] How to offer the same feature for the loggers ?
 
 
 def _print_exception_with_promising_context(

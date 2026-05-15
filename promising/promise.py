@@ -13,6 +13,7 @@ from promising.errors import (
     PromiseNotDoneError,
     PromiseNotFoundError,
     PromiseNotUnpackedError,
+    install_promising_tracebacks,
 )
 from promising.logging_utils import PromiseUnpackingLogger
 from promising.promising_context import PromisingContext
@@ -756,6 +757,11 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _unpack_once_from_loop a Promise "
                     f"that was already unpacked once or done: {self!r}"
                 )
+
+            # TODO [TRACES] Introduce some sort of `DEBUG` boolean flag (like in
+            #  Django) to know when to avoid installing these excepthooks in
+            #  production ?
+            install_promising_tracebacks()
 
             with self:
                 result = await self._awaitable

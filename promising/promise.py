@@ -2,14 +2,18 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
+import os
+import traceback
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
+from traceback import FrameSummary
 from typing import Any, Generic
 
 from promising.errors import (
     PromiseNotDoneError,
     PromiseNotFoundError,
     PromiseNotUnpackedError,
+    install_promising_tracebacks,
 )
 from promising.logging_utils import PromiseUnpackingLogger
 from promising.promising_context import PromisingContext
@@ -25,10 +29,18 @@ from promising.sentinels import (
     Sentinel,
 )
 from promising.types import T_co
-from promising.utils import attach_context_to_error_chain_root, awaitable_as_coroutine, resolve_namespace
+from promising.utils import (
+    attach_context_to_error_chain_root,
+    awaitable_as_coroutine,
+    resolve_namespace,
+)
 
 _logger = logging.getLogger(__name__)
 _unpacking_logger = PromiseUnpackingLogger(level=logging.DEBUG)
+
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to check that the path is correct
+_MODULE_ABS_PATH: str = os.path.abspath(__file__)
 
 
 def wrap_awaitable(
@@ -41,6 +53,7 @@ def wrap_awaitable(
     start_soon: bool | None | Sentinel = None,
     children_start_soon: bool | None | Sentinel = None,
     start_soon_default: bool | Sentinel = INHERIT,
+    collapse_tracebacks: bool | Sentinel = INHERIT,
     prefilled_result: T_co | Sentinel = UNCHANGED,
     prefilled_exception: BaseException | None = None,
 ) -> "Promise[Any]":
@@ -61,6 +74,7 @@ def wrap_awaitable(
         start_soon=start_soon,
         children_start_soon=children_start_soon,
         start_soon_default=start_soon_default,
+        collapse_tracebacks=collapse_tracebacks,
         prefilled_result=prefilled_result,
         prefilled_exception=prefilled_exception,
     )
@@ -159,6 +173,16 @@ class Promise(PromisingContext, Generic[T_co]):
         start_soon_default: Local override for the global Defaults.START_SOON.
             INHERIT (default) propagates from the parent. PROMISING_DEFAULT reads
             the current global setting without inheriting.
+        collapse_tracebacks: When True (the default), tracebacks of
+            exceptions that propagate out of this Promise (or its subtree)
+            are rendered without the noisy promising-internal frames, so the
+            user sees only the application-level frames that actually
+            originated the failure. Set to False to keep the full,
+            uncollapsed traceback (useful when debugging the promising
+            library itself). Local override for the global
+            Defaults.COLLAPSE_TRACEBACKS. INHERIT (default) propagates from
+            the parent. PROMISING_DEFAULT reads the current global setting
+            without inheriting.
         prefilled_result: Pre-set result value. Cannot be an awaitable (pass
             awaitables as the first positional argument instead). Cannot be
             combined with awaitable or prefilled_exception.
@@ -175,6 +199,8 @@ class Promise(PromisingContext, Generic[T_co]):
     # TODO [P1] Make sure there is a clear mechanism of avoiding memory leaks,
     #  though, when sequences are enormously long and are not meant to be
     #  revisited by the user (e.g. a stream of events etc.)
+    # TODO Do we want to implement _add_done_callback() and
+    #  _add_unpacked_once_callback() ? Any other callbacks ?
 
     def __init__(
         self,
@@ -187,12 +213,24 @@ class Promise(PromisingContext, Generic[T_co]):
         start_soon: bool | None | Sentinel = None,
         children_start_soon: bool | None | Sentinel = None,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         prefilled_result: T_co | Sentinel = UNCHANGED,
         prefilled_exception: BaseException | None = None,
     ) -> None:
         # Validate before super().__init__ to avoid registering an unsettled
         # child with the parent when arguments are invalid.
         self._validate_init_args(awaitable, prefilled_result, prefilled_exception)
+
+        # TODO [TRACES] Introduce some sort of `DEBUG` boolean flag (like in
+        #  Django) to avoid extracting the stack trace in production due to
+        #  performance reasons
+        # TODO [TRACES] Modify excepthooks accordingly: when the
+        #  frame_summary_tuple is None, just print the list of promises one
+        #  after another and then the final traceback. (Keep collapsing
+        #  framework frames, though ?)
+        self.frame_summary_tuple = tuple[FrameSummary, ...](
+            traceback.StackSummary.extract(traceback.walk_stack(None), lookup_lines=False)[1:]
+        )
 
         self._result: T_co | Sentinel = UNCHANGED
         self._exception: BaseException | None = None
@@ -211,7 +249,12 @@ class Promise(PromisingContext, Generic[T_co]):
             thread_pool=thread_pool,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             close_context_immediately=awaitable is None,
+            # We will do the registering with parent at the very end, to make
+            # sure any construction errors happen before the Promise is
+            # registered with the parent
+            register_with_parent=False,
         )
         self._start_soon = self._resolve_start_soon(start_soon)
 
@@ -219,6 +262,9 @@ class Promise(PromisingContext, Generic[T_co]):
         self._single_unpacking_task: Task[T_co | Promise[Any]] | None = None
 
         if self._awaitable is None:
+            # No outside code has any reference to this Promise yet, so we can
+            # set the result/exception directly, no matter which thread the
+            # constructor is currently running in
             if prefilled_result is not UNCHANGED:
                 self._set_result_from_loop(prefilled_result)
             else:
@@ -228,7 +274,10 @@ class Promise(PromisingContext, Generic[T_co]):
             # We don't know which thread the Promise is created in, so we
             # use the event loop's `call_soon_threadsafe` to "stay on the
             # safe side"
-            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled)
+            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
+
+        # TODO Activate the threading lock ?
+        self._register_with_parent_thread_unsafe()
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -631,6 +680,26 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
+    def _ensure_from_loop_full_unpacking_scheduled_wrapper(self) -> None:
+        """
+        ``call_soon_threadsafe``-safe wrapper around
+        ``_ensure_from_loop_full_unpacking_scheduled``.
+
+        Used by the ``start_soon=True`` path in ``__init__``, where scheduling
+        is deferred to the event loop via ``call_soon_threadsafe``. Any
+        exception raised from that callback would otherwise propagate to the
+        loop's default exception handler and leave the Promise stuck in a
+        non-terminal state. This wrapper instead routes the exception through
+        ``_force_internal_error_finish_from_loop`` so the Promise is settled
+        as an internal error.
+
+        NOTE: This method can only be used from the event loop of the Promise.
+        """
+        try:
+            self._ensure_from_loop_full_unpacking_scheduled()
+        except BaseException as exc:
+            self._force_internal_error_finish_from_loop(exc)
+
     def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
         """
         Bridge the case where ``task.cancel()`` lands between
@@ -685,6 +754,11 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"An attempt was made to _unpack_once_from_loop a Promise "
                     f"that was already unpacked once or done: {self!r}"
                 )
+
+            # TODO [TRACES] Introduce some sort of `DEBUG` boolean flag (like in
+            #  Django) to know when to avoid installing these excepthooks in
+            #  production ?
+            install_promising_tracebacks()
 
             with self:
                 result = await self._awaitable
@@ -742,10 +816,13 @@ class Promise(PromisingContext, Generic[T_co]):
             # TODO [CANCELLATION] Decide the philosophy on hierarchical
             #  promises vs. "promises that return other promises" — should
             #  subtree cancellation and cancellation of nested (returned)
-            #  Promises be treated as the same thing?
+            #  Promises be treated as the same thing ?
             depth = 0
             while isinstance(result, Promise):
                 result = await result
+                # TODO I suspect that logging of `depth` is currently broken -
+                #  full unpacking happens recursively, and this loop
+                #  (supposedly) always runs only once
                 depth += 1
                 _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 
@@ -838,9 +915,17 @@ class Promise(PromisingContext, Generic[T_co]):
                 # caught by the elif above).
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
-            self.set_as_promising_context_on_exception(exception)
+            # The context was probably already attached to the exception by the
+            # ``with self:`` block of ``_unpack_once_from_loop``, but it is
+            # also possible that the exception occurred outside the
+            # ``with self:`` block (e.g. a framework bug), so lets try to
+            # attach it here too.
+            self.try_to_link_exception(exception)
             self._exception = exception
             self._set_state(terminal_state)
+            # TODO The fact that we have no "exception was never fetched"
+            #  warning might be a problem. (What about "result was never
+            #  fetched", is it a thing too ?)
 
         except BaseException as internal_error:
             # Bug in the Promise class itself, or a misuse of the state
@@ -849,6 +934,8 @@ class Promise(PromisingContext, Generic[T_co]):
             try:
                 attach_context_to_error_chain_root(internal_error, context=exception)
             except BaseException:
+                # TODO Should it be just `Exception` ? Any danger that
+                #  `KeyboardInterrupt` would get swallowed here ?
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_from_loop(internal_error)
 
@@ -869,11 +956,20 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
-            self.set_as_promising_context_on_exception(error)
+            # ``error`` is synthesized in the framework's except handlers
+            # after ``with self:`` has already exited, so it never passes
+            # through ``__exit__``'s attribution. Attach the context
+            # explicitly here.
+            self.try_to_link_exception(error)
             self._exception = error
             self._set_state(_FINISHED)
+            # TODO The fact that we have no "exception was never fetched"
+            #  warning might be a problem. (What about "result was never
+            #  fetched", is it a thing too ?)
+
         except BaseException:
             _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)
+            raise
 
     def _assert_done(self) -> None:
         """
@@ -948,17 +1044,17 @@ class Promise(PromisingContext, Generic[T_co]):
                 try:
                     close()
                 except BaseException:
+                    # TODO Should it be just `Exception` ? Any danger that
+                    #  `KeyboardInterrupt` would get swallowed here ?
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state(self, new_state: Sentinel) -> None:
         self._state = new_state
-        self._unregister_from_parent_if_time()
-
-    def _unregister_from_parent_if_time(self) -> None:
-        # Do not unregister from parent unless the Promise is done (even if it
-        # is already closed)
-        if self.done():
-            super()._unregister_from_parent_if_time()
+        # Force-close the context just in case (it was most likely closed by
+        # the `with` block already, but it might also have been
+        # `_force_internal_error_finish_from_loop`) and unregister from parent
+        # "if time":
+        self.close_context_threadsafe()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         """

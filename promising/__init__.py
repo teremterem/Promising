@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from promising.errors import (
@@ -17,6 +18,7 @@ from promising.errors import (
     PromisingError,
     SentinelUsageError,
     SyncUsageError,
+    install_promising_tracebacks,
 )
 from promising.promise import Promise, get_active_promise, wrap_awaitable
 from promising.promising_context import (
@@ -41,6 +43,10 @@ from promising.sentinels import (
     Sentinel,
 )
 
+# TODO [TRACES] Is it ok that we are not using Pathlib here ?
+# TODO [TRACES] A unit test is needed to check that the path is correct
+_PACKAGE_ABS_PATH: str = os.path.dirname(os.path.abspath(__file__)) + os.sep
+
 
 class Defaults:
     """
@@ -51,7 +57,10 @@ class Defaults:
     ``Defaults.X`` always reads the current value from a single source.
     """
 
+    # TODO Make these configurable via environment variables
+
     START_SOON = True
+    COLLAPSE_TRACEBACKS = True
     PROMISING_THREAD_POOL = ThreadPoolExecutor(max_workers=128)
     # TODO Raise a disableable error when synchronous function call depth
     #  reaches the maximum number of workers in the thread pool, to prevent
@@ -101,6 +110,7 @@ __all__ = [
     "get_active_context",
     "get_active_promise",
     "get_trace",
+    "install_promising_tracebacks",
     "print_trace",
     "wrap_awaitable",
 ]

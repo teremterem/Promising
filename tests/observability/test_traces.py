@@ -15,17 +15,17 @@ async def test_get_trace_single_context() -> None:
     assert trace[0] is ctx
 
 
-@pytest.mark.parametrize("parents_first", [True, False], ids=["parents_first", "children_first"])
+@pytest.mark.parametrize("ancestors_first", [True, False], ids=["ancestors_first", "children_first"])
 @pytest.mark.do_not_patch_qualnames
-async def test_get_trace_with_promise(*, parents_first: bool) -> None:
+async def test_get_trace_with_promise(*, ancestors_first: bool) -> None:
     """A Promise inside a context shows in the trace as the innermost entry."""
     with promising.context(namespace="Outer") as outer:
         promise = promising.Promise(prefilled_result=42, namespace="MyPromise")
 
-    trace = promise.get_trace(parents_first=parents_first)
+    trace = promise.get_trace(ancestors_first=ancestors_first)
     assert isinstance(trace, list)
     assert len(trace) == 2
-    if parents_first:
+    if ancestors_first:
         assert trace[0] is outer
         assert trace[1] is promise
     else:
@@ -35,7 +35,7 @@ async def test_get_trace_with_promise(*, parents_first: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("parents_first", "expected"),
+    ("ancestors_first", "expected"),
     [
         (
             True,
@@ -54,15 +54,15 @@ async def test_get_trace_with_promise(*, parents_first: bool) -> None:
             ],
         ),
     ],
-    ids=["parents_first", "children_first"],
+    ids=["ancestors_first", "children_first"],
 )
 @pytest.mark.do_not_patch_qualnames
-async def test_format_trace_nested_contexts(*, parents_first: bool, expected: list[str]) -> None:
+async def test_format_trace_nested_contexts(*, ancestors_first: bool, expected: list[str]) -> None:
     """format_trace returns string representations in the requested order."""
     with promising.context(namespace="App"):
         with promising.context(namespace="Service"):
             with promising.context(namespace="Handler"):
-                trace_strs = promising.format_trace(parents_first=parents_first)
+                trace_strs = promising.format_trace(ancestors_first=ancestors_first)
 
     assert isinstance(trace_strs, list)
     assert [normalize_object_repr(s) for s in trace_strs] == expected

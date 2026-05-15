@@ -102,6 +102,16 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         start_soon_default: Local override for the global
             ``Defaults.START_SOON``, effective in the whole subtree of this
             context. ``INHERIT`` (default) propagates from the parent.
+        collapse_tracebacks: When True (the default), tracebacks of
+            exceptions that propagate out of this context (or its subtree)
+            are rendered without the noisy promising-internal frames, so the
+            user sees only the application-level frames that actually
+            originated the failure. Set to False to keep the full,
+            uncollapsed traceback (useful when debugging the promising
+            library itself). Local override for the global
+            ``Defaults.COLLAPSE_TRACEBACKS``, effective in the whole subtree
+            of this context. ``INHERIT`` (default) propagates from the
+            parent.
     """
 
     def __init__(
@@ -113,6 +123,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = AUTO,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = INHERIT,
     ) -> None:
         super().__init__(
@@ -120,6 +131,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
         )
         self.ctx_loop = loop
@@ -147,6 +159,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
                 thread_pool=self.thread_pool,
                 children_start_soon=self.children_start_soon,
                 start_soon_default=self.start_soon_default,
+                collapse_tracebacks=self.collapse_tracebacks,
             )
         return self._promising_context.__enter__()
 
@@ -171,6 +184,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         parent: "PromisingContext | None | Sentinel" = UNCHANGED,
         children_start_soon: bool | None | Sentinel = UNCHANGED,
         start_soon_default: bool | Sentinel = UNCHANGED,
+        collapse_tracebacks: bool | Sentinel = UNCHANGED,
         thread_pool: concurrent.futures.ThreadPoolExecutor | Sentinel = UNCHANGED,
         **kwargs: Any,
     ) -> Any | DecoratableFunctionType:
@@ -186,6 +200,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             namespace=namespace,
             children_start_soon=children_start_soon,
             start_soon_default=start_soon_default,
+            collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
             **kwargs,
             **{_SETTINGS_AS_DICT_KEY: settings_as_dict},
@@ -199,6 +214,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),
             start_soon_default=settings_as_dict.get("start_soon_default", self.start_soon_default),
+            collapse_tracebacks=settings_as_dict.get("collapse_tracebacks", self.collapse_tracebacks),
         )
 
         if self._is_wrapped_async:
@@ -313,34 +329,34 @@ def collect_unsettled_children(
     )
 
 
-def get_trace(*, parents_first: bool = True) -> "list[PromisingContext]":
+def get_trace(*, ancestors_first: bool = True) -> "list[PromisingContext]":
     """
     Return a list of PromisingContext objects in the trace of the active
-    context. If *parents_first* is True (the default), the list is ordered
+    context. If *ancestors_first* is True (the default), the list is ordered
     from the topmost parent down to the active context; otherwise from the
     active context up.
     """
-    return get_active_context().get_trace(parents_first=parents_first)
+    return get_active_context().get_trace(ancestors_first=ancestors_first)
 
 
-def format_trace(*, parents_first: bool = True) -> "list[str]":
+def format_trace(*, ancestors_first: bool = True) -> "list[str]":
     """
     Return a list of string representations of each PromisingContext
-    in the trace of the active context. If *parents_first* is True (the
+    in the trace of the active context. If *ancestors_first* is True (the
     default), the list is ordered from the topmost parent down to the active
     context; otherwise from the active context up.
     """
-    return get_active_context().format_trace(parents_first=parents_first)
+    return get_active_context().format_trace(ancestors_first=ancestors_first)
 
 
-def print_trace(*, parents_first: bool = True) -> None:
+def print_trace(*, ancestors_first: bool = True) -> None:
     """
     Print each PromisingContext in the trace of the active context on a
-    separate line. If *parents_first* is True (the default), the list is
+    separate line. If *ancestors_first* is True (the default), the list is
     ordered from the topmost parent down to the active context; otherwise
     from the active context up.
     """
-    get_active_context().print_trace(parents_first=parents_first)
+    get_active_context().print_trace(ancestors_first=ancestors_first)
 
 
 class PromisingContext:
@@ -374,11 +390,13 @@ class PromisingContext:
         thread_pool: "concurrent.futures.ThreadPoolExecutor | Sentinel" = INHERIT,
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
+        collapse_tracebacks: bool | Sentinel = INHERIT,
         # TODO Introduce inheritable promise_class parameter
         #  (and promise_class_default) ?
         # TODO Introduce inheritable wrap_coroutines parameter
         #  (and wrap_coroutines_default) ?
         close_context_immediately: bool = False,
+        register_with_parent: bool = True,
     ) -> None:
         self.namespace = namespace
         self._previous_token: contextvars.Token | None = None
@@ -395,6 +413,7 @@ class PromisingContext:
 
         self._start_soon_default = self._resolve_start_soon_default(start_soon_default)
         self._children_start_soon = self._resolve_children_start_soon(children_start_soon)
+        self._collapse_tracebacks = self._resolve_collapse_tracebacks(collapse_tracebacks)
         self._thread_pool = self._resolve_thread_pool(thread_pool)
 
         if loop is None:
@@ -413,10 +432,23 @@ class PromisingContext:
 
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
+        # TODO To simplify safe-guarding against race conditions, do EVERYTHING
+        #  on the event loop, instead of using threading locks or any other
+        #  kinds of synchronization techniques (except for the ones that are
+        #  designed for operation within the same async event loop). For any
+        #  public method that can be invoked both, from the event loop and from
+        #  a different thread, just check what thread we are in and either do
+        #  the operation directly or schedule it with
+        #  `asyncio.run_coroutine_threadsafe` and read the concurrent future
+        #  result instead. Do all this after you take care of the following
+        #  issue:
+        #  https://github.com/teremterem/Promising/issues/104
         self._unsettled_children_lock = threading.Lock()
 
-        if self._parent is not None and not self._context_closed:
-            self._parent._register_children_threadsafe(self)
+        if register_with_parent:
+            # No other code has a reference to this PromisingContext yet, so we
+            # can just register it with the parent in a thread-unsafe manner
+            self._register_with_parent_thread_unsafe()
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -531,10 +563,10 @@ class PromisingContext:
             raise PromiseNotFoundError(f"No parent Promise found for {self!r}")
         return parent
 
-    def get_trace(self, *, parents_first: bool = True) -> "list[PromisingContext]":
+    def get_trace(self, *, ancestors_first: bool = True) -> "list[PromisingContext]":
         """
         Return a list of PromisingContext objects in the trace. If
-        *parents_first* is True (the default), the list is ordered from the
+        *ancestors_first* is True (the default), the list is ordered from the
         topmost parent down to this context; otherwise from this context up.
         """
         trace = []
@@ -544,26 +576,28 @@ class PromisingContext:
             trace.append(current)
             current = current._parent
 
-        if parents_first:
+        if ancestors_first:
             trace.reverse()
         return trace
 
-    def format_trace(self, *, parents_first: bool = True) -> "list[str]":
+    def format_trace(self, *, ancestors_first: bool = True) -> "list[str]":
         """
         Return a list of string representations of each
-        PromisingContext in the trace. If *parents_first* is True (the
+        PromisingContext in the trace. If *ancestors_first* is True (the
         default), the list is ordered from the topmost parent down to this
         context; otherwise from this context up.
         """
-        return [str(ctx) for ctx in self.get_trace(parents_first=parents_first)]
+        # TODO [TRACES] Reconcile this with the excepthooks in errors.py ?
+        return [str(ctx) for ctx in self.get_trace(ancestors_first=ancestors_first)]
 
-    def print_trace(self, *, parents_first: bool = True) -> None:
+    def print_trace(self, *, ancestors_first: bool = True) -> None:
         """
         Print each PromisingContext in the trace on a separate line. If
-        *parents_first* is True (the default), the list is ordered from the
+        *ancestors_first* is True (the default), the list is ordered from the
         topmost parent down to this context; otherwise from this context up.
         """
-        for line in self.format_trace(parents_first=parents_first):
+        # TODO [TRACES] Reconcile this with the excepthooks in errors.py ?
+        for line in self.format_trace(ancestors_first=ancestors_first):
             print(line)
 
     async def await_children(self, *, whole_subtree: bool = True, unpack_promises_fully: bool = True) -> None:
@@ -744,6 +778,11 @@ class PromisingContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
+        if exc_value is not None:
+            # Attach this context to the in-flight exception as it leaves
+            # the ``with`` block.
+            self.try_to_link_exception(exc_value)
+
         try:
             if self._previous_token is None:
                 raise ContextNotActiveError(f"{self!r} is not active")
@@ -779,21 +818,31 @@ class PromisingContext:
             self._context_closed = True
         self._unregister_from_parent_if_time()
 
-    def set_as_promising_context_on_exception(self, exception: BaseException) -> None:
+    def try_to_link_exception(self, exception: BaseException) -> None:
+        """
+        Attach this context to the given exception. Idempotent (deepest
+        level wins), so a nested context that already attributed itself
+        is preserved.
+        """
         try:
-            # TODO Make it possible to disable setting this trace ?
-            # TODO [P1] Borrow from MiniAgents the mechanism that logs this
-            #  "promising breadcrumb" together with the error tracebacks
-            if not hasattr(exception, "__promising_context__"):
+            if hasattr(exception, "__promising_context__"):
                 # We only let it be set at the deepest level of the promise
                 # hierarchy
-                exception.__promising_context__: PromisingContext = self
+                return
+            exception.__promising_context__: PromisingContext = self
+            exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
         except BaseException:
-            # Suppress the error if any - failure to store the trace should
-            # not affect the exception handling
+            # TODO Should it be just `Exception` ? Any danger that
+            #  `KeyboardInterrupt` would get swallowed here ?
             _logger.debug(
-                "Failed to attach __promising_context__ to exception %r on %r", exception, self, exc_info=True
+                "Failed to attach either __promising_context__ or "
+                "__promising_collapse_traceback__ to exception %r on %r",
+                exception,
+                self,
+                exc_info=True,
             )
+            # TODO [TRACES] Should any kind of warning be printed besides the
+            #  debug log ?
 
     def is_on_correct_running_loop(self, *, raise_thread_loop_not_running: bool = False) -> bool:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_thread_loop_not_running)
@@ -803,43 +852,13 @@ class PromisingContext:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _assert_event_loop_running_for_sync(self) -> None:
-        """
-        Assert that the event loop of the PromisingContext itself is running
-        (regardless of whether we are on the same thread or not).
-        """
-        if not self.loop.is_running():
-            # TODO Are we sure we need to worry about this at all ? The loop
-            #  can start later (if it is on a different thread indeed), and
-            #  then all the scheduled callbacks and tasks will run and the
-            #  synchronous operations will be unblocked. Maybe it should be
-            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
-            #  against a stopped loop ?
-            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
-            raise NoRunningEventLoopError(
-                f"Synchronous operations on {self!r} can only be performed if its event loop is running"
-            )
-
-    def _assert_no_sync_usage_deadlock(self) -> None:
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            raise SyncUsageError(
-                f"Synchronous operations of {self!r} cannot be performed on "
-                f"its own event loop thread, as that typically leads to a "
-                f"deadlock. Use awaitable operations instead."
-            )
-        # If we are on a different thread indeed, then let's make sure the event
-        # loop of the PromisingContext itself is running, so we don't end up
-        # waiting for something that might not happen at all
-        self._assert_event_loop_running_for_sync()
-
-    def _assert_awaiting_on_correct_event_loop(self) -> None:
-        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
-            raise EventLoopMismatchError(
-                f"Cannot await {self!r} from a different event loop than the one it belongs to."
-            )
+    def _register_with_parent_thread_unsafe(self) -> None:
+        # It is thread-safe for the parent but is unsafe for the child itself
+        if self._parent is not None and not self.done():
+            self._parent._register_children_threadsafe(self)
 
     def _unregister_from_parent_if_time(self) -> None:
-        if self._context_closed and self._parent is not None and not self._unsettled_children:
+        if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
             self._parent._unregister_children_threadsafe(self)
@@ -853,7 +872,7 @@ class PromisingContext:
                 )
 
         with self._unsettled_children_lock:
-            if self._context_closed:
+            if self.closed():
                 raise ContextAlreadyClosedError(
                     f"Cannot register children in a context that has already been closed.\n"
                     f"Context: {self!r}\nChildren: {children!r}"
@@ -892,6 +911,26 @@ class PromisingContext:
         raise ValueError(
             f"`start_soon_default` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
             f"but `{type(start_soon_default)}` was given for {self!r} instead"
+        )
+
+    def _resolve_collapse_tracebacks(self, collapse_tracebacks: bool | Sentinel) -> bool:
+        from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
+
+        if isinstance(collapse_tracebacks, bool):
+            return collapse_tracebacks
+
+        if collapse_tracebacks is PROMISING_DEFAULT:
+            return Defaults.COLLAPSE_TRACEBACKS
+
+        if collapse_tracebacks is INHERIT:
+            if self._parent is None:
+                return Defaults.COLLAPSE_TRACEBACKS
+
+            return self._parent._collapse_tracebacks
+
+        raise ValueError(
+            f"`collapse_tracebacks` must be either PROMISING_DEFAULT, INHERIT or a boolean value, "
+            f"but `{type(collapse_tracebacks)}` was given for {self!r} instead"
         )
 
     def _resolve_children_start_soon(self, children_start_soon: bool | None | Sentinel) -> bool | None:
@@ -943,3 +982,38 @@ class PromisingContext:
             f"`thread_pool` must be either INHERIT, PROMISING_DEFAULT, ASYNCIO_DEFAULT "
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
+
+    def _assert_event_loop_running_for_sync(self) -> None:
+        """
+        Assert that the event loop of the PromisingContext itself is running
+        (regardless of whether we are on the same thread or not).
+        """
+        if not self.loop.is_running():
+            # TODO Are we sure we need to worry about this at all ? The loop
+            #  can start later (if it is on a different thread indeed), and
+            #  then all the scheduled callbacks and tasks will run and the
+            #  synchronous operations will be unblocked. Maybe it should be
+            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
+            #  against a stopped loop ?
+            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
+            raise NoRunningEventLoopError(
+                f"Synchronous operations on {self!r} can only be performed if its event loop is running"
+            )
+
+    def _assert_no_sync_usage_deadlock(self) -> None:
+        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
+            raise SyncUsageError(
+                f"Synchronous operations of {self!r} cannot be performed on "
+                f"its own event loop thread, as that typically leads to a "
+                f"deadlock. Use awaitable operations instead."
+            )
+        # If we are on a different thread indeed, then let's make sure the event
+        # loop of the PromisingContext itself is running, so we don't end up
+        # waiting for something that might not happen at all
+        self._assert_event_loop_running_for_sync()
+
+    def _assert_awaiting_on_correct_event_loop(self) -> None:
+        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
+            raise EventLoopMismatchError(
+                f"Cannot await {self!r} from a different event loop than the one it belongs to."
+            )

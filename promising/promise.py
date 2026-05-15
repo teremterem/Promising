@@ -934,6 +934,8 @@ class Promise(PromisingContext, Generic[T_co]):
             try:
                 attach_context_to_error_chain_root(internal_error, context=exception)
             except BaseException:
+                # TODO Should it be just `Exception` ? Any danger that
+                #  `KeyboardInterrupt` would get swallowed here ?
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_from_loop(internal_error)
 
@@ -967,6 +969,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         except BaseException:
             _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)
+            raise
 
     def _assert_done(self) -> None:
         """
@@ -1041,6 +1044,8 @@ class Promise(PromisingContext, Generic[T_co]):
                 try:
                     close()
                 except BaseException:
+                    # TODO Should it be just `Exception` ? Any danger that
+                    #  `KeyboardInterrupt` would get swallowed here ?
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state(self, new_state: Sentinel) -> None:

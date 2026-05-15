@@ -832,6 +832,8 @@ class PromisingContext:
             exception.__promising_context__: PromisingContext = self
             exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
         except BaseException:
+            # TODO Should it be just `Exception` ? Any danger that
+            #  `KeyboardInterrupt` would get swallowed here ?
             _logger.debug(
                 "Failed to attach either __promising_context__ or "
                 "__promising_collapse_traceback__ to exception %r on %r",

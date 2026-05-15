@@ -146,7 +146,7 @@ def _promising_sys_excepthook(
             exc_value,
             exc_tb,
         )
-    except BaseException as e:
+    except Exception as e:
         _excepthook_state.previous_sys(exc_type, exc_value, exc_tb)
         _report_failure_to_print_promising_trace(e)
 
@@ -160,7 +160,7 @@ def _promising_threading_excepthook(args: threading.ExceptHookArgs) -> None:
             args.exc_value,
             args.exc_traceback,
         )
-    except BaseException as e:
+    except Exception as e:
         _excepthook_state.previous_threading(args)
         _report_failure_to_print_promising_trace(e)
 

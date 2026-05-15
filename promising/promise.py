@@ -936,6 +936,8 @@ class Promise(PromisingContext, Generic[T_co]):
             except BaseException:
                 # TODO Should it be just `Exception` ? Any danger that
                 #  `KeyboardInterrupt` would get swallowed here ?
+                #  Contemplate on this GitHub issue along the way:
+                #  https://github.com/teremterem/Promising/issues/105
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_from_loop(internal_error)
 
@@ -1046,6 +1048,8 @@ class Promise(PromisingContext, Generic[T_co]):
                 except BaseException:
                     # TODO Should it be just `Exception` ? Any danger that
                     #  `KeyboardInterrupt` would get swallowed here ?
+                    #  Contemplate on this GitHub issue along the way:
+                    #  https://github.com/teremterem/Promising/issues/105
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state(self, new_state: Sentinel) -> None:

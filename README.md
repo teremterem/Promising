@@ -375,7 +375,7 @@ Like `await`, calling `promise.sync()` automatically triggers the Promise's exec
 
 ## Result Unpacking
 
-A decorated function always returns a `Promise`, regardless of whether the underlying function returns a concrete value, a coroutine, or another Promise. This means:
+A decorated function always returns a `Promise`, regardless of whether the underlying function returns a concrete value or another Promise. This means:
 
 - `await promise` and `promise.sync()` recursively unpack nested `Promise` results until a non-`Promise` value is reached. Note that unpacking only traverses `Promise` instances specifically — it does **not** unpack arbitrary awaitables (e.g. an `asyncio.Future` returned by your function comes back to you as an `asyncio.Future`, not as a wrapped Promise).
 - `promise.unpack_once()` and `promise.unpack_once_sync()` unpack only one level — they return either a non-`Promise` value (which may itself be a plain awaitable) or another `Promise`.
@@ -471,7 +471,7 @@ Wrapping every async (or sync) operation in a `Promise` gives you:
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children()`), inspect what's still running (`collect_unsettled_children`), or scope configuration to a subtree — all without manual bookkeeping.
 - **Thread-safe synchronous access.** Every Promise exposes `.sync()` and `.unpack_once_sync()`, so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
-- **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value, a coroutine, or another Promise. `await` and `.sync()` recursively unpack nested Promises and return the final non-`Promise` value, so consumers get a uniform interface regardless of how deep the chain is.
+- **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value or another Promise. `await` and `.sync()` recursively unpack nested Promises and return the final non-`Promise` value, so consumers get a uniform interface regardless of how deep the chain is.
 - **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
 
 In short, a `Promise` turns a fire-and-forget coroutine into a first-class object you can pass around, await from anywhere (async or sync), and organize into a tree.

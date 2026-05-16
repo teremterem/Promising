@@ -393,8 +393,6 @@ class PromisingContext:
         collapse_tracebacks: bool | Sentinel = INHERIT,
         # TODO Introduce inheritable promise_class parameter
         #  (and promise_class_default) ?
-        # TODO Introduce inheritable wrap_coroutines parameter
-        #  (and wrap_coroutines_default) ?
         close_context_immediately: bool = False,
         register_with_parent: bool = True,
     ) -> None:
@@ -822,9 +820,23 @@ class PromisingContext:
 
     def try_to_link_exception(self, exception: BaseException) -> None:
         """
-        Attach this context to the given exception. Idempotent (deepest
-        level wins), so a nested context that already attributed itself
-        is preserved.
+        Attach this context to the given exception by setting two
+        attributes on it:
+
+        - ``__promising_context__`` — this ``PromisingContext`` instance
+          (consumed by the ``sys.excepthook`` / ``threading.excepthook``
+          overrides in ``promising/errors.py`` to render the
+          promising-context trace alongside the standard traceback).
+        - ``__promising_collapse_traceback__`` — a boolean snapshot of
+          this context's resolved ``collapse_tracebacks`` setting,
+          telling the renderer whether to drop promising-internal frames.
+
+        Idempotent (deepest level wins): if ``__promising_context__`` is
+        already set on the exception, this call is a no-op, so a nested
+        context that already attributed itself is preserved. Failures
+        to set either attribute (e.g. on a frozen exception type) are
+        swallowed and logged at debug level — losing the breadcrumb must
+        not affect exception handling.
         """
         try:
             if hasattr(exception, "__promising_context__"):

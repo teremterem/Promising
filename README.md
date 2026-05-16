@@ -2,7 +2,7 @@
 
 Hierarchical async and sync Promise management for Python.
 
-Decorate any function with `@promising.function` and it runs concurrently. Async functions run on the event loop as usual; sync functions require an explicit `use_thread_pool` setting — `True` (recommended) dispatches them to a thread pool, `False` runs them directly on the event loop thread. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value, a coroutine, or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
+Decorate any function with `@promising.function` and it runs concurrently. Async functions run on the event loop as usual; sync functions require an explicit `use_thread_pool` setting — `True` (recommended) dispatches them to a thread pool, `False` runs them directly on the event loop thread. The caller always gets back a `Promise` — regardless of whether the function is async or sync, and regardless of whether it returns a concrete value or another Promise. You don't have to think about any of that — just call it and let it run. By default, everything starts eagerly and in parallel.
 
 ## Installation
 
@@ -453,6 +453,7 @@ uv sync --extra examples
 ```
 
 - `examples/keyword_agent.py` — an LLM-powered keyword extraction agent using `@promising.function` with `litellm` and `pydantic`.
+- `examples/agents_with_errors.py` — illustrates the promising-traceback rendering (`collapse_tracebacks=True`) across a multi-agent call graph that ultimately fails, including the `__cause__` / `__context__` chain produced by re-raising and chaining exceptions.
 
 ## Design Note: Settings Are Frozen at Creation Time
 
@@ -481,11 +482,11 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 
 | Symbol | Description |
 |---|---|
-| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, and `thread_pool`. |
+| `promising.function` | Decorator that wraps async or sync functions to return `Promise` objects. Usable as `@promising.function` (async) or `@promising.function(use_thread_pool=True\|False)` (sync). For sync functions, `use_thread_pool` is **required** — set to `True` to run in a thread pool or `False` for lightweight transforms that won't block the event loop. For async functions, `use_thread_pool` is **disallowed**. Also accepts `namespace`, `start_soon`, `children_start_soon`, `start_soon_default`, `collapse_tracebacks`, and `thread_pool`. |
 | `promising.PromisingFunction` | The wrapper class created by the decorator. Implements the descriptor protocol for method support. |
 | `promising.PromisingFunction.run(*args, **kwargs)` | Top-level entrypoint for running a decorated function from non-async code — analogous to `asyncio.run()`. Calls `asyncio.run()` on `protected_run()`, which means it creates its own event loop, awaits the result, and by default awaits all children recursively (`await_children=WHOLE_SUBTREE`). This is **not** the same as `promise.sync()`: `.sync()` is for consuming a promise's result from within a sync promising function that already runs inside an event loop (in a thread pool), whereas `.run()` is for starting the whole promise tree from scratch. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
 | `promising.PromisingFunction.protected_run(*args, **kwargs)` | Returns a **coroutine** (not a `Promise`), making it safe to pass to `asyncio.run()` — unlike calling the decorated function directly, which would construct a root `Promise` before the event loop exists and fail (a root `PromisingContext` requires a running loop). Inside, the coroutine calls the decorated function, awaits the resulting `Promise`, and awaits its children (controlled by `await_children`, which defaults to `WHOLE_SUBTREE`). Used by `run()` internally. Accepts the same configuration overrides as `__call__` (as well as all the parameters of the underlying decorated function), plus `await_children`. |
-| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, and `start_soon_default`. |
+| `promising.context` | Context manager and decorator that creates a `PromisingContext` without producing a `Promise`. Usable as `with promising.context():` or `@promising.context`. Accepts `namespace`, `loop`, `parent`, `thread_pool`, `children_start_soon`, `start_soon_default`, and `collapse_tracebacks`. |
 
 ### Promise
 
@@ -509,7 +510,7 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 
 ### `wrap_awaitable`
 
-`promising.wrap_awaitable(awaitable=None, **kwargs)` is the recommended way to construct a `Promise` from a bare awaitable (for example, around an arbitrary coroutine that you didn't decorate with `@promising.function`). Accepts the same keyword arguments as the `Promise` constructor — `namespace`, `loop`, `parent`, `thread_pool`, `start_soon`, `children_start_soon`, `start_soon_default`, `prefilled_result`, `prefilled_exception`.
+`promising.wrap_awaitable(awaitable=None, **kwargs)` is the recommended way to construct a `Promise` from a bare awaitable (for example, around an arbitrary coroutine that you didn't decorate with `@promising.function`). Accepts the same keyword arguments as the `Promise` constructor — `namespace`, `loop`, `parent`, `thread_pool`, `start_soon`, `children_start_soon`, `start_soon_default`, `collapse_tracebacks`, `prefilled_result`, `prefilled_exception`.
 
 ### PromisingContext
 
@@ -545,7 +546,9 @@ To plug a *custom awaitable* into the hierarchy as an awaitable child, subclass 
 | `promising.get_trace(ancestors_first=True)` | Get a list of `PromisingContext` objects from the active context up to the root (or, rather, root down to the active context when `ancestors_first=True`). |
 | `promising.format_trace(ancestors_first=True)` | Like `get_trace`, but returns a list of string representations of each context. |
 | `promising.print_trace(ancestors_first=True)` | Print each context in the trace on a separate line. |
+| `promising.install_promising_tracebacks()` | Install custom `sys.excepthook` and `threading.excepthook` overrides that render exception tracebacks enriched with the promising-context trace (and, when `collapse_tracebacks` is enabled, with promising-internal frames collapsed). Idempotent — subsequent calls are no-ops. Normally called automatically the first time a `Promise` runs, so users rarely need to invoke it directly. |
 | `promising.Defaults.START_SOON` | Class attribute holding the global default for eager execution (`True` by default). Set it to `False` to switch to lazy execution globally. |
+| `promising.Defaults.COLLAPSE_TRACEBACKS` | Global default for whether tracebacks of exceptions that propagate out of a Promise (or its subtree) are rendered with promising-internal frames collapsed (`True`, the default) or in full (`False`). |
 | `promising.Defaults.PROMISING_THREAD_POOL` | The global `ThreadPoolExecutor` used by sync promising functions when `thread_pool` resolves to `PROMISING_DEFAULT`. |
 | `promising.Defaults.QUALNAMES_IN_NAMESPACES` | When `True` (the default), auto-derived namespaces include the fully qualified name (`module::qualname`). When `False`, only the short `__name__` is used. |
 

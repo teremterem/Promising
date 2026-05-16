@@ -114,11 +114,27 @@ class Promise(PromisingContext, Generic[T_co]):
       unpacking that recursively chases nested Promises down to a concrete
       value
     - Cancellation that is safe to invoke from any thread
+    - Construction-time stack capture (``frame_summary_tuple``) consumed
+      by the ``sys.excepthook`` / ``threading.excepthook`` overrides
+      installed via ``install_promising_tracebacks()`` to render
+      promising-aware tracebacks (optionally collapsing
+      promising-internal frames via ``collapse_tracebacks``)
 
     From ``PromisingContext`` it inherits the hierarchical parent-child
     machinery — automatic registration as a child of the currently active
     context, propagation of configuration through the tree, and
     ``await_children()`` / ``collect_unsettled_children()``.
+
+    Attributes:
+        frame_summary_tuple: Snapshot of the call stack captured at
+            construction time (excluding the ``Promise.__init__`` frame
+            itself), as a tuple of ``traceback.FrameSummary`` objects in
+            innermost-first order. The promising excepthook overrides
+            read this attribute on each ``Promise`` returned by
+            ``get_trace(ancestors_first=True)`` to render the
+            promising-context trace. Subclasses (or other contexts that
+            want to participate in the rendered trace) can expose a
+            matching attribute; contexts without it are skipped.
 
     Parent-child relationships (inherited from PromisingContext):
     - If a Promise's awaitable creates other Promises or

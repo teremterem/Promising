@@ -1,3 +1,25 @@
+"""
+Smoke-test for the promising-traceback rendering.
+
+This example wires together a multi-agent call graph that ultimately fails
+(``unreachable_agent`` is called with a non-bool ``start_soon`` argument),
+then re-raises the failure twice — once plain, once chained via
+``__context__``, and once chained via ``__cause__`` — so all three
+exception-chain mechanisms are exercised in a single run.
+
+What to look at when running ``python examples/agents_with_errors.py``:
+
+- The output contains three "Traceback" sections separated by the chain
+  banners ``During handling of the above exception...`` and ``The above
+  exception was the direct cause...``.
+- Each section is enriched with the promising-context trace of the
+  Promise / context hierarchy that was active when the failure occurred.
+- Because ``main.run(collapse_tracebacks=True)`` is used, promising-
+  internal frames are collapsed and replaced with ``... (collapsed
+  frames)``. Flip it to ``False`` to see the full, uncollapsed
+  tracebacks.
+"""
+
 import promising
 from promising import Promise
 

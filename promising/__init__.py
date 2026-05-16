@@ -55,6 +55,26 @@ class Defaults:
     would copy the value into the importing module's namespace at import time,
     making it impossible to override the default later. With a class,
     ``Defaults.X`` always reads the current value from a single source.
+
+    Attributes:
+        START_SOON: Global default for eager execution. When ``True`` (the
+            default), Promises start running as soon as they are created;
+            set to ``False`` for lazy execution. Used as the fallback at
+            the root of the parent chain by ``start_soon_default``.
+        COLLAPSE_TRACEBACKS: Global default for whether tracebacks of
+            exceptions that propagate out of a Promise (or its subtree)
+            are rendered with the promising-internal frames collapsed
+            (``True``, the default) or in full (``False``, useful when
+            debugging the library itself). Consumed by the
+            ``sys.excepthook`` / ``threading.excepthook`` overrides
+            installed by ``install_promising_tracebacks()``.
+        PROMISING_THREAD_POOL: The global ``ThreadPoolExecutor`` used by
+            sync promising functions when ``thread_pool`` resolves to
+            ``PROMISING_DEFAULT``.
+        QUALNAMES_IN_NAMESPACES: When ``True`` (the default), auto-derived
+            namespaces include the fully qualified name
+            (``module::qualname``). When ``False``, only the short
+            ``__name__`` is used.
     """
 
     # TODO Make these configurable via environment variables

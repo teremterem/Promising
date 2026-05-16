@@ -105,6 +105,26 @@ class PromiseNotUnpackedError(PromiseInvalidStateError):
 
 
 def install_promising_tracebacks() -> bool:
+    """
+    Install the promising overrides for ``sys.excepthook`` and
+    ``threading.excepthook`` so that uncaught exceptions are rendered with
+    their promising-context trace (and, when ``collapse_tracebacks`` is
+    enabled, with promising-internal frames collapsed).
+
+    Idempotent: calling this function while the hooks are already
+    installed is a no-op. Whichever hooks were in place before the first
+    successful installation are captured and used as a fallback if the
+    promising renderer itself raises.
+
+    ``Promise._unpack_once_from_loop`` calls this function automatically
+    the first time a Promise runs, so applications rarely need to invoke
+    it directly. It is exposed in the public API for cases where you want
+    to enable promising tracebacks before any Promise has executed (for
+    example, in a test fixture that asserts on traceback output).
+
+    Returns ``True`` if at least one of the two hooks was actually
+    replaced by this call; ``False`` if both were already in place.
+    """
     replaced = False
     if sys.excepthook is _promising_sys_excepthook and threading.excepthook is _promising_threading_excepthook:
         return replaced

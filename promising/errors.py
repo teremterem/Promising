@@ -116,7 +116,7 @@ def install_promising_tracebacks() -> bool:
     successful installation are captured and used as a fallback if the
     promising renderer itself raises.
 
-    ``Promise._fully_unpack_from_loop`` calls this function automatically
+    ``Promise._unpack_once_from_loop`` calls this function automatically
     the first time a Promise runs, so applications rarely need to invoke
     it directly. It is exposed in the public API for cases where you want
     to enable promising tracebacks before any Promise has executed (for

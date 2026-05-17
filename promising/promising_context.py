@@ -891,11 +891,15 @@ class PromisingContext:
         _hierarchy_logger.log_children_registered(parent=self, children=children)
 
     def _unregister_children(self, *children: "PromisingContext") -> None:
-        # DELIBERATE BUG: same non-atomic read-modify-write as in
-        # ``_register_children``. Racing with a concurrent register
-        # can resurrect a removed element or drop an added one.
+        # DELIBERATE BUG: non-atomic read-modify-write (resurrects/drops
+        # entries when racing with a concurrent register) PLUS use
+        # ``.remove`` instead of ``.difference_update`` so a double
+        # close_context() raises KeyError. Mirrors a refactor where
+        # someone wanted "strict" semantics but forgot the call site
+        # can fire idempotently from multiple threads.
         new_set = set(self._unsettled_children)
-        new_set.difference_update(children)
+        for c in children:
+            new_set.remove(c)
         self._unsettled_children = new_set
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)

@@ -44,7 +44,7 @@ def test_concurrent_enter_same_context_only_one_succeeds() -> None:
     loop = _make_dedicated_loop()
     try:
         N = 8
-        for _ in range(500):
+        for _ in range(3000):
             ctx = promising.PromisingContext(loop=loop, parent=None)
             barrier = threading.Barrier(N)
             succeeded: list[str] = []
@@ -215,57 +215,61 @@ async def test_promise_context_open_races_with_external_child_registration() -> 
     """
     loop = asyncio.get_running_loop()
 
-    @promising.function
-    async def parent_promise() -> int:
-        active = promising.get_active_promise()
-        errors: list[BaseException] = []
-        children: list[promising.Promise] = []
-        children_lock = threading.Lock()
-        stop = threading.Event()
+    for _ in range(30):
 
-        async def _quick() -> int:
-            return 1
+        @promising.function
+        async def parent_promise() -> int:
+            active = promising.get_active_promise()
+            errors: list[BaseException] = []
+            children: list[promising.Promise] = []
+            children_lock = threading.Lock()
+            stop = threading.Event()
 
-        def worker() -> None:
-            try:
-                while not stop.is_set():
-                    p = promising.wrap_awaitable(
-                        _quick(),
-                        parent=active,
-                        loop=loop,
-                        start_soon=False,
-                    )
-                    with children_lock:
-                        children.append(p)
-            except BaseException as exc:  # noqa: BLE001
-                errors.append(exc)
+            async def _quick() -> int:
+                return 1
 
-        writers = [threading.Thread(target=worker, daemon=True) for _ in range(8)]
-        for w in writers:
-            w.start()
-        try:
-            for _ in range(200):
-                await asyncio.sleep(0)
-        finally:
-            stop.set()
+            def worker() -> None:
+                try:
+                    while not stop.is_set():
+                        p = promising.wrap_awaitable(
+                            _quick(),
+                            parent=active,
+                            loop=loop,
+                            start_soon=False,
+                        )
+                        with children_lock:
+                            children.append(p)
+                except BaseException as exc:  # noqa: BLE001
+                    errors.append(exc)
+
+            writers = [threading.Thread(target=worker, daemon=True) for _ in range(8)]
             for w in writers:
-                w.join(timeout=5)
+                w.start()
+            try:
+                for _ in range(200):
+                    await asyncio.sleep(0)
+            finally:
+                stop.set()
+                for w in writers:
+                    w.join(timeout=5)
 
-        assert not errors, errors
+            assert not errors, errors
 
-        # Every child registered while the Promise was running must
-        # be tracked.
-        actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
-        missing = set(children) - actual
-        assert not missing, f"{len(missing)} children were lost from active Promise's set during the lifecycle race"
+            # Every child registered while the Promise was running must
+            # be tracked.
+            actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
+            missing = set(children) - actual
+            assert not missing, (
+                f"{len(missing)} children were lost from active Promise's set during the lifecycle race"
+            )
 
-        # Clean up so asyncio doesn't warn about un-awaited coros.
-        for c in children:
-            c.cancel()
+            # Clean up so asyncio doesn't warn about un-awaited coros.
+            for c in children:
+                c.cancel()
 
-        return 0
+            return 0
 
-    await parent_promise()
+        await parent_promise()
 
 
 # ── close_context idempotency under threads ─────────────────────
@@ -286,7 +290,7 @@ def test_close_context_concurrent_calls_must_be_idempotent() -> None:
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(100):
+        for _ in range(2000):
             parent = promising.PromisingContext(loop=loop, parent=None)
             child = promising.PromisingContext(loop=loop, parent=parent)
 

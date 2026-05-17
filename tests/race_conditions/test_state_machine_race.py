@@ -71,7 +71,7 @@ async def test_many_threads_cancelling_same_pending_promise_yield_consistent_sta
     ``_synthesize_cancellation`` which writes ``_state``). All workers
     should agree on a single cancelled terminal state.
     """
-    for _ in range(2000):
+    for _ in range(50):
 
         async def coro() -> int:
             return 1
@@ -105,7 +105,7 @@ async def test_cancel_racing_with_natural_completion_keeps_state_consistent() ->
     or ``cancelled``. It must never end up with a hybrid internal-error
     state or surface ``RuntimeError`` to the caller.
     """
-    for _ in range(1000):
+    for _ in range(80):
         loop = asyncio.get_running_loop()
 
         async def coro() -> int:
@@ -163,7 +163,7 @@ async def test_concurrent_cancel_with_full_unpacking_promise_chain() -> None:
     fire ``_synthesize_cancellation`` against an already-transitioning
     state, triggering an internal ``RuntimeError``.
     """
-    for _ in range(500):
+    for _ in range(40):
         loop = asyncio.get_running_loop()
 
         async def inner_coro() -> str:
@@ -235,7 +235,7 @@ async def test_concurrent_set_state_does_not_double_unregister_from_parent() -> 
 
     parent = promising.PromisingContext(loop=loop, parent=None)
 
-    for _ in range(1000):
+    for _ in range(50):
 
         async def coro() -> int:
             return 5

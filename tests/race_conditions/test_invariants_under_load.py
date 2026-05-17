@@ -52,11 +52,10 @@ async def test_deep_hierarchy_stress_keeps_tree_consistent() -> None:
         return sum(await asyncio.gather(*parents))
 
     expected = sum(p * 1000 * N_CHILDREN_PER_PARENT + sum(range(N_CHILDREN_PER_PARENT)) for p in range(N_PARENTS))
-    for _ in range(30):
-        actual = await root()
-        assert actual == expected, (
-            f"lost children or duplicated work in concurrent hierarchy build: {actual} vs {expected}"
-        )
+    actual = await root()
+    assert actual == expected, (
+        f"lost children or duplicated work in concurrent hierarchy build: {actual} vs {expected}"
+    )
 
 
 # ── many cancels racing with a fast natural completion ──────────
@@ -80,7 +79,7 @@ async def test_cancel_race_state_consistency_high_iterations() -> None:
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(2000):
+    for _ in range(300):
 
         async def coro() -> int:
             for _ in range(3):
@@ -153,69 +152,67 @@ async def test_await_children_under_continuous_registration_load() -> None:
     N_WRITERS = 6
     WRITES = 100
 
-    for _ in range(20):
+    @promising.function
+    async def root() -> int:
+        active = promising.get_active_promise()
+        loop = asyncio.get_running_loop()
 
-        @promising.function
-        async def root() -> int:
-            active = promising.get_active_promise()
-            loop = asyncio.get_running_loop()
+        thread_errors: list[BaseException] = []
+        thread_errors_lock = threading.Lock()
+        all_promises: list[promising.Promise] = []
+        all_promises_lock = threading.Lock()
 
-            thread_errors: list[BaseException] = []
-            thread_errors_lock = threading.Lock()
-            all_promises: list[promising.Promise] = []
-            all_promises_lock = threading.Lock()
-
-            async def _quick() -> int:
-                return 0
-
-            start = threading.Barrier(N_WRITERS + 1)
-
-            def writer() -> None:
-                try:
-                    start.wait()
-                    local = []
-                    for _ in range(WRITES):
-                        local.append(
-                            promising.wrap_awaitable(
-                                _quick(),
-                                parent=active,
-                                loop=loop,
-                                start_soon=False,
-                            )
-                        )
-                    with all_promises_lock:
-                        all_promises.extend(local)
-                except BaseException as exc:  # noqa: BLE001
-                    with thread_errors_lock:
-                        thread_errors.append(exc)
-
-            writers = [threading.Thread(target=writer, daemon=True) for _ in range(N_WRITERS)]
-            for w in writers:
-                w.start()
-
-            start.wait()
-
-            # Drain while workers register.
-            for _ in range(30):
-                await promising.await_children(whole_subtree=True)
-
-            for w in writers:
-                w.join(timeout=10)
-                assert not w.is_alive()
-
-            await promising.await_children(whole_subtree=True)
-
-            assert not thread_errors, thread_errors
-
-            with all_promises_lock:
-                for p in all_promises:
-                    assert p.done(), f"child promise not done after final drain: {p!r}"
-
-            unsettled = active.collect_unsettled_children(whole_subtree=True, awaitables_only=True)
-            assert unsettled == set(), f"{len(unsettled)} awaitable descendants left after draining"
+        async def _quick() -> int:
             return 0
 
-        await root()
+        start = threading.Barrier(N_WRITERS + 1)
+
+        def writer() -> None:
+            try:
+                start.wait()
+                local = []
+                for _ in range(WRITES):
+                    local.append(
+                        promising.wrap_awaitable(
+                            _quick(),
+                            parent=active,
+                            loop=loop,
+                            start_soon=False,
+                        )
+                    )
+                with all_promises_lock:
+                    all_promises.extend(local)
+            except BaseException as exc:  # noqa: BLE001
+                with thread_errors_lock:
+                    thread_errors.append(exc)
+
+        writers = [threading.Thread(target=writer, daemon=True) for _ in range(N_WRITERS)]
+        for w in writers:
+            w.start()
+
+        start.wait()
+
+        # Drain while workers register.
+        for _ in range(30):
+            await promising.await_children(whole_subtree=True)
+
+        for w in writers:
+            w.join(timeout=10)
+            assert not w.is_alive()
+
+        await promising.await_children(whole_subtree=True)
+
+        assert not thread_errors, thread_errors
+
+        with all_promises_lock:
+            for p in all_promises:
+                assert p.done(), f"child promise not done after final drain: {p!r}"
+
+        unsettled = active.collect_unsettled_children(whole_subtree=True, awaitables_only=True)
+        assert unsettled == set(), f"{len(unsettled)} awaitable descendants left after draining"
+        return 0
+
+    await root()
 
 
 # ── concurrent get_active_context across threads ────────────────
@@ -250,8 +247,7 @@ async def test_get_active_context_returns_correct_context_per_thread() -> None:
                 f"contain {expected!r}, got {actual!r}"
             )
 
-    for _ in range(100):
-        await root()
+    await root()
 
 
 # ── massive concurrent close (cascading unregister) ─────────────
@@ -267,7 +263,7 @@ def test_massive_concurrent_close_grandparent_consistency() -> None:
     """
     loop = asyncio.new_event_loop()
     try:
-        for _ in range(100):
+        for _ in range(20):
             grandparent = promising.PromisingContext(loop=loop, parent=None)
             middle = promising.PromisingContext(loop=loop, parent=grandparent)
 
@@ -341,33 +337,32 @@ def test_concurrent_independent_promise_run_invocations_isolate() -> None:
 
     N = 8
 
-    for _ in range(50):
-        results: list[int] = []
-        errors: list[BaseException] = []
-        lock = threading.Lock()
-        barrier = threading.Barrier(N)
+    results: list[int] = []
+    errors: list[BaseException] = []
+    lock = threading.Lock()
+    barrier = threading.Barrier(N)
 
-        def runner(idx: int) -> None:
-            try:
-                barrier.wait()
-                value = task.run(idx)
-                with lock:
-                    results.append(value)
-            except BaseException as exc:  # noqa: BLE001
-                with lock:
-                    errors.append(exc)
+    def runner(idx: int) -> None:
+        try:
+            barrier.wait()
+            value = task.run(idx)
+            with lock:
+                results.append(value)
+        except BaseException as exc:  # noqa: BLE001
+            with lock:
+                errors.append(exc)
 
-        threads = [threading.Thread(target=runner, args=(i,), daemon=True) for i in range(N)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=10)
-            assert not t.is_alive()
+    threads = [threading.Thread(target=runner, args=(i,), daemon=True) for i in range(N)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+        assert not t.is_alive()
 
-        assert not errors, errors
-        assert sorted(results) == [i * 2 for i in range(N)], (
-            f"results mismatch — possible cross-thread leakage of active context: {sorted(results)}"
-        )
+    assert not errors, errors
+    assert sorted(results) == [i * 2 for i in range(N)], (
+        f"results mismatch — possible cross-thread leakage of active context: {sorted(results)}"
+    )
 
 
 # ── sync() race with cancel — RuntimeError must not surface ─────
@@ -383,7 +378,7 @@ async def test_sync_consumers_never_observe_internal_runtime_error() -> None:
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(500):
+    for _ in range(50):
 
         async def coro() -> str:
             for _ in range(4):

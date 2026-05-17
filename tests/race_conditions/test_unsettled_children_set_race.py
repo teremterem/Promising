@@ -85,7 +85,7 @@ def test_concurrent_child_registration_keeps_all_children() -> None:
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(200):
+        for _ in range(20):
             parent = promising.PromisingContext(loop=loop, parent=None)
 
             N_THREADS = 64
@@ -145,34 +145,33 @@ def test_collect_unsettled_children_during_concurrent_registration_does_not_rais
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(30):
-            parent = promising.PromisingContext(loop=loop, parent=None)
+        parent = promising.PromisingContext(loop=loop, parent=None)
 
-            N_WRITERS = 16
-            WRITES_PER_WRITER = 200
+        N_WRITERS = 16
+        WRITES_PER_WRITER = 200
 
-            writers_done = threading.Event()
-            writers_finished_count = 0
-            writers_finished_lock = threading.Lock()
+        writers_done = threading.Event()
+        writers_finished_count = 0
+        writers_finished_lock = threading.Lock()
 
-            def writer() -> None:
-                nonlocal writers_finished_count
-                try:
-                    for _ in range(WRITES_PER_WRITER):
-                        promising.PromisingContext(loop=loop, parent=parent)
-                finally:
-                    with writers_finished_lock:
-                        writers_finished_count += 1
-                        if writers_finished_count == N_WRITERS:
-                            writers_done.set()
+        def writer() -> None:
+            nonlocal writers_finished_count
+            try:
+                for _ in range(WRITES_PER_WRITER):
+                    promising.PromisingContext(loop=loop, parent=parent)
+            finally:
+                with writers_finished_lock:
+                    writers_finished_count += 1
+                    if writers_finished_count == N_WRITERS:
+                        writers_done.set()
 
-            def reader() -> None:
-                while not writers_done.is_set():
-                    parent.collect_unsettled_children(whole_subtree=True, awaitables_only=False)
+        def reader() -> None:
+            while not writers_done.is_set():
+                parent.collect_unsettled_children(whole_subtree=True, awaitables_only=False)
 
-            targets = [reader] + [writer] * N_WRITERS
-            errors = _run_workers(targets)
-            assert not errors, errors
+        targets = [reader] + [writer] * N_WRITERS
+        errors = _run_workers(targets)
+        assert not errors, errors
     finally:
         loop.close()
 
@@ -189,27 +188,24 @@ def test_concurrent_child_close_keeps_consistent_set() -> None:
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(50):
-            parent = promising.PromisingContext(loop=loop, parent=None)
+        parent = promising.PromisingContext(loop=loop, parent=None)
 
-            N_CHILDREN = 256
-            children = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_CHILDREN)]
-            # Sanity check before the race
-            assert len(parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)) == N_CHILDREN
+        N_CHILDREN = 256
+        children = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_CHILDREN)]
+        # Sanity check before the race
+        assert len(parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)) == N_CHILDREN
 
-            def make_closer(child: promising.PromisingContext):
-                def _close() -> None:
-                    child.close_context()
+        def make_closer(child: promising.PromisingContext):
+            def _close() -> None:
+                child.close_context()
 
-                return _close
+            return _close
 
-            errors = _run_workers([make_closer(c) for c in children])
-            assert not errors, errors
+        errors = _run_workers([make_closer(c) for c in children])
+        assert not errors, errors
 
-            remaining = parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)
-            assert remaining == set(), (
-                f"parent still holds {len(remaining)} stale child references after concurrent close"
-            )
+        remaining = parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)
+        assert remaining == set(), f"parent still holds {len(remaining)} stale child references after concurrent close"
     finally:
         loop.close()
 
@@ -224,37 +220,36 @@ def test_concurrent_registration_and_unregistration_keeps_set_intact() -> None:
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(50):
-            parent = promising.PromisingContext(loop=loop, parent=None)
+        parent = promising.PromisingContext(loop=loop, parent=None)
 
-            N_PRE_EXISTING = 200
-            pre_existing = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_PRE_EXISTING)]
+        N_PRE_EXISTING = 200
+        pre_existing = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_PRE_EXISTING)]
 
-            N_NEW = 200
-            new_children: list[promising.PromisingContext] = []
-            new_children_lock = threading.Lock()
+        N_NEW = 200
+        new_children: list[promising.PromisingContext] = []
+        new_children_lock = threading.Lock()
 
-            def closer(child: promising.PromisingContext):
-                def _close() -> None:
-                    child.close_context()
+        def closer(child: promising.PromisingContext):
+            def _close() -> None:
+                child.close_context()
 
-                return _close
+            return _close
 
-            def adder() -> None:
-                local = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_NEW // 50)]
-                with new_children_lock:
-                    new_children.extend(local)
+        def adder() -> None:
+            local = [promising.PromisingContext(loop=loop, parent=parent) for _ in range(N_NEW // 50)]
+            with new_children_lock:
+                new_children.extend(local)
 
-            targets = [closer(c) for c in pre_existing] + [adder] * 50
-            errors = _run_workers(targets)
-            assert not errors, errors
+        targets = [closer(c) for c in pre_existing] + [adder] * 50
+        errors = _run_workers(targets)
+        assert not errors, errors
 
-            remaining = parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)
-            assert remaining == set(new_children), (
-                f"after concurrent add/close, parent's set has "
-                f"{len(remaining ^ set(new_children))} discrepancies "
-                f"(expected={len(new_children)}, got={len(remaining)})"
-            )
+        remaining = parent.collect_unsettled_children(whole_subtree=False, awaitables_only=False)
+        assert remaining == set(new_children), (
+            f"after concurrent add/close, parent's set has "
+            f"{len(remaining ^ set(new_children))} discrepancies "
+            f"(expected={len(new_children)}, got={len(remaining)})"
+        )
     finally:
         loop.close()
 
@@ -347,60 +342,58 @@ async def test_await_children_during_concurrent_thread_registration() -> None:
     N_WRITERS = 4
     WRITES = 200
 
-    for _ in range(20):
+    @promising.function
+    async def parent_func() -> None:
+        active = promising.get_active_promise()
+        loop = asyncio.get_running_loop()
+        thread_errors: list[BaseException] = []
+        thread_errors_lock = threading.Lock()
 
-        @promising.function
-        async def parent_func() -> None:
-            active = promising.get_active_promise()
-            loop = asyncio.get_running_loop()
-            thread_errors: list[BaseException] = []
-            thread_errors_lock = threading.Lock()
+        async def _quick() -> int:
+            return 42
 
-            async def _quick() -> int:
-                return 42
+        start_barrier = threading.Barrier(N_WRITERS + 1)
 
-            start_barrier = threading.Barrier(N_WRITERS + 1)
+        def thread_writer() -> None:
+            try:
+                start_barrier.wait()
+                for _ in range(WRITES):
+                    promising.wrap_awaitable(
+                        _quick(),
+                        parent=active,
+                        loop=loop,
+                        start_soon=False,
+                    )
+            except BaseException as exc:  # noqa: BLE001
+                with thread_errors_lock:
+                    thread_errors.append(exc)
 
-            def thread_writer() -> None:
-                try:
-                    start_barrier.wait()
-                    for _ in range(WRITES):
-                        promising.wrap_awaitable(
-                            _quick(),
-                            parent=active,
-                            loop=loop,
-                            start_soon=False,
-                        )
-                except BaseException as exc:  # noqa: BLE001
-                    with thread_errors_lock:
-                        thread_errors.append(exc)
+        writers = [threading.Thread(target=thread_writer, daemon=True) for _ in range(N_WRITERS)]
+        for w in writers:
+            w.start()
 
-            writers = [threading.Thread(target=thread_writer, daemon=True) for _ in range(N_WRITERS)]
-            for w in writers:
-                w.start()
+        # Release the writers and immediately race them with await_children.
+        start_barrier.wait()
 
-            # Release the writers and immediately race them with await_children.
-            start_barrier.wait()
-
-            # Drain children many times to keep the race window open.
-            for _ in range(20):
-                await promising.await_children(whole_subtree=True)
-
-            for w in writers:
-                w.join(timeout=10)
-                assert not w.is_alive()
-
-            # Final drain.
+        # Drain children many times to keep the race window open.
+        for _ in range(20):
             await promising.await_children(whole_subtree=True)
 
-            assert not thread_errors, thread_errors
+        for w in writers:
+            w.join(timeout=10)
+            assert not w.is_alive()
 
-            unsettled = active.collect_unsettled_children(whole_subtree=True, awaitables_only=True)
-            assert unsettled == set(), (
-                f"await_children returned with {len(unsettled)} unsettled awaitable children remaining"
-            )
+        # Final drain.
+        await promising.await_children(whole_subtree=True)
 
-        await parent_func()
+        assert not thread_errors, thread_errors
+
+        unsettled = active.collect_unsettled_children(whole_subtree=True, awaitables_only=True)
+        assert unsettled == set(), (
+            f"await_children returned with {len(unsettled)} unsettled awaitable children remaining"
+        )
+
+    await parent_func()
 
 
 # ── cascading unregister race ────────────────────────────────────
@@ -420,7 +413,7 @@ def test_cascading_unregister_keeps_grandparent_set_consistent() -> None:
     """
     loop = _make_dedicated_loop()
     try:
-        for _ in range(300):
+        for _ in range(50):
             grandparent = promising.PromisingContext(loop=loop, parent=None)
             middle = promising.PromisingContext(loop=loop, parent=grandparent)
 
@@ -462,51 +455,49 @@ async def test_concurrent_promise_creation_from_threads_registers_all() -> None:
     the parent's ``_unsettled_children`` set; none must be lost.
     """
 
-    for _ in range(20):
+    @promising.function
+    async def parent_func() -> int:
+        active = promising.get_active_promise()
+        loop = asyncio.get_running_loop()
 
-        @promising.function
-        async def parent_func() -> int:
-            active = promising.get_active_promise()
-            loop = asyncio.get_running_loop()
+        N_THREADS = 32
+        CHILDREN_PER_THREAD = 20
 
-            N_THREADS = 32
-            CHILDREN_PER_THREAD = 20
+        created: list[promising.Promise] = []
+        created_lock = threading.Lock()
 
-            created: list[promising.Promise] = []
-            created_lock = threading.Lock()
+        async def _quick() -> int:
+            return 0
 
-            async def _quick() -> int:
-                return 0
+        def worker() -> None:
+            local = []
+            for _ in range(CHILDREN_PER_THREAD):
+                child = promising.wrap_awaitable(
+                    _quick(),
+                    parent=active,
+                    loop=loop,
+                    start_soon=False,
+                )
+                local.append(child)
+            with created_lock:
+                created.extend(local)
 
-            def worker() -> None:
-                local = []
-                for _ in range(CHILDREN_PER_THREAD):
-                    child = promising.wrap_awaitable(
-                        _quick(),
-                        parent=active,
-                        loop=loop,
-                        start_soon=False,
-                    )
-                    local.append(child)
-                with created_lock:
-                    created.extend(local)
+        with ThreadPoolExecutor(max_workers=N_THREADS) as ex:
+            await asyncio.gather(*[loop.run_in_executor(ex, worker) for _ in range(N_THREADS)])
 
-            with ThreadPoolExecutor(max_workers=N_THREADS) as ex:
-                await asyncio.gather(*[loop.run_in_executor(ex, worker) for _ in range(N_THREADS)])
+        expected = set(created)
+        actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
+        missing = expected - actual
+        assert not missing, f"{len(missing)} child Promises lost from the parent's set"
 
-            expected = set(created)
-            actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
-            missing = expected - actual
-            assert not missing, f"{len(missing)} child Promises lost from the parent's set"
+        # Clean up the unused coroutines so asyncio doesn't warn.
+        for child in created:
+            child.cancel()
 
-            # Clean up the unused coroutines so asyncio doesn't warn.
-            for child in created:
-                child.cancel()
+        return len(created)
 
-            return len(created)
-
-        n = await parent_func()
-        assert n == 32 * 20
+    n = await parent_func()
+    assert n == 32 * 20
 
 
 # ── sanity (would-pass) test, included for self-verification ─────

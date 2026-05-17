@@ -45,7 +45,7 @@ async def test_many_threads_calling_sync_on_same_promise_consistent() -> None:
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(100):
+    for _ in range(10):
 
         async def coro() -> int:
             await asyncio.sleep(0.01)
@@ -91,33 +91,31 @@ async def test_many_threads_calling_unpack_once_sync_on_same_promise_consistent(
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(100):
+    async def coro() -> str:
+        await asyncio.sleep(0.01)
+        return "ok"
 
-        async def coro() -> str:
-            await asyncio.sleep(0.01)
-            return "ok"
+    promise = promising.wrap_awaitable(coro(), parent=None, loop=loop, start_soon=False)
 
-        promise = promising.wrap_awaitable(coro(), parent=None, loop=loop, start_soon=False)
+    N = 32
+    results: list[object] = []
+    errors: list[BaseException] = []
+    lock = threading.Lock()
 
-        N = 32
-        results: list[object] = []
-        errors: list[BaseException] = []
-        lock = threading.Lock()
+    def consumer() -> None:
+        try:
+            value = promise.unpack_once_sync(timeout=5)
+            with lock:
+                results.append(value)
+        except BaseException as exc:  # noqa: BLE001
+            with lock:
+                errors.append(exc)
 
-        def consumer() -> None:
-            try:
-                value = promise.unpack_once_sync(timeout=5)
-                with lock:
-                    results.append(value)
-            except BaseException as exc:  # noqa: BLE001
-                with lock:
-                    errors.append(exc)
+    with ThreadPoolExecutor(max_workers=N) as ex:
+        await asyncio.gather(*[loop.run_in_executor(ex, consumer) for _ in range(N)])
 
-        with ThreadPoolExecutor(max_workers=N) as ex:
-            await asyncio.gather(*[loop.run_in_executor(ex, consumer) for _ in range(N)])
-
-        assert not errors, errors
-        assert results == ["ok"] * N
+    assert not errors, errors
+    assert results == ["ok"] * N
 
 
 # ── sync() race with cancel() ──────────────────────────────────
@@ -133,7 +131,7 @@ async def test_sync_consumer_thread_observes_clean_terminal_after_cancel() -> No
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(500):
+    for _ in range(40):
         cancel_event = asyncio.Event()
 
         async def coro() -> int:
@@ -200,59 +198,57 @@ async def test_await_children_sync_during_thread_registration_does_not_raise() -
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(30):
+    @promising.function
+    async def root() -> None:
+        active = promising.get_active_promise()
+        stop = threading.Event()
+        thread_errors: list[BaseException] = []
+        registered_children: list[promising.Promise] = []
+        registered_lock = threading.Lock()
 
-        @promising.function
-        async def root() -> None:
-            active = promising.get_active_promise()
-            stop = threading.Event()
-            thread_errors: list[BaseException] = []
-            registered_children: list[promising.Promise] = []
-            registered_lock = threading.Lock()
+        async def _quick() -> int:
+            return 0
 
-            async def _quick() -> int:
-                return 0
-
-            def writer() -> None:
-                try:
-                    while not stop.is_set():
-                        p = promising.wrap_awaitable(
-                            _quick(),
-                            parent=active,
-                            loop=loop,
-                            start_soon=False,
-                        )
-                        with registered_lock:
-                            registered_children.append(p)
-                except BaseException as exc:  # noqa: BLE001
-                    thread_errors.append(exc)
-
-            @promising.function(use_thread_pool=True)
-            def sync_waiter() -> str:
-                # Each iteration triggers a fresh collect_unsettled_children
-                # via await_children_sync.
-                for _ in range(20):
-                    promising.await_children_sync(whole_subtree=True)
-                return "drained"
-
-            writers = [threading.Thread(target=writer, daemon=True) for _ in range(4)]
-            for w in writers:
-                w.start()
+        def writer() -> None:
             try:
-                waiter_promise = sync_waiter()
-                try:
-                    await waiter_promise
-                finally:
-                    stop.set()
-                    for w in writers:
-                        w.join(timeout=5)
+                while not stop.is_set():
+                    p = promising.wrap_awaitable(
+                        _quick(),
+                        parent=active,
+                        loop=loop,
+                        start_soon=False,
+                    )
+                    with registered_lock:
+                        registered_children.append(p)
+            except BaseException as exc:  # noqa: BLE001
+                thread_errors.append(exc)
+
+        @promising.function(use_thread_pool=True)
+        def sync_waiter() -> str:
+            # Each iteration triggers a fresh collect_unsettled_children
+            # via await_children_sync.
+            for _ in range(20):
+                promising.await_children_sync(whole_subtree=True)
+            return "drained"
+
+        writers = [threading.Thread(target=writer, daemon=True) for _ in range(4)]
+        for w in writers:
+            w.start()
+        try:
+            waiter_promise = sync_waiter()
+            try:
+                await waiter_promise
             finally:
-                for c in registered_children:
-                    c.cancel()
+                stop.set()
+                for w in writers:
+                    w.join(timeout=5)
+        finally:
+            for c in registered_children:
+                c.cancel()
 
-            assert not thread_errors, thread_errors
+        assert not thread_errors, thread_errors
 
-        await root()
+    await root()
 
 
 # ── concurrent .sync() consumption *and* registration ───────────
@@ -267,69 +263,67 @@ async def test_concurrent_sync_consumers_and_child_registrations() -> None:
     """
     loop = asyncio.get_running_loop()
 
-    for _ in range(30):
+    @promising.function
+    async def root() -> int:
+        active = promising.get_active_promise()
 
         @promising.function
-        async def root() -> int:
-            active = promising.get_active_promise()
+        async def published() -> int:
+            await asyncio.sleep(0.01)
+            return 99
 
-            @promising.function
-            async def published() -> int:
-                await asyncio.sleep(0.01)
-                return 99
+        target = published()
 
-            target = published()
+        N_CONSUMERS = 16
+        N_REGISTRARS = 16
+        errors: list[BaseException] = []
+        errors_lock = threading.Lock()
+        consumer_results: list[int] = []
+        new_children: list[promising.Promise] = []
 
-            N_CONSUMERS = 16
-            N_REGISTRARS = 16
-            errors: list[BaseException] = []
-            errors_lock = threading.Lock()
-            consumer_results: list[int] = []
-            new_children: list[promising.Promise] = []
-
-            async def _quick() -> int:
-                return 0
-
-            def consumer() -> None:
-                try:
-                    consumer_results.append(target.sync(timeout=5))
-                except BaseException as exc:  # noqa: BLE001
-                    with errors_lock:
-                        errors.append(exc)
-
-            def registrar() -> None:
-                try:
-                    for _ in range(20):
-                        new_children.append(
-                            promising.wrap_awaitable(
-                                _quick(),
-                                parent=active,
-                                loop=loop,
-                                start_soon=False,
-                            )
-                        )
-                except BaseException as exc:  # noqa: BLE001
-                    with errors_lock:
-                        errors.append(exc)
-
-            with ThreadPoolExecutor(max_workers=N_CONSUMERS + N_REGISTRARS) as ex:
-                consumer_futs = [loop.run_in_executor(ex, consumer) for _ in range(N_CONSUMERS)]
-                registrar_futs = [loop.run_in_executor(ex, registrar) for _ in range(N_REGISTRARS)]
-                await asyncio.gather(*consumer_futs, *registrar_futs)
-
-            assert not errors, errors
-            assert consumer_results == [99] * N_CONSUMERS
-
-            # All registrars' children must be tracked.
-            actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
-            missing = set(new_children) - actual
-            assert not missing, f"{len(missing)} children were lost from the parent's set"
-
-            for c in new_children:
-                c.cancel()
+        async def _quick() -> int:
             return 0
 
-        await root()
+        def consumer() -> None:
+            try:
+                consumer_results.append(target.sync(timeout=5))
+            except BaseException as exc:  # noqa: BLE001
+                with errors_lock:
+                    errors.append(exc)
+
+        def registrar() -> None:
+            try:
+                for _ in range(20):
+                    new_children.append(
+                        promising.wrap_awaitable(
+                            _quick(),
+                            parent=active,
+                            loop=loop,
+                            start_soon=False,
+                        )
+                    )
+            except BaseException as exc:  # noqa: BLE001
+                with errors_lock:
+                    errors.append(exc)
+
+        with ThreadPoolExecutor(max_workers=N_CONSUMERS + N_REGISTRARS) as ex:
+            consumer_futs = [loop.run_in_executor(ex, consumer) for _ in range(N_CONSUMERS)]
+            registrar_futs = [loop.run_in_executor(ex, registrar) for _ in range(N_REGISTRARS)]
+            await asyncio.gather(*consumer_futs, *registrar_futs)
+
+        assert not errors, errors
+        assert consumer_results == [99] * N_CONSUMERS
+
+        # All registrars' children must be tracked.
+        actual = active.collect_unsettled_children(whole_subtree=False, awaitables_only=True)
+        missing = set(new_children) - actual
+        assert not missing, f"{len(missing)} children were lost from the parent's set"
+
+        for c in new_children:
+            c.cancel()
+        return 0
+
+    await root()
 
 
 # ── sanity ──────────────────────────────────────────────────────

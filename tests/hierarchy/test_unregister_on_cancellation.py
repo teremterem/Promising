@@ -43,8 +43,8 @@ async def test_cancel_pending_promise_unregisters_from_parent() -> None:
 
 async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent() -> None:
     """
-    Synthesize path reached via the thread-safe dispatch: cancel() is
-    called from a non-loop thread. The unregistration must still happen.
+    cancel() is called from a non-loop thread. The unregistration must still
+    happen.
     """
     with promising.context() as parent:
 
@@ -63,10 +63,6 @@ async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent(
 
         thread = threading.Thread(target=cancel_in_thread)
         thread.start()
-        # Yield so the threadsafe callback (and the thread blocked on its
-        # future) can run on this loop. Don't await the promise itself
-        # here — that would start an unpacking task and race with the
-        # synthesize path we're trying to exercise.
         while not cancel_result:
             await asyncio.sleep(0.1)
         thread.join(timeout=2)
@@ -118,8 +114,6 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
             return "unreachable"
 
         promise = Promise(coro(), start_soon=True)
-        # Let the threadsafe scheduling callback create the task without
-        # giving the task itself a chance to take its first step.
         await asyncio.sleep(0)
         full_task = promise._full_unpacking_task
         assert full_task is not None

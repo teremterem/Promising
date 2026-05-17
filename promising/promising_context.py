@@ -431,8 +431,6 @@ class PromisingContext:
         self._unsettled_children = set[PromisingContext]()
 
         if register_with_parent:
-            # No other code has a reference to this PromisingContext yet, so we
-            # can just register it with the parent in a thread-unsafe manner
             self._register_with_parent()
 
     @property
@@ -790,7 +788,7 @@ class PromisingContext:
     def close_context(self) -> None:
         """
         Mark this context as closed and unregister it from its parent if
-        no unsettled descendants remain. Safe to call from any thread.
+        no unsettled descendants remain.
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
         always closes the context). For a ``Promise``, the context is
@@ -854,7 +852,6 @@ class PromisingContext:
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
     def _register_with_parent(self) -> None:
-        # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():
             self._parent._register_children(self)
 

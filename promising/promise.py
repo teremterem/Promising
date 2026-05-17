@@ -108,12 +108,11 @@ class Promise(PromisingContext, Generic[T_co]):
     Promise implements:
     - Asynchronous computation backed by an awaitable
     - Result/exception caching, with both async (``await``, ``unpack_once``)
-      and thread-safe sync (``sync``, ``unpack_once_sync``) consumption
+      and sync (``sync``, ``unpack_once_sync``) consumption
     - A two-step unpacking model: a single unpacking step that produces an
       intermediate Promise (if the awaitable returned one), and a full
       unpacking that recursively chases nested Promises down to a concrete
       value
-    - Cancellation that is safe to invoke from any thread
     - Construction-time stack capture (``frame_summary_tuple``) consumed
       by the ``sys.excepthook`` / ``threading.excepthook`` overrides
       installed via ``install_promising_tracebacks()`` to render
@@ -567,13 +566,6 @@ class Promise(PromisingContext, Generic[T_co]):
         synthesized as a ``CancelledError`` stored directly via
         ``_set_exception``, with no task involvement — analogous to
         ``Future.cancel()`` on a not-yet-running future.
-
-        When called from the Promise's own event loop thread the cancellation
-        is dispatched directly. When called from any other thread it is
-        scheduled onto the Promise's event loop via
-        ``call_soon_threadsafe`` and the call blocks only long enough for the
-        scheduled dispatch to finish (it does not wait for the cancellation
-        itself to land).
 
         Returns:
             ``True`` if cancellation was requested for at least one

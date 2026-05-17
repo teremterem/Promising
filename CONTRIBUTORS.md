@@ -45,7 +45,7 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 **Settings are frozen at creation time.** All configuration (`start_soon`, `children_start_soon`, `start_soon_default`, `thread_pool`, etc.) is fully resolved when a `Promise` or `PromisingContext` is constructed. Sentinels like `INHERIT` and `PROMISING_DEFAULT` are replaced with concrete values immediately — no deferred resolution happens at execution time. This is a core design principle: because a promise may run eagerly or be deferred, the user cannot predict *when* execution will happen, so settings must reflect the state of the world at the moment the promise was created.
 
-**Core hierarchy flow:** `PromisingFunction` wraps an async or sync function → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises (and `PromisingContext` instances) created during that execution register themselves as its children via thread-safe strong-ref sets.
+**Core hierarchy flow:** `PromisingFunction` wraps an async or sync function → calling it creates a `Promise[T]` → during execution, the Promise sets itself as the current context via `ContextVar` → any Promises (and `PromisingContext` instances) created during that execution register themselves as its children.
 
 ### PromisingContext (`promising/promising_context.py`)
 
@@ -61,7 +61,7 @@ This file also contains the `context` class — a context manager / decorator th
 
 ### Promise (`promising/promise.py`)
 
-`Promise[T_co]` is a direct subclass of `PromisingContext`. It owns a small state machine — `_PENDING` → `_UNPACKED_ONCE` → `_FINISHED`, with `_CANCELLED_BEFORE_UNPACKED_ONCE` / `_CANCELLED_AFTER_UNPACKED_ONCE` as alternative terminals — exposed through `done()`, `unpacked_once()`, `unpacked_once_or_done()`, and `cancelled()`, and queried for results via `result()`, `exception()`, and `intermediate_promise()`. All of those readers are thread-safe (state can only move forward). `loop`, `thread_pool`, and the rest of the configuration are inherited from `PromisingContext`.
+`Promise[T_co]` is a direct subclass of `PromisingContext`. It owns a small state machine — `_PENDING` → `_UNPACKED_ONCE` → `_FINISHED`, with `_CANCELLED_BEFORE_UNPACKED_ONCE` / `_CANCELLED_AFTER_UNPACKED_ONCE` as alternative terminals — exposed through `done()`, `unpacked_once()`, `unpacked_once_or_done()`, and `cancelled()`, and queried for results via `result()`, `exception()`, and `intermediate_promise()`. `loop`, `thread_pool`, and the rest of the configuration are inherited from `PromisingContext`.
 
 **Two-step unpacking on the loop.** Resolution is split into two cooperating tasks, both pinned to `self.loop`:
 

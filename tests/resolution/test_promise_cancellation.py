@@ -200,14 +200,13 @@ async def test_result_raises_not_done_before_cancel_propagates() -> None:
     assert promise.done() is True
 
 
-# ── Thread-safe cancel() ─────────────────────────────────────────
+# ── cancel() from another thread ─────────────────────────────────
 
 
 async def test_cancel_from_another_thread() -> None:
     """
     cancel() called from a thread other than the event loop's thread
-    dispatches via call_soon_threadsafe and reports True once the
-    cancellation request was scheduled.
+    reports True once the cancellation request was scheduled.
     """
     coro_started = asyncio.Event()
     coro_finished = False

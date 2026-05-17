@@ -292,8 +292,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # safe side"
             self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
 
-        # TODO Activate the threading lock ?
-        self._register_with_parent_thread_unsafe()
+        self._register_with_parent()
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -1047,7 +1046,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # `_unpack_once_from_loop` would normally close the context via
         # `with self:`. Without this, `_context_closed` stays False and the
         # child never unregisters from its parent.
-        self.close_context_threadsafe()
+        self.close_context()
 
         self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
@@ -1074,7 +1073,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # the `with` block already, but it might also have been
         # `_force_internal_error_finish_from_loop`) and unregister from parent
         # "if time":
-        self.close_context_threadsafe()
+        self.close_context()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         """

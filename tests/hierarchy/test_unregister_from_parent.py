@@ -61,7 +61,7 @@ async def test_unregisters_from_parent_when_last_child_is_unregistered() -> None
         assert parent in grandparent._unsettled_children
 
         # Removing the last child triggers deferred unregistration
-        parent._unregister_children_threadsafe(grandchild)
+        parent._unregister_children(grandchild)
         assert grandchild not in parent._unsettled_children
         assert parent not in grandparent._unsettled_children
 
@@ -81,11 +81,11 @@ async def test_does_not_unregister_while_other_children_remain() -> None:
         assert parent in grandparent._unsettled_children
 
         # Removing one child — parent should stay registered
-        parent._unregister_children_threadsafe(child_a)
+        parent._unregister_children(child_a)
         assert parent in grandparent._unsettled_children
 
         # Removing the last child triggers deferred unregistration
-        parent._unregister_children_threadsafe(child_b)
+        parent._unregister_children(child_b)
         assert parent not in grandparent._unsettled_children
 
 

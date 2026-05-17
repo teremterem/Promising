@@ -471,7 +471,7 @@ class Promise(PromisingContext, Generic[T_co]):
         The Promise state machine is monotonic — once advanced past
         ``_PENDING`` (to ``_UNPACKED_ONCE``, ``_FINISHED``, or one of the
         ``_CANCELLED_XX`` states), the state never moves backwards. The
-        writers (``_set_intermediate_promise_from_loop`` /
+        writers (``_set_intermediate_promise`` /
         ``_set_result`` / ``_set_exception``) write the
         corresponding attribute (``_intermediate_promise``, ``_result``,
         ``_exception``) *before* advancing the state via ``_set_state``, so a
@@ -637,26 +637,26 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            # We are on the event loop of the Promise, so we can cancel it
-            # directly
-            return self._cancel_from_loop(msg)
+        if self.done():
+            return False
 
-        # We are on a different thread, so we need to use a thread-safe
-        # mechanism to cancel the Promise
-        self._assert_event_loop_running_for_sync()
-        future = concurrent.futures.Future()
+        cancellation_requested = False
+        if self._single_unpacking_task is not None and not self._single_unpacking_task.done():
+            cancellation_requested |= self._single_unpacking_task.cancel(msg)
+        if self._full_unpacking_task is not None and not self._full_unpacking_task.done():
+            cancellation_requested |= self._full_unpacking_task.cancel(msg)
 
-        def callback():
-            try:
-                result = self._cancel_from_loop(msg)
-            except BaseException as exc:
-                future.set_exception(exc)
-            else:
-                future.set_result(result)
+        if cancellation_requested:
+            return True
 
-        self.loop.call_soon_threadsafe(callback)
-        return future.result()
+        # No task is currently running cancellation through — synthesize the
+        # CancelledError and store it directly. Covers the
+        # `start_soon=False`/never-awaited case as well as the rare race
+        # where every task has finished but the Promise hasn't transitioned
+        # to a terminal state yet.
+        self._synthesize_cancellation_from_loop(msg)
+
+        return self.cancelled()
 
     def _ensure_single_unpacking_scheduled(self) -> None:
         """
@@ -721,7 +721,7 @@ class Promise(PromisingContext, Generic[T_co]):
         promises created during this step are registered as its children),
         awaits the wrapped awaitable, and stores either an intermediate Promise
         or a final value/exception. The state machine is moved forward via
-        ``_set_intermediate_promise_from_loop`` / ``_set_result`` /
+        ``_set_intermediate_promise`` / ``_set_result`` /
         ``_set_exception``.
 
         Backs ``unpack_once()`` (and the first leg of
@@ -752,7 +752,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_exception(exc)
         else:
             if isinstance(result, Promise):
-                self._set_intermediate_promise_from_loop(result)
+                self._set_intermediate_promise(result)
             else:
                 self._set_result(result)
 
@@ -816,7 +816,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         _unpacking_logger.log_full_unpacking_finished(promise=self)
 
-    def _set_intermediate_promise_from_loop(self, promise: "Promise[Any]") -> None:
+    def _set_intermediate_promise(self, promise: "Promise[Any]") -> None:
         """
         Record the intermediate Promise returned by a single unpacking step.
         No-op if already unpacked once or done.
@@ -949,47 +949,13 @@ class Promise(PromisingContext, Generic[T_co]):
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
-    def _cancel_from_loop(self, msg: str | None = None) -> bool:
-        """
-        Request cancellation of the underlying unpacking task(s) — or, when
-        no task has been scheduled yet, synthesize the cancellation directly
-        (see ``_synthesize_cancellation_from_loop``).
-
-        The state machine is *not* moved here. Instead, the ``CancelledError``
-        propagates through ``_unpack_once`` /
-        ``_unpack_fully`` (``except BaseException`` catches it) and
-        is stored via ``_set_exception``.
-
-        NOTE: This method can only be used from the event loop of the Promise.
-        """
-        if self.done():
-            return False
-
-        cancellation_requested = False
-        if self._single_unpacking_task is not None and not self._single_unpacking_task.done():
-            cancellation_requested |= self._single_unpacking_task.cancel(msg)
-        if self._full_unpacking_task is not None and not self._full_unpacking_task.done():
-            cancellation_requested |= self._full_unpacking_task.cancel(msg)
-
-        if cancellation_requested:
-            return True
-
-        # No task is currently running cancellation through — synthesize the
-        # CancelledError and store it directly. Covers the
-        # `start_soon=False`/never-awaited case as well as the rare race
-        # where every task has finished but the Promise hasn't transitioned
-        # to a terminal state yet.
-        self._synthesize_cancellation_from_loop(msg)
-
-        return self.cancelled()
-
     def _synthesize_cancellation_from_loop(self, msg: str | None = None) -> None:
         """
         Drive the Promise into a cancelled terminal state without relying
         on a running unpacking task to surface the ``CancelledError``.
         Mirrors ``Future.cancel()`` on a not-yet-running future.
 
-        Shared by ``_cancel_from_loop`` (synthesize path, no task ever
+        Shared by ``cancel`` (synthesize path, no task ever
         scheduled) and ``_unpacking_task_done_callback`` (task cancelled
         between ``create_task`` and its first ``__step``, so the body's
         ``except BaseException`` never saw the ``CancelledError``).

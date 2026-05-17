@@ -83,7 +83,7 @@ async def test_coroutine_raising_cancelled_error_unregisters_from_parent() -> No
     """
     When the coroutine itself raises ``CancelledError`` (no external
     cancel() call), the Promise still goes through the standard
-    ``_unpack_once_from_loop`` path whose ``with self:`` closes the
+    ``_unpack_once`` path whose ``with self:`` closes the
     context. Verify the cancelled Promise unregisters from its parent.
     """
     with promising.context() as parent:
@@ -110,7 +110,7 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
     ``create_task`` and its first ``__step`` throws ``CancelledError``
     into a not-yet-started coroutine — Python propagates that exception
     out without entering the body's ``try/except BaseException``, so the
-    coroutine never calls ``_set_exception_from_loop`` itself. Without
+    coroutine never calls ``_set_exception`` itself. Without
     the done-callback bridge, the Task ends cancelled while the Promise
     stays ``_PENDING`` and leaks in its parent's ``_unsettled_children``.
     """

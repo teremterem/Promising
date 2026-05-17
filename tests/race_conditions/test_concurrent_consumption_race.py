@@ -28,6 +28,20 @@ async def test_many_threads_calling_sync_on_same_promise_consistent() -> None:
     """
     N worker threads simultaneously call ``promise.sync()`` on the same
     Promise. All must return the same value; none must hang or raise.
+
+    NOTE [race-injection / 2026-05-17]: this test could not be made to
+    fail even by deliberately introducing race-prone breakage in
+    ``promising/`` (lost children, non-atomic state writes, dropped
+    ContextVar copy, etc.). All ``.sync()`` callers dispatch their
+    awaiting onto the Promise's single event loop via
+    ``run_coroutine_threadsafe``, so the actual ``await self`` runs
+    serialized on the loop thread; only one ``_full_unpacking_task`` is
+    ever scheduled, every coroutine yields from the same task, and the
+    final ``_result`` is written once by the task itself. There is no
+    race surface to inject into without changing this serialization.
+    Keep as a regression guard against future refactors that try to
+    short-circuit the loop dispatch (e.g. a "fast path" returning a
+    cached ``_result`` directly from the caller thread).
     """
     loop = asyncio.get_running_loop()
 
@@ -66,6 +80,14 @@ async def test_many_threads_calling_unpack_once_sync_on_same_promise_consistent(
     but using ``unpack_once_sync``. All threads should observe the same
     one-level-unpacking outcome (here: a concrete value, since the
     coroutine does not return a Promise).
+
+    NOTE [race-injection / 2026-05-17]: same finding as the ``.sync()``
+    sibling above — could not be broken by deliberate framework
+    sabotage. ``unpack_once_sync`` also goes through
+    ``run_coroutine_threadsafe`` and the single
+    ``_single_unpacking_task``. Only one task ever drives the unpack,
+    all callers share its result. Keep as regression guard against
+    future refactors that bypass the loop dispatch.
     """
     loop = asyncio.get_running_loop()
 

@@ -91,6 +91,9 @@ def test_concurrent_enter_then_concurrent_exit_does_not_corrupt_contextvar() -> 
     worst raises ``ValueError``. Either way ``__exit__`` must not crash with an
     unrelated error.
     """
+    # TODO [TESTS] Is this really a useful test ? Stress-testing `__enter__` is
+    #  important, but `__exit__` ? On the condition that there is already a
+    #  race condition upon `__enter__` ? Who cares at that point ?
     import time
 
     loop = _make_dedicated_loop()

@@ -84,12 +84,12 @@ def test_concurrent_enter_same_context_only_one_succeeds() -> None:
 
 def test_concurrent_enter_then_concurrent_exit_does_not_corrupt_contextvar() -> None:
     """
-    When two threads enter the same context (currently both can pass
-    the check) and then both call ``__exit__``, one of them ends up
-    calling ``ContextVar.reset(token)`` with a token that was created
-    in the *other* thread's context. That cross-thread reset is at
-    minimum a no-op and at worst raises ``ValueError``. Either way
-    ``__exit__`` must not crash with an unrelated error.
+    When two threads enter the same context (provided such a race condition
+    exists) and then both call ``__exit__``, one of them ends up calling
+    ``ContextVar.reset(token)`` with a token that was created in the *other*
+    thread's context. That cross-thread reset is at minimum a no-op and at
+    worst raises ``ValueError``. Either way ``__exit__`` must not crash with an
+    unrelated error.
     """
     import time
 
@@ -145,6 +145,9 @@ def test_register_child_during_close_does_not_silently_succeed() -> None:
     OR the registration completes and the child must still be reachable
     via ``collect_unsettled_children`` until it is closed itself.
     """
+    # TODO [TESTS] How is this test different from
+    #  tests/race_conditions/test_unsettled_children_set_race.py
+    #  ::test_register_child_after_parent_closed_must_be_rejected ?
     loop = _make_dedicated_loop()
     try:
         for _ in range(3000):
@@ -177,6 +180,10 @@ def test_register_child_during_close_does_not_silently_succeed() -> None:
                 # a closed parent, that contract is broken — the child
                 # has a parent reference that points at a context that
                 # will never drive its lifecycle.
+                # TODO [TESTS] How do we know it happened AFTER the parent was
+                #  closed ? I'm struggling to spot the part of test that
+                #  insures things happened in that order and not the other way
+                #  around
                 assert not parent.closed(), (
                     "child registration succeeded onto a parent that is now closed — "
                     "the `closed() → no new children` invariant was violated by a race"

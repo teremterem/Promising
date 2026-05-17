@@ -270,6 +270,9 @@ def test_register_child_after_parent_closed_must_be_rejected() -> None:
     we expect *either* that error, or no leaked child in the closed
     parent's set — never both "no error" and "child present".
     """
+    # TODO [TESTS] How is this test different from
+    #  tests/race_conditions/test_context_lifecycle_race.py
+    #  ::test_register_child_during_close_does_not_silently_succeed ?
     loop = _make_dedicated_loop()
     try:
         # Run many short races to widen the window.
@@ -306,6 +309,10 @@ def test_register_child_after_parent_closed_must_be_rejected() -> None:
                 # If registration silently succeeded against a parent that
                 # is now closed, the framework's `closed() → no new
                 # children` contract has been broken by the race.
+                # TODO [TESTS] How do we know it happened AFTER the parent was
+                #  closed ? I'm struggling to spot the part of test that
+                #  insures things happened in that order and not the other way
+                #  around
                 assert not parent.closed(), (
                     "child registration silently succeeded after parent was closed — invariant violated"
                 )

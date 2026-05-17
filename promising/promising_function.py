@@ -1,6 +1,5 @@
 import asyncio
 import concurrent.futures
-import contextvars
 import functools
 from collections.abc import Callable
 from typing import Any, Generic
@@ -441,12 +440,16 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
                 # this async wrapper function
                 active_promise = get_active_promise()
                 executor = active_promise.get_thread_pool_executor()
-                # Copy the current context so that ContextVars (in particular
-                # Promise._current) are accessible inside the executor thread
-                ctx = contextvars.copy_context()
+                # DELIBERATE BUG: drop the ``contextvars.copy_context()`` /
+                # ``ctx.run(...)`` wrapping. Worker threads no longer
+                # inherit the parent Promise's ContextVar context, so
+                # ``get_active_context()`` / ``get_active_promise()``
+                # inside the sync body can return ``None`` or — under
+                # multi-loop stress — some *other* concurrently running
+                # promise.
                 return await active_promise.loop.run_in_executor(
                     executor,
-                    functools.partial(ctx.run, self._wrapped_as_callable, *args, **kwargs),
+                    functools.partial(self._wrapped_as_callable, *args, **kwargs),
                 )
 
             coro = _sync_to_async()

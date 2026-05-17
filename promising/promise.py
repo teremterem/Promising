@@ -654,7 +654,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
-        self._synthesize_cancellation_from_loop(msg)
+        self._synthesize_cancellation(msg)
 
         return self.cancelled()
 
@@ -711,7 +711,7 @@ class Promise(PromisingContext, Generic[T_co]):
             if exc.args:
                 msg = exc.args[0]
 
-        self._synthesize_cancellation_from_loop(msg)
+        self._synthesize_cancellation(msg)
 
     async def _unpack_once(self) -> None:
         """
@@ -748,7 +748,7 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
 
         except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="_unpack_once", exc=exc)
             self._set_exception(exc)
         else:
             if isinstance(result, Promise):
@@ -778,7 +778,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             if self.done():
                 # When there are no more nested Promises to unpack, the Promise
-                # becomes done already after unpack_once_from_loop completes
+                # becomes done already after _unpack_once completes
                 return
 
             self._ensure_single_unpacking_scheduled()
@@ -809,7 +809,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 
         except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="_unpack_fully", exc=exc)
             self._set_exception(exc)
         else:
             self._set_result(result)
@@ -832,7 +832,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state(_UNPACKED_ONCE)
 
         except BaseException as internal_error:
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish(internal_error)
 
     def _set_result(self, result: T_co) -> None:
         """
@@ -848,7 +848,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state(_FINISHED)
 
         except BaseException as internal_error:
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish(internal_error)
 
     def _set_exception(self, exception: BaseException) -> None:
         """
@@ -907,9 +907,9 @@ class Promise(PromisingContext, Generic[T_co]):
                 #  Contemplate on this GitHub issue along the way:
                 #  https://github.com/teremterem/Promising/issues/105
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish(internal_error)
 
-    def _force_internal_error_finish_from_loop(self, error: BaseException) -> None:
+    def _force_internal_error_finish(self, error: BaseException) -> None:
         """
         Last-resort recovery path. Force the Promise into _FINISHED with
         the given error, bypassing state validation. Each step is wrapped
@@ -949,7 +949,7 @@ class Promise(PromisingContext, Generic[T_co]):
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
-    def _synthesize_cancellation_from_loop(self, msg: str | None = None) -> None:
+    def _synthesize_cancellation(self, msg: str | None = None) -> None:
         """
         Drive the Promise into a cancelled terminal state without relying
         on a running unpacking task to surface the ``CancelledError``.
@@ -990,7 +990,7 @@ class Promise(PromisingContext, Generic[T_co]):
         self._state = new_state
         # Force-close the context just in case (it was most likely closed by
         # the `with` block already, but it might also have been
-        # `_force_internal_error_finish_from_loop`) and unregister from parent
+        # `_force_internal_error_finish`) and unregister from parent
         # "if time":
         self.close_context()
 

@@ -247,7 +247,8 @@ async def test_get_active_context_returns_correct_context_per_thread() -> None:
                 f"contain {expected!r}, got {actual!r}"
             )
 
-    await root()
+    for _ in range(30):
+        await root()
 
 
 # ── massive concurrent close (cascading unregister) ─────────────

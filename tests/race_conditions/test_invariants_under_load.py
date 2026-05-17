@@ -316,6 +316,19 @@ def test_concurrent_independent_promise_run_invocations_isolate() -> None:
     ``@promising.function`` concurrently without leaking state across
     each other's hierarchies — the ``__active_context`` ContextVar
     must be properly per-thread/per-loop.
+
+    NOTE [race-injection / 2026-05-17]: this test could not be made to
+    fail by injecting the obvious race bugs into ``promising/``
+    (non-atomic set writes, dropped ``copy_context``, dropped state
+    guards, etc.). Each ``.run()`` allocates its own ``asyncio`` event
+    loop in its own thread, and ``PromisingContext.__active_context``
+    is a ``ContextVar`` whose value is per-thread / per-asyncio-task —
+    so the threads never share an active-context slot in the first
+    place. Breaking it would require an architectural change (e.g.
+    replacing the ``ContextVar`` with a module-level global). Keep as
+    regression guard against exactly that kind of refactor: someone
+    "caching" the active promise in a global for perf would cause
+    cross-thread leakage and this test would catch it.
     """
 
     @promising.function

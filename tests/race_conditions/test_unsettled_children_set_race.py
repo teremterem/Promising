@@ -123,6 +123,25 @@ def test_collect_unsettled_children_during_concurrent_registration_does_not_rais
     no lock around the set, the reader's internal ``list(set)`` snapshot
     races with mutations and can raise
     ``RuntimeError: Set changed size during iteration``.
+
+    NOTE [race-injection / 2026-05-17]: could not be made to fail
+    simultaneously with the lost-children tests in this file. The two
+    bug surfaces are mutually exclusive:
+
+    - "lost children" requires non-atomic read-modify-write on
+      ``_unsettled_children`` (i.e. rebinding to a fresh set), which
+      means the reader's iteration target is a *different object* than
+      the writer mutates — no in-place mutation, no
+      ``RuntimeError: set changed size during iteration``.
+    - "set changed size during iteration" requires in-place mutation
+      (``.add`` / ``.discard``) on the live set, which is atomic per
+      call in CPython and therefore would not lose children.
+
+    Pick one bug pattern, surface the other. Keep this test as
+    forward-compat for nogil Python (3.13t) where set-iteration
+    atomicity weakens, and as a regression guard against refactors
+    that swap the atomic ``set.update`` / ``list(set)`` C calls for
+    Python-level loops over the live set.
     """
     loop = _make_dedicated_loop()
     try:

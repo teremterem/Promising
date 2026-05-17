@@ -108,6 +108,9 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
     the done-callback bridge, the Task ends cancelled while the Promise
     stays ``_PENDING`` and leaks in its parent's ``_unsettled_children``.
     """
+    # TODO [TESTS] This test is suspicious - we need a way to know that it
+    #  actually tests what it's supposed to test and doesn't pass for unrelated
+    #  reasons
     with promising.context() as parent:
 
         async def coro() -> str:
@@ -138,6 +141,9 @@ async def test_cancel_single_unpacking_task_before_first_step_transitions_promis
     ``_single_unpacking_task`` created via ``unpack_once()``. Verifies
     the done-callback is wired on both task creation sites.
     """
+    # TODO [TESTS] This test is suspicious - we need a way to know that it
+    #  actually tests what it's supposed to test and doesn't pass for unrelated
+    #  reasons
     with promising.context() as parent:
 
         async def coro() -> str:

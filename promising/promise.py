@@ -283,7 +283,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_exception(prefilled_exception)
 
         if self._start_soon and self._awaitable is not None:
-            self._ensure_from_unpacking_scheduled()
+            self._ensure_full_unpacking_scheduled()
 
         self._register_with_parent()
 
@@ -332,7 +332,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self._assert_awaiting_on_correct_event_loop()
 
-        self._ensure_from_unpacking_scheduled()
+        self._ensure_full_unpacking_scheduled()
 
         if self._full_unpacking_task is not None:
             yield from self._full_unpacking_task
@@ -604,7 +604,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
-    def _ensure_from_unpacking_scheduled(self) -> None:
+    def _ensure_full_unpacking_scheduled(self) -> None:
         _unpacking_logger.log_full_unpacking_scheduling(promise=self)
 
         if self._full_unpacking_task is None and not self.done():

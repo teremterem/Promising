@@ -56,8 +56,7 @@ def test_promising_function_run_with_child_promise(
 ) -> None:
     """
     Same as above but also creates a child Promise inside the function, which
-    exercises _call_soon_threadsafe and verifies the event loop is correctly
-    resolved at runtime.
+    verifies the event loop is correctly resolved at runtime.
 
     Runs in a separate thread to avoid interfering with the pytest-asyncio
     event loop.

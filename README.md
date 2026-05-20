@@ -346,9 +346,9 @@ promising.Defaults.START_SOON = True
 promising.Defaults.START_SOON = False
 ```
 
-## Thread-Safe Access
+## Access from Non-Async Threads
 
-`promise.sync()` (and `promise.unpack_once_sync()`) lets non-async threads block on a Promise's result. Both are thread-safe and schedule work on the Promise's event loop via `asyncio.run_coroutine_threadsafe`:
+`promise.sync()` (and `promise.unpack_once_sync()`) lets non-async threads block on a Promise's result. Both schedule work on the Promise's event loop via `asyncio.run_coroutine_threadsafe`:
 
 ```python
 import threading
@@ -357,7 +357,7 @@ async def main():
     promise = fetch_data("https://example.com")
 
     def worker():
-        # Blocks until the Promise resolves (thread-safe)
+        # Blocks until the Promise resolves
         result = promise.sync(timeout=5.0)
         print(result)
 
@@ -367,11 +367,9 @@ async def main():
     thread.join()
 ```
 
-Like `await`, calling `promise.sync()` automatically triggers the Promise's execution if it was created with `start_soon=False`. There is no need to start the Promise manually before blocking on it.
+Like `await`, calling `promise.sync()` automatically triggers the Promise's execution if it was created with `start_soon=False`.
 
 `promise.sync()`, `promise.unpack_once_sync()`, and `await_children_sync()` all raise `SyncUsageError` if called from the event loop thread (which would deadlock).
-
-`Promise.cancel()` is also thread-safe — it can be invoked from any thread and is dispatched onto the Promise's event loop when the caller is not already on it.
 
 ## Result Unpacking
 
@@ -470,7 +468,7 @@ Wrapping every async (or sync) operation in a `Promise` gives you:
 - **Effortless parallelism.** Call your decorated functions and they start running immediately — async on the event loop, sync in a thread pool (with `use_thread_pool=True`). Mix and match freely; the Promise abstraction papers over the difference. No manual `asyncio.gather`, no explicit executor management, no boilerplate to bridge async and threaded code.
 - **Multiple awaits.** A Promise caches its result. Any number of consumers can `await`, `.sync()`, `unpack_once()`, or `unpack_once_sync()` the same Promise and get the same value — the underlying function is never executed more than once.
 - **Automatic hierarchy.** Promises created during another Promise's execution become its children. You can wait for the entire subtree (`await_children()`), inspect what's still running (`collect_unsettled_children`), or scope configuration to a subtree — all without manual bookkeeping.
-- **Thread-safe synchronous access.** Every Promise exposes `.sync()` and `.unpack_once_sync()`, so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
+- **Synchronous access.** Every Promise exposes `.sync()` and `.unpack_once_sync()`, so threads that can't `await` can still block on a Promise's result. Blocking automatically triggers execution of deferred (`start_soon=False`) Promises, just like `await` does.
 - **Consistent interface.** A decorated function always returns a `Promise` — whether the underlying function returns a concrete value or another Promise. `await` and `.sync()` recursively unpack nested Promises and return the final non-`Promise` value, so consumers get a uniform interface regardless of how deep the chain is.
 - **Configurable execution.** `start_soon`, `children_start_soon`, `thread_pool`, and other settings propagate through the hierarchy, letting you control eager vs. deferred execution and thread pool usage at any level.
 
@@ -496,16 +494,16 @@ In short, a `Promise` turns a fire-and-forget coroutine into a first-class objec
 |---|---|
 | `await promise` | Wait for and return the result. Recursively unpacks nested Promises and always returns a concrete value. All consumption methods (`await`, `sync`, `unpack_once`, `unpack_once_sync`) can be called multiple times and always return the same cached result. Must be awaited on the Promise's own event loop (raises `EventLoopMismatchError` otherwise). |
 | `promise.unpack_once()` | Async — resolve the Promise but unpack only one level. Returns either a concrete value or another `Promise`. Must be awaited on the Promise's own event loop. |
-| `promise.sync(timeout=None)` | Synchronous counterpart of `await promise` — blocks the calling thread, recursively unpacks nested Promises, and always returns a concrete value. Thread-safe; must not be called from the Promise's own event loop thread (raises `SyncUsageError`). |
-| `promise.unpack_once_sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and unpacks only one level. Returns either a concrete value or another `Promise`. Thread-safe; must not be called from the Promise's own event loop thread. |
-| `promise.done()` | Whether the Promise is "done" — finished (with a result or exception) or cancelled. Thread-safe. Overrides `PromisingContext.done()`, which by default tracks the context-manager lifecycle. |
-| `promise.cancelled()` | Whether the Promise has been cancelled. Thread-safe. |
-| `promise.unpacked_once()` | Whether the Promise has been unpacked at least one level (i.e. its awaitable has produced either an intermediate Promise or a final value). Thread-safe. |
-| `promise.unpacked_once_or_done()` | True if the Promise is at least one-level unpacked, fully done, or cancelled. Thread-safe. |
-| `promise.result()` | The resolved value. Raises the underlying exception if the Promise finished with one, `PromiseNotDoneError` if it is not done yet, or `asyncio.CancelledError` if it was cancelled. Thread-safe. |
-| `promise.exception()` | The exception that the Promise finished with, or `None`. Same readiness/cancellation rules as `result()`. Thread-safe. |
-| `promise.intermediate_promise()` | The intermediate `Promise` produced by the first unpacking step, or `None` if the awaitable's result was already a non-Promise value. Raises `PromiseNotUnpackedError` if the Promise has not yet been unpacked once. Thread-safe. |
-| `promise.cancel(msg=None)` | Request cancellation of the Promise. Mirrors `asyncio.Future.cancel()` / `asyncio.Task.cancel()`: the return value reports whether cancellation was *requested* — the Promise's terminal cancelled state is reached only once the `CancelledError` actually propagates through the underlying unpacking task(s). Thread-safe — when called from outside the Promise's event loop, the cancellation is dispatched onto that loop. |
+| `promise.sync(timeout=None)` | Synchronous counterpart of `await promise` — blocks the calling thread, recursively unpacks nested Promises, and always returns a concrete value. Must not be called from the Promise's own event loop thread (raises `SyncUsageError`). |
+| `promise.unpack_once_sync(timeout=None)` | Synchronous counterpart of `unpack_once` — blocks the calling thread and unpacks only one level. Returns either a concrete value or another `Promise`. Must not be called from the Promise's own event loop thread. |
+| `promise.done()` | Whether the Promise is "done" — finished (with a result or exception) or cancelled. Overrides `PromisingContext.done()`, which by default tracks the context-manager lifecycle. |
+| `promise.cancelled()` | Whether the Promise has been cancelled. |
+| `promise.unpacked_once()` | Whether the Promise has been unpacked at least one level (i.e. its awaitable has produced either an intermediate Promise or a final value). |
+| `promise.unpacked_once_or_done()` | True if the Promise is at least one-level unpacked, fully done, or cancelled. |
+| `promise.result()` | The resolved value. Raises the underlying exception if the Promise finished with one, `PromiseNotDoneError` if it is not done yet, or `asyncio.CancelledError` if it was cancelled. |
+| `promise.exception()` | The exception that the Promise finished with, or `None`. Same readiness/cancellation rules as `result()`. |
+| `promise.intermediate_promise()` | The intermediate `Promise` produced by the first unpacking step, or `None` if the awaitable's result was already a non-Promise value. Raises `PromiseNotUnpackedError` if the Promise has not yet been unpacked once. |
+| `promise.cancel(msg=None)` | Request cancellation of the Promise. Mirrors `asyncio.Future.cancel()` / `asyncio.Task.cancel()`: the return value reports whether cancellation was *requested* — the Promise's terminal cancelled state is reached only once the `CancelledError` actually propagates through the underlying unpacking task(s). |
 | `promise.loop` | The event loop this Promise is bound to (inherited from `PromisingContext`). |
 
 ### `wrap_awaitable`

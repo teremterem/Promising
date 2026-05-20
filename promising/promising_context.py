@@ -4,7 +4,6 @@ import contextvars
 import functools
 import inspect
 import logging
-import threading
 from asyncio import AbstractEventLoop
 from contextvars import ContextVar
 from types import TracebackType
@@ -430,23 +429,9 @@ class PromisingContext:
 
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
-        # TODO To simplify safe-guarding against race conditions, do EVERYTHING
-        #  on the event loop, instead of using threading locks or any other
-        #  kinds of synchronization techniques (except for the ones that are
-        #  designed for operation within the same async event loop). For any
-        #  public method that can be invoked both, from the event loop and from
-        #  a different thread, just check what thread we are in and either do
-        #  the operation directly or schedule it with
-        #  `asyncio.run_coroutine_threadsafe` and read the concurrent future
-        #  result instead. Do all this after you take care of the following
-        #  issue:
-        #  https://github.com/teremterem/Promising/issues/104
-        self._unsettled_children_lock = threading.Lock()
 
         if register_with_parent:
-            # No other code has a reference to this PromisingContext yet, so we
-            # can just register it with the parent in a thread-unsafe manner
-            self._register_with_parent_thread_unsafe()
+            self._register_with_parent()
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -479,7 +464,7 @@ class PromisingContext:
         Whether this context is closed.
 
         A ``PromisingContext`` is "open" from the moment it is constructed
-        until ``close_context_threadsafe()`` runs (which happens automatically
+        until ``close_context()`` runs (which happens automatically
         when the ``with`` block exits). Closed contexts are still kept around
         in their parent's ``_unsettled_children`` until their own unsettled
         descendants drain (they do not accept new children anymore).
@@ -732,8 +717,7 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        with self._unsettled_children_lock:
-            children = list[PromisingContext](self._unsettled_children)
+        children = list[PromisingContext](self._unsettled_children)
 
         if awaitables_only:
             result = {child for child in children if inspect.isawaitable(child)}
@@ -797,25 +781,24 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            self.close_context_threadsafe()
+            self.close_context()
 
         return False  # Let's not suppress any exceptions
 
-    def close_context_threadsafe(self) -> None:
+    def close_context(self) -> None:
         """
         Mark this context as closed and unregister it from its parent if
-        no unsettled descendants remain. Safe to call from any thread.
+        no unsettled descendants remain.
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
         always closes the context). For a ``Promise``, the context is
-        also entered and exited from inside ``_unpack_once_from_loop``
+        also entered and exited from inside ``_unpack_once``
         around the awaiting of the wrapped awaitable, so the close happens
         in lockstep with the unpacking step that produced its first
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
         """
-        with self._unsettled_children_lock:
-            self._context_closed = True
+        self._context_closed = True
         self._unregister_from_parent_if_time()
 
     def try_to_link_exception(self, exception: BaseException) -> None:
@@ -868,18 +851,17 @@ class PromisingContext:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _register_with_parent_thread_unsafe(self) -> None:
-        # It is thread-safe for the parent but is unsafe for the child itself
+    def _register_with_parent(self) -> None:
         if self._parent is not None and not self.done():
-            self._parent._register_children_threadsafe(self)
+            self._parent._register_children(self)
 
     def _unregister_from_parent_if_time(self) -> None:
         if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
-            self._parent._unregister_children_threadsafe(self)
+            self._parent._unregister_children(self)
 
-    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+    def _register_children(self, *children: "PromisingContext") -> None:
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(
@@ -887,21 +869,19 @@ class PromisingContext:
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 
-        with self._unsettled_children_lock:
-            if self.closed():
-                raise ContextAlreadyClosedError(
-                    f"Cannot register children in a context that has already been closed.\n"
-                    f"Context: {self!r}\nChildren: {children!r}"
-                )
-            self._unsettled_children.update(children)
+        if self.closed():
+            raise ContextAlreadyClosedError(
+                f"Cannot register children in a context that has already been closed.\n"
+                f"Context: {self!r}\nChildren: {children!r}"
+            )
+        self._unsettled_children.update(children)
 
-            _hierarchy_logger.log_children_registered(parent=self, children=children)
+        _hierarchy_logger.log_children_registered(parent=self, children=children)
 
-    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
-        with self._unsettled_children_lock:
-            self._unsettled_children.difference_update(children)
+    def _unregister_children(self, *children: "PromisingContext") -> None:
+        self._unsettled_children.difference_update(children)
 
-            _hierarchy_logger.log_children_unregistered(parent=self, children=children)
+        _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
         self._unregister_from_parent_if_time()
 

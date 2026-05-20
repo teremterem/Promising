@@ -1,6 +1,6 @@
 """
 Tests for Promise.cancel() — modeled on asyncio.Future / asyncio.Task
-semantics. Cancellation flows through ``_set_exception_from_loop``: the
+semantics. Cancellation flows through ``_set_exception``: the
 ``CancelledError`` is stored first, the ``_CANCELLED_*`` state transition
 is its effect.
 """
@@ -173,7 +173,7 @@ async def test_cancelled_error_not_caught_as_exception() -> None:
 async def test_result_raises_not_done_before_cancel_propagates() -> None:
     """
     ``cancel()`` on a running task only *requests* cancellation; until the
-    CancelledError lands and is stored via ``_set_exception_from_loop``, ``done()``
+    CancelledError lands and is stored via ``_set_exception``, ``done()``
     stays False and ``result()`` raises ``PromiseNotDoneError``.
     """
     coro_started = asyncio.Event()
@@ -200,14 +200,13 @@ async def test_result_raises_not_done_before_cancel_propagates() -> None:
     assert promise.done() is True
 
 
-# ── Thread-safe cancel() ─────────────────────────────────────────
+# ── cancel() from another thread ─────────────────────────────────
 
 
 async def test_cancel_from_another_thread() -> None:
     """
     cancel() called from a thread other than the event loop's thread
-    dispatches via call_soon_threadsafe and reports True once the
-    cancellation request was scheduled.
+    reports True once the cancellation request was scheduled.
     """
     coro_started = asyncio.Event()
     coro_finished = False

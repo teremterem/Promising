@@ -1,4 +1,4 @@
-"""Race-condition tests for ``try_to_link_exception`` (invariants §7).
+"""Race-condition tests for ``try_to_link_exception``.
 
 Covers deepest-context-wins attachment of
 ``__promising_context__`` under concurrent re-raise paths, and the

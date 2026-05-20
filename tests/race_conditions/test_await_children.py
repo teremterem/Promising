@@ -1,4 +1,4 @@
-"""Race-condition tests for ``await_children`` under churn (invariants §5).
+"""Race-condition tests for ``await_children`` under churn.
 
 Covers eventual quiescence with grand-children spawned mid-wait,
 non-awaitable context siblings being filtered out, child exceptions not

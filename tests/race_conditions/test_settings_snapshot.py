@@ -1,4 +1,4 @@
-"""Race-condition tests for per-Promise settings snapshot (invariants §8).
+"""Race-condition tests for per-Promise settings snapshot.
 
 Covers immutability of resolved settings after ``__init__`` (even when
 ``promising.Defaults.*`` is mutated concurrently) and absence of

@@ -1,4 +1,4 @@
-"""Race-condition tests for ``__active_context`` ``ContextVar`` (invariants §6).
+"""Race-condition tests for ``__active_context`` ``ContextVar``.
 
 Covers per-task isolation, non-reentrant ``__enter__``, cross-thread
 context inheritance via ``copy_context`` into thread-pool workers, and

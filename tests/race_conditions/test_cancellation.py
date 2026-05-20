@@ -1,4 +1,4 @@
-"""Race-condition tests for ``Promise.cancel()`` (invariants §3).
+"""Race-condition tests for ``Promise.cancel()``.
 
 Covers thread-safety and bounded completion of concurrent ``cancel()``
 calls, terminal-state guarantee, result-vs-cancel races, idempotency,

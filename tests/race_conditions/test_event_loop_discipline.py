@@ -1,4 +1,4 @@
-"""Race-condition tests for event-loop discipline (invariants §4).
+"""Race-condition tests for event-loop discipline.
 
 Covers that ``_*_from_loop`` methods stay on the owning loop,
 ``SyncUsageError`` is raised (not deadlock) for sync calls from the loop

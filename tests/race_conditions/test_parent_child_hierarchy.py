@@ -1,4 +1,4 @@
-"""Race-condition tests for parent-child bookkeeping (invariants §2).
+"""Race-condition tests for parent-child bookkeeping.
 
 Covers ``_unsettled_children`` correctness under concurrent
 register/unregister: no lost or stuck children, no double

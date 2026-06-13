@@ -717,7 +717,13 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        children = list[PromisingContext](self._unsettled_children)
+        # DELIBERATE BUG: iterate the live set instead of a C-atomic
+        # `list(set)` snapshot. Every loop iteration is a GIL release
+        # point, so concurrent set.update() / set.discard() during
+        # this loop can raise "Set changed size during iteration".
+        children: list[PromisingContext] = []
+        for c in self._unsettled_children:
+            children.append(c)
 
         if awaitables_only:
             result = {child for child in children if inspect.isawaitable(child)}
@@ -874,12 +880,27 @@ class PromisingContext:
                 f"Cannot register children in a context that has already been closed.\n"
                 f"Context: {self!r}\nChildren: {children!r}"
             )
-        self._unsettled_children.update(children)
+        # DELIBERATE BUG: replace atomic ``set.update`` with non-atomic
+        # read-modify-write. Two threads can read the same snapshot,
+        # each add their own child, both write back — last writer wins,
+        # the other child is lost.
+        new_set = set(self._unsettled_children)
+        new_set.update(children)
+        self._unsettled_children = new_set
 
         _hierarchy_logger.log_children_registered(parent=self, children=children)
 
     def _unregister_children(self, *children: "PromisingContext") -> None:
-        self._unsettled_children.difference_update(children)
+        # DELIBERATE BUG: non-atomic read-modify-write (resurrects/drops
+        # entries when racing with a concurrent register) PLUS use
+        # ``.remove`` instead of ``.difference_update`` so a double
+        # close_context() raises KeyError. Mirrors a refactor where
+        # someone wanted "strict" semantics but forgot the call site
+        # can fire idempotently from multiple threads.
+        new_set = set(self._unsettled_children)
+        for c in children:
+            new_set.remove(c)
+        self._unsettled_children = new_set
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 

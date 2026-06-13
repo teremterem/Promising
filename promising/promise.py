@@ -572,8 +572,11 @@ class Promise(PromisingContext, Generic[T_co]):
             underlying task, or synthesized for a not-yet-started Promise;
             ``False`` if the Promise was already done.
         """
-        if self.done():
-            return False
+        # DELIBERATE BUG: drop the ``if self.done(): return False`` guard,
+        # so a concurrent cancel that lands after natural completion still
+        # runs ``_synthesize_cancellation`` against an already-terminal
+        # Promise. Combined with the ``_set_exception`` change below, this
+        # produces visible state corruption.
 
         cancellation_requested = False
         if self._single_unpacking_task is not None and not self._single_unpacking_task.done():
@@ -793,12 +796,11 @@ class Promise(PromisingContext, Generic[T_co]):
                 terminal_state = (
                     _CANCELLED_AFTER_UNPACKED_ONCE if isinstance(exception, asyncio.CancelledError) else _FINISHED
                 )
-            elif self.done() and isinstance(exception, asyncio.CancelledError):
-                # Cancellation can land on both the single and full
-                # unpacking tasks, so the same CancelledError can reach
-                # this method twice — the second arrival sees a Promise
-                # that's already cancelled. Drop it; the original wins.
-                return
+            # DELIBERATE BUG: remove the "duplicate CancelledError on an
+            # already-terminal Promise → silently drop" branch. Concurrent
+            # cancels (and cancels arriving after natural completion) now
+            # raise RuntimeError, which is caught by the outer handler and
+            # surfaces via ``_force_internal_error_finish``.
             else:
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 

@@ -175,3 +175,73 @@ async def test_concurrent_registration_from_many_raw_threads() -> None:
     """
     for _ in range(20):
         assert await _hub(AtomicCounter(), 8) == 8
+
+
+async def test_prefilled_promises_created_and_read_across_threads() -> None:
+    """
+    Prefilled Promises are born already-terminal: the constructor stores
+    the result/exception directly, on whatever thread it runs in —
+    currently justified by "no outside code has a reference to this
+    Promise yet". After the refactoring this cross-thread write must stay
+    immediately visible: a prefilled Promise must read as ``done()`` with
+    the correct value/exception both on the creating thread and on any
+    other thread, with no "not done yet" window ever observable.
+    """
+    loop = asyncio.get_running_loop()
+
+    for _ in range(20):
+
+        def _create_with_result() -> Promise:
+            prefilled = Promise(prefilled_result=["prefilled-value"], parent=None, loop=loop)
+            assert prefilled.done()
+            assert prefilled.result() == ["prefilled-value"]
+            return prefilled
+
+        def _create_with_exception() -> Promise:
+            prefilled = Promise(prefilled_exception=ValueError("prefilled-boom"), parent=None, loop=loop)
+            assert prefilled.done()
+            assert isinstance(prefilled.exception(), ValueError)
+            return prefilled
+
+        results, errors = await run_racers(
+            _create_with_result,
+            _create_with_exception,
+            _create_with_result,
+            _create_with_exception,
+        )
+        assert_no_errors(errors)
+
+        # Cross-thread visibility: promises created in worker threads must
+        # read as terminal from the loop thread too, immediately.
+        for prefilled in results:
+            assert prefilled.done()
+
+
+async def test_prefilled_child_creation_racing_parent_close_never_rejected() -> None:
+    """
+    Prefilled children are born done and skip parent registration
+    entirely, so — unlike regular children — they can never collide with
+    the parent's closing: creation must never raise
+    ``ContextAlreadyClosedError`` and must never leave anything tracked on
+    the parent.
+
+    Currently protected (registration is skipped when the child is already
+    ``done()``) — this is a regression net for the refactoring, where a
+    naive "register everything, always" rule would start rejecting (or
+    leaking) prefilled children created against a closing parent.
+    """
+    loop = asyncio.get_running_loop()
+
+    for _ in range(RACE_ITERATIONS):
+        ctx = PromisingContext(parent=None)
+        ctx.__enter__()
+
+        def _create_prefilled(ctx: PromisingContext = ctx) -> Promise:
+            return Promise(prefilled_result="prefilled", parent=ctx, loop=loop)
+
+        _, errors = await run_racers(_create_prefilled, ctx.close_context_threadsafe)
+        ctx.__exit__(None, None, None)
+        # ContextAlreadyClosedError (or anything else) here is a contract
+        # violation — prefilled creation must always succeed.
+        assert_no_errors(errors)
+        assert ctx.collect_unsettled_children(awaitables_only=False) == set()

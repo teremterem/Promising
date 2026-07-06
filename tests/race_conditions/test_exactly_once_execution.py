@@ -219,3 +219,58 @@ async def test_sync_function_promise_executes_once_under_mixed_consumption() -> 
         assert value == ["pool-made"]
         assert all(result is value for result in results)
         assert calls.value == 1, f"Pool-bound body executed {calls.value} times instead of exactly once"
+
+
+async def test_mixed_consumer_herd_shares_single_unpacking() -> None:
+    """
+    Every consumption entry point at once, on one lazy nested Promise:
+    ``unpack_once_sync()`` and ``sync()`` from worker threads, plus
+    multiple concurrent ``await`` tasks and an ``unpack_once()`` task on
+    the event loop. All the paths race to create the single/full
+    unpacking tasks; still:
+
+    - the outer function body runs exactly once;
+    - the inner (nested) promise runs exactly once;
+    - every one-level consumer receives the *same* intermediate Promise;
+    - every full consumer receives the *same* final result object.
+    """
+    for _ in range(20):
+        inner_calls = AtomicCounter()
+        outer_calls = AtomicCounter()
+        promise = _outer_fn(inner_calls, outer_calls, start_soon=False)
+
+        async def _consume_fully(promise: Promise = promise) -> list[str]:
+            return await promise
+
+        async def _unpack_one_level(promise: Promise = promise) -> Promise:
+            return await promise.unpack_once()
+
+        racers_future = asyncio.ensure_future(
+            run_racers(
+                functools.partial(promise.unpack_once_sync, timeout=5),
+                functools.partial(promise.unpack_once_sync, timeout=5),
+                functools.partial(promise.sync, timeout=5),
+                functools.partial(promise.sync, timeout=5),
+            )
+        )
+        task_full_a = asyncio.create_task(_consume_fully())
+        task_full_b = asyncio.create_task(_consume_fully())
+        task_once = asyncio.create_task(_unpack_one_level())
+
+        thread_results, errors = await racers_future
+        loop_full_a, loop_full_b, loop_once = await asyncio.gather(task_full_a, task_full_b, task_once)
+        assert_no_errors(errors)
+
+        one_level_results = [thread_results[0], thread_results[1], loop_once]
+        full_results = [thread_results[2], thread_results[3], loop_full_a, loop_full_b]
+
+        assert isinstance(one_level_results[0], Promise)
+        assert all(result is one_level_results[0] for result in one_level_results), (
+            "One-level consumers received different intermediate Promises"
+        )
+        assert full_results[0] == ["final-value"]
+        assert all(result is full_results[0] for result in full_results), (
+            "Full consumers received different result objects"
+        )
+        assert outer_calls.value == 1, f"Outer body executed {outer_calls.value} times instead of exactly once"
+        assert inner_calls.value == 1, f"Inner body executed {inner_calls.value} times instead of exactly once"

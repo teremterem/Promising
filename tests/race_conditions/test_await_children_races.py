@@ -23,14 +23,17 @@ Contract pinned down here:
 
 import asyncio
 import functools
+import threading
 
 import pytest
 
 import promising
 from promising import Promise
 from tests.race_conditions.utils_for_race_tests import (
+    RACE_ITERATIONS,
     AtomicCounter,
     assert_no_errors,
+    make_child_creator,
     run_racers,
 )
 
@@ -165,3 +168,129 @@ async def test_await_children_unpack_once_only_mode_under_thread_churn() -> None
 
         for outer in outers:
             assert outer.result() == "final"
+
+
+@promising.function
+async def _lazy_leaf(counter: AtomicCounter) -> list[str]:
+    counter.increment()
+    return ["lazy-leaf"]
+
+
+@promising.function(use_thread_pool=True)
+def _spawn_lazy_children(counter: AtomicCounter, children: list, children_lock: threading.Lock, n: int) -> int:
+    for _ in range(n):
+        child = _lazy_leaf(counter, start_soon=False)
+        with children_lock:
+            children.append(child)
+    return n
+
+
+async def test_await_children_triggers_lazy_children_racing_external_consumers() -> None:
+    """
+    Lazy (``start_soon=False``) children created in pool threads are
+    *triggered* by the parent's ``await_children()`` — awaiting a deferred
+    Promise starts it — while external threads simultaneously trigger the
+    same children via ``sync()``. Both trigger paths race per child; each
+    child must still execute exactly once and everything must settle.
+    """
+    for _ in range(10):
+        counter = AtomicCounter()
+        children: list = []
+        children_lock = threading.Lock()
+
+        with promising.context() as ctx:
+            spawners = [_spawn_lazy_children(counter, children, children_lock, 2) for _ in range(3)]
+            for spawner in spawners:
+                assert await spawner == 2
+            assert len(children) == 6
+            assert counter.value == 0, "Lazy children must not have started before anything awaited them"
+
+            racers_future = asyncio.ensure_future(
+                run_racers(*[functools.partial(child.sync, timeout=5) for child in children])
+            )
+            await ctx.await_children()
+            results, errors = await racers_future
+
+        assert_no_errors(errors)
+        assert all(result == ["lazy-leaf"] for result in results)
+        assert counter.value == 6, f"Each lazy child must run exactly once; observed {counter.value} executions"
+        assert all(child.done() for child in children)
+
+
+async def test_concurrent_await_children_tasks_on_same_context() -> None:
+    """
+    Two ``await_children()`` calls on the same context run concurrently
+    (as separate tasks on the loop) while descendants keep being spawned
+    and finished in pool threads. Both waiters must return, and only after
+    the entire alternating async/sync chain has completed.
+    """
+    for _ in range(10):
+        counter = AtomicCounter()
+        with promising.context() as ctx:
+            _sync_spawner_node(4, counter)
+            waiter_a = asyncio.create_task(ctx.await_children())
+            waiter_b = asyncio.create_task(ctx.await_children())
+            await asyncio.gather(waiter_a, waiter_b)
+        # Depth 4 → 5 nodes; both waiters must have covered all of them.
+        assert counter.value == 5
+
+
+@promising.function(use_thread_pool=True)
+def _impatient_parent(counter: AtomicCounter, n: int) -> int:
+    for _ in range(n):
+        _slow_tick(counter)
+    attempts = 0
+    while True:
+        try:
+            promising.await_children_sync(timeout=0.0005)
+            break
+        except TimeoutError:  # noqa: PERF203 - retry loop is the point
+            attempts += 1
+            assert attempts < 100_000, "await_children_sync never succeeded despite retries"
+    return counter.value
+
+
+async def test_await_children_sync_timeout_retry_under_churn() -> None:
+    """
+    ``await_children_sync()`` with a timeout shorter than the children's
+    runtime, retried in a loop from a pool thread. Every timed-out attempt
+    abandons an ``await_children()`` coroutine that keeps running on the
+    loop, so the retries pile up concurrent waiters over the same context.
+    The timeouts must not corrupt child tracking: the eventually-successful
+    attempt must observe every child completed.
+    """
+    for _ in range(10):
+        assert await _impatient_parent(AtomicCounter(), 3) == 3
+
+
+async def test_late_registration_racing_await_children_final_sweep_is_never_lost() -> None:
+    """
+    A raw thread registers a brand-new child on an OPEN context at the
+    very moment ``await_children()`` finishes its final sweep (the
+    "no unsettled children left" check and the return are not one atomic
+    step). The in-flight ``await_children()`` may legitimately return
+    without the newcomer — but the child must never be silently dropped:
+    it must remain tracked, and a subsequent ``await_children()`` must
+    wait for it.
+    """
+    loop = asyncio.get_running_loop()
+
+    for _ in range(RACE_ITERATIONS):
+        with promising.context() as ctx:
+            executions = AtomicCounter()
+            box: dict = {}
+
+            racers_future = asyncio.ensure_future(run_racers(make_child_creator(ctx, loop, executions, box)))
+            await ctx.await_children()
+            _, errors = await racers_future
+            assert_no_errors(errors)
+
+            # The context is still open, so the creation must have been
+            # accepted (a rejection here would itself be a bug).
+            child = box["child"]
+            assert child.done() or child in ctx.collect_unsettled_children(), (
+                "Late-registered child was silently dropped from tracking"
+            )
+            await ctx.await_children()
+            assert child.done()
+            assert executions.value == 1

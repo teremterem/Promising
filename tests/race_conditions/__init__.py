@@ -43,25 +43,39 @@ Map of the suite
   machine (``done``/``result``/``exception``/``intermediate_promise``
   consistency and monotonicity while the loop thread writes).
 - ``test_exactly_once_execution.py`` — the wrapped awaitable must execute
-  exactly once no matter how many threads race to consume/trigger it.
+  exactly once no matter how many threads race to consume/trigger it
+  (including a mixed herd of every consumption entry point at once).
 - ``test_sync_consumption_races.py`` — ``sync()`` / ``unpack_once_sync()``
   hammered at the exact moment of resolution/failure, including short
   timeouts and consumption from pool-based sync promising functions.
 - ``test_cancellation_races.py`` — ``cancel()`` storms, cancellation racing
-  natural completion, racing lazy-start triggers, and cancellation landing
-  before the underlying task's first step.
+  natural completion / coroutine failure, racing lazy-start triggers,
+  cancellation landing before the underlying task's first step, and
+  cancellation isolation from nested (returned) Promises.
 - ``test_child_registration_races.py`` — child Promise creation (from
   worker threads) racing the parent's closing/completion; creation must be
   atomic: either cleanly rejected (and never executed) or fully tracked.
+  Also prefilled (born-terminal) promises: cross-thread visibility and
+  registration-skipping semantics.
 - ``test_hierarchy_drain_races.py`` — the unregistration cascade when many
   descendants across threads finish simultaneously; nothing may be lost
-  and nothing may linger.
+  and nothing may linger. Plus ``collect_unsettled_children`` hammered
+  from threads during churn.
 - ``test_await_children_races.py`` — ``await_children`` /
   ``await_children_sync`` completeness while children keep being spawned
-  from worker threads and consumed from external threads.
+  from worker threads and consumed from external threads; lazy children
+  triggered by ``await_children`` racing external triggers; concurrent
+  waiters; timeout-retry stacking; late registration never silently lost.
 - ``test_context_lifecycle_races.py`` — ``PromisingContext`` enter/exit/
-  close races (double-enter from two threads, close racing registration).
+  close races (double-enter from two threads, close racing registration),
+  the ``promising.context`` wrapper's shared CM state raced from two
+  threads, and idempotency of concurrent ``close_context_threadsafe()``.
 - ``test_multi_loop_races.py`` — several event loops in parallel threads
   sharing the global thread pool; contextvar isolation between trees and
   cross-loop consumption rules.
+- ``test_loop_lifecycle_races.py`` — the promise's own loop shutting down
+  while cross-thread consumers are blocked (fail fast, never hang) and
+  the dead-loop ``NoRunningEventLoopError`` guards.
+- ``test_global_state_races.py`` — concurrent first installation of the
+  promising excepthooks (idempotency, no self-chained fallback hook).
 """

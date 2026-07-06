@@ -178,3 +178,63 @@ async def test_grandchild_registration_racing_mid_context_drain() -> None:
             await verify_atomic_creation_outcome(mid_ctx, executions, box)
 
         assert root_ctx.collect_unsettled_children(awaitables_only=False) == set()
+
+
+async def test_collect_unsettled_children_hammered_during_churn() -> None:
+    """
+    ``collect_unsettled_children()`` is public and must be callable from
+    any thread at any moment. Hammer it from several threads while the
+    tree churns — pool-thread children registering, finishing, and
+    cascading unregistrations through their parents. It must never crash
+    (a refactoring that drops the per-context snapshot-under-lock would
+    surface here as "set changed size during iteration") and must always
+    return a set. And, of course, once everything settled the tree must be
+    fully drained.
+
+    KNOWN RACE (the final drained-tree assertion currently fails
+    intermittently on it — the reader contention widens the window): a
+    **lost unregistration** via register-after-finish. A leaf Promise
+    created in a pool thread has its execution scheduled onto the loop
+    BEFORE ``_register_with_parent_thread_unsafe`` runs, and that
+    registration guards with an unsynchronized check-then-act
+    (``not self.done()`` → register). The loop can run the leaf's entire
+    lifecycle in between: the leaf's finish-time unregistration fires
+    while the leaf is not yet in its parent's set (a no-op), and only THEN
+    does the pool thread register the already-finished leaf — which nobody
+    will ever unregister. Result: a fully-FINISHED leaf (and its
+    fully-FINISHED parent, transitively) pinned in the hierarchy forever.
+    Same root cause as the non-atomic-creation contract in
+    ``test_child_registration_races.py`` (schedule-before-register), but a
+    different symptom: a permanent tracking leak instead of an orphaned
+    execution.
+    """
+    for _ in range(5):
+        counter = AtomicCounter()
+        stop = threading.Event()
+
+        with promising.context() as root_ctx:
+
+            def _hammer(root_ctx: promising.PromisingContext = root_ctx, stop: threading.Event = stop) -> int:
+                snapshots = 0
+                while not stop.is_set():
+                    unsettled = root_ctx.collect_unsettled_children(awaitables_only=False)
+                    assert isinstance(unsettled, set)
+                    snapshots += 1
+                return snapshots
+
+            racers_future = asyncio.ensure_future(run_racers(_hammer, _hammer, _hammer))
+
+            # Churn: pool-thread mids spawning async leaves, staggered so
+            # registrations and unregistrations overlap the readers.
+            for _ in range(10):
+                _mid(counter)
+                await asyncio.sleep(0.001)
+            await root_ctx.await_children()
+            stop.set()
+
+            results, errors = await racers_future
+
+        assert_no_errors(errors)
+        assert all(snapshots > 0 for snapshots in results), "Readers never got a chance to run"
+        assert counter.value == 10
+        assert root_ctx.collect_unsettled_children(awaitables_only=False) == set()

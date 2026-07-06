@@ -245,3 +245,99 @@ async def test_child_cancelled_from_thread_does_not_wedge_parent_await_children(
 
         assert await parent_promise == "parent-done"
         assert child_box["child"].cancelled()
+
+
+async def test_cancel_racing_coroutine_failure() -> None:
+    """
+    The coroutine raises ``ValueError`` at (almost) the same moment
+    ``cancel()`` arrives from a thread. The terminal transition is fed two
+    competing exceptions — the coroutine's ``ValueError`` and the
+    cancellation's ``CancelledError`` — potentially via two different
+    unpacking tasks. Exactly one must win; the duplicate must be dropped
+    silently (this hammers the "CancelledError arriving on an
+    already-terminal Promise is dropped" branch of the state machine).
+    Consumers must observe an outcome consistent with the flags — never a
+    half-and-half state, never an internal RuntimeError.
+    """
+    for iteration in range(RACE_ITERATIONS):
+
+        async def _failing(iteration: int = iteration) -> None:
+            # Jitter the failure moment relative to the cancel call so
+            # different iterations hit different interleavings.
+            for _ in range(iteration % 5):
+                await asyncio.sleep(0)
+            raise ValueError("failure-vs-cancel")
+
+        promise = Promise(_failing(), start_soon=True, parent=None)
+
+        _, errors = await run_racers(promise.cancel)
+        assert_no_errors(errors)
+
+        await eventually(promise.done, message="Promise never reached a terminal state")
+        if promise.cancelled():
+            with pytest.raises(asyncio.CancelledError):
+                promise.result()
+        else:
+            with pytest.raises(ValueError, match="failure-vs-cancel"):
+                promise.result()
+            assert isinstance(promise.exception(), ValueError)
+
+
+@promising.function
+async def _gated_inner(gate: asyncio.Event) -> list[str]:
+    await gate.wait()
+    return ["nested-value"]
+
+
+@promising.function
+async def _gated_outer(gate: asyncio.Event) -> Promise[list[str]]:
+    return _gated_inner(gate, start_soon=True)
+
+
+async def test_cancel_after_first_unpacking_leaves_nested_promise_running() -> None:
+    """
+    Pins the semantics that the code comment in
+    ``Promise._fully_unpack_from_loop`` CLAIMS to hold: cancelling a
+    Promise whose first unpacking step already produced a nested Promise
+    cancels only the wrapper — "the inner Promise's own task keeps running
+    independently".
+
+    KNOWN DISCREPANCY (this test currently fails on it): the claim does
+    not match asyncio's actual behavior. When the outer's full-unpacking
+    task is suspended on ``await inner``, its ``_fut_waiter`` IS the inner
+    promise's unpacking task — so ``Task.cancel()`` on the outer cancels
+    the inner task too, and the nested Promise ends up
+    ``_CANCELLED_BEFORE_UNPACKED_ONCE`` instead of running to completion.
+    The refactoring must resolve the ``TODO [CANCELLATION]`` design
+    question explicitly: either make the isolation real (shield the nested
+    await, and keep this test), or embrace propagation (and flip this
+    test's assertions) — but not leave a comment that contradicts the
+    behavior.
+
+    Also verifies that the cancelled-after-unpacked state of the *outer*
+    promise stays fully readable from other threads: ``unpacked_once()``
+    remains True and ``intermediate_promise()`` returns the nested Promise
+    instead of raising the stored ``CancelledError`` (these parts pass
+    today).
+    """
+    for _ in range(20):
+        gate = asyncio.Event()
+        outer = _gated_outer(gate)
+
+        await eventually(outer.unpacked_once)
+        inner = outer.intermediate_promise()
+        assert isinstance(inner, Promise)
+
+        _, errors = await run_racers(outer.cancel)
+        assert_no_errors(errors)
+        await eventually(outer.done, message="Cancelled outer never reached a terminal state")
+
+        assert outer.cancelled()
+        assert outer.unpacked_once()
+        assert outer.intermediate_promise() is inner
+
+        # The nested promise must NOT have been dragged down by the
+        # wrapper's cancellation — it is still waiting on the gate.
+        assert not inner.done()
+        gate.set()
+        assert await inner == ["nested-value"]

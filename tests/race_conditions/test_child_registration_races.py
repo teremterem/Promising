@@ -84,6 +84,8 @@ async def test_child_creation_racing_parent_promise_completion_is_atomic() -> No
     completion (triggered via ``sync()`` from a second racer thread)
     closes its context — the natural way a parent closes in real usage.
     """
+    # TODO [RACE CONDITIONS] Any way to make this test fail more reliably when
+    #  the respective bug exists ?
     loop = asyncio.get_running_loop()
 
     for _ in range(RACE_ITERATIONS):

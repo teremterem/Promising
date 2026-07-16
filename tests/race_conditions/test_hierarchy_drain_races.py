@@ -208,6 +208,8 @@ async def test_collect_unsettled_children_hammered_during_churn() -> None:
     different symptom: a permanent tracking leak instead of an orphaned
     execution.
     """
+    # TODO [RACE CONDITIONS] Any way to make this test fail more reliably when
+    #  respective bugs exist ?
     for _ in range(5):
         counter = AtomicCounter()
         stop = threading.Event()

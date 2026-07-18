@@ -287,10 +287,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_exception_from_loop(prefilled_exception)
 
         if self._start_soon and self._awaitable is not None:
-            # We don't know which thread the Promise is created in, so we
-            # use the event loop's `call_soon_threadsafe` to "stay on the
-            # safe side"
-            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
+            self._ensure_from_loop_full_unpacking_scheduled_wrapper()
 
         # TODO Activate the threading lock ?
         self._register_with_parent_thread_unsafe()

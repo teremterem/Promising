@@ -4,7 +4,6 @@ import contextvars
 import functools
 import inspect
 import logging
-import threading
 from asyncio import AbstractEventLoop
 from contextvars import ContextVar
 from types import TracebackType
@@ -430,18 +429,6 @@ class PromisingContext:
 
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
-        # TODO To simplify safe-guarding against race conditions, do EVERYTHING
-        #  on the event loop, instead of using threading locks or any other
-        #  kinds of synchronization techniques (except for the ones that are
-        #  designed for operation within the same async event loop). For any
-        #  public method that can be invoked both, from the event loop and from
-        #  a different thread, just check what thread we are in and either do
-        #  the operation directly or schedule it with
-        #  `asyncio.run_coroutine_threadsafe` and read the concurrent future
-        #  result instead. Do all this after you take care of the following
-        #  issue:
-        #  https://github.com/teremterem/Promising/issues/104
-        self._unsettled_children_lock = threading.Lock()
 
         if register_with_parent:
             # No other code has a reference to this PromisingContext yet, so we
@@ -732,8 +719,7 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        with self._unsettled_children_lock:
-            children = list[PromisingContext](self._unsettled_children)
+        children = list[PromisingContext](self._unsettled_children)
 
         if awaitables_only:
             result = {child for child in children if inspect.isawaitable(child)}
@@ -814,8 +800,7 @@ class PromisingContext:
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
         """
-        with self._unsettled_children_lock:
-            self._context_closed = True
+        self._context_closed = True
         self._unregister_from_parent_if_time()
 
     def try_to_link_exception(self, exception: BaseException) -> None:
@@ -887,21 +872,19 @@ class PromisingContext:
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 
-        with self._unsettled_children_lock:
-            if self.closed():
-                raise ContextAlreadyClosedError(
-                    f"Cannot register children in a context that has already been closed.\n"
-                    f"Context: {self!r}\nChildren: {children!r}"
-                )
-            self._unsettled_children.update(children)
+        if self.closed():
+            raise ContextAlreadyClosedError(
+                f"Cannot register children in a context that has already been closed.\n"
+                f"Context: {self!r}\nChildren: {children!r}"
+            )
+        self._unsettled_children.update(children)
 
-            _hierarchy_logger.log_children_registered(parent=self, children=children)
+        _hierarchy_logger.log_children_registered(parent=self, children=children)
 
     def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
-        with self._unsettled_children_lock:
-            self._unsettled_children.difference_update(children)
+        self._unsettled_children.difference_update(children)
 
-            _hierarchy_logger.log_children_unregistered(parent=self, children=children)
+        _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
         self._unregister_from_parent_if_time()
 

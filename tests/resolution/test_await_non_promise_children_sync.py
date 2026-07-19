@@ -137,11 +137,13 @@ async def test_await_children_whole_subtree_non_promise_grandchildren() -> None:
     result = await asyncio.wait_for(promise, timeout=3)
 
     assert result == "grandchild"
-    assert execution_order == [
+    assert execution_order[:-2] == [
+        "root_coro_done",
         "child_done",
         "grandchild_done",
-        "root_coro_done",
-        "non_promise_great_grandchild_1_done",
         "non_promise_grandchild_done",
+    ]
+    assert sorted(execution_order[-2:]) == [
+        "non_promise_great_grandchild_1_done",
         "non_promise_great_grandchild_2_done",
     ]

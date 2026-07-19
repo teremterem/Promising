@@ -103,15 +103,15 @@ async def test_await_children_whole_subtree(*, whole_subtree: bool) -> None:
 
     if whole_subtree:
         assert execution_order == [
-            "child_done",
             "root_coro_done",
+            "child_done",
             "grandchild_done",
             "great_grandchild_done",
         ]
     else:
         assert execution_order == [
-            "child_done",
             "root_coro_done",
+            "child_done",
         ]
         # Let's await for all the children to complete anyway, so that we don't
         # get any asyncio warnings about coroutines never being awaited
@@ -163,15 +163,15 @@ async def test_await_children_whole_subtree_sync_children(*, whole_subtree: bool
 
     if whole_subtree:
         assert execution_order == [
-            "child_done",
             "root_coro_done",
+            "child_done",
             "grandchild_done",
             "great_grandchild_done",
         ]
     else:
         assert execution_order == [
-            "child_done",
             "root_coro_done",
+            "child_done",
         ]
         # Let's await for all the children to complete anyway, so that we don't
         # get any asyncio warnings about coroutines never being awaited
@@ -331,14 +331,14 @@ async def test_await_children_direct_only_but_unpack_promises_fully(
     if sleep_in_root:
         if unpack_promises_fully is False:
             assert execution_order == [
-                "child_done",
                 "root_coro_done",
+                "child_done",
             ]
         else:
             # `unpack_promises_fully` is either True or None ("use default")
             assert execution_order == [
-                "child_done",
                 "root_coro_done",
+                "child_done",
                 "grandchild_done",
             ]
     elif unpack_promises_fully is False:

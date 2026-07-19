@@ -133,7 +133,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             collapse_tracebacks=collapse_tracebacks,
             thread_pool=thread_pool,
         )
-        self.ctx_loop = loop
+        self.loop = loop
         self.parent = parent
 
         self._promising_context = None
@@ -153,7 +153,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         if self._promising_context is None:
             self._promising_context = PromisingContext(
                 namespace=self.namespace,
-                loop=self.ctx_loop,
+                loop=self.loop,
                 parent=self.parent,
                 thread_pool=self.thread_pool,
                 children_start_soon=self.children_start_soon,
@@ -208,7 +208,7 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         ctx = PromisingContext(
             namespace=settings_as_dict.get("namespace", self.namespace),
-            loop=settings_as_dict.get("loop", self.ctx_loop),
+            loop=settings_as_dict.get("loop", self.loop),
             parent=settings_as_dict.get("parent", self.parent),
             thread_pool=settings_as_dict.get("thread_pool", self.thread_pool),
             children_start_soon=settings_as_dict.get("children_start_soon", self.children_start_soon),

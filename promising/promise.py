@@ -289,7 +289,7 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._start_soon and self._awaitable is not None:
             self._ensure_from_loop_full_unpacking_scheduled_wrapper()
 
-        # TODO Activate the threading lock ?
+        # TODO [RACE CONDITIONS] Activate the threading lock ?
         self._register_with_parent_thread_unsafe()
 
     @classmethod

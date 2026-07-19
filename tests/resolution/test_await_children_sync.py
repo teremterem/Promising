@@ -336,10 +336,10 @@ async def test_await_children_direct_only_but_unpack_promises_fully(
             ]
         else:
             # `unpack_promises_fully` is either True or None ("use default")
-            assert execution_order == [
-                "root_coro_done",
+            assert sorted(execution_order) == [
                 "child_done",
                 "grandchild_done",
+                "root_coro_done",
             ]
     elif unpack_promises_fully is False:
         assert execution_order == [

@@ -662,7 +662,7 @@ class Promise(PromisingContext, Generic[T_co]):
             else:
                 future.set_result(result)
 
-        self.loop.call_soon_threadsafe(callback)
+        callback()
         return future.result()
 
     def _ensure_from_loop_single_unpacking_scheduled(self) -> None:

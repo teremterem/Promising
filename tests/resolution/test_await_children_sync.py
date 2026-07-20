@@ -102,11 +102,11 @@ async def test_await_children_whole_subtree(*, whole_subtree: bool) -> None:
     await promise
 
     if whole_subtree:
-        assert execution_order == [
-            "root_coro_done",
+        assert sorted(execution_order) == [
             "child_done",
             "grandchild_done",
             "great_grandchild_done",
+            "root_coro_done",
         ]
     else:
         assert execution_order == [

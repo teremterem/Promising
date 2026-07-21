@@ -988,13 +988,6 @@ class PromisingContext:
         (regardless of whether we are on the same thread or not).
         """
         if not self.loop.is_running():
-            # TODO Are we sure we need to worry about this at all ? The loop
-            #  can start later (if it is on a different thread indeed), and
-            #  then all the scheduled callbacks and tasks will run and the
-            #  synchronous operations will be unblocked. Maybe it should be
-            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
-            #  against a stopped loop ?
-            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
             raise NoRunningEventLoopError(
                 f"Synchronous operations on {self!r} can only be performed if its event loop is running"
             )

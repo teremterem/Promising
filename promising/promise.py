@@ -644,26 +644,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            # We are on the event loop of the Promise, so we can cancel it
-            # directly
-            return self._cancel_from_loop(msg)
-
-        # We are on a different thread, so we need to use a thread-safe
-        # mechanism to cancel the Promise
-        self._assert_event_loop_running_for_sync()
-        future = concurrent.futures.Future()
-
-        def callback():
-            try:
-                result = self._cancel_from_loop(msg)
-            except BaseException as exc:
-                future.set_exception(exc)
-            else:
-                future.set_result(result)
-
-        callback()
-        return future.result()
+        return self._cancel_from_loop(msg)
 
     def _ensure_from_loop_single_unpacking_scheduled(self) -> None:
         """

@@ -1,7 +1,8 @@
 import asyncio
+import concurrent
 import inspect
 from asyncio import AbstractEventLoop
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from promising.errors import NoRunningEventLoopError
@@ -49,6 +50,38 @@ def get_running_asyncio_loop(*, raise_if_none: bool = True) -> AbstractEventLoop
         if raise_if_none:
             raise NoRunningEventLoopError(e) from e
         return None
+
+
+def run_sync_from_loop(callable: Callable[[], Any], *, loop: AbstractEventLoop, fire_and_forget: bool = False) -> Any:
+    if get_running_asyncio_loop(raise_if_none=False) is loop:
+        # We are already on the loop, so we can just call the callable
+        result = callable()
+        if fire_and_forget:
+            # TODO What to do about potential exceptions ? Let them bubble up ?
+            return None
+
+        return result
+
+    # We are NOT on the correct loop, so we need to schedule the callable on
+    # the loop
+    if not fire_and_forget:
+        # We are interested in the result, so we need to use a future to get it
+        future = concurrent.futures.Future()
+
+        def callback():
+            try:
+                result = callable()
+            except BaseException as exc:
+                future.set_exception(exc)
+            else:
+                future.set_result(result)
+
+        loop.call_soon_threadsafe(callback)
+        return future.result()
+
+    # We don't care about the result (fire_and_forget=True), so we don't wait for
+    # it
+    loop.call_soon_threadsafe(callable)
 
 
 def resolve_namespace(*, provided_explicitly: str | None, named_object_fallback: Any | None) -> str | None:

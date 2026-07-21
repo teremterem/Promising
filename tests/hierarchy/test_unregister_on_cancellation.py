@@ -19,7 +19,7 @@ from promising import Promise
 async def test_cancel_pending_promise_unregisters_from_parent() -> None:
     """
     Cancelling a never-started Promise (no underlying task — synthesize
-    path in ``_cancel_from_loop``) must close its context so that the
+    path in ``_cancel_unsafe``) must close its context so that the
     Promise unregisters from its parent. Without ``close_context_threadsafe()``
     on that path, ``_context_closed`` stays False and the child is leaked
     in the parent's ``_unsettled_children``.
@@ -44,7 +44,7 @@ async def test_cancel_pending_promise_unregisters_from_parent() -> None:
 async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent() -> None:
     """
     Synthesize path reached via the thread-safe dispatch: cancel() is
-    called from a non-loop thread, which schedules ``_cancel_from_loop``
+    called from a non-loop thread, which schedules ``_cancel_unsafe``
     on the loop. The unregistration must still happen, just on the loop
     thread.
     """

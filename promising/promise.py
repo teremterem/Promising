@@ -6,6 +6,7 @@ import os
 import traceback
 from asyncio import AbstractEventLoop, Task
 from collections.abc import Awaitable, Generator
+from functools import partial
 from traceback import FrameSummary
 from typing import Any, Generic
 
@@ -643,26 +644,11 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            # We are on the event loop of the Promise, so we can cancel it
-            # directly
-            return self._cancel_from_loop(msg)
-
-        # We are on a different thread, so we need to use a thread-safe
-        # mechanism to cancel the Promise
-        self._sync_op_assert_promise_loop_running()
-        future = concurrent.futures.Future()
-
-        def callback():
-            try:
-                result = self._cancel_from_loop(msg)
-            except BaseException as exc:
-                future.set_exception(exc)
-            else:
-                future.set_result(result)
-
-        callback()
-        return future.result()
+        return self._send_sync_op_to_loop(
+            partial[bool](self._cancel_unsafe, msg),
+            send_and_forget=False,
+            fail_if_loop_not_running=True,
+        )
 
     def _ensure_from_loop_single_unpacking_scheduled(self) -> None:
         """
@@ -993,7 +979,7 @@ class Promise(PromisingContext, Generic[T_co]):
         if not self.done():
             raise PromiseNotDoneError(f"Promise is not done: {self!r}")
 
-    def _cancel_from_loop(self, msg: str | None = None) -> bool:
+    def _cancel_unsafe(self, msg: str | None = None) -> bool:
         """
         Request cancellation of the underlying unpacking task(s) — or, when
         no task has been scheduled yet, synthesize the cancellation directly
@@ -1033,7 +1019,7 @@ class Promise(PromisingContext, Generic[T_co]):
         on a running unpacking task to surface the ``CancelledError``.
         Mirrors ``Future.cancel()`` on a not-yet-running future.
 
-        Shared by ``_cancel_from_loop`` (synthesize path, no task ever
+        Shared by ``_cancel_unsafe`` (synthesize path, no task ever
         scheduled) and ``_unpacking_task_done_callback`` (task cancelled
         between ``create_task`` and its first ``__step``, so the body's
         ``except BaseException`` never saw the ``CancelledError``).

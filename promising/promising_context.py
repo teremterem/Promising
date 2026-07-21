@@ -1041,7 +1041,7 @@ class PromisingContext:
         # the loop
         if not send_and_forget:
             # We are interested in the result, so we need to use a future to
-            # get it
+            # wait for it and get it
             future = concurrent.futures.Future()
 
             def callback():
@@ -1056,5 +1056,5 @@ class PromisingContext:
             return future.result()
 
         # We don't care about the result (send_and_forget=True), so we don't
-        # wait for it
+        # wait for anything
         self.loop.call_soon_threadsafe(callable)

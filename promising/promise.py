@@ -650,7 +650,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         # We are on a different thread, so we need to use a thread-safe
         # mechanism to cancel the Promise
-        self._assert_event_loop_running_for_sync()
+        self._sync_op_assert_promise_loop_running()
         future = concurrent.futures.Future()
 
         def callback():

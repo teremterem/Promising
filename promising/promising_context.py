@@ -1018,6 +1018,11 @@ class PromisingContext:
         send_and_forget: bool = False,
         fail_if_loop_not_running: bool = True,
     ) -> Any:
+        """
+        TODO Explain in the docstring that this private method is the central
+         primitive in solving synchronization between synchronous and
+         asynchronous paradigms combined by this framework.
+        """
         if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
             # We are on the event loop of the Promise, so we can call the
             # callable directly

@@ -855,6 +855,10 @@ class PromisingContext:
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
     def _register_with_parent_thread_unsafe(self) -> None:
+        """
+        TODO Add a "This method can only be used from the event loop of the
+         Promise." NOTE to the docstring ?
+        """
         # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():
             self._parent._register_children_threadsafe(self)

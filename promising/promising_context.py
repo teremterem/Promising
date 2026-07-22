@@ -1019,8 +1019,8 @@ class PromisingContext:
         self,
         callable: Callable[[], Any],
         *,
-        send_and_forget: bool = False,
-        fail_if_loop_not_running: bool = True,
+        send_and_forget: bool,
+        fail_if_loop_not_running: bool,
     ) -> Any:
         """
         TODO Explain in the docstring that this private method is the central

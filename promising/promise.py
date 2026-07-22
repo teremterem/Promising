@@ -288,7 +288,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_exception_unsafe(prefilled_exception)
 
         if self._start_soon and self._awaitable is not None:
-            self._unsafe_ensure_full_unpacking_scheduled_wrapper()
+            self._ensure_full_unpacking_scheduled_unsafe_wrapper()
 
         self._register_with_parent_thread_unsafe()
 
@@ -339,7 +339,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self._assert_awaiting_on_correct_event_loop()
 
-        self._unsafe_ensure_full_unpacking_scheduled()
+        self._ensure_full_unpacking_scheduled_unsafe()
 
         if self._full_unpacking_task is not None:
             yield from self._full_unpacking_task
@@ -402,7 +402,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         self._assert_awaiting_on_correct_event_loop()
 
-        self._unsafe_ensure_single_unpacking_scheduled()
+        self._ensure_single_unpacking_scheduled_unsafe()
 
         if self._single_unpacking_task is not None:
             await self._single_unpacking_task
@@ -650,7 +650,7 @@ class Promise(PromisingContext, Generic[T_co]):
             fail_if_loop_not_running=True,
         )
 
-    def _unsafe_ensure_single_unpacking_scheduled(self) -> None:
+    def _ensure_single_unpacking_scheduled_unsafe(self) -> None:
         """
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -664,7 +664,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
-    def _unsafe_ensure_full_unpacking_scheduled(self) -> None:
+    def _ensure_full_unpacking_scheduled_unsafe(self) -> None:
         """
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -678,10 +678,10 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
-    def _unsafe_ensure_full_unpacking_scheduled_wrapper(self) -> None:
+    def _ensure_full_unpacking_scheduled_unsafe_wrapper(self) -> None:
         """
         ``call_soon_threadsafe``-safe wrapper around
-        ``_unsafe_ensure_full_unpacking_scheduled``.
+        ``_ensure_full_unpacking_scheduled_unsafe``.
 
         Used by the ``start_soon=True`` path in ``__init__``, where scheduling
         is deferred to the event loop via ``call_soon_threadsafe``. Any
@@ -694,7 +694,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method can only be used from the event loop of the Promise.
         """
         try:
-            self._unsafe_ensure_full_unpacking_scheduled()
+            self._ensure_full_unpacking_scheduled_unsafe()
         except BaseException as exc:
             self._force_internal_error_finish_unsafe(exc)
 
@@ -746,7 +746,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             if self.unpacked_once_or_done():
                 # Should not happen: this method is only scheduled by
-                # _unsafe_ensure_single_unpacking_scheduled, which guards
+                # _ensure_single_unpacking_scheduled_unsafe, which guards
                 # on `not unpacked_once_or_done()`.
                 raise RuntimeError(
                     f"An attempt was made to _unpack_once_unsafe a Promise "
@@ -797,7 +797,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # becomes done already after _unpack_once_unsafe completes
                 return
 
-            self._unsafe_ensure_single_unpacking_scheduled()
+            self._ensure_single_unpacking_scheduled_unsafe()
             if self._single_unpacking_task is not None:
                 await self._single_unpacking_task
 

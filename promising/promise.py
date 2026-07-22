@@ -283,9 +283,9 @@ class Promise(PromisingContext, Generic[T_co]):
             # set the result/exception directly, no matter which thread the
             # constructor is currently running in
             if prefilled_result is not UNCHANGED:
-                self._set_result_from_loop(prefilled_result)
+                self._set_result_unsafe(prefilled_result)
             else:
-                self._set_exception_from_loop(prefilled_exception)
+                self._set_exception_unsafe(prefilled_exception)
 
         if self._start_soon and self._awaitable is not None:
             self._unsafe_ensure_full_unpacking_scheduled_wrapper()
@@ -323,7 +323,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Await the Promise, fully unpacking all nested Promises.
 
         If the Promise hasn't started yet, starts execution via
-        ``_fully_unpack_from_loop()``. If already started via start_soon,
+        ``_fully_unpack_unsafe()``. If already started via start_soon,
         waits for the existing task to complete. Once the Promise resolves,
         recursively awaits the result as long as it is itself a Promise,
         returning the final non-Promise value.
@@ -475,8 +475,8 @@ class Promise(PromisingContext, Generic[T_co]):
         The Promise state machine is monotonic — once advanced past
         ``_PENDING`` (to ``_UNPACKED_ONCE``, ``_FINISHED``, or one of the
         ``_CANCELLED_XX`` states), the state never moves backwards. The
-        writers (``_set_intermediate_promise_from_loop`` /
-        ``_set_result_from_loop`` / ``_set_exception_from_loop``) write the
+        writers (``_set_intermediate_promise_unsafe`` /
+        ``_set_result_unsafe`` / ``_set_exception_unsafe``) write the
         corresponding attribute (``_intermediate_promise``, ``_result``,
         ``_exception``) *before* advancing the state via ``_set_state``, so a
         reader that observes a state past ``_PENDING`` is guaranteed to also
@@ -552,7 +552,7 @@ class Promise(PromisingContext, Generic[T_co]):
         if self._result is UNCHANGED:
             # Should not happen: _assert_done() above guarantees a terminal
             # state, and the only way to reach _FINISHED without an
-            # exception is via _set_result_from_loop (which sets _result).
+            # exception is via _set_result_unsafe (which sets _result).
             raise RuntimeError(
                 f"Promise result is UNCHANGED even though the promise is done and there is no exception: {self!r}"
             )
@@ -620,13 +620,13 @@ class Promise(PromisingContext, Generic[T_co]):
         return value reports whether cancellation was *requested* — the
         Promise's terminal cancelled state is reached only once the
         ``CancelledError`` actually propagates through the underlying
-        unpacking task and is stored via ``_set_exception_from_loop``. Until
+        unpacking task and is stored via ``_set_exception_unsafe``. Until
         then, ``cancelled()`` may still return ``False``.
 
         For a Promise whose underlying task hasn't been scheduled yet (e.g.
         ``start_soon=False`` and never awaited), the cancellation is
         synthesized as a ``CancelledError`` stored directly via
-        ``_set_exception_from_loop``, with no task involvement — analogous to
+        ``_set_exception_unsafe``, with no task involvement — analogous to
         ``Future.cancel()`` on a not-yet-running future.
 
         When called from the Promise's own event loop thread the cancellation
@@ -658,7 +658,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._single_unpacking_task is None and not self.unpacked_once_or_done():
             self._single_unpacking_task = self.loop.create_task(
-                self._unpack_once_from_loop(), name=str(self) + "-SingleUnpackingTask"
+                self._unpack_once_unsafe(), name=str(self) + "-SingleUnpackingTask"
             )
             self._single_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
 
@@ -672,7 +672,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         if self._full_unpacking_task is None and not self.done():
             self._full_unpacking_task = self.loop.create_task(
-                self._fully_unpack_from_loop(), name=str(self) + "-FullUnpackingTask"
+                self._fully_unpack_unsafe(), name=str(self) + "-FullUnpackingTask"
             )
             self._full_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
 
@@ -688,7 +688,7 @@ class Promise(PromisingContext, Generic[T_co]):
         exception raised from that callback would otherwise propagate to the
         loop's default exception handler and leave the Promise stuck in a
         non-terminal state. This wrapper instead routes the exception through
-        ``_force_internal_error_finish_from_loop`` so the Promise is settled
+        ``_force_internal_error_finish_unsafe`` so the Promise is settled
         as an internal error.
 
         NOTE: This method can only be used from the event loop of the Promise.
@@ -696,7 +696,7 @@ class Promise(PromisingContext, Generic[T_co]):
         try:
             self._unsafe_ensure_full_unpacking_scheduled()
         except BaseException as exc:
-            self._force_internal_error_finish_from_loop(exc)
+            self._force_internal_error_finish_unsafe(exc)
 
     def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
         """
@@ -704,7 +704,7 @@ class Promise(PromisingContext, Generic[T_co]):
         ``create_task`` and the first ``__step``: ``CancelledError`` is
         thrown into a not-yet-started coroutine and propagates out
         without entering the ``try/except BaseException`` inside
-        ``_unpack_once_from_loop`` / ``_fully_unpack_from_loop``, leaving
+        ``_unpack_once_unsafe`` / ``_fully_unpack_unsafe``, leaving
         the Promise non-terminal even though the Task ended cancelled.
         """
         # Early return if the task wasn't cancelled, or if the Promise (self)
@@ -723,9 +723,9 @@ class Promise(PromisingContext, Generic[T_co]):
             if exc.args:
                 msg = exc.args[0]
 
-        self._synthesize_cancellation_from_loop(msg)
+        self._synthesize_cancellation_unsafe(msg)
 
-    async def _unpack_once_from_loop(self) -> None:
+    async def _unpack_once_unsafe(self) -> None:
         """
         Drive a single unpacking step on the event loop.
 
@@ -733,11 +733,11 @@ class Promise(PromisingContext, Generic[T_co]):
         promises created during this step are registered as its children),
         awaits the wrapped awaitable, and stores either an intermediate Promise
         or a final value/exception. The state machine is moved forward via
-        ``_set_intermediate_promise_from_loop`` / ``_set_result_from_loop`` /
-        ``_set_exception_from_loop``.
+        ``_set_intermediate_promise_unsafe`` / ``_set_result_unsafe`` /
+        ``_set_exception_unsafe``.
 
         Backs ``unpack_once()`` (and the first leg of
-        ``_fully_unpack_from_loop``).
+        ``_fully_unpack_unsafe``).
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -749,7 +749,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # _unsafe_ensure_single_unpacking_scheduled, which guards
                 # on `not unpacked_once_or_done()`.
                 raise RuntimeError(
-                    f"An attempt was made to _unpack_once_from_loop a Promise "
+                    f"An attempt was made to _unpack_once_unsafe a Promise "
                     f"that was already unpacked once or done: {self!r}"
                 )
 
@@ -764,17 +764,17 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
 
         except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="unpack_once_from_loop", exc=exc)
-            self._set_exception_from_loop(exc)
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="_unpack_once_unsafe", exc=exc)
+            self._set_exception_unsafe(exc)
         else:
             if isinstance(result, Promise):
-                self._set_intermediate_promise_from_loop(result)
+                self._set_intermediate_promise_unsafe(result)
             else:
-                self._set_result_from_loop(result)
+                self._set_result_unsafe(result)
 
         _unpacking_logger.log_single_unpacking_finished(promise=self)
 
-    async def _fully_unpack_from_loop(self) -> None:
+    async def _fully_unpack_unsafe(self) -> None:
         """
         Drive the Promise to completion on the event loop, recursively
         unpacking nested Promises.
@@ -783,7 +783,7 @@ class Promise(PromisingContext, Generic[T_co]):
         that produced an intermediate Promise, awaits it (and any further
         nested Promises) until a non-Promise value is reached, then stores
         that value as the final result. Any exception from the chain is
-        captured via ``_set_exception_from_loop``.
+        captured via ``_set_exception_unsafe``.
 
         Backs ``__await__`` (and, indirectly, ``sync()``).
 
@@ -794,7 +794,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             if self.done():
                 # When there are no more nested Promises to unpack, the Promise
-                # becomes done already after unpack_once_from_loop completes
+                # becomes done already after _unpack_once_unsafe completes
                 return
 
             self._unsafe_ensure_single_unpacking_scheduled()
@@ -825,14 +825,14 @@ class Promise(PromisingContext, Generic[T_co]):
                 _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
 
         except BaseException as exc:
-            _unpacking_logger.log_unpacking_exception(promise=self, stage="fully_unpack_from_loop", exc=exc)
-            self._set_exception_from_loop(exc)
+            _unpacking_logger.log_unpacking_exception(promise=self, stage="_fully_unpack_unsafe", exc=exc)
+            self._set_exception_unsafe(exc)
         else:
-            self._set_result_from_loop(result)
+            self._set_result_unsafe(result)
 
         _unpacking_logger.log_full_unpacking_finished(promise=self)
 
-    def _set_intermediate_promise_from_loop(self, promise: "Promise[Any]") -> None:
+    def _set_intermediate_promise_unsafe(self, promise: "Promise[Any]") -> None:
         """
         Record the intermediate Promise returned by a single unpacking step.
         No-op if already unpacked once or done.
@@ -841,7 +841,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             if self._state is not _PENDING:
-                # Should not happen: only called from _unpack_once_from_loop
+                # Should not happen: only called from _unpack_once_unsafe
                 # when the awaitable resolved to a Promise. The only steps
                 # between the awaitable resolving and this call are the
                 # synchronous `with self:` exit and a logger call —
@@ -853,9 +853,9 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state(_UNPACKED_ONCE)
 
         except BaseException as internal_error:
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish_unsafe(internal_error)
 
-    def _set_result_from_loop(self, result: T_co) -> None:
+    def _set_result_unsafe(self, result: T_co) -> None:
         """
         Store the fully unpacked result. No-op if the Promise is already
         done (finished or cancelled).
@@ -866,16 +866,16 @@ class Promise(PromisingContext, Generic[T_co]):
             if self._state not in (_PENDING, _UNPACKED_ONCE):
                 # Should not happen: all callsites reach this with state in
                 # (_PENDING, _UNPACKED_ONCE) — prefill in __init__, the
-                # non-Promise branch of _unpack_once_from_loop, or the end
-                # of _fully_unpack_from_loop's unwrap chain.
+                # non-Promise branch of _unpack_once_unsafe, or the end
+                # of _fully_unpack_unsafe's unwrap chain.
                 raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
             self._result = result
             self._set_state(_FINISHED)
 
         except BaseException as internal_error:
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish_unsafe(internal_error)
 
-    def _set_exception_from_loop(self, exception: BaseException) -> None:
+    def _set_exception_unsafe(self, exception: BaseException) -> None:
         """
         Store the exception and move the Promise into a terminal state. The
         cancelled state is an *effect* of storing a ``CancelledError``, not a
@@ -914,7 +914,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 raise RuntimeError(f"Cannot set exception on a promise because of its current state: {self!r}")
 
             # The context was probably already attached to the exception by the
-            # ``with self:`` block of ``_unpack_once_from_loop``, but it is
+            # ``with self:`` block of ``_unpack_once_unsafe``, but it is
             # also possible that the exception occurred outside the
             # ``with self:`` block (e.g. a framework bug), so lets try to
             # attach it here too.
@@ -937,9 +937,9 @@ class Promise(PromisingContext, Generic[T_co]):
                 #  Contemplate on this GitHub issue along the way:
                 #  https://github.com/teremterem/Promising/issues/105
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
-            self._force_internal_error_finish_from_loop(internal_error)
+            self._force_internal_error_finish_unsafe(internal_error)
 
-    def _force_internal_error_finish_from_loop(self, error: BaseException) -> None:
+    def _force_internal_error_finish_unsafe(self, error: BaseException) -> None:
         """
         Last-resort recovery path. Force the Promise into _FINISHED with
         the given error, bypassing state validation. Each step is wrapped
@@ -983,12 +983,12 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         Request cancellation of the underlying unpacking task(s) — or, when
         no task has been scheduled yet, synthesize the cancellation directly
-        (see ``_synthesize_cancellation_from_loop``).
+        (see ``_synthesize_cancellation_unsafe``).
 
         The state machine is *not* moved here. Instead, the ``CancelledError``
-        propagates through ``_unpack_once_from_loop`` /
-        ``_fully_unpack_from_loop`` (``except BaseException`` catches it) and
-        is stored via ``_set_exception_from_loop``.
+        propagates through ``_unpack_once_unsafe`` /
+        ``_fully_unpack_unsafe`` (``except BaseException`` catches it) and
+        is stored via ``_set_exception_unsafe``.
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
@@ -1009,11 +1009,11 @@ class Promise(PromisingContext, Generic[T_co]):
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
-        self._synthesize_cancellation_from_loop(msg)
+        self._synthesize_cancellation_unsafe(msg)
 
         return self.cancelled()
 
-    def _synthesize_cancellation_from_loop(self, msg: str | None = None) -> None:
+    def _synthesize_cancellation_unsafe(self, msg: str | None = None) -> None:
         """
         Drive the Promise into a cancelled terminal state without relying
         on a running unpacking task to surface the ``CancelledError``.
@@ -1026,12 +1026,12 @@ class Promise(PromisingContext, Generic[T_co]):
 
         NOTE: This method can only be used from the event loop of the Promise.
         """
-        # `_unpack_once_from_loop` would normally close the context via
+        # `_unpack_once_unsafe` would normally close the context via
         # `with self:`. Without this, `_context_closed` stays False and the
         # child never unregisters from its parent.
         self.close_context_threadsafe()
 
-        self._set_exception_from_loop(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
+        self._set_exception_unsafe(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
         # Close the wrapped awaitable so a never-driven coroutine doesn't
         # trigger a "coroutine was never awaited" warning at GC time —
@@ -1054,7 +1054,7 @@ class Promise(PromisingContext, Generic[T_co]):
         self._state = new_state
         # Force-close the context just in case (it was most likely closed by
         # the `with` block already, but it might also have been
-        # `_force_internal_error_finish_from_loop`) and unregister from parent
+        # `_force_internal_error_finish_unsafe`) and unregister from parent
         # "if time":
         self.close_context_threadsafe()
 

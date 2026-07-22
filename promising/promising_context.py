@@ -795,7 +795,7 @@ class PromisingContext:
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
         always closes the context). For a ``Promise``, the context is
-        also entered and exited from inside ``_unpack_once_from_loop``
+        also entered and exited from inside ``_unpack_once_unsafe``
         around the awaiting of the wrapped awaitable, so the close happens
         in lockstep with the unpacking step that produced its first
         result. After this runs, any further attempt to enter the context

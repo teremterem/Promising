@@ -987,7 +987,7 @@ class PromisingContext:
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
 
-    def _sync_op_assert_promise_loop_running(self) -> None:
+    def _assert_promise_loop_running_for_sync_op(self) -> None:
         """
         Assert that the event loop of the PromisingContext itself is running
         (regardless of whether we are on the same thread or not).
@@ -1007,7 +1007,7 @@ class PromisingContext:
         # If we are on a different thread indeed, then let's make sure the event
         # loop of the PromisingContext itself is running, so we don't end up
         # waiting for something that might not happen at all
-        self._sync_op_assert_promise_loop_running()
+        self._assert_promise_loop_running_for_sync_op()
 
     def _assert_awaiting_on_correct_event_loop(self) -> None:
         if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
@@ -1039,7 +1039,7 @@ class PromisingContext:
             return result
 
         if fail_if_loop_not_running:
-            self._sync_op_assert_promise_loop_running()
+            self._assert_promise_loop_running_for_sync_op()
 
         # We are on a different thread, so we need to schedule the callable on
         # the loop

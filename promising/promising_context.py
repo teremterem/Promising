@@ -1024,8 +1024,9 @@ class PromisingContext:
         from a wrong loop always fails, regardless of the Promise's status.
 
         As a bonus, it fails fast (before any unpacking tasks get scheduled
-        on the Promise's own loop) and raises a typed
-        ``EventLoopMismatchError`` instead of a generic ``RuntimeError``.
+        on the Promise's own loop) and raises a typed ``EventLoopMismatchError``
+        with a cleaner message instead of a generic ``RuntimeError`` and a
+        noisy message.
         """
         if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
             raise EventLoopMismatchError(

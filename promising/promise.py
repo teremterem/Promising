@@ -372,7 +372,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, but it is unavailable from the event
         loop of the Promise to avoid a deadlock.
         """
-        self._assert_no_sync_usage_deadlock()
+        self._guard_against_sync_op_deadlock()
 
         if self.done():
             return self.result()
@@ -441,7 +441,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, but it is unavailable from the event
         loop of the Promise to avoid a deadlock.
         """
-        self._assert_no_sync_usage_deadlock()
+        self._guard_against_sync_op_deadlock()
 
         if self.unpacked_once_or_done():
             intermediate_promise = self.intermediate_promise()

@@ -679,7 +679,7 @@ class PromisingContext:
             TimeoutError: If timeout expires before
                 completion.
         """
-        self._assert_no_sync_usage_deadlock()
+        self._guard_against_sync_op_deadlock()
 
         concurrent_future = asyncio.run_coroutine_threadsafe(
             self.await_children(
@@ -997,7 +997,7 @@ class PromisingContext:
                 f"Synchronous operations on {self!r} can only be performed if its event loop is running"
             )
 
-    def _assert_no_sync_usage_deadlock(self) -> None:
+    def _guard_against_sync_op_deadlock(self) -> None:
         if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
             raise SyncUsageError(
                 f"Synchronous operations of {self!r} cannot be performed on "
@@ -1010,6 +1010,8 @@ class PromisingContext:
         self._assert_promise_loop_running_for_sync_op()
 
     def _assert_awaiting_on_correct_event_loop(self) -> None:
+        # TODO Doesn't Python do its own guard against this ? What does the
+        #  native message look like ?
         if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."

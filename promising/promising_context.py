@@ -1010,8 +1010,23 @@ class PromisingContext:
         self._assert_promise_loop_running_for_sync_op()
 
     def _assert_awaiting_on_correct_event_loop(self) -> None:
-        # TODO Doesn't Python do its own guard against this ? What does the
-        #  native message look like ?
+        """
+        Guard against awaiting from a wrong event loop.
+
+        Python's asyncio has a native guard for this (``Task.__step`` raises
+        ``RuntimeError: Task <...> got Future <...> attached to a different
+        loop``), but it only fires when a pending ``Future`` is actually
+        yielded to the wrong loop. A Promise that is already done never
+        yields one, so awaiting it from a wrong loop would quietly succeed.
+        Whether a cross-loop await blows up would then depend on the
+        Promise's completion state at that moment — a race the user has no
+        control over. This check makes the behavior deterministic: awaiting
+        from a wrong loop always fails, regardless of the Promise's status.
+
+        As a bonus, it fails fast (before any unpacking tasks get scheduled
+        on the Promise's own loop) and raises a typed
+        ``EventLoopMismatchError`` instead of a generic ``RuntimeError``.
+        """
         if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."

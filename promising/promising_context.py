@@ -720,6 +720,8 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
+        # TODO [NEW SYNC] Send this operation to the loop.
+        #  (This operation only ? Or the whole method ?)
         children = list[PromisingContext](self._unsettled_children)
 
         if awaitables_only:

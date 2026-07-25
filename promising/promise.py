@@ -287,10 +287,10 @@ class Promise(PromisingContext, Generic[T_co]):
             else:
                 self._set_exception_unsafe(prefilled_exception)
 
+        # TODO [NEW SYNC] Send operations below to the loop
+        self._register_with_parent_thread_unsafe()
         if self._start_soon and self._awaitable is not None:
             self._ensure_full_unpacking_scheduled_unsafe_wrapper()
-
-        self._register_with_parent_thread_unsafe()
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":

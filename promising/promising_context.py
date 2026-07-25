@@ -1041,16 +1041,16 @@ class PromisingContext:
         fail_if_loop_not_running: bool,
     ) -> Any:
         """
-        TODO Explain in the docstring that this private method is the central
-         primitive in solving synchronization between synchronous and
-         asynchronous paradigms combined by this framework.
+        TODO [NEW SYNC] Explain in the docstring that this private method is
+         the central primitive in solving synchronization between synchronous
+         and asynchronous paradigms combined by this framework.
         """
         if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
             # We are on the event loop of the Promise, so we can call the
             # callable directly
             result = callable()
             if send_and_forget:
-                # TODO What to do about potential exceptions from the
+                # TODO [NEW SYNC] What to do about potential exceptions from the
                 #  callable ? Let them bubble up ?
                 return None
 
@@ -1070,6 +1070,9 @@ class PromisingContext:
                 try:
                     result = callable()
                 except BaseException as exc:
+                    # TODO [NEW SYNC] Set as an internal error on the Promise itself
+                    #  instead ? (Would require moving the method to the
+                    #  Promise class.)
                     future.set_exception(exc)
                 else:
                     future.set_result(result)

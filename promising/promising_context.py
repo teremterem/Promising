@@ -803,7 +803,8 @@ class PromisingContext:
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
         """
-        # TODO [NEW SYNC] Send this whole method to the loop
+        # TODO [NEW SYNC] Figure this out.
+        #  (Send this whole method to the loop ?)
         self._context_closed = True
         self._unregister_from_parent_if_time()
 
@@ -872,9 +873,10 @@ class PromisingContext:
 
             # TODO [NEW SYNC] Send this operation to the loop.
             #  (This operation only ? Or the whole method ?)
-            self._parent._unregister_children_threadsafe(self)
+            self._parent._unregister_children_unsafe(self)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+        # TODO [NEW SYNC] Rename this method too (one way or another)
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(
@@ -882,6 +884,7 @@ class PromisingContext:
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 
+        # TODO [NEW SYNC] Figure this out
         if self.closed():
             raise ContextAlreadyClosedError(
                 f"Cannot register children in a context that has already been closed.\n"
@@ -891,7 +894,7 @@ class PromisingContext:
 
         _hierarchy_logger.log_children_registered(parent=self, children=children)
 
-    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+    def _unregister_children_unsafe(self, *children: "PromisingContext") -> None:
         self._unsettled_children.difference_update(children)
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)

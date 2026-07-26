@@ -480,9 +480,9 @@ class Promise(PromisingContext, Generic[T_co]):
         writers (``_set_intermediate_promise_unsafe`` /
         ``_set_result_unsafe`` / ``_set_exception_unsafe``) write the
         corresponding attribute (``_intermediate_promise``, ``_result``,
-        ``_exception``) *before* advancing the state via ``_set_state``, so a
-        reader that observes a state past ``_PENDING`` is guaranteed to also
-        observe the matching attribute.
+        ``_exception``) *before* advancing the state via ``_set_state_unsafe``,
+        so a reader that observes a state past ``_PENDING`` is guaranteed to
+        also observe the matching attribute.
 
         This relies on single-attribute reads and writes being atomic across
         threads — which holds under CPython's reference (GIL-backed)
@@ -860,7 +860,7 @@ class Promise(PromisingContext, Generic[T_co]):
                     f"Cannot set intermediate_promise on a promise because of the promise's current state: {self!r}"
                 )
             self._intermediate_promise = promise
-            self._set_state(_UNPACKED_ONCE)
+            self._set_state_unsafe(_UNPACKED_ONCE)
 
         except BaseException as internal_error:
             self._force_internal_error_finish_unsafe(internal_error)
@@ -881,7 +881,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 # of _fully_unpack_unsafe's unwrap chain.
                 raise RuntimeError(f"Cannot set result on a promise because of its current state: {self!r}")
             self._result = result
-            self._set_state(_FINISHED)
+            self._set_state_unsafe(_FINISHED)
 
         except BaseException as internal_error:
             self._force_internal_error_finish_unsafe(internal_error)
@@ -932,7 +932,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # attach it here too.
             self.try_to_link_exception(exception)
             self._exception = exception
-            self._set_state(terminal_state)
+            self._set_state_unsafe(terminal_state)
             # TODO The fact that we have no "exception was never fetched"
             #  warning might be a problem. (What about "result was never
             #  fetched", is it a thing too ?)
@@ -975,7 +975,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # explicitly here.
             self.try_to_link_exception(error)
             self._exception = error
-            self._set_state(_FINISHED)
+            self._set_state_unsafe(_FINISHED)
             # TODO The fact that we have no "exception was never fetched"
             #  warning might be a problem. (What about "result was never
             #  fetched", is it a thing too ?)
@@ -1044,7 +1044,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # `_unpack_once_unsafe` would normally close the context via
         # `with self:`. Without this, `_context_closed` stays False and the
         # child never unregisters from its parent.
-        self.close_context_threadsafe()
+        self._close_context_unsafe()
 
         self._set_exception_unsafe(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
@@ -1065,10 +1065,11 @@ class Promise(PromisingContext, Generic[T_co]):
                     #  https://github.com/teremterem/Promising/issues/105
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
-    def _set_state(self, new_state: Sentinel) -> None:
-        # TODO [NEW SYNC] Rename this method to _set_state_unsafe and explain
-        #  in a docstring NOTE its connection to race conditions against
-        #  unsettled children ?
+    def _set_state_unsafe(self, new_state: Sentinel) -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same Promise.
+        """
         self._state = new_state
         # TODO [NEW SYNC] A better comment is needed. The one below does not
         #  explain why are we closing the context UNCONDITIONALLY. (Good thing
@@ -1079,7 +1080,7 @@ class Promise(PromisingContext, Generic[T_co]):
         # the `with` block already, but it might also have been
         # `_force_internal_error_finish_unsafe`) and unregister from parent
         # "if time":
-        self.close_context_threadsafe()
+        self._close_context_unsafe()
 
     def _resolve_start_soon(self, start_soon: bool | None | Sentinel) -> bool:
         """

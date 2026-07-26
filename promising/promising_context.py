@@ -467,7 +467,7 @@ class PromisingContext:
         Whether this context is closed.
 
         A ``PromisingContext`` is "open" from the moment it is constructed
-        until ``close_context_threadsafe()`` runs (which happens automatically
+        until ``_close_context_unsafe()`` runs (which happens automatically
         when the ``with`` block exits). Closed contexts are still kept around
         in their parent's ``_unsettled_children`` until their own unsettled
         descendants drain (they do not accept new children anymore).
@@ -788,11 +788,12 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            self.close_context_threadsafe()
+            # TODO [NEW SYNC] Send this operation to the loop.
+            self._close_context_unsafe()
 
         return False  # Let's not suppress any exceptions
 
-    def close_context_threadsafe(self) -> None:
+    def _close_context_unsafe(self) -> None:
         """
         Mark this context as closed and unregister it from its parent if
         no unsettled descendants remain. Safe to call from any thread.
@@ -804,11 +805,10 @@ class PromisingContext:
         in lockstep with the unpacking step that produced its first
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
+
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
         """
-        # TODO [NEW SYNC] Rename this method to _close_context_unsafe and add
-        #  a NOTE in a docstring
-        # TODO [NEW SYNC] Figure this out.
-        #  (Send this whole method to the loop ?)
         self._context_closed = True
         self._unregister_from_parent_if_time_unsafe()
 
@@ -879,8 +879,6 @@ class PromisingContext:
         if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
-            # TODO [NEW SYNC] Send this operation to the loop.
-            #  (This operation only ? Or the whole method ?)
             self._parent._unregister_children_unsafe(self)
 
     def _register_children_threadsafe(self, *children: "PromisingContext") -> None:

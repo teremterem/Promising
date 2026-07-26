@@ -865,7 +865,7 @@ class PromisingContext:
     def _register_with_parent_unsafe(self) -> None:
         """
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same PromisingContext.
         """
         # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():

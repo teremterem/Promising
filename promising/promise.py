@@ -336,7 +336,7 @@ class Promise(PromisingContext, Generic[T_co]):
             nested Promises).
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         self._assert_awaiting_on_correct_event_loop()
 
@@ -400,7 +400,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 than the one this Promise belongs to.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         self._assert_awaiting_on_correct_event_loop()
 
@@ -469,7 +469,7 @@ class Promise(PromisingContext, Generic[T_co]):
             Whether this Promise is "done".
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        same Promise.
 
         Thread-safety contract for ``Promise`` state-reading methods (this
         method and the ones below referencing it):
@@ -644,7 +644,7 @@ class Promise(PromisingContext, Generic[T_co]):
             ``False`` if the Promise was already done.
 
         NOTE: This method is thread-safe, including from the event loop of the
-        Promise.
+        same Promise.
         """
         return self._send_sync_op_to_loop(
             partial[bool](self._cancel_unsafe, msg),
@@ -655,7 +655,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def _ensure_single_unpacking_scheduled_unsafe(self) -> None:
         """
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         _unpacking_logger.log_single_unpacking_scheduling(promise=self)
 
@@ -670,7 +670,7 @@ class Promise(PromisingContext, Generic[T_co]):
     def _ensure_full_unpacking_scheduled_unsafe(self) -> None:
         """
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         _unpacking_logger.log_full_unpacking_scheduling(promise=self)
 
@@ -696,7 +696,7 @@ class Promise(PromisingContext, Generic[T_co]):
         as an internal error.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             self._ensure_full_unpacking_scheduled_unsafe()
@@ -747,7 +747,7 @@ class Promise(PromisingContext, Generic[T_co]):
         ``_fully_unpack_unsafe``).
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             _unpacking_logger.log_single_unpacking_started(promise=self)
@@ -796,7 +796,7 @@ class Promise(PromisingContext, Generic[T_co]):
         Backs ``__await__`` (and, indirectly, ``sync()``).
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             _unpacking_logger.log_full_unpacking_started(promise=self)
@@ -847,7 +847,7 @@ class Promise(PromisingContext, Generic[T_co]):
         No-op if already unpacked once or done.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             if self._state is not _PENDING:
@@ -871,7 +871,7 @@ class Promise(PromisingContext, Generic[T_co]):
         done (finished or cancelled).
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             if self._state not in (_PENDING, _UNPACKED_ONCE):
@@ -900,7 +900,7 @@ class Promise(PromisingContext, Generic[T_co]):
         as a framework bug and raises ``RuntimeError``.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             if self._state is _PENDING:
@@ -965,7 +965,7 @@ class Promise(PromisingContext, Generic[T_co]):
         a terminal state over surfacing further errors.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         try:
             _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
@@ -1004,7 +1004,7 @@ class Promise(PromisingContext, Generic[T_co]):
         is stored via ``_set_exception_unsafe``.
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         if self.done():
             return False
@@ -1039,7 +1039,7 @@ class Promise(PromisingContext, Generic[T_co]):
         ``except BaseException`` never saw the ``CancelledError``).
 
         NOTE: This method should only be called from the event loop of the
-        Promise.
+        same Promise.
         """
         # `_unpack_once_unsafe` would normally close the context via
         # `with self:`. Without this, `_context_closed` stays False and the

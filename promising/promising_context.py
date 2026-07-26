@@ -751,7 +751,7 @@ class PromisingContext:
         return self._thread_pool
 
     def __enter__(self) -> "PromisingContext":
-        # TODO [RACE CONDITIONS] Is the following GitHub issue relevant ?
+        # TODO [NEW SYNC] Is the following GitHub issue relevant ?
         #  https://github.com/teremterem/Promising/issues/98
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")

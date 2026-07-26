@@ -753,6 +753,8 @@ class PromisingContext:
     def __enter__(self) -> "PromisingContext":
         # TODO [NEW SYNC] Is the following GitHub issue relevant ?
         #  https://github.com/teremterem/Promising/issues/98
+        # TODO [NEW SYNC] Also, should we worry about anything similar in
+        #  `__exit__` ?
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")
         if self._context_closed:

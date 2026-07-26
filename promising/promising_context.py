@@ -805,6 +805,8 @@ class PromisingContext:
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
         """
+        # TODO [NEW SYNC] Rename this method to _close_context_unsafe and add
+        #  a NOTE in a docstring
         # TODO [NEW SYNC] Figure this out.
         #  (Send this whole method to the loop ?)
         self._context_closed = True

@@ -707,6 +707,8 @@ class Promise(PromisingContext, Generic[T_co]):
         ``_unpack_once_unsafe`` / ``_fully_unpack_unsafe``, leaving
         the Promise non-terminal even though the Task ended cancelled.
         """
+        # TODO [NEW SYNC] Rename this method to ..._unsafe_calback (with a
+        #  respective docstring NOTE) for consistency ?
         # Early return if the task wasn't cancelled, or if the Promise (self)
         # is already done
         if not task.cancelled() or self.done():
@@ -1051,6 +1053,9 @@ class Promise(PromisingContext, Generic[T_co]):
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state(self, new_state: Sentinel) -> None:
+        # TODO [NEW SYNC] Rename this method to _set_state_unsafe and explain
+        #  in a docstring NOTE its connection to race conditions against
+        #  unsettled children ?
         self._state = new_state
         # TODO [NEW SYNC] A better comment is needed. The one below does not
         #  explain why are we closing the context UNCONDITIONALLY. (Good thing

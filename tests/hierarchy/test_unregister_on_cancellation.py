@@ -18,7 +18,7 @@ from promising import Promise
 
 async def test_cancel_pending_promise_unregisters_from_parent() -> None:
     """
-    Cancelling a never-started Promise (no underlying task — synthesize
+    Cancelling a never-started Promise (no underlying task — fabricate
     path in ``_cancel_unsafe``) must close its context so that the
     Promise unregisters from its parent. Without ``_close_context_unsafe()``
     on that path, ``_context_closed`` stays False and the child is leaked
@@ -43,7 +43,7 @@ async def test_cancel_pending_promise_unregisters_from_parent() -> None:
 
 async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent() -> None:
     """
-    Synthesize path reached via the thread-safe dispatch: cancel() is
+    Fabricate path reached via the thread-safe dispatch: cancel() is
     called from a non-loop thread, which schedules ``_cancel_unsafe``
     on the loop. The unregistration must still happen, just on the loop
     thread.
@@ -68,7 +68,7 @@ async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent(
         # Yield so the threadsafe callback (and the thread blocked on its
         # future) can run on this loop. Don't await the promise itself
         # here — that would start an unpacking task and race with the
-        # synthesize path we're trying to exercise.
+        # fabricate path we're trying to exercise.
         while not cancel_result:
             await asyncio.sleep(0.1)
         thread.join(timeout=2)

@@ -18,7 +18,7 @@ from promising import Promise, PromiseNotDoneError, get_active_promise
 async def test_cancel_pending_promise_with_no_task() -> None:
     """
     A Promise with start_soon=False that has never been awaited has no
-    underlying task; cancel() should still synthesize CancelledError and
+    underlying task; cancel() should still fabricate CancelledError and
     move the Promise into the cancelled state immediately.
     """
     coro_ran = False

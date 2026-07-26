@@ -627,7 +627,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         For a Promise whose underlying task hasn't been scheduled yet (e.g.
         ``start_soon=False`` and never awaited), the cancellation is
-        synthesized as a ``CancelledError`` stored directly via
+        fabricated as a ``CancelledError`` stored directly via
         ``_set_exception_unsafe``, with no task involvement — analogous to
         ``Future.cancel()`` on a not-yet-running future.
 
@@ -640,7 +640,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Returns:
             ``True`` if cancellation was requested for at least one
-            underlying task, or synthesized for a not-yet-started Promise;
+            underlying task, or fabricated for a not-yet-started Promise;
             ``False`` if the Promise was already done.
 
         NOTE: This method is thread-safe, including from the event loop of the
@@ -663,7 +663,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._single_unpacking_task = self.loop.create_task(
                 self._unpack_once_unsafe(), name=str(self) + "-SingleUnpackingTask"
             )
-            self._single_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
+            self._single_unpacking_task.add_done_callback(self._unpacking_task_done_unsafe_callback)
 
             _unpacking_logger.log_single_unpacking_scheduled(promise=self)
 
@@ -678,7 +678,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._full_unpacking_task = self.loop.create_task(
                 self._fully_unpack_unsafe(), name=str(self) + "-FullUnpackingTask"
             )
-            self._full_unpacking_task.add_done_callback(self._unpacking_task_done_callback)
+            self._full_unpacking_task.add_done_callback(self._unpacking_task_done_unsafe_callback)
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
 
@@ -703,7 +703,7 @@ class Promise(PromisingContext, Generic[T_co]):
         except BaseException as exc:
             self._force_internal_error_finish_unsafe(exc)
 
-    def _unpacking_task_done_callback(self, task: Task[Any]) -> None:
+    def _unpacking_task_done_unsafe_callback(self, task: Task[Any]) -> None:
         """
         Bridge the case where ``task.cancel()`` lands between
         ``create_task`` and the first ``__step``: ``CancelledError`` is
@@ -711,9 +711,10 @@ class Promise(PromisingContext, Generic[T_co]):
         without entering the ``try/except BaseException`` inside
         ``_unpack_once_unsafe`` / ``_fully_unpack_unsafe``, leaving
         the Promise non-terminal even though the Task ended cancelled.
+
+        NOTE: This method should only be called from the event loop of the
+        same Promise.
         """
-        # TODO [NEW SYNC] Rename this method to ..._unsafe_calback (with a
-        #  respective docstring NOTE) for consistency ?
         # Early return if the task wasn't cancelled, or if the Promise (self)
         # is already done
         if not task.cancelled() or self.done():
@@ -730,7 +731,7 @@ class Promise(PromisingContext, Generic[T_co]):
             if exc.args:
                 msg = exc.args[0]
 
-        self._synthesize_cancellation_unsafe(msg)
+        self._fabricate_cancellation_unsafe(msg)
 
     async def _unpack_once_unsafe(self) -> None:
         """
@@ -969,7 +970,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         try:
             _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
-            # ``error`` is synthesized in the framework's except handlers
+            # ``error`` is fabricated in the framework's except handlers
             # after ``with self:`` has already exited, so it never passes
             # through ``__exit__``'s attribution. Attach the context
             # explicitly here.
@@ -994,9 +995,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _cancel_unsafe(self, msg: str | None = None) -> bool:
         """
-        Request cancellation of the underlying unpacking task(s) — or, when
-        no task has been scheduled yet, synthesize the cancellation directly
-        (see ``_synthesize_cancellation_unsafe``).
+        Request cancellation of the underlying unpacking task(s) — or, if
+        no task has been scheduled yet, fabricate cancellation (see
+        ``_fabricate_cancellation_unsafe``).
 
         The state machine is *not* moved here. Instead, the ``CancelledError``
         propagates through ``_unpack_once_unsafe`` /
@@ -1018,23 +1019,23 @@ class Promise(PromisingContext, Generic[T_co]):
         if cancellation_requested:
             return True
 
-        # No task is currently running cancellation through — synthesize the
+        # No task is currently running cancellation through — fabricate the
         # CancelledError and store it directly. Covers the
         # `start_soon=False`/never-awaited case as well as the rare race
         # where every task has finished but the Promise hasn't transitioned
         # to a terminal state yet.
-        self._synthesize_cancellation_unsafe(msg)
+        self._fabricate_cancellation_unsafe(msg)
 
         return self.cancelled()
 
-    def _synthesize_cancellation_unsafe(self, msg: str | None = None) -> None:
+    def _fabricate_cancellation_unsafe(self, msg: str | None = None) -> None:
         """
         Drive the Promise into a cancelled terminal state without relying
         on a running unpacking task to surface the ``CancelledError``.
         Mirrors ``Future.cancel()`` on a not-yet-running future.
 
-        Shared by ``_cancel_unsafe`` (synthesize path, no task ever
-        scheduled) and ``_unpacking_task_done_callback`` (task cancelled
+        Shared by ``_cancel_unsafe`` (fabricate path, no task ever
+        scheduled) and ``_unpacking_task_done_unsafe_callback`` (task cancelled
         between ``create_task`` and its first ``__step``, so the body's
         ``except BaseException`` never saw the ``CancelledError``).
 

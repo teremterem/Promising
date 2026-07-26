@@ -1052,6 +1052,11 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _set_state(self, new_state: Sentinel) -> None:
         self._state = new_state
+        # TODO [NEW SYNC] A better comment is needed. The one below does not
+        #  explain why are we closing the context UNCONDITIONALLY. (Good thing
+        #  that commenting out the closing operation fails a whole bunch of
+        #  tests - we can at least be certain that it is not being done for no
+        #  reason.)
         # Force-close the context just in case (it was most likely closed by
         # the `with` block already, but it might also have been
         # `_force_internal_error_finish_unsafe`) and unregister from parent

@@ -431,6 +431,8 @@ class PromisingContext:
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
 
+        # TODO [NEW SYNC] Any way to avoid having this `register_with_parent`
+        #  at all ?
         if register_with_parent:
             # No other code has a reference to this PromisingContext yet, so we
             # can just register it with the parent in a thread-unsafe manner
@@ -788,7 +790,7 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            # TODO [NEW SYNC] Send this operation to the loop.
+            # TODO [NEW SYNC] Send this operation to the loop
             self._close_context_unsafe()
 
         return False  # Let's not suppress any exceptions
@@ -869,7 +871,7 @@ class PromisingContext:
         """
         # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():
-            self._parent._register_children_threadsafe(self)
+            self._parent._register_children_unsafe(self)
 
     def _unregister_from_parent_if_time_unsafe(self) -> None:
         """
@@ -881,8 +883,11 @@ class PromisingContext:
 
             self._parent._unregister_children_unsafe(self)
 
-    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
-        # TODO [NEW SYNC] Rename this method too (one way or another)
+    def _register_children_unsafe(self, *children: "PromisingContext") -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(
@@ -890,7 +895,6 @@ class PromisingContext:
                     f"Context: {self!r}\nChild: {child!r}"
                 )
 
-        # TODO [NEW SYNC] Figure this out
         if self.closed():
             raise ContextAlreadyClosedError(
                 f"Cannot register children in a context that has already been closed.\n"
@@ -901,6 +905,10 @@ class PromisingContext:
         _hierarchy_logger.log_children_registered(parent=self, children=children)
 
     def _unregister_children_unsafe(self, *children: "PromisingContext") -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         self._unsettled_children.difference_update(children)
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)

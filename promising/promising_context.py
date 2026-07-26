@@ -810,7 +810,7 @@ class PromisingContext:
         # TODO [NEW SYNC] Figure this out.
         #  (Send this whole method to the loop ?)
         self._context_closed = True
-        self._unregister_from_parent_if_time()
+        self._unregister_from_parent_if_time_unsafe()
 
     def try_to_link_exception(self, exception: BaseException) -> None:
         """
@@ -871,7 +871,11 @@ class PromisingContext:
         if self._parent is not None and not self.done():
             self._parent._register_children_threadsafe(self)
 
-    def _unregister_from_parent_if_time(self) -> None:
+    def _unregister_from_parent_if_time_unsafe(self) -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
@@ -903,7 +907,7 @@ class PromisingContext:
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
-        self._unregister_from_parent_if_time()
+        self._unregister_from_parent_if_time_unsafe()
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)

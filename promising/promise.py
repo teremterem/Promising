@@ -288,7 +288,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_exception_unsafe(prefilled_exception)
 
         # TODO [NEW SYNC] Send operations below to the loop
-        self._register_with_parent_thread_unsafe()
+        self._register_with_parent_unsafe()
         if self._start_soon and self._awaitable is not None:
             self._ensure_full_unpacking_scheduled_unsafe_wrapper()
 
@@ -335,7 +335,8 @@ class Promise(PromisingContext, Generic[T_co]):
             The fully unpacked result of the Promise (no remaining
             nested Promises).
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         self._assert_awaiting_on_correct_event_loop()
 
@@ -398,7 +399,8 @@ class Promise(PromisingContext, Generic[T_co]):
             EventLoopMismatchError: If awaited from a different event loop
                 than the one this Promise belongs to.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         self._assert_awaiting_on_correct_event_loop()
 
@@ -652,7 +654,8 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _ensure_single_unpacking_scheduled_unsafe(self) -> None:
         """
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         _unpacking_logger.log_single_unpacking_scheduling(promise=self)
 
@@ -666,7 +669,8 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _ensure_full_unpacking_scheduled_unsafe(self) -> None:
         """
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         _unpacking_logger.log_full_unpacking_scheduling(promise=self)
 
@@ -691,7 +695,8 @@ class Promise(PromisingContext, Generic[T_co]):
         ``_force_internal_error_finish_unsafe`` so the Promise is settled
         as an internal error.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             self._ensure_full_unpacking_scheduled_unsafe()
@@ -741,7 +746,8 @@ class Promise(PromisingContext, Generic[T_co]):
         Backs ``unpack_once()`` (and the first leg of
         ``_fully_unpack_unsafe``).
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             _unpacking_logger.log_single_unpacking_started(promise=self)
@@ -789,7 +795,8 @@ class Promise(PromisingContext, Generic[T_co]):
 
         Backs ``__await__`` (and, indirectly, ``sync()``).
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             _unpacking_logger.log_full_unpacking_started(promise=self)
@@ -839,7 +846,8 @@ class Promise(PromisingContext, Generic[T_co]):
         Record the intermediate Promise returned by a single unpacking step.
         No-op if already unpacked once or done.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             if self._state is not _PENDING:
@@ -862,7 +870,8 @@ class Promise(PromisingContext, Generic[T_co]):
         Store the fully unpacked result. No-op if the Promise is already
         done (finished or cancelled).
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             if self._state not in (_PENDING, _UNPACKED_ONCE):
@@ -890,7 +899,8 @@ class Promise(PromisingContext, Generic[T_co]):
         silently dropped. Any other exception arriving in that state is treated
         as a framework bug and raises ``RuntimeError``.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             if self._state is _PENDING:
@@ -954,7 +964,8 @@ class Promise(PromisingContext, Generic[T_co]):
         bugs in the Promise class itself, this method prioritizes reaching
         a terminal state over surfacing further errors.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         try:
             _logger.debug("Force-finishing Promise %r with internal error", self, exc_info=error)
@@ -992,7 +1003,8 @@ class Promise(PromisingContext, Generic[T_co]):
         ``_fully_unpack_unsafe`` (``except BaseException`` catches it) and
         is stored via ``_set_exception_unsafe``.
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         if self.done():
             return False
@@ -1026,7 +1038,8 @@ class Promise(PromisingContext, Generic[T_co]):
         between ``create_task`` and its first ``__step``, so the body's
         ``except BaseException`` never saw the ``CancelledError``).
 
-        NOTE: This method can only be used from the event loop of the Promise.
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         # `_unpack_once_unsafe` would normally close the context via
         # `with self:`. Without this, `_context_closed` stays False and the

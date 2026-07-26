@@ -434,7 +434,7 @@ class PromisingContext:
         if register_with_parent:
             # No other code has a reference to this PromisingContext yet, so we
             # can just register it with the parent in a thread-unsafe manner
-            self._register_with_parent_thread_unsafe()
+            self._register_with_parent_unsafe()
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -862,10 +862,10 @@ class PromisingContext:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _register_with_parent_thread_unsafe(self) -> None:
+    def _register_with_parent_unsafe(self) -> None:
         """
-        TODO Add a "This method can only be used from the event loop of the
-         Promise." NOTE to the docstring ?
+        NOTE: This method should only be called from the event loop of the
+        Promise.
         """
         # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():

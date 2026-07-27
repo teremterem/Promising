@@ -287,10 +287,36 @@ class Promise(PromisingContext, Generic[T_co]):
             else:
                 self._set_exception_unsafe(prefilled_exception)
 
-        # TODO [NEW SYNC] Send operations below to the loop
-        self._register_with_parent_unsafe()
-        if self._start_soon and self._awaitable is not None:
-            self._ensure_full_unpacking_scheduled_unsafe_wrapper()
+        self._send_sync_op_to_loop(
+            self._finish_init_unsafe,
+            send_and_forget=True,
+            fail_if_loop_not_running=True,
+        )
+
+    def _finish_init_unsafe(self) -> None:
+        """
+        TODO [NEW SYNC] Update this docstring
+
+        ``call_soon_threadsafe``-safe wrapper around
+        ``_ensure_full_unpacking_scheduled_unsafe``.
+
+        Used by the ``start_soon=True`` path in ``__init__``, where scheduling
+        is deferred to the event loop via ``call_soon_threadsafe``. Any
+        exception raised from that callback would otherwise propagate to the
+        loop's default exception handler and leave the Promise stuck in a
+        non-terminal state. This wrapper instead routes the exception through
+        ``_force_internal_error_finish_unsafe`` so the Promise is settled
+        as an internal error.
+
+        NOTE: This method should only be called from the event loop of the
+        same Promise.
+        """
+        try:
+            self._register_with_parent_unsafe()
+            if self._start_soon and self._awaitable is not None:
+                self._ensure_full_unpacking_scheduled_unsafe()
+        except BaseException as exc:
+            self._force_internal_error_finish_unsafe(exc)
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":
@@ -681,27 +707,6 @@ class Promise(PromisingContext, Generic[T_co]):
             self._full_unpacking_task.add_done_callback(self._unpacking_task_done_unsafe_callback)
 
             _unpacking_logger.log_full_unpacking_scheduled(promise=self)
-
-    def _ensure_full_unpacking_scheduled_unsafe_wrapper(self) -> None:
-        """
-        ``call_soon_threadsafe``-safe wrapper around
-        ``_ensure_full_unpacking_scheduled_unsafe``.
-
-        Used by the ``start_soon=True`` path in ``__init__``, where scheduling
-        is deferred to the event loop via ``call_soon_threadsafe``. Any
-        exception raised from that callback would otherwise propagate to the
-        loop's default exception handler and leave the Promise stuck in a
-        non-terminal state. This wrapper instead routes the exception through
-        ``_force_internal_error_finish_unsafe`` so the Promise is settled
-        as an internal error.
-
-        NOTE: This method should only be called from the event loop of the
-        same Promise.
-        """
-        try:
-            self._ensure_full_unpacking_scheduled_unsafe()
-        except BaseException as exc:
-            self._force_internal_error_finish_unsafe(exc)
 
     def _unpacking_task_done_unsafe_callback(self, task: Task[Any]) -> None:
         """

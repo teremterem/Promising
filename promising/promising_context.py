@@ -604,7 +604,7 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        self._assert_awaiting_on_correct_event_loop()
+        self._assert_loop_running_and_correct()
 
         _hierarchy_logger.log_awaiting_children_started(parent=self)
 
@@ -856,8 +856,8 @@ class PromisingContext:
             # TODO [TRACES] Should any kind of warning be printed besides the
             #  debug log ?
 
-    def is_on_correct_running_loop(self, *, raise_thread_loop_not_running: bool = False) -> bool:
-        running_loop = get_running_asyncio_loop(raise_if_none=raise_thread_loop_not_running)
+    def is_loop_running_and_correct(self, *, raise_if_loop_not_running: bool = False) -> bool:
+        running_loop = get_running_asyncio_loop(raise_if_none=raise_if_loop_not_running)
         return running_loop is self.loop
 
     def __repr__(self) -> str:
@@ -1020,7 +1020,7 @@ class PromisingContext:
             )
 
     def _guard_against_sync_op_deadlock(self) -> None:
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
+        if self.is_loop_running_and_correct(raise_if_loop_not_running=False):
             raise SyncUsageError(
                 f"Synchronous operations of {self!r} cannot be performed on "
                 f"its own event loop thread, as that typically leads to a "
@@ -1031,7 +1031,7 @@ class PromisingContext:
         # waiting for something that might not happen at all
         self._assert_promise_loop_running_for_sync_op()
 
-    def _assert_awaiting_on_correct_event_loop(self) -> None:
+    def _assert_loop_running_and_correct(self) -> None:
         """
         Guard against awaiting from a wrong event loop.
 
@@ -1050,7 +1050,7 @@ class PromisingContext:
         with a cleaner message instead of a generic ``RuntimeError`` and a
         noisy message.
         """
-        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
+        if not self.is_loop_running_and_correct(raise_if_loop_not_running=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )
@@ -1067,7 +1067,7 @@ class PromisingContext:
          the central primitive in solving synchronization between synchronous
          and asynchronous paradigms combined by this framework.
         """
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
+        if self.is_loop_running_and_correct(raise_if_loop_not_running=False):
             # We are on the event loop of the Promise, so we can call the
             # callable directly
             result = callable()

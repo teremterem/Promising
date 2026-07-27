@@ -338,7 +338,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method should only be called from the event loop of the
         same Promise.
         """
-        self._assert_awaiting_on_correct_event_loop()
+        self._assert_loop_running_and_correct()
 
         self._ensure_full_unpacking_scheduled_unsafe()
 
@@ -402,7 +402,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method should only be called from the event loop of the
         same Promise.
         """
-        self._assert_awaiting_on_correct_event_loop()
+        self._assert_loop_running_and_correct()
 
         self._ensure_single_unpacking_scheduled_unsafe()
 

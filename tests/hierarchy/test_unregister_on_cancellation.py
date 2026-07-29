@@ -18,9 +18,9 @@ from promising import Promise
 
 async def test_cancel_pending_promise_unregisters_from_parent() -> None:
     """
-    Cancelling a never-started Promise (no underlying task — fabricate
-    path in ``_cancel_unsafe``) must close its context so that the
-    Promise unregisters from its parent. Without ``_close_context_unsafe()``
+    Cancelling a never-started Promise (no underlying task — synthesize
+    path in ``_cancel_from_loop``) must close its context so that the
+    Promise unregisters from its parent. Without ``close_context_threadsafe()``
     on that path, ``_context_closed`` stays False and the child is leaked
     in the parent's ``_unsettled_children``.
     """
@@ -43,8 +43,8 @@ async def test_cancel_pending_promise_unregisters_from_parent() -> None:
 
 async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent() -> None:
     """
-    Fabricate path reached via the thread-safe dispatch: cancel() is
-    called from a non-loop thread, which schedules ``_cancel_unsafe``
+    Synthesize path reached via the thread-safe dispatch: cancel() is
+    called from a non-loop thread, which schedules ``_cancel_from_loop``
     on the loop. The unregistration must still happen, just on the loop
     thread.
     """
@@ -68,7 +68,7 @@ async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent(
         # Yield so the threadsafe callback (and the thread blocked on its
         # future) can run on this loop. Don't await the promise itself
         # here — that would start an unpacking task and race with the
-        # fabricate path we're trying to exercise.
+        # synthesize path we're trying to exercise.
         while not cancel_result:
             await asyncio.sleep(0.1)
         thread.join(timeout=2)
@@ -83,7 +83,7 @@ async def test_coroutine_raising_cancelled_error_unregisters_from_parent() -> No
     """
     When the coroutine itself raises ``CancelledError`` (no external
     cancel() call), the Promise still goes through the standard
-    ``_unpack_once_unsafe`` path whose ``with self:`` closes the
+    ``_unpack_once_from_loop`` path whose ``with self:`` closes the
     context. Verify the cancelled Promise unregisters from its parent.
     """
     with promising.context() as parent:
@@ -110,7 +110,7 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
     ``create_task`` and its first ``__step`` throws ``CancelledError``
     into a not-yet-started coroutine — Python propagates that exception
     out without entering the body's ``try/except BaseException``, so the
-    coroutine never calls ``_set_exception_unsafe`` itself. Without
+    coroutine never calls ``_set_exception_from_loop`` itself. Without
     the done-callback bridge, the Task ends cancelled while the Promise
     stays ``_PENDING`` and leaks in its parent's ``_unsettled_children``.
     """
@@ -133,7 +133,7 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
         for _ in range(3):
             await asyncio.sleep(0)
 
-        # assert full_task.cancelled() is True
+        assert full_task.cancelled() is True
         assert promise.done() is True
         assert promise.cancelled() is True
         assert promise._context_closed is True

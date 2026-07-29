@@ -287,12 +287,9 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_exception_from_loop(prefilled_exception)
 
         if self._start_soon and self._awaitable is not None:
-            # We don't know which thread the Promise is created in, so we
-            # use the event loop's `call_soon_threadsafe` to "stay on the
-            # safe side"
-            self.loop.call_soon_threadsafe(self._ensure_from_loop_full_unpacking_scheduled_wrapper)
+            self._ensure_from_loop_full_unpacking_scheduled_wrapper()
 
-        # TODO Activate the threading lock ?
+        # TODO [RACE CONDITIONS] Activate the threading lock ?
         self._register_with_parent_thread_unsafe()
 
     @classmethod
@@ -647,26 +644,7 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method is thread-safe, including from the event loop of the
         Promise.
         """
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
-            # We are on the event loop of the Promise, so we can cancel it
-            # directly
-            return self._cancel_from_loop(msg)
-
-        # We are on a different thread, so we need to use a thread-safe
-        # mechanism to cancel the Promise
-        self._assert_event_loop_running_for_sync()
-        future = concurrent.futures.Future()
-
-        def callback():
-            try:
-                result = self._cancel_from_loop(msg)
-            except BaseException as exc:
-                future.set_exception(exc)
-            else:
-                future.set_result(result)
-
-        self.loop.call_soon_threadsafe(callback)
-        return future.result()
+        return self._cancel_from_loop(msg)
 
     def _ensure_from_loop_single_unpacking_scheduled(self) -> None:
         """

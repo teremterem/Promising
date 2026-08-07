@@ -289,7 +289,9 @@ class Promise(PromisingContext, Generic[T_co]):
 
         self._send_sync_op_to_loop(
             self._finish_init_unsafe,
-            send_and_forget=True,
+            # TODO [NEW SYNC] Should we await for the registration with the
+            #  parent to happen or just fire and forget ?
+            fire_and_forget=True,
             fail_if_loop_not_running=True,
         )
 
@@ -674,7 +676,7 @@ class Promise(PromisingContext, Generic[T_co]):
         """
         return self._send_sync_op_to_loop(
             partial[bool](self._cancel_unsafe, msg),
-            send_and_forget=False,
+            fire_and_forget=False,
             fail_if_loop_not_running=True,
         )
 

@@ -1059,7 +1059,7 @@ class PromisingContext:
         self,
         callable: Callable[[], Any],
         *,
-        send_and_forget: bool,
+        fire_and_forget: bool,
         fail_if_loop_not_running: bool,
     ) -> Any:
         """
@@ -1071,7 +1071,7 @@ class PromisingContext:
             # We are on the event loop of the Promise, so we can call the
             # callable directly
             result = callable()
-            if send_and_forget:
+            if fire_and_forget:
                 # TODO [NEW SYNC] What to do about potential exceptions from the
                 #  callable ? Let them bubble up ?
                 return None
@@ -1083,7 +1083,7 @@ class PromisingContext:
 
         # We are on a different thread, so we need to schedule the callable on
         # the loop
-        if not send_and_forget:
+        if not fire_and_forget:
             # We are interested in the result, so we need to use a future to
             # wait for it and get it
             future = concurrent.futures.Future()
@@ -1102,6 +1102,6 @@ class PromisingContext:
             self.loop.call_soon_threadsafe(callback)
             return future.result()
 
-        # We don't care about the result (send_and_forget=True), so we don't
+        # We don't care about the result (fire_and_forget=True), so we don't
         # wait for anything
         self.loop.call_soon_threadsafe(callable)

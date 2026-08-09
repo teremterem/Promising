@@ -790,8 +790,12 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            # TODO [NEW SYNC] Send this operation to the loop
-            self._close_context_unsafe()
+            self._send_sync_op_to_loop(
+                self._close_context_unsafe,
+                # TODO [NEW SYNC] Should fire_and_forget be True or False ?
+                fire_and_forget=True,
+                fail_if_loop_not_running=True,
+            )
 
         return False  # Let's not suppress any exceptions
 

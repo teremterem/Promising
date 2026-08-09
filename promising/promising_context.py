@@ -794,14 +794,21 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            self._send_sync_op_to_loop(
-                self._close_context_unsafe,
-                # TODO [NEW SYNC] Should fire_and_forget be True or False ?
-                fire_and_forget=False,
-                fail_if_loop_not_running=True,
-            )
+            self.close_context_threadsafe()
 
         return False  # Let's not suppress any exceptions
+
+    def close_context_threadsafe(self) -> None:
+        # TODO [NEW SYNC] Figure out how race_conditions tests can be modified
+        #  so they don't need this method to exist as a public method ?
+        #  (It does not make much sense as something separate from
+        #  activation/deactivaton of the context in the ContextVar.)
+        self._send_sync_op_to_loop(
+            self._close_context_unsafe,
+            # TODO [NEW SYNC] Should fire_and_forget be True or False ?
+            fire_and_forget=False,
+            fail_if_loop_not_running=True,
+        )
 
     def _close_context_unsafe(self) -> None:
         """

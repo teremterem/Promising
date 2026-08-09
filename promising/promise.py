@@ -291,7 +291,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._finish_init_unsafe,
             # TODO [NEW SYNC] Should we await for the registration with the
             #  parent to happen or just fire and forget ?
-            fire_and_forget=True,
+            fire_and_forget=False,
             fail_if_loop_not_running=True,
         )
 

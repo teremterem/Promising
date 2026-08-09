@@ -797,7 +797,7 @@ class PromisingContext:
             self._send_sync_op_to_loop(
                 self._close_context_unsafe,
                 # TODO [NEW SYNC] Should fire_and_forget be True or False ?
-                fire_and_forget=True,
+                fire_and_forget=False,
                 fail_if_loop_not_running=True,
             )
 

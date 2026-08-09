@@ -699,6 +699,7 @@ class PromisingContext:
     def collect_unsettled_children(
         self,
         *,
+        # TODO Do we really want a whole subtree in a flat set ?
         whole_subtree: bool = True,
         awaitables_only: bool = True,
     ) -> set["PromisingContext"]:

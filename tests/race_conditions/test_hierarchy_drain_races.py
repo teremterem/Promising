@@ -161,7 +161,7 @@ async def test_grandchild_registration_racing_mid_context_drain() -> None:
 
             _, errors = await run_racers(
                 make_child_creator(mid_ctx, loop, executions, box),
-                mid_ctx.close_context_threadsafe,
+                mid_ctx.close_context,
             )
             assert_no_errors(errors)
 

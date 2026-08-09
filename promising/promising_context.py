@@ -794,11 +794,11 @@ class PromisingContext:
                 raise exc from exc_value
 
         finally:
-            self.close_context_threadsafe()
+            self.close_context()
 
         return False  # Let's not suppress any exceptions
 
-    def close_context_threadsafe(self) -> None:
+    def close_context(self) -> None:
         # TODO [NEW SYNC] Figure out how race_conditions tests can be modified
         #  so they don't need this method to exist as a public method ?
         #  (It does not make much sense as something separate from

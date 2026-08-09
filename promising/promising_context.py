@@ -152,6 +152,8 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             )
 
         if self._promising_context is None:
+            # TODO Introduce something similar to `wrap_awaitable` here for
+            #  consistency
             self._promising_context = PromisingContext(
                 namespace=self.namespace,
                 loop=self.loop,
@@ -207,6 +209,8 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         )
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
+        # TODO Introduce something similar to `wrap_awaitable` here for
+        #  consistency
         ctx = PromisingContext(
             namespace=settings_as_dict.get("namespace", self.namespace),
             loop=settings_as_dict.get("loop", self.loop),

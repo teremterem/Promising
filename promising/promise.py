@@ -830,6 +830,10 @@ class Promise(PromisingContext, Generic[T_co]):
             #  promises vs. "promises that return other promises" — should
             #  subtree cancellation and cancellation of nested (returned)
             #  Promises be treated as the same thing ?
+            #  No, I don't think so. Promises, that aren't in the hierarchy,
+            #  originated elsewhere - their processing should not be affected
+            #  by whether the happen to "pass through" some other promise that
+            #  also happens to be being cancelled.
             depth = 0
             while isinstance(result, Promise):
                 result = await result

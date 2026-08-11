@@ -435,8 +435,8 @@ class PromisingContext:
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
 
-        # TODO [NEW SYNC] Any way to avoid having this `register_with_parent`
-        #  at all ?
+        # TODO [PROMISE CREATION] Any way to avoid having this
+        #  `register_with_parent` parameter at all ?
         if register_with_parent:
             # No other code has a reference to this PromisingContext yet, so we
             # can just register it with the parent in a thread-unsafe manner

@@ -296,9 +296,9 @@ class Promise(PromisingContext, Generic[T_co]):
         )
 
     def _finish_init_unsafe(self) -> None:
+        # TODO [PROMISE CREATION] Update this docstring (and/or redo this method
+        #  entirely ?)
         """
-        TODO [NEW SYNC] Update this docstring
-
         ``call_soon_threadsafe``-safe wrapper around
         ``_ensure_full_unpacking_scheduled_unsafe``.
 

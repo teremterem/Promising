@@ -826,14 +826,16 @@ class Promise(PromisingContext, Generic[T_co]):
             # into the nested Promise being awaited below — asyncio's
             # task-cancellation lands on this task and unwinds upward; the
             # inner Promise's own task keeps running independently.
-            # TODO [CANCELLATION] Decide the philosophy on hierarchical
-            #  promises vs. "promises that return other promises" — should
-            #  subtree cancellation and cancellation of nested (returned)
-            #  Promises be treated as the same thing ?
-            #  No, I don't think so. Promises, that aren't in the hierarchy,
+            # TODO [CANCELLATION] Decide on the philosophy of hierarchical
+            #  promises vs. "promises that return other promises".
+            #  - Should subtree cancellation and cancellation of nested
+            #  (returned) Promises be treated as the same thing ?
+            #  - No, I don't think so. Promises, that aren't in the hierarchy,
             #  originated elsewhere - their processing should not be affected
             #  by whether the happen to "pass through" some other promise that
             #  also happens to be being cancelled.
+            #  - How should the consumer of a promise, that is being cancelled,
+            #  experience its "unpack once" vs "unpack fully" then ?
             depth = 0
             while isinstance(result, Promise):
                 result = await result

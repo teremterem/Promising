@@ -858,10 +858,12 @@ class PromisingContext:
             exception.__promising_context__: PromisingContext = self
             exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
         except BaseException:
-            # TODO Should it be just `Exception` ? Any danger that
-            #  `KeyboardInterrupt` would get swallowed here ?
-            #  Contemplate on this GitHub issue along the way:
-            #  https://github.com/teremterem/Promising/issues/105
+            # TODO [BASE EXCEPTION] Should it be just `Exception` ? Any
+            #  danger that `KeyboardInterrupt` would get swallowed
+            #  here ?
+            #  - Contemplate on this GitHub issue along the way:
+            #    https://github.com/teremterem/Promising/issues/105
+            #  - Search for all `except BaseException` in the codebase.
             _logger.debug(
                 "Failed to attach either __promising_context__ or "
                 "__promising_collapse_traceback__ to exception %r on %r",

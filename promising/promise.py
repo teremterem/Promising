@@ -951,10 +951,12 @@ class Promise(PromisingContext, Generic[T_co]):
             try:
                 attach_context_to_error_chain_root(internal_error, context=exception)
             except BaseException:
-                # TODO Should it be just `Exception` ? Any danger that
-                #  `KeyboardInterrupt` would get swallowed here ?
-                #  Contemplate on this GitHub issue along the way:
-                #  https://github.com/teremterem/Promising/issues/105
+                # TODO [BASE EXCEPTION] Should it be just `Exception` ? Any
+                #  danger that `KeyboardInterrupt` would get swallowed
+                #  here ?
+                #  - Contemplate on this GitHub issue along the way:
+                #    https://github.com/teremterem/Promising/issues/105
+                #  - Search for all `except BaseException` in the codebase.
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_unsafe(internal_error)
 
@@ -1066,10 +1068,12 @@ class Promise(PromisingContext, Generic[T_co]):
                 try:
                     close()
                 except BaseException:
-                    # TODO Should it be just `Exception` ? Any danger that
-                    #  `KeyboardInterrupt` would get swallowed here ?
-                    #  Contemplate on this GitHub issue along the way:
-                    #  https://github.com/teremterem/Promising/issues/105
+                    # TODO [BASE EXCEPTION] Should it be just `Exception` ? Any
+                    #  danger that `KeyboardInterrupt` would get swallowed
+                    #  here ?
+                    #  - Contemplate on this GitHub issue along the way:
+                    #    https://github.com/teremterem/Promising/issues/105
+                    #  - Search for all `except BaseException` in the codebase.
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state_unsafe(self, new_state: Sentinel) -> None:

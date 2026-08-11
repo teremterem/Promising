@@ -829,13 +829,13 @@ class Promise(PromisingContext, Generic[T_co]):
             # TODO [CANCELLATION] Decide on the philosophy of hierarchical
             #  promises vs. "promises that return other promises".
             #  - Should subtree cancellation and cancellation of nested
-            #  (returned) Promises be treated as the same thing ?
+            #    (returned) Promises be treated as the same thing ?
             #  - No, I don't think so. Promises, that aren't in the hierarchy,
-            #  originated elsewhere - their processing should not be affected
-            #  by whether the happen to "pass through" some other promise that
-            #  also happens to be being cancelled.
+            #    originated elsewhere - their processing should not be affected
+            #    by whether the happen to "pass through" some other promise
+            #    that also happens to be being cancelled.
             #  - How should the consumer of a promise, that is being cancelled,
-            #  experience its "unpack once" vs "unpack fully" then ?
+            #    experience its "unpack once" vs "unpack fully" then ?
             while isinstance(result, Promise):
                 result = await result
                 _unpacking_logger.log_unwrap_step(promise=self, result=result)

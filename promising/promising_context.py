@@ -806,7 +806,7 @@ class PromisingContext:
         #  activation/deactivaton of the context in the ContextVar.)
         self._send_sync_op_to_loop(
             self._close_context_unsafe,
-            # TODO [NEW SYNC] Should fire_and_forget be True or False ?
+            # TODO [FIRE AND FORGET] Should fire_and_forget be True or False ?
             fire_and_forget=False,
             fail_if_loop_not_running=True,
         )

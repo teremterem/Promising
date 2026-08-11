@@ -942,7 +942,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state_unsafe(terminal_state)
             # TODO The fact that we have no "exception was never fetched"
             #  warning might be a problem. (What about "result was never
-            #  fetched", is it a thing too ?)
+            #  fetched" ?)
 
         except BaseException as internal_error:
             # Bug in the Promise class itself, or a misuse of the state

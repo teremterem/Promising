@@ -152,8 +152,9 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             )
 
         if self._promising_context is None:
-            # TODO Introduce something similar to `wrap_awaitable` here for
-            #  consistency
+            # TODO [FACTORY FUNCTIONS] Introduce something similar to
+            #  `wrap_awaitable` here for consistency (and maybe rename
+            #  `wrap_awaitable` somehow too)
             self._promising_context = PromisingContext(
                 namespace=self.namespace,
                 loop=self.loop,
@@ -209,8 +210,9 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         )
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
-        # TODO Introduce something similar to `wrap_awaitable` here for
-        #  consistency
+        # TODO [FACTORY FUNCTIONS] Introduce something similar to
+        #  `wrap_awaitable` here for consistency (and maybe rename
+        #  `wrap_awaitable` somehow too)
         ctx = PromisingContext(
             namespace=settings_as_dict.get("namespace", self.namespace),
             loop=settings_as_dict.get("loop", self.loop),
@@ -395,8 +397,11 @@ class PromisingContext:
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
         collapse_tracebacks: bool | Sentinel = INHERIT,
-        # TODO Introduce inheritable promise_class parameter
-        #  (and promise_class_default) ?
+        # TODO [FACTORY FUNCTIONS] Introduce inheritable promise_factory
+        #  parameter (and promise_factory_default as well) ?
+        # TODO [FACTORY FUNCTIONS] Introduce inheritable
+        #  promising_context_factory parameter (and promise_factory_default
+        #  as well) ?
         close_context_immediately: bool = False,
         register_with_parent: bool = True,
     ) -> None:
@@ -699,7 +704,8 @@ class PromisingContext:
     def collect_unsettled_children(
         self,
         *,
-        # TODO Do we really want a whole subtree in a flat set ?
+        # TODO [UNSETTLED CHILDREN] Do we really want a whole subtree in a flat
+        #  set ?
         whole_subtree: bool = True,
         awaitables_only: bool = True,
     ) -> set["PromisingContext"]:
@@ -727,7 +733,7 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        # TODO [NEW SYNC] Send this operation to the loop.
+        # TODO [UNSETTLED CHILDREN] Send this operation to the loop.
         #  (This operation only ? Or the whole method ?)
         children = list[PromisingContext](self._unsettled_children)
 

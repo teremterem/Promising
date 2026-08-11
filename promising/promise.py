@@ -987,7 +987,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_state_unsafe(_FINISHED)
             # TODO The fact that we have no "exception was never fetched"
             #  warning might be a problem. (What about "result was never
-            #  fetched", is it a thing too ?)
+            #  fetched" ?)
 
         except BaseException:
             _logger.debug("Failed to force-finish Promise %r with internal error", self, exc_info=True)

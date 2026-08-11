@@ -154,7 +154,7 @@ class PromiseUnpackingLogger:
         )
         self.logger.log(self.level, f"\n{log_message}\n")
 
-    def log_unwrap_step(self, *, promise: "Promise", depth: int, result: Any) -> None:
+    def log_unwrap_step(self, *, promise: "Promise", result: Any) -> None:
         if not self.logger.isEnabledFor(self.level):
             return
 
@@ -163,7 +163,7 @@ class PromiseUnpackingLogger:
         kind = "Promise (continue unwrap)" if isinstance(result, Promise) else "Non-Promise (stop)"
         log_message = "\n".join(
             [
-                f"_FULLY_UNPACK_UNSAFE Unwrap Step depth={depth}: {kind}",
+                f"_FULLY_UNPACK_UNSAFE Unwrap Step: {kind}",
                 f"  promise: {promise}",
                 f"  result type: {type(result).__name__}",
             ]

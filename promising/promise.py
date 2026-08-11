@@ -836,14 +836,9 @@ class Promise(PromisingContext, Generic[T_co]):
             #  also happens to be being cancelled.
             #  - How should the consumer of a promise, that is being cancelled,
             #  experience its "unpack once" vs "unpack fully" then ?
-            depth = 0
             while isinstance(result, Promise):
                 result = await result
-                # TODO I suspect that logging of `depth` is currently broken -
-                #  full unpacking happens recursively, and this loop
-                #  (supposedly) always runs only once
-                depth += 1
-                _unpacking_logger.log_unwrap_step(promise=self, depth=depth, result=result)
+                _unpacking_logger.log_unwrap_step(promise=self, result=result)
 
         except BaseException as exc:
             _unpacking_logger.log_unpacking_exception(promise=self, stage="_fully_unpack_unsafe", exc=exc)

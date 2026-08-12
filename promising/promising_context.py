@@ -784,8 +784,10 @@ class PromisingContext:
         # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
         #  context activation/deactivation:
         #  https://github.com/teremterem/Promising/issues/98
-        # TODO [INSTANCE LEVEL LOCKING] Do we need to "atomize" (or even send
-        #  to the loop) the `try_to_link_exception` call ?
+        # TODO [INSTANCE LEVEL LOCKING] Do we need to "atomize" the
+        #  `try_to_link_exception` call ?
+        #  - Or even send it to the loop ?
+        #  - Most likely yes.
         if exc_value is not None:
             # Attach this context to the in-flight exception as it leaves
             # the ``with`` block.
@@ -1091,17 +1093,17 @@ class PromisingContext:
         fail_if_loop_not_running: bool,
     ) -> Any:
         """
-        TODO [NEW SYNC] Explain in the docstring that this private method is
-         the central primitive in solving synchronization between synchronous
-         and asynchronous paradigms combined by this framework.
+        TODO [SYNC OP TO LOOP] Explain in the docstring that this private
+         method is the central primitive in solving synchronization between
+         synchronous and asynchronous paradigms combined by this framework.
         """
         if self.is_loop_running_and_correct(raise_if_loop_not_running=False):
             # We are on the event loop of the Promise, so we can call the
             # callable directly
             result = callable()
             if fire_and_forget:
-                # TODO [NEW SYNC] What to do about potential exceptions from the
-                #  callable ? Let them bubble up ?
+                # TODO [SYNC OP TO LOOP] What to do about potential exceptions
+                #  from the callable ? Let them bubble up ?
                 return None
 
             return result
@@ -1120,9 +1122,9 @@ class PromisingContext:
                 try:
                     result = callable()
                 except BaseException as exc:
-                    # TODO [NEW SYNC] Set as an internal error on the Promise itself
-                    #  instead ? (Would require moving the method to the
-                    #  Promise class.)
+                    # TODO [SYNC OP TO LOOP] Set as an internal error on the
+                    #  Promise itself instead ? (Would require moving the
+                    #  method to the Promise class.)
                     future.set_exception(exc)
                 else:
                     future.set_result(result)

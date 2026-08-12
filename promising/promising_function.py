@@ -417,11 +417,12 @@ class PromisingFunction(PromisingDecorator, Generic[T_co]):
         try:
             return await promise
         finally:
-            # TODO What about await_children's `unpack_promises_fully` ?
             if await_children is WHOLE_SUBTREE:
                 await promise.await_children(whole_subtree=True)
             elif await_children:
                 await promise.await_children(whole_subtree=False)
+            # TODO Support a complementary `unpack_promises_fully` boolean
+            #  parameter (defaulting to True) ?
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
         # TODO Develop a convenient and idiomatic way (whatever that might

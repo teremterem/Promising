@@ -812,9 +812,9 @@ class PromisingContext:
         return False  # Let's not suppress any exceptions
 
     def close_context(self) -> None:
-        # TODO [NEW SYNC] Figure out how race_conditions tests can be modified
-        #  so they don't need this method to exist as a public method ?
-        #  (It does not make much sense as something separate from
+        # TODO [NEW SYNC GENERAL] Figure out how race_conditions tests can be
+        #  modified so they don't need this method to exist as a public
+        #  method ? (It does not make much sense as something separate from
         #  activation/deactivaton of the context in the ContextVar.)
         self._send_sync_op_to_loop(
             self._close_context_unsafe,

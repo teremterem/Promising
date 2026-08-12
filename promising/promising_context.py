@@ -764,10 +764,9 @@ class PromisingContext:
         return self._thread_pool
 
     def __enter__(self) -> "PromisingContext":
-        # TODO [NEW SYNC] Is the following GitHub issue relevant ?
+        # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
+        #  context activation/deactivation:
         #  https://github.com/teremterem/Promising/issues/98
-        # TODO [NEW SYNC] Also, should we worry about anything similar in
-        #  `__exit__` ?
         if self._previous_token is not None:
             raise ContextAlreadyActiveError(f"{self!r} is already active")
         if self._context_closed:
@@ -782,6 +781,11 @@ class PromisingContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
+        # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
+        #  context activation/deactivation:
+        #  https://github.com/teremterem/Promising/issues/98
+        # TODO [INSTANCE LEVEL LOCKING] Do we need to "atomize" (or even send
+        #  to the loop) the `try_to_link_exception` call ?
         if exc_value is not None:
             # Attach this context to the in-flight exception as it leaves
             # the ``with`` block.

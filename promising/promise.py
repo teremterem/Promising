@@ -940,7 +940,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self.try_to_link_exception(exception)
             self._exception = exception
             self._set_state_unsafe(terminal_state)
-            # TODO [ASYNC WARNING] The fact that we have no "exception was
+            # TODO [ASYNC WARNINGS] The fact that we have no "exception was
             #  never fetched" warning might be a problem. (What about "result
             #  was never fetched" ?)
 
@@ -985,7 +985,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self.try_to_link_exception(error)
             self._exception = error
             self._set_state_unsafe(_FINISHED)
-            # TODO [ASYNC WARNING] The fact that we have no "exception was
+            # TODO [ASYNC WARNINGS] The fact that we have no "exception was
             #  never fetched" warning might be a problem. (What about "result
             #  was never fetched" ?)
 

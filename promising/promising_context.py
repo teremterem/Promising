@@ -786,7 +786,7 @@ class PromisingContext:
         #  https://github.com/teremterem/Promising/issues/98
         # TODO [INSTANCE LEVEL LOCKING] Do we need to "atomize" the
         #  `try_to_link_exception` call ?
-        #  - Or even send it to the loop ?
+        #  - Or maybe even send it to the loop instead ?
         #  - Most likely yes.
         if exc_value is not None:
             # Attach this context to the in-flight exception as it leaves

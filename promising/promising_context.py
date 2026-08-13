@@ -621,6 +621,8 @@ class PromisingContext:
         # children may be spawned by existing ones while the existing ones
         # are being awaited
         while children := self.collect_unsettled_children(
+            # TODO [UNSETTLED CHILDREN] asyncio.gather() recursively instead of
+            #  building a huge flat set of all the descendants ?
             whole_subtree=whole_subtree,
             awaitables_only=True,
         ):
@@ -632,7 +634,7 @@ class PromisingContext:
                     # it picks which "doneness" check to apply per child based
                     # on the unpacking mode. A flatter chain of boolean
                     # conditions covering the same logic would be harder to
-                    # follow.
+                    # read.
                     child.done()
                     if unpack_promises_fully or not isinstance(child, Promise)
                     else child.unpacked_once_or_done()
@@ -704,8 +706,6 @@ class PromisingContext:
     def collect_unsettled_children(
         self,
         *,
-        # TODO [UNSETTLED CHILDREN] Do we really want a whole subtree in a flat
-        #  set ?
         whole_subtree: bool = True,
         awaitables_only: bool = True,
     ) -> set["PromisingContext"]:

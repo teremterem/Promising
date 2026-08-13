@@ -733,9 +733,11 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        # TODO [UNSETTLED CHILDREN] Send this operation to the loop.
-        #  (This operation only ? Or the whole method ?)
-        children = list[PromisingContext](self._unsettled_children)
+        children = self._send_sync_op_to_loop(
+            functools.partial(list, self._unsettled_children),
+            fire_and_forget=False,
+            fail_if_loop_not_running=True,
+        )
 
         if awaitables_only:
             result = {child for child in children if inspect.isawaitable(child)}

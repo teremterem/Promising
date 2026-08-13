@@ -4,6 +4,7 @@ import contextvars
 import functools
 import inspect
 import logging
+import threading
 from asyncio import AbstractEventLoop
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -440,6 +441,9 @@ class PromisingContext:
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
 
+        # A non-reentrant(!) lock for context activation/deactivation
+        self._threading_lock = threading.Lock()
+
         # TODO [PROMISE CREATION] Any way to avoid having this
         #  `register_with_parent` parameter at all ?
         if register_with_parent:
@@ -766,15 +770,14 @@ class PromisingContext:
         return self._thread_pool
 
     def __enter__(self) -> "PromisingContext":
-        # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
-        #  context activation/deactivation:
-        #  https://github.com/teremterem/Promising/issues/98
-        if self._previous_token is not None:
-            raise ContextAlreadyActiveError(f"{self!r} is already active")
-        if self._context_closed:
-            raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
+        with self._threading_lock:
+            if self._previous_token is not None:
+                raise ContextAlreadyActiveError(f"{self!r} is already active")
+            if self._context_closed:
+                raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
 
-        self._previous_token = self.__active_context.set(self)
+            self._previous_token = self.__active_context.set(self)
+
         return self
 
     def __exit__(
@@ -792,24 +795,22 @@ class PromisingContext:
                 fail_if_loop_not_running=True,
             )
 
-        try:
-            # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
-            #  context activation/deactivation:
-            #  https://github.com/teremterem/Promising/issues/98
-            if self._previous_token is None:
-                raise ContextNotActiveError(f"{self!r} is not active")
+        with self._threading_lock:
+            try:
+                if self._previous_token is None:
+                    raise ContextNotActiveError(f"{self!r} is not active")
 
-            self.__active_context.reset(self._previous_token)
-            self._previous_token = None
+                self.__active_context.reset(self._previous_token)
+                self._previous_token = None
 
-        except BaseException as exc:
-            if exc_value is None:
-                raise exc
-            else:
-                raise exc from exc_value
+            except BaseException as exc:
+                if exc_value is None:
+                    raise exc
+                else:
+                    raise exc from exc_value
 
-        finally:
-            self.close_context()
+            finally:
+                self.close_context()
 
         return False  # Let's not suppress any exceptions
 

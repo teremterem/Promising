@@ -807,6 +807,11 @@ class PromisingContext:
                 if exc_value is None:
                     raise exc
                 else:
+                    # TODO [BASE EXCEPTION] Is this really that important to
+                    #  capture and attach exc_value explicitly ? Wouldn't it be
+                    #  attached automatically somehow ?
+                    #  - Some experimentation was done on related things in
+                    #    `examples/agents_with_errors.py`.
                     raise exc from exc_value
 
             finally:

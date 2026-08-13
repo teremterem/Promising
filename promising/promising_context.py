@@ -622,7 +622,7 @@ class PromisingContext:
         # are being awaited
         while children := self.collect_unsettled_children(
             # TODO [UNSETTLED CHILDREN] asyncio.gather() recursively instead of
-            #  building a huge flat set of all the descendants ?
+            #  building a (potentially) huge flat set of all the descendants
             whole_subtree=whole_subtree,
             awaitables_only=True,
         ):

@@ -783,19 +783,19 @@ class PromisingContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
-        # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
-        #  context activation/deactivation:
-        #  https://github.com/teremterem/Promising/issues/98
-        # TODO [INSTANCE LEVEL LOCKING] Do we need to "atomize" the
-        #  `try_to_link_exception` call ?
-        #  - Or maybe even send it to the loop instead ?
-        #  - Most likely yes.
         if exc_value is not None:
             # Attach this context to the in-flight exception as it leaves
             # the ``with`` block.
-            self.try_to_link_exception(exc_value)
+            self._send_sync_op_to_loop(
+                functools.partial(self.try_to_link_exception, exc_value),
+                fire_and_forget=False,
+                fail_if_loop_not_running=True,
+            )
 
         try:
+            # TODO [INSTANCE LEVEL LOCKING] "atomize" private attribute access and
+            #  context activation/deactivation:
+            #  https://github.com/teremterem/Promising/issues/98
             if self._previous_token is None:
                 raise ContextNotActiveError(f"{self!r} is not active")
 

@@ -772,7 +772,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
             _unpacking_logger.log_single_unpacking_result(promise=self, result=result)
 
-        except BaseException as exc:
+        except BaseException as exc:  # TODO [BASE EXCEPTION]
             _unpacking_logger.log_unpacking_exception(promise=self, stage="_unpack_once_unsafe", exc=exc)
             self._set_exception_unsafe(exc)
         else:
@@ -835,7 +835,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 result = await result
                 _unpacking_logger.log_unwrap_step(promise=self, result=result)
 
-        except BaseException as exc:
+        except BaseException as exc:  # TODO [BASE EXCEPTION]
             _unpacking_logger.log_unpacking_exception(promise=self, stage="_fully_unpack_unsafe", exc=exc)
             self._set_exception_unsafe(exc)
         else:
@@ -864,7 +864,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._intermediate_promise = promise
             self._set_state_unsafe(_UNPACKED_ONCE)
 
-        except BaseException as internal_error:
+        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
             self._force_internal_error_finish_unsafe(internal_error)
 
     def _set_result_unsafe(self, result: T_co) -> None:
@@ -885,7 +885,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._result = result
             self._set_state_unsafe(_FINISHED)
 
-        except BaseException as internal_error:
+        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
             self._force_internal_error_finish_unsafe(internal_error)
 
     def _set_exception_unsafe(self, exception: BaseException) -> None:
@@ -939,7 +939,7 @@ class Promise(PromisingContext, Generic[T_co]):
             #  never fetched" warning might be a problem. (What about "result
             #  was never fetched" ?)
 
-        except BaseException as internal_error:
+        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
             # Bug in the Promise class itself, or a misuse of the state
             # machine. Chain the original exception so context is not lost,
             # then force the Promise into a terminal state.
@@ -951,7 +951,6 @@ class Promise(PromisingContext, Generic[T_co]):
                 #  here ?
                 #  - Contemplate on this GitHub issue along the way:
                 #    https://github.com/teremterem/Promising/issues/105
-                #  - Search for all `except BaseException` in the codebase.
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_unsafe(internal_error)
 
@@ -1022,11 +1021,8 @@ class Promise(PromisingContext, Generic[T_co]):
         if cancellation_requested:
             return True
 
-        # No task is currently running cancellation through — fabricate the
-        # CancelledError and store it directly. Covers the
-        # `start_soon=False`/never-awaited case as well as the rare race
-        # where every task has finished but the Promise hasn't transitioned
-        # to a terminal state yet.
+        # No task is currently running — fabricate the CancelledError. Covers
+        # the `start_soon=False`/never-awaited case.
         self._fabricate_cancellation_unsafe(msg)
 
         return self.cancelled()
@@ -1068,7 +1064,6 @@ class Promise(PromisingContext, Generic[T_co]):
                     #  here ?
                     #  - Contemplate on this GitHub issue along the way:
                     #    https://github.com/teremterem/Promising/issues/105
-                    #  - Search for all `except BaseException` in the codebase.
                     _logger.debug("Failed to close awaitable on cancellation of %r", self, exc_info=True)
 
     def _set_state_unsafe(self, new_state: Sentinel) -> None:

@@ -447,9 +447,11 @@ class PromisingContext:
         # TODO [PROMISE CREATION] Any way to avoid having this
         #  `register_with_parent` parameter at all ?
         if register_with_parent:
-            # No other code has a reference to this PromisingContext yet, so we
-            # can just register it with the parent in a thread-unsafe manner
-            self._register_with_parent_unsafe()
+            self._send_sync_op_to_loop(
+                self._register_with_parent_unsafe,
+                fire_and_forget=False,  # We don't want to defer errors
+                fail_if_loop_not_running=True,
+            )
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -826,7 +828,7 @@ class PromisingContext:
         #  activation/deactivaton of the context in the ContextVar.)
         self._send_sync_op_to_loop(
             self._close_context_unsafe,
-            # TODO [FIRE AND FORGET] Should fire_and_forget be True or False ?
+            # The context should be closed before we return from `__exit__`
             fire_and_forget=False,
             fail_if_loop_not_running=True,
         )

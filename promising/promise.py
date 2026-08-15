@@ -289,9 +289,7 @@ class Promise(PromisingContext, Generic[T_co]):
 
         self._send_sync_op_to_loop(
             self._finish_init_unsafe,
-            # TODO [FIRE AND FORGET] Should we await for the registration with
-            #  the parent to happen or just fire and forget ?
-            fire_and_forget=False,
+            fire_and_forget=False,  # We don't want to defer errors
             fail_if_loop_not_running=True,
         )
 
@@ -313,12 +311,9 @@ class Promise(PromisingContext, Generic[T_co]):
         NOTE: This method should only be called from the event loop of the
         same Promise.
         """
-        try:
-            self._register_with_parent_unsafe()
-            if self._start_soon and self._awaitable is not None:
-                self._ensure_full_unpacking_scheduled_unsafe()
-        except BaseException as exc:
-            self._force_internal_error_finish_unsafe(exc)
+        self._register_with_parent_unsafe()
+        if self._start_soon and self._awaitable is not None:
+            self._ensure_full_unpacking_scheduled_unsafe()
 
     @classmethod
     def get_active_promise(cls, *, raise_if_none: bool = True) -> "Promise[Any] | None":

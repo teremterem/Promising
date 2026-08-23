@@ -39,7 +39,7 @@ Tests that pin behavior which is known to be broken (and tracked in a GitHub iss
 
 1. `[tool.pytest.ini_options] markers` in `pyproject.toml` - registers the marker with pytest.
 2. `MARKERS_TO_XFAIL` in `tests/utils_for_tests.py` - the switch that makes the marker actually do something.
-3. `@pytest.mark.xfail_gh_issue_<N>` decorators on the affected tests.
+3. `@pytest.mark.xfail_gh_issue_<N>` decorators on the affected tests. (`xfail_gh_issue_<N>` is just one possible format - marker names are actually entirely custom.)
 
 The machinery lives in `possibly_xfail()` (`tests/utils_for_tests.py`), invoked from the `pytest_runtest_setup` hook in `tests/conftest.py` for every test. For each marker on the test that is also present in `MARKERS_TO_XFAIL`, it dynamically adds `pytest.mark.xfail(...)` to the test item, with a reason composed of the sorted marker names plus any `reason=` kwargs passed to the markers.
 

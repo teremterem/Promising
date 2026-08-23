@@ -205,7 +205,7 @@ async def test_cancel_racing_sync_trigger() -> None:
             assert not promise.cancelled()
         else:
             assert isinstance(consumer_error, asyncio.CancelledError), (
-                f"sync() must raise CancelledError on cancellation, got: {consumer_error!r}"
+                f"sync() must raise asyncio.CancelledError on cancellation, got: {type(consumer_error)!r}"
             )
             assert promise.cancelled()
 

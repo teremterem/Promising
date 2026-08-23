@@ -33,6 +33,20 @@ pre-commit run --all-files
 
 Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). A global timeout is enforced via pytest-timeout per each test. Tests are organized into subdirectories by concern: `tests/configuration/` (settings: `start_soon`, `thread_pool`, `use_thread_pool`, call-time overrides), `tests/decoration/` (decorator/descriptor plumbing for `@promising.function` and `@promising.context`), `tests/hierarchy/` (parent-child registration, nesting, cascading unregister), `tests/observability/` (namespaces, traces), `tests/resolution/` (awaiting, sync/await-children, timeout, cycle detection), and `tests/misc/` (`run_in_executor`, `run_in_thread`, sentinels).
 
+## Known-Failing Tests (Issue-Linked xfail Markers)
+
+Tests that pin behavior which is known to be broken (and tracked in a GitHub issue) are not marked with plain `@pytest.mark.xfail`. Instead, each issue gets its own custom marker named after it, e.g. `xfail_gh_issue_116` or, with an optional descriptive prefix, `xfail_cycle_detection_gh_issue_66`. A marker is wired up in three places:
+
+1. `[tool.pytest.ini_options] markers` in `pyproject.toml` - registers the marker with pytest.
+2. `MARKERS_TO_XFAIL` in `tests/utils_for_tests.py` - the switch that makes the marker actually do something.
+3. `@pytest.mark.xfail_gh_issue_<N>` decorators on the affected tests.
+
+The machinery lives in `possibly_xfail()` (`tests/utils_for_tests.py`), invoked from the `pytest_runtest_setup` hook in `tests/conftest.py` for every test. For each marker on the test that is also present in `MARKERS_TO_XFAIL`, it dynamically adds `pytest.mark.xfail(...)` to the test item, with a reason composed of the sorted marker names plus any `reason=` kwargs passed to the markers.
+
+Passing `skip_entirely=True` to the marker (e.g. `@pytest.mark.xfail_cycle_detection_gh_issue_66(skip_entirely=True)`) makes the test `pytest.skip()` instead of xfail. Use this for tests that would hang or time out on the known bug: xfail still executes the test body, skip does not. `possibly_xfail()` can also be called directly from inside a test body with marker-name strings; at that point it is too late to xfail, so it always skips.
+
+The point of the indirection through `MARKERS_TO_XFAIL`: when the underlying issue is fixed, deleting the marker name from that one list reactivates the whole group of tests at once - the decorators left behind become inert until cleaned up (along with the entries in `pyproject.toml`). This also means that verifying a candidate fix against all of its pinned tests is a one-line change. Do not rely on XPASS reporting for that instead: the xfail applied here is non-strict, so an unexpectedly passing test does not fail the suite.
+
 ## Code Style
 
 - Line length for all code: 119 characters (Ruff)

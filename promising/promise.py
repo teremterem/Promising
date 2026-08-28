@@ -705,12 +705,12 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _unpacking_task_done_unsafe_callback(self, task: Task[Any]) -> None:
         """
-        Bridge the case where ``task.cancel()`` lands between
-        ``create_task`` and the first ``__step``: ``CancelledError`` is
-        thrown into a not-yet-started coroutine and propagates out
-        without entering the ``try/except BaseException`` inside
-        ``_unpack_once_unsafe`` / ``_fully_unpack_unsafe``, leaving
-        the Promise non-terminal even though the Task ended cancelled.
+        Bridge the case where ``task.cancel()`` lands between ``create_task``
+        and the first ``__step``: ``CancelledError`` is thrown into a
+        not-yet-started coroutine and propagates out without entering the
+        ``try/except`` inside ``_unpack_once_unsafe`` /
+        ``_fully_unpack_unsafe``, leaving the Promise non-terminal even though
+        the Task ended cancelled.
 
         NOTE: This method should only be called from the event loop of the
         same Promise.
@@ -997,14 +997,13 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _cancel_unsafe(self, msg: str | None = None) -> bool:
         """
-        Request cancellation of the underlying unpacking task(s) — or, if
-        no task has been scheduled yet, fabricate cancellation (see
+        Request cancellation of the underlying unpacking task(s) — or, if no
+        task has been scheduled yet, fabricate cancellation (see
         ``_fabricate_cancellation_unsafe``).
 
         The state machine is *not* moved here. Instead, the ``CancelledError``
-        propagates through ``_unpack_once_unsafe`` /
-        ``_fully_unpack_unsafe`` (``except BaseException`` catches it) and
-        is stored via ``_set_exception_unsafe``.
+        propagates through ``_unpack_once_unsafe`` / ``_fully_unpack_unsafe``
+        (``except`` catches it) and is stored via ``_set_exception_unsafe``.
 
         NOTE: This method should only be called from the event loop of the
         same Promise.
@@ -1029,14 +1028,14 @@ class Promise(PromisingContext, Generic[T_co]):
 
     def _fabricate_cancellation_unsafe(self, msg: str | None = None) -> None:
         """
-        Drive the Promise into a cancelled terminal state without relying
-        on a running unpacking task to surface the ``CancelledError``.
-        Mirrors ``Future.cancel()`` on a not-yet-running future.
+        Drive the Promise into a cancelled terminal state without relying on a
+        running unpacking task to surface the ``CancelledError``. Mirrors
+        ``Future.cancel()`` on a not-yet-running future.
 
-        Shared by ``_cancel_unsafe`` (fabricate path, no task ever
-        scheduled) and ``_unpacking_task_done_unsafe_callback`` (task cancelled
-        between ``create_task`` and its first ``__step``, so the body's
-        ``except BaseException`` never saw the ``CancelledError``).
+        Shared by ``_cancel_unsafe`` (fabricate path, no task ever scheduled)
+        and ``_unpacking_task_done_unsafe_callback`` (task cancelled between
+        ``create_task`` and its first ``__step``, so the body's ``except``
+        never saw the ``CancelledError``).
 
         NOTE: This method should only be called from the event loop of the
         same Promise.

@@ -106,13 +106,13 @@ async def test_coroutine_raising_cancelled_error_unregisters_from_parent() -> No
 
 async def test_cancel_full_unpacking_task_before_first_step_transitions_promise() -> None:
     """
-    Cancelling the underlying ``_full_unpacking_task`` between
-    ``create_task`` and its first ``__step`` throws ``CancelledError``
-    into a not-yet-started coroutine — Python propagates that exception
-    out without entering the body's ``try/except BaseException``, so the
-    coroutine never calls ``_set_exception_unsafe`` itself. Without
-    the done-callback bridge, the Task ends cancelled while the Promise
-    stays ``_PENDING`` and leaks in its parent's ``_unsettled_children``.
+    Cancelling the underlying ``_full_unpacking_task`` between ``create_task``
+    and its first ``__step`` throws ``CancelledError`` into a not-yet-started
+    coroutine — Python propagates that exception out without entering the
+    body's ``try/except``, so the coroutine never calls
+    ``_set_exception_unsafe`` itself. Without the done-callback bridge, the
+    Task ends cancelled while the Promise stays ``_PENDING`` and leaks in its
+    parent's ``_unsettled_children``.
     """
     with promising.context() as parent:
 

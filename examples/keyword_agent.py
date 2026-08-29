@@ -20,7 +20,7 @@ class KeywordResponse(BaseModel):
 
 
 @promising.function
-async def extract_keywords(thought: str, *, litellm_session: ClientSession | None = None) -> list[str]:
+async def extract_keywords(thought: str) -> list[str]:
     """Extract keywords from a user's thought for semantic similarity search enhancement."""
     model = "openrouter/openai/gpt-5-mini"
     temperature = 0
@@ -49,7 +49,7 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         response_format=KeywordResponse,
-        shared_session=litellm_session,
+        shared_session=promising.extras().litellm_session,
     )
 
     keyword_response = KeywordResponse.model_validate_json(response.choices[0].message.content)
@@ -58,24 +58,19 @@ async def extract_keywords(thought: str, *, litellm_session: ClientSession | Non
 
 if __name__ == "__main__":
 
-    @promising.function
+    @promising.function(with_extras_factories={"litellm_session": ClientSession})
     async def main() -> None:
-        # TODO [P1] Support arbitrary attributes in PromisingContext to put
-        #  things like litellm_session in there. Child contexts should inherit
-        #  those attributes from their parents. (Should probably be copied to
-        #  children to avoid race conditions.)
-        async with ClientSession() as litellm_session:
-            try:
-                while True:
-                    thought = input("Enter a thought:\n")
-                    if thought == "exit":
-                        break
-                    elif not thought.strip():
-                        continue
-                    keywords = await extract_keywords(thought, litellm_session=litellm_session)
-                    print(keywords)
-                    print()
-            except KeyboardInterrupt:
-                pass
+        try:
+            while True:
+                thought = input("Enter a thought:\n")
+                if thought == "exit":
+                    break
+                elif not thought.strip():
+                    continue
+                keywords = await extract_keywords(thought)
+                print(keywords)
+                print()
+        except KeyboardInterrupt:
+            pass
 
     main.run()

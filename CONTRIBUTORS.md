@@ -186,20 +186,18 @@ flowchart TD
     class send,link,fully,once,set_interm,set_result,set_exc,force,fabricate catcher
 ```
 
-The same call hierarchy reduced to the eight handlers that matter most (`_send_sync_op_to_loop` is omitted — its handler is a plain "transfer the exception onto the waiting Future" bridge and does not participate in the state machine). Solid edges are direct calls; the dashed edge collapses the path `_fully_unpack_unsafe` → `_ensure_single_unpacking_scheduled_unsafe` → `create_task` → `_unpack_once_unsafe`.
+The same call hierarchy reduced to the eight handlers that matter most (`_send_sync_op_to_loop` is omitted — its handler is a plain "transfer the exception onto the waiting Future" bridge and does not participate in the state machine). All edges are direct calls. The indirect `_fully_unpack_unsafe` → `_ensure_single_unpacking_scheduled_unsafe` → `create_task` → `_unpack_once_unsafe` scheduling path from the full diagram above is deliberately left out here so that the two unpacking Tasks sit side by side.
 
 ```mermaid
 flowchart TD
-    link["PromisingContext.try_to_link_exception"]
-    fully["Promise._fully_unpack_unsafe"]
-    once["Promise._unpack_once_unsafe"]
     fabricate["Promise._fabricate_cancellation_unsafe"]
+    once["Promise._unpack_once_unsafe"]
+    fully["Promise._fully_unpack_unsafe"]
+    set_exc["Promise._set_exception_unsafe<br/>(2 sites)"]
     set_interm["Promise._set_intermediate_promise_unsafe"]
     set_result["Promise._set_result_unsafe"]
-    set_exc["Promise._set_exception_unsafe<br/>(2 sites)"]
     force["Promise._force_internal_error_finish_unsafe"]
-
-    fully -.-> once
+    link["PromisingContext.try_to_link_exception"]
 
     fabricate --> set_exc
     once --> set_exc

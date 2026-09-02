@@ -100,6 +100,129 @@ Scheduling is driven by `_ensure_single_unpacking_scheduled_unsafe()` and `_ensu
 
 **Module helpers.** `wrap_awaitable(awaitable, **kwargs)` is the recommended way to lift a bare coroutine (or other awaitable) into a `Promise` from outside a decorated function. `get_active_promise()` walks the active context chain skipping non-`Promise` nodes.
 
+### Blanket `except BaseException` Handlers
+
+Nine methods catch `BaseException` (ten `except` sites in total — `_set_exception_unsafe` has two). All of them live in `promising/promise.py` and `promising/promising_context.py`, and every one carries a `# TODO [BASE EXCEPTION]` comment (see [issue #105](https://github.com/teremterem/Promising/issues/105) about whether some of them should narrow to `Exception` so that `KeyboardInterrupt` is not swallowed). The diagram below shows how these handlers call each other, plus the public/internal entry points that lead into them. Bold-bordered nodes are the methods that contain an `except BaseException`; plain nodes are ordinary callers shown for orientation. Dashed edges are indirect: the callee is scheduled as a Task via `loop.create_task(...)`, or passed as a callable into `_send_sync_op_to_loop`, rather than called directly.
+
+```mermaid
+flowchart TD
+    subgraph PC["PromisingContext (promising/promising_context.py)"]
+        pc_init["__init__"]
+        pc_exit["__exit__"]
+        pc_close["close_context"]
+        pc_collect["collect_unsettled_children"]
+        pc_close_unsafe["_close_context_unsafe"]
+        pc_register["_register_with_parent_unsafe"]
+        send["_send_sync_op_to_loop<br/>(inner callback)"]
+        link["try_to_link_exception"]
+    end
+
+    subgraph PR["Promise (promising/promise.py)"]
+        pr_init["__init__"]
+        pr_await["__await__ / sync"]
+        pr_unpack_once["unpack_once / unpack_once_sync"]
+        pr_cancel["cancel"]
+        finish_init["_finish_init_unsafe"]
+        ensure_full["_ensure_full_unpacking_scheduled_unsafe"]
+        ensure_single["_ensure_single_unpacking_scheduled_unsafe"]
+        done_cb["_unpacking_task_done_unsafe_callback"]
+        cancel_unsafe["_cancel_unsafe"]
+        fully["_fully_unpack_unsafe"]
+        once["_unpack_once_unsafe"]
+        set_interm["_set_intermediate_promise_unsafe"]
+        set_result["_set_result_unsafe"]
+        set_exc["_set_exception_unsafe<br/>(2 sites)"]
+        force["_force_internal_error_finish_unsafe"]
+        fabricate["_fabricate_cancellation_unsafe"]
+    end
+
+    %% Entry points into _send_sync_op_to_loop
+    pc_init -.->|"callable"| send
+    pc_exit -.->|"callable"| send
+    pc_exit --> pc_close
+    pc_close -.->|"callable"| send
+    pc_collect -.->|"callable"| send
+    pr_init -.->|"callable"| send
+    pr_cancel -.->|"callable"| send
+
+    %% What _send_sync_op_to_loop invokes
+    send -.-> pc_register
+    send -.-> pc_close_unsafe
+    send -.-> link
+    send -.-> finish_init
+    send -.-> cancel_unsafe
+
+    %% Scheduling of the unpacking tasks
+    finish_init --> ensure_full
+    pr_await --> ensure_full
+    pr_unpack_once --> ensure_single
+    ensure_full -.->|"create_task"| fully
+    ensure_single -.->|"create_task"| once
+    fully --> ensure_single
+
+    %% Cancellation
+    cancel_unsafe --> fabricate
+    done_cb --> fabricate
+    fabricate --> pc_close_unsafe
+    fabricate --> set_exc
+
+    %% Prefilled Promises
+    pr_init --> set_result
+    pr_init --> set_exc
+
+    %% State-machine writers
+    once --> set_exc
+    once --> set_interm
+    once --> set_result
+    fully --> set_exc
+    fully --> set_result
+    set_interm --> force
+    set_result --> force
+    set_exc --> link
+    set_exc --> force
+    force --> link
+
+    classDef catcher stroke-width:3px,font-weight:bold
+    class send,link,fully,once,set_interm,set_result,set_exc,force,fabricate catcher
+```
+
+The same call hierarchy reduced to the eight handlers that matter most (`_send_sync_op_to_loop` is omitted — its handler is a plain "transfer the exception onto the waiting Future" bridge and does not participate in the state machine). Solid edges are direct calls; the dashed edge collapses the path `_fully_unpack_unsafe` → `_ensure_single_unpacking_scheduled_unsafe` → `create_task` → `_unpack_once_unsafe`.
+
+```mermaid
+flowchart TD
+    link["PromisingContext.try_to_link_exception"]
+    fully["Promise._fully_unpack_unsafe"]
+    once["Promise._unpack_once_unsafe"]
+    fabricate["Promise._fabricate_cancellation_unsafe"]
+    set_interm["Promise._set_intermediate_promise_unsafe"]
+    set_result["Promise._set_result_unsafe"]
+    set_exc["Promise._set_exception_unsafe<br/>(2 sites)"]
+    force["Promise._force_internal_error_finish_unsafe"]
+
+    fully -.-> once
+
+    fabricate --> set_exc
+    once --> set_exc
+    once --> set_interm
+    once --> set_result
+    fully --> set_exc
+    fully --> set_result
+    set_interm --> force
+    set_result --> force
+    set_exc --> link
+    set_exc --> force
+    force --> link
+```
+
+What each handler does with what it catches:
+
+- `_unpack_once_unsafe` / `_fully_unpack_unsafe` — the two unpacking Tasks. Anything raised by the wrapped awaitable (including `CancelledError`) is stored on the Promise via `_set_exception_unsafe` instead of escaping to the loop's exception handler.
+- `_set_intermediate_promise_unsafe` / `_set_result_unsafe` / `_set_exception_unsafe` — state-machine writers. A failure here is a framework bug (state validation raised, or parent unregistration failed), so the error is routed to `_force_internal_error_finish_unsafe`. The second site in `_set_exception_unsafe` guards `attach_context_to_error_chain_root`, which only chains the original exception onto the internal error for context and must not be allowed to fail.
+- `_force_internal_error_finish_unsafe` — last-resort path; logs and re-raises (the only handler that does not swallow).
+- `_fabricate_cancellation_unsafe` — guards the `close()` call on the never-driven awaitable (which exists only to silence the "coroutine was never awaited" warning).
+- `try_to_link_exception` — guards attribute assignment on the exception object (e.g. a frozen exception type); losing the breadcrumb must not affect exception handling.
+- `_send_sync_op_to_loop` — the inner `callback` catches whatever the dispatched callable raises on the loop thread and transfers it onto the `concurrent.futures.Future` that the calling thread is blocked on, so the exception re-raises there.
+
 ### DecoratorSupport and PromisingDecorator (`promising/decorator_support.py`)
 
 `DecoratorSupport` is the base class that provides decorator and descriptor plumbing shared by `promising.context` and `PromisingFunction`. It handles `functools.update_wrapper` bookkeeping and implements `__get__` so that decorators work correctly on instance methods, `@classmethod`, and `@staticmethod`. `PromisingDecorator` extends `DecoratorSupport` with the common configuration parameters (`children_start_soon`, `start_soon_default`, `thread_pool`) and the `__call__` dispatch logic that distinguishes "still decorating" from "calling the decorated function".

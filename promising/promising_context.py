@@ -856,10 +856,12 @@ class PromisingContext:
 
         Idempotent (deepest level wins): if ``__promising_context__`` is
         already set on the exception, this call is a no-op, so a nested
-        context that already attributed itself is preserved. Failures
-        to set either attribute (e.g. on a frozen exception type) are
-        swallowed and logged at debug level — losing the breadcrumb must
-        not affect exception handling.
+        context that already attributed itself is preserved.
+
+        Failures to set either attribute (e.g. on a frozen exception
+        type) are always logged at debug level. What happens next is up
+        to ``fail``: when ``True`` (the default) the failure is
+        re-raised, when ``False`` it is swallowed.
         """
         try:
             if hasattr(exception, "__promising_context__"):

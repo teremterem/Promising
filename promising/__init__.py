@@ -88,8 +88,10 @@ class Defaults:
     #  for an even deeper promise, which, in turn, cannot be scheduled because
     #  the thread pool is already fully occupied exactly with the promise chain
     #  that is awaiting)
-    # TODO Introduce a "promise factory" setting, both - as a global default
+    # TODO Introduce a "Promise factory" setting, both - as a global default
     #  and as an inheritable setting ?
+    # TODO Introduce a "PromisingContext factory" setting, both - as a global default
+    #  and as an inheritable setting as well ?
     QUALNAMES_IN_NAMESPACES = True
 
 

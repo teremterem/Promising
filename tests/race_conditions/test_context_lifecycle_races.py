@@ -12,7 +12,7 @@ pinned down here:
   succeed, the loser must get a clean ``ContextError``
   (``ContextAlreadyActiveError`` / ``ContextAlreadyClosedError``), and
   the winner's exit must work flawlessly;
-- ``close_context_threadsafe()`` from another thread racing the owning
+- ``close_context()`` from another thread racing the owning
   thread's ``with``-block exit must never break the exit;
 - N threads creating children racing one thread closing the context:
   every creation is atomic (accepted-and-tracked XOR cleanly-rejected-and
@@ -21,7 +21,7 @@ pinned down here:
   mutable state (``_promising_context``) with no synchronization — the
   same wrapper instance raced from two threads must never end up
   simultaneously "inside" both;
-- ``close_context_threadsafe()`` (close + unregister-from-parent cascade)
+- ``close_context()`` (close + unregister-from-parent cascade)
   must be idempotent under concurrent invocation, without collateral
   damage to sibling registrations.
 """
@@ -78,7 +78,7 @@ async def test_concurrent_enter_of_same_context_has_at_most_one_winner() -> None
 
 async def test_threadsafe_close_racing_with_block_exit() -> None:
     """
-    A worker thread calls ``close_context_threadsafe()`` at the same
+    A worker thread calls ``close_context()`` at the same
     moment the owning (loop) thread exits the ``with`` block (which also
     closes). Both operations are idempotent by contract; neither may
     raise, and the context must end up closed.
@@ -86,7 +86,7 @@ async def test_threadsafe_close_racing_with_block_exit() -> None:
     for _ in range(RACE_ITERATIONS):
         ctx = PromisingContext(parent=None)
         with ctx:
-            closer_future = asyncio.ensure_future(run_racers(ctx.close_context_threadsafe))
+            closer_future = asyncio.ensure_future(run_racers(ctx.close_context))
             # Exit the with block while the closer thread runs — the two
             # close paths collide. (The with-block exit happens right
             # here, as this block ends.)
@@ -116,7 +116,7 @@ async def test_many_creators_racing_single_close() -> None:
         boxes: list[dict] = [{} for _ in range(5)]
 
         creators = [make_child_creator(ctx, loop, executions, box) for box in boxes]
-        _, errors = await run_racers(*creators, ctx.close_context_threadsafe)
+        _, errors = await run_racers(*creators, ctx.close_context)
         ctx.__exit__(None, None, None)
         assert_no_errors(errors)
 
@@ -214,8 +214,8 @@ async def test_concurrent_threadsafe_close_of_child_context() -> None:
             sibling_ctx = PromisingContext(parent=root_ctx)  # bystander — must not be affected
 
             _, errors = await run_racers(
-                child_ctx.close_context_threadsafe,
-                child_ctx.close_context_threadsafe,
+                child_ctx.close_context,
+                child_ctx.close_context,
             )
             assert_no_errors(errors)
 
@@ -224,5 +224,5 @@ async def test_concurrent_threadsafe_close_of_child_context() -> None:
             assert child_ctx not in unsettled
             assert sibling_ctx in unsettled, "An unrelated sibling was lost during the concurrent close"
 
-            sibling_ctx.close_context_threadsafe()
+            sibling_ctx.close_context()
         assert root_ctx.collect_unsettled_children(awaitables_only=False) == set()

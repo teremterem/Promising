@@ -31,7 +31,21 @@ ruff check
 pre-commit run --all-files
 ```
 
-Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). A global timeout is enforced via pytest-timeout per each test. Tests are organized into subdirectories by concern: `tests/configuration/` (settings: `start_soon`, `thread_pool`, `use_thread_pool`, call-time overrides), `tests/decoration/` (decorator/descriptor plumbing for `@promising.function` and `@promising.context`), `tests/hierarchy/` (parent-child registration, nesting, cascading unregister), `tests/observability/` (namespaces, traces), `tests/resolution/` (awaiting, sync/await-children, timeout, cycle detection, future-like API), and `tests/misc/` (`run_in_executor`, `run_in_thread`, sentinels).
+Tests use `pytest-asyncio` in auto mode — all async test functions are automatically detected without needing `@pytest.mark.asyncio`. Each test gets its own event loop (`asyncio_default_fixture_loop_scope = "function"`). Tests run in parallel by default via pytest-xdist (`-n auto`). A global timeout is enforced via pytest-timeout per each test. Tests are organized into subdirectories by concern: `tests/configuration/` (settings: `start_soon`, `thread_pool`, `use_thread_pool`, call-time overrides), `tests/decoration/` (decorator/descriptor plumbing for `@promising.function` and `@promising.context`), `tests/hierarchy/` (parent-child registration, nesting, cascading unregister), `tests/observability/` (namespaces, traces), `tests/resolution/` (awaiting, sync/await-children, timeout, cycle detection), and `tests/misc/` (`run_in_executor`, `run_in_thread`, sentinels).
+
+## Known-Failing Tests (Issue-Linked xfail Markers)
+
+Tests that pin behavior which is known to be broken (and tracked in a GitHub issue) are not marked with plain `@pytest.mark.xfail`. Instead, each issue gets its own custom marker named after it, e.g. `xfail_gh_issue_116` or, with an optional descriptive prefix, `xfail_cycle_detection_gh_issue_66`. A marker is wired up in three places:
+
+1. `[tool.pytest.ini_options] markers` in `pyproject.toml` - registers the marker with pytest.
+2. `MARKERS_TO_XFAIL` in `tests/utils_for_tests.py` - the switch that makes the marker actually do something.
+3. `@pytest.mark.xfail_gh_issue_<N>` decorators on the affected tests. (`xfail_gh_issue_<N>` is just one possible format - marker names are actually entirely custom.)
+
+The machinery lives in `possibly_xfail()` (`tests/utils_for_tests.py`), invoked from the `pytest_runtest_setup` hook in `tests/conftest.py` for every test. For each marker on the test that is also present in `MARKERS_TO_XFAIL`, it dynamically adds `pytest.mark.xfail(...)` to the test item, with a reason composed of the sorted marker names plus any `reason=` kwargs passed to the markers.
+
+Passing `skip_entirely=True` to the marker (e.g. `@pytest.mark.xfail_cycle_detection_gh_issue_66(skip_entirely=True)`) makes the test `pytest.skip()` instead of xfail. Use this for tests that would hang or time out on the known bug: xfail still executes the test body, skip does not. `possibly_xfail()` can also be called directly from inside a test body with marker-name strings; at that point it is too late to xfail, so it always skips.
+
+The point of the indirection through `MARKERS_TO_XFAIL`: when the underlying issue is fixed, deleting the marker name from that one list reactivates the whole group of tests at once - the decorators left behind become inert until cleaned up (along with the entries in `pyproject.toml`). This also means that verifying a candidate fix against all of its pinned tests is a one-line change. Do not rely on XPASS reporting for that instead: the xfail applied here is non-strict, so an unexpectedly passing test does not fail the suite.
 
 ## Code Style
 
@@ -51,7 +65,7 @@ Tests use `pytest-asyncio` in auto mode — all async test functions are automat
 
 The base class for hierarchical context management. Manages parent-child relationships, namespacing (`namespace` parameter), configuration inheritance (`children_start_soon`, `start_soon_default`, `collapse_tracebacks`, `thread_pool`), child-waiting (`await_children` / `await_children_sync`), child inspection (`collect_unsettled_children`), and trace/debugging (`get_trace`, `format_trace`, `print_trace`). Also provides `get_parent_promise()` to walk up past non-Promise contexts. Uses a `ContextVar` (`PromisingContext.__active_context`) to track the currently active context.
 
-**Lifecycle and child tracking.** Each `PromisingContext` keeps an `_unsettled_children: set[PromisingContext]` (a strong-ref set) protected by a `threading.Lock`. Children are added via `_register_children_threadsafe()` when they are constructed (unless born closed via `close_context_immediately=True`, in which case registration is skipped entirely) and removed via `_unregister_children_threadsafe()` once they are both *closed* and have no remaining unsettled descendants. A context is "closed" when its `with` block has exited (`close_context_threadsafe()` runs in `__exit__`'s `finally`); for a `Promise`, the `with self:` block lives inside `_unpack_once_from_loop`, so the context closes the moment the wrapped awaitable produces its first result (intermediate Promise or final value). Closed contexts that still have unsettled descendants stay registered until those descendants drain — this is what `collect_unsettled_children` traverses recursively. Attempting to register a child on an already-closed context raises `ContextAlreadyClosedError`; re-entering an already-closed context raises the same error.
+**Lifecycle and child tracking.** Each `PromisingContext` keeps an `_unsettled_children: set[PromisingContext]` (a strong-ref set) protected by a `threading.Lock`. Children are added via `_register_children_unsafe()` when they are constructed (unless born closed via `close_context_immediately=True`, in which case registration is skipped entirely) and removed via `_unregister_children_unsafe()` once they are both *closed* and have no remaining unsettled descendants. A context is "closed" when its `with` block has exited (`_close_context_unsafe()` runs in `__exit__`'s `finally`); for a `Promise`, the `with self:` block lives inside `_unpack_once_unsafe`, so the context closes the moment the wrapped awaitable produces its first result (intermediate Promise or final value). Closed contexts that still have unsettled descendants stay registered until those descendants drain — this is what `collect_unsettled_children` traverses recursively. Attempting to register a child on an already-closed context raises `ContextAlreadyClosedError`; re-entering an already-closed context raises the same error.
 
 `PromisingContext` exposes two doneness predicates: `closed()` tracks the context-manager lifecycle (`__exit__` flips it to `True`), and `done()` is what `await_children()` actually waits on. By default `done()` simply delegates to `closed()`. Subclasses can override `done()` to track a non-lifecycle condition — `Promise` does exactly this (it ties `done()` to its own result/cancellation state machine, since "fully unpacked" can come *after* the `with self:` block has already exited).
 
@@ -65,26 +79,147 @@ This file also contains the `context` class — a context manager / decorator th
 
 **Two-step unpacking on the loop.** Resolution is split into two cooperating tasks, both pinned to `self.loop`:
 
-- `_unpack_once_from_loop()` — drives a single unpacking step. It enters the `with self:` block, awaits the wrapped `_awaitable`, and either records an intermediate `Promise` (via `_set_intermediate_promise_from_loop`, transition to `_UNPACKED_ONCE`) or stores the final value/exception (via `_set_result_from_loop` / `_set_exception_from_loop`, transition to `_FINISHED`). This is the task `unpack_once()` waits on.
-- `_fully_unpack_from_loop()` — drives the Promise to completion. It ensures the single-unpacking task is scheduled, awaits it, then walks the chain of intermediate Promises (`while isinstance(result, Promise): result = await result`) until a non-Promise value is reached, and records that value as the final result. This is the task `__await__` (and, indirectly, `sync()`) waits on.
+- `_unpack_once_unsafe()` — drives a single unpacking step. It enters the `with self:` block, awaits the wrapped `_awaitable`, and either records an intermediate `Promise` (via `_set_intermediate_promise_unsafe`, transition to `_UNPACKED_ONCE`) or stores the final value/exception (via `_set_result_unsafe` / `_set_exception_unsafe`, transition to `_FINISHED`). This is the task `unpack_once()` waits on.
+- `_fully_unpack_unsafe()` — drives the Promise to completion. It ensures the single-unpacking task is scheduled, awaits it, then walks the chain of intermediate Promises (`while isinstance(result, Promise): result = await result`) until a non-Promise value is reached, and records that value as the final result. This is the task `__await__` (and, indirectly, `sync()`) waits on.
 
-Scheduling is driven by `_ensure_from_loop_single_unpacking_scheduled()` and `_ensure_from_loop_full_unpacking_scheduled()`, both of which create the underlying `loop.create_task(...)` lazily on first need. `__init__` schedules `_fully_unpack_from_loop` via `call_soon_threadsafe` when `start_soon` is `True`, so eager Promises start as soon as the loop is reachable; deferred Promises (`start_soon=False`) are scheduled the first time anyone consumes them (`__await__`, `sync()`, `unpack_once()`, `unpack_once_sync()`).
+Scheduling is driven by `_ensure_single_unpacking_scheduled_unsafe()` and `_ensure_full_unpacking_scheduled_unsafe()`, both of which create the underlying `loop.create_task(...)` lazily on first need. `__init__` schedules `_fully_unpack_unsafe` via `call_soon_threadsafe` when `start_soon` is `True`, so eager Promises start as soon as the loop is reachable; deferred Promises (`start_soon=False`) are scheduled the first time anyone consumes them (`__await__`, `sync()`, `unpack_once()`, `unpack_once_sync()`).
 
-**Sync and thread-safe consumption.** `sync()` and `unpack_once_sync()` dispatch onto the Promise's own event loop via `asyncio.run_coroutine_threadsafe` and block the calling thread on the resulting `concurrent.futures.Future`. Both refuse to run on the Promise's loop thread (`_assert_no_sync_usage_deadlock` → `SyncUsageError`). `cancel()` is similarly thread-safe: when called from outside the loop, it dispatches `_cancel_from_loop` via `call_soon_threadsafe` and blocks only long enough for the dispatched `_cancel_from_loop` call to return — it does not wait for the `CancelledError` itself to land (mirroring `asyncio.Future.cancel()` / `asyncio.Task.cancel()` semantics: the return value reports whether cancellation was *requested*).
+**Sync and thread-safe consumption.** `sync()` and `unpack_once_sync()` dispatch onto the Promise's own event loop via `asyncio.run_coroutine_threadsafe` and block the calling thread on the resulting `concurrent.futures.Future`. Both refuse to run on the Promise's loop thread (`_guard_against_sync_op_deadlock` → `SyncUsageError`). `cancel()` is similarly thread-safe: when called from outside the loop, it dispatches `_cancel_unsafe` via `call_soon_threadsafe` and blocks only long enough for the dispatched `_cancel_unsafe` call to return — it does not wait for the `CancelledError` itself to land (mirroring `asyncio.Future.cancel()` / `asyncio.Task.cancel()` semantics: the return value reports whether cancellation was *requested*).
 
-**Cancellation mechanics.** `_cancel_from_loop` requests cancellation of any running unpacking task(s) via `Task.cancel(msg)`; the `CancelledError` then propagates through `_unpack_once_from_loop` / `_fully_unpack_from_loop` and is stored via `_set_exception_from_loop`, which picks the terminal state (`_CANCELLED_BEFORE_UNPACKED_ONCE` vs. `_CANCELLED_AFTER_UNPACKED_ONCE`) based on whether the first unpacking step had completed. When no task has been scheduled yet (e.g. `start_soon=False` and never awaited), `_synthesize_cancellation_from_loop` closes the context, stores a `CancelledError` directly, and closes the wrapped awaitable to silence the "coroutine was never awaited" warning. A `_unpacking_task_done_callback` covers the edge case where `Task.cancel()` lands between `create_task` and the first `__step`: asyncio resumes a cancelled task by throwing `CancelledError` into the coroutine, but on a coroutine that has never been stepped into there is no suspension point to throw at, so the exception is raised at function entry — *before* the `try` block — and propagates straight out of the task without the body's `try/except BaseException` ever seeing it. The Task ends up `cancelled()` but the Promise is still `_PENDING`, so the callback synthesizes the terminal state from the Task's recorded `CancelledError`.
+**Cancellation mechanics.** `_cancel_unsafe` requests cancellation of any running unpacking task(s) via `Task.cancel(msg)`; the `CancelledError` then propagates through `_unpack_once_unsafe` / `_fully_unpack_unsafe` and is stored via `_set_exception_unsafe`, which picks the terminal state (`_CANCELLED_BEFORE_UNPACKED_ONCE` vs. `_CANCELLED_AFTER_UNPACKED_ONCE`) based on whether the first unpacking step had completed. When no task has been scheduled yet (e.g. `start_soon=False` and never awaited), `_fabricate_cancellation_unsafe` closes the context, stores a `CancelledError` directly, and closes the wrapped awaitable to silence the "coroutine was never awaited" warning. A `_unpacking_task_done_unsafe_callback` covers the edge case where `Task.cancel()` lands between `create_task` and the first `__step`: asyncio resumes a cancelled task by throwing `CancelledError` into the coroutine, but on a coroutine that has never been stepped into there is no suspension point to throw at, so the exception is raised at function entry — *before* the `try` block — and propagates straight out of the task without the body's `try/except` ever seeing it. The Task ends up `cancelled()` but the Promise is still `_PENDING`, so the callback fabricates the terminal state from the Task's recorded `CancelledError`.
 
 **Prefilled Promises.** A Promise constructed without an `awaitable` (using `prefilled_result` or `prefilled_exception`) passes `close_context_immediately=True` to `PromisingContext.__init__`, so it is born already closed and immediately set to `_FINISHED` — there is no coroutine to run inside a `with self:` block, and no parent registration happens.
 
-**Late parent registration.** `Promise.__init__` passes `register_with_parent=False` to `PromisingContext.__init__` and only calls `_register_with_parent_thread_unsafe()` at the very end of its own constructor, after the state machine has been seeded (including the prefilled `_FINISHED` / exception path). This guarantees that a Promise whose construction raises is never visible to its parent's child set, and that the prefilled-Promise case described above falls out naturally — by the time `_register_with_parent_thread_unsafe` runs, `done()` is already `True`, so the registration is skipped.
+**Late parent registration.** `Promise.__init__` passes `register_with_parent=False` to `PromisingContext.__init__` and only calls `_register_with_parent_unsafe()` at the very end of its own constructor, after the state machine has been seeded (including the prefilled `_FINISHED` / exception path). This guarantees that a Promise whose construction raises is never visible to its parent's child set, and that the prefilled-Promise case described above falls out naturally — by the time `_register_with_parent_unsafe` runs, `done()` is already `True`, so the registration is skipped.
 
-**Exception breadcrumbs.** `try_to_link_exception` attaches the `PromisingContext` to an exception as `__promising_context__` and stamps `__promising_collapse_traceback__` (a boolean snapshot of the context's resolved `collapse_tracebacks` setting) alongside it — only at the deepest level (skips if `__promising_context__` is already set, so a nested context that already attributed itself is preserved; the two attributes are always stamped as a pair). Primary attribution happens in `PromisingContext.__exit__`; `_set_exception_from_loop` and `_force_internal_error_finish_from_loop` also call it as a safety net for paths that don't pass through `__exit__`. The `sys.excepthook` / `threading.excepthook` overrides in `promising/errors.py` use `__promising_context__` to walk the ancestor chain and render each `Promise`'s `frame_summary_tuple` snapshot, and read `__promising_collapse_traceback__` (a boolean) to decide whether to collapse promising-internal frames in those stacks (and in the exception's own traceback) or print them in full.
+**Exception breadcrumbs.** `link_exception` attaches the `PromisingContext` to an exception as `__promising_context__` and stamps `__promising_collapse_traceback__` (a boolean snapshot of the context's resolved `collapse_tracebacks` setting) alongside it — only at the deepest level (skips if `__promising_context__` is already set, so a nested context that already attributed itself is preserved; the two attributes are always stamped as a pair). It takes a `fail` flag deciding what to do when the attribute assignment fails: `True` (the default) re-raises, `False` swallows. Primary attribution happens in `PromisingContext.__exit__`; `_set_exception_unsafe` and `_force_internal_error_finish_unsafe` also call it as a safety net for paths that don't pass through `__exit__` — all three pass `fail=False`, since they run while an exception is already in flight. The `sys.excepthook` / `threading.excepthook` overrides in `promising/errors.py` use `__promising_context__` to walk the ancestor chain and render each `Promise`'s `frame_summary_tuple` snapshot, and read `__promising_collapse_traceback__` (a boolean) to decide whether to collapse promising-internal frames in those stacks (and in the exception's own traceback) or print them in full.
 
 **Unpacking semantics.** A `PromisingFunction` always returns a `Promise`, regardless of whether the underlying function returns a concrete value or another `Promise`. `await promise` and `promise.sync()` recursively chase nested `Promise`s until a non-`Promise` value is reached. `promise.unpack_once()` and `promise.unpack_once_sync()` unpack a single level — they return either a concrete value or the intermediate `Promise`.
 
 **Non-`Promise` awaitables.** Unpacking only traverses `Promise` instances specifically. Anything else a function might return — a plain coroutine, an `asyncio.Future`, an async generator — is treated as a concrete value by the framework: it is surfaced to the caller as-is, with no auto-wrapping and no further unpacking. In practice the typical return value is either a concrete value or another `Promise`; non-`Promise` awaitables are an edge case the framework deliberately leaves to the caller.
 
 **Module helpers.** `wrap_awaitable(awaitable, **kwargs)` is the recommended way to lift a bare coroutine (or other awaitable) into a `Promise` from outside a decorated function. `get_active_promise()` walks the active context chain skipping non-`Promise` nodes.
+
+### Blanket `except BaseException` Handlers
+
+Nine methods catch `BaseException` (ten `except` sites in total — `_set_exception_unsafe` has two). All of them live in `promising/promise.py` and `promising/promising_context.py`, and every one carries a `# TODO [BASE EXCEPTION]` comment (see [issue #105](https://github.com/teremterem/Promising/issues/105) about whether some of them should narrow to `Exception` so that `KeyboardInterrupt` is not swallowed). The diagram below shows how these handlers call each other, plus the public/internal entry points that lead into them. Bold-bordered nodes are the methods that contain an `except BaseException`; plain nodes are ordinary callers shown for orientation. Dashed edges are indirect: the callee is scheduled as a Task via `loop.create_task(...)`, or passed as a callable into `_send_sync_op_to_loop`, rather than called directly.
+
+```mermaid
+flowchart TD
+    subgraph PC["PromisingContext (promising/promising_context.py)"]
+        pc_init["__init__"]
+        pc_exit["__exit__"]
+        pc_close["close_context"]
+        pc_collect["collect_unsettled_children"]
+        pc_close_unsafe["_close_context_unsafe"]
+        pc_register["_register_with_parent_unsafe"]
+        send["_send_sync_op_to_loop<br/>(inner callback)"]
+        link["link_exception"]
+    end
+
+    subgraph PR["Promise (promising/promise.py)"]
+        pr_init["__init__"]
+        pr_await["__await__ / sync"]
+        pr_unpack_once["unpack_once / unpack_once_sync"]
+        pr_cancel["cancel"]
+        finish_init["_finish_init_unsafe"]
+        ensure_full["_ensure_full_unpacking_scheduled_unsafe"]
+        ensure_single["_ensure_single_unpacking_scheduled_unsafe"]
+        done_cb["_unpacking_task_done_unsafe_callback"]
+        cancel_unsafe["_cancel_unsafe"]
+        fully["_fully_unpack_unsafe"]
+        once["_unpack_once_unsafe"]
+        set_interm["_set_intermediate_promise_unsafe"]
+        set_result["_set_result_unsafe"]
+        set_exc["_set_exception_unsafe<br/>(2 sites)"]
+        force["_force_internal_error_finish_unsafe"]
+        fabricate["_fabricate_cancellation_unsafe"]
+    end
+
+    %% Entry points into _send_sync_op_to_loop
+    pc_init -.->|"callable"| send
+    pc_exit -.->|"callable"| send
+    pc_exit --> pc_close
+    pc_close -.->|"callable"| send
+    pc_collect -.->|"callable"| send
+    pr_init -.->|"callable"| send
+    pr_cancel -.->|"callable"| send
+
+    %% What _send_sync_op_to_loop invokes
+    send -.-> pc_register
+    send -.-> pc_close_unsafe
+    send -.-> link
+    send -.-> finish_init
+    send -.-> cancel_unsafe
+
+    %% Scheduling of the unpacking tasks
+    finish_init --> ensure_full
+    pr_await --> ensure_full
+    pr_unpack_once --> ensure_single
+    ensure_full -.->|"create_task"| fully
+    ensure_single -.->|"create_task"| once
+    fully --> ensure_single
+
+    %% Cancellation
+    cancel_unsafe --> fabricate
+    done_cb --> fabricate
+    fabricate --> pc_close_unsafe
+    fabricate --> set_exc
+
+    %% Prefilled Promises
+    pr_init --> set_result
+    pr_init --> set_exc
+
+    %% State-machine writers
+    once --> set_exc
+    once --> set_interm
+    once --> set_result
+    fully --> set_exc
+    fully --> set_result
+    set_interm --> force
+    set_result --> force
+    set_exc --> link
+    set_exc --> force
+    force --> link
+
+    classDef catcher stroke-width:3px,font-weight:bold
+    class send,link,fully,once,set_interm,set_result,set_exc,force,fabricate catcher
+```
+
+The same call hierarchy reduced to the eight handlers that matter most (`_send_sync_op_to_loop` is omitted — its handler is a plain "transfer the exception onto the waiting Future" bridge and does not participate in the state machine). All edges are direct calls. The indirect `_fully_unpack_unsafe` → `_ensure_single_unpacking_scheduled_unsafe` → `create_task` → `_unpack_once_unsafe` scheduling path from the full diagram above is deliberately left out here so that the two unpacking Tasks sit side by side.
+
+```mermaid
+flowchart TD
+    fabricate["Promise._fabricate_cancellation_unsafe"]
+    once["Promise._unpack_once_unsafe"]
+    fully["Promise._fully_unpack_unsafe"]
+    set_exc["Promise._set_exception_unsafe<br/>(2 sites)"]
+    set_interm["Promise._set_intermediate_promise_unsafe"]
+    set_result["Promise._set_result_unsafe"]
+    force["Promise._force_internal_error_finish_unsafe"]
+    link["PromisingContext.link_exception"]
+
+    fabricate --> set_exc
+    once --> set_exc
+    once --> set_interm
+    once --> set_result
+    fully --> set_exc
+    fully --> set_result
+    set_interm --> force
+    set_result --> force
+    set_exc --> link
+    set_exc --> force
+    force --> link
+```
+
+What each handler does with what it catches:
+
+- `_unpack_once_unsafe` / `_fully_unpack_unsafe` — the two unpacking Tasks. Anything raised by the wrapped awaitable (including `CancelledError`) is stored on the Promise via `_set_exception_unsafe` instead of escaping to the loop's exception handler.
+- `_set_intermediate_promise_unsafe` / `_set_result_unsafe` / `_set_exception_unsafe` — state-machine writers. A failure here is a framework bug (state validation raised, or parent unregistration failed), so the error is routed to `_force_internal_error_finish_unsafe`. The second site in `_set_exception_unsafe` guards `attach_context_to_error_chain_root`, which only chains the original exception onto the internal error for context and must not be allowed to fail.
+- `_force_internal_error_finish_unsafe` — last-resort path; logs and re-raises (the only handler that does not swallow).
+- `_fabricate_cancellation_unsafe` — guards the `close()` call on the never-driven awaitable (which exists only to silence the "coroutine was never awaited" warning).
+- `link_exception` — guards attribute assignment on the exception object (e.g. a frozen exception type); always logs at debug level, then re-raises unless the caller passed `fail=False`. All three call sites that run while an exception is already in flight (`__exit__`, `_set_exception_unsafe`, `_force_internal_error_finish_unsafe`) pass `fail=False`, because losing the breadcrumb must not affect the exception handling already under way.
+- `_send_sync_op_to_loop` — the inner `callback` catches whatever the dispatched callable raises on the loop thread and transfers it onto the `concurrent.futures.Future` that the calling thread is blocked on, so the exception re-raises there.
 
 ### DecoratorSupport and PromisingDecorator (`promising/decorator_support.py`)
 
@@ -124,11 +259,11 @@ This module also defines the private state-machine sentinels used by `Promise` (
 - `SentinelUsageError` — a `Sentinel` was used in a boolean context (e.g. `if INHERIT:`)
 - `SyncUsageError` — raised when a sync method (`promise.sync()`, `promise.unpack_once_sync()`, `await_children_sync()`) is called from the event loop thread
 
-**Promising-traceback rendering.** `install_promising_tracebacks()` swaps in `_promising_sys_excepthook` and `_promising_threading_excepthook` (saving the previously installed hooks in `_excepthook_state` so they can be used as a fallback if rendering itself raises). Installation is idempotent and protected by `_excepthooks_lock`. `Promise._unpack_once_from_loop` calls `install_promising_tracebacks()` the first time it runs, so users typically don't have to install the hooks by hand.
+**Promising-traceback rendering.** `install_promising_tracebacks()` swaps in `_promising_sys_excepthook` and `_promising_threading_excepthook` (saving the previously installed hooks in `_excepthook_state` so they can be used as a fallback if rendering itself raises). Installation is idempotent and protected by `_excepthooks_lock`. `Promise._unpack_once_unsafe` calls `install_promising_tracebacks()` the first time it runs, so users typically don't have to install the hooks by hand.
 
 `_print_exception_with_promising_context` walks the standard `__cause__` / `__context__` chain (mirroring CPython's behavior, including `__suppress_context__`) via `_print_exception_chain`, and `_print_single_exception` prints each link of that chain with a per-link "promising trace". For each `PromisingContext` returned by `get_trace(ancestors_first=True)` that exposes a `frame_summary_tuple` (i.e. each `Promise`), the snapshot captured at construction time is rendered, with promising-internal frames optionally collapsed.
 
-Collapse is controlled by `__promising_collapse_traceback__` on the exception (stamped by `try_to_link_exception` from the context's resolved `collapse_tracebacks` setting). Three helpers do the trimming using the module-level absolute paths `_PACKAGE_ABS_PATH` (from `promising/__init__.py`, the whole `promising/` directory) and `_MODULE_ABS_PATH` (from `promising/promise.py`, the core Promise module):
+Collapse is controlled by `__promising_collapse_traceback__` on the exception (stamped by `link_exception` from the context's resolved `collapse_tracebacks` setting). Three helpers do the trimming using the module-level absolute paths `_PACKAGE_ABS_PATH` (from `promising/__init__.py`, the whole `promising/` directory) and `_MODULE_ABS_PATH` (from `promising/promise.py`, the core Promise module):
 
 - `_format_first_stack` — strips trailing framework frames off the outermost promise's stack so the user sees only their own code at the top of the trace.
 - `_format_middle_stack` — strips trailing framework frames *and* leading `promising/promise.py` plumbing, leaving only the user code that lives between two promises.

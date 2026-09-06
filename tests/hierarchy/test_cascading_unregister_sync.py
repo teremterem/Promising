@@ -117,12 +117,9 @@ async def test_cascading_unregister_with_bare_contexts() -> None:
     @promising.function(use_thread_pool=True)
     def _test() -> str:
         with promising.context() as root:
-            level1 = promising.PromisingContext(parent=root)
-            with level1:
-                level2 = promising.PromisingContext(parent=level1)
-                with level2:
-                    level3 = promising.PromisingContext(parent=level2)
-                    with level3:
+            with promising.context() as level1:
+                with promising.context() as level2:
+                    with promising.context() as level3:
                         # All four levels unsettled
                         assert level3._unsettled_children == set()
                         assert level2._unsettled_children == {level3}
@@ -167,19 +164,16 @@ async def test_cascading_unregister_with_bare_contexts_and_promise() -> None:
     synced and completes, the entire chain cascades upward in one shot.
     """
 
-    @promising.function(use_thread_pool=True)
+    @promising.function(use_thread_pool=True, start_soon=False)
     def level4_func() -> str:
         return "level4"
 
     @promising.function(use_thread_pool=True)
     def _test() -> str:
         with promising.context() as root:
-            level1 = promising.PromisingContext(parent=root)
-            with level1:
-                level2 = promising.PromisingContext(parent=level1)
-                with level2:
-                    level3 = promising.PromisingContext(parent=level2)
-                    with level3:
+            with promising.context() as level1:
+                with promising.context() as level2:
+                    with promising.context() as level3:
                         level4_promise = level4_func()
 
                         # All four levels unsettled

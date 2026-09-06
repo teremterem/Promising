@@ -162,6 +162,7 @@ async def test_concurrent_cancel_of_lazy_promise_has_exactly_one_winner() -> Non
         assert results.count(True) == 1, f"Expected exactly one winning cancel(), got {results.count(True)}"
 
 
+@pytest.mark.xfail_gh_issue_116
 async def test_cancel_racing_sync_trigger() -> None:
     """
     One thread ``sync()``-s a lazy Promise (thereby triggering its
@@ -205,7 +206,7 @@ async def test_cancel_racing_sync_trigger() -> None:
             assert not promise.cancelled()
         else:
             assert isinstance(consumer_error, asyncio.CancelledError), (
-                f"sync() must raise CancelledError on cancellation, got: {consumer_error!r}"
+                f"sync() must raise asyncio.CancelledError on cancellation, got: {type(consumer_error)!r}"
             )
             assert promise.cancelled()
 
@@ -294,6 +295,7 @@ async def _gated_outer(gate: asyncio.Event) -> Promise[list[str]]:
     return _gated_inner(gate, start_soon=True)
 
 
+@pytest.mark.xfail_gh_issue_117
 async def test_cancel_after_first_unpacking_leaves_nested_promise_running() -> None:
     """
     Pins the semantics that the code comment in

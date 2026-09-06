@@ -4,7 +4,9 @@ import contextvars
 import functools
 import inspect
 import logging
+import threading
 from asyncio import AbstractEventLoop
+from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
@@ -151,6 +153,9 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
             )
 
         if self._promising_context is None:
+            # TODO [FACTORY FUNCTIONS] Introduce something similar to
+            #  `wrap_awaitable` here for consistency (and maybe rename
+            #  `wrap_awaitable` somehow too)
             self._promising_context = PromisingContext(
                 namespace=self.namespace,
                 loop=self.loop,
@@ -206,6 +211,9 @@ class context(PromisingDecorator):  # noqa: N801 (invalid-class-name)
         )
 
     def _call_wrapped(self, *args: Any, settings_as_dict: dict[str, Any], **kwargs: Any) -> Any:
+        # TODO [FACTORY FUNCTIONS] Introduce something similar to
+        #  `wrap_awaitable` here for consistency (and maybe rename
+        #  `wrap_awaitable` somehow too)
         ctx = PromisingContext(
             namespace=settings_as_dict.get("namespace", self.namespace),
             loop=settings_as_dict.get("loop", self.loop),
@@ -390,8 +398,11 @@ class PromisingContext:
         children_start_soon: bool | None | Sentinel = INHERIT,
         start_soon_default: bool | Sentinel = INHERIT,
         collapse_tracebacks: bool | Sentinel = INHERIT,
-        # TODO Introduce inheritable promise_class parameter
-        #  (and promise_class_default) ?
+        # TODO [FACTORY FUNCTIONS] Introduce inheritable promise_factory
+        #  parameter (and promise_factory_default as well) ?
+        # TODO [FACTORY FUNCTIONS] Introduce inheritable
+        #  promising_context_factory parameter (and promise_factory_default
+        #  as well) ?
         close_context_immediately: bool = False,
         register_with_parent: bool = True,
     ) -> None:
@@ -430,10 +441,17 @@ class PromisingContext:
         self._context_closed = close_context_immediately
         self._unsettled_children = set[PromisingContext]()
 
+        # A non-reentrant(!) lock for context activation/deactivation
+        self._threading_lock = threading.Lock()
+
+        # TODO [PROMISE CREATION] Any way to avoid having this
+        #  `register_with_parent` parameter at all ?
         if register_with_parent:
-            # No other code has a reference to this PromisingContext yet, so we
-            # can just register it with the parent in a thread-unsafe manner
-            self._register_with_parent_thread_unsafe()
+            self._send_sync_op_to_loop(
+                self._register_with_parent_unsafe,
+                fire_and_forget=False,  # We don't want to defer errors
+                fail_if_loop_not_running=True,
+            )
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -466,7 +484,7 @@ class PromisingContext:
         Whether this context is closed.
 
         A ``PromisingContext`` is "open" from the moment it is constructed
-        until ``close_context_threadsafe()`` runs (which happens automatically
+        until ``_close_context_unsafe()`` runs (which happens automatically
         when the ``with`` block exits). Closed contexts are still kept around
         in their parent's ``_unsettled_children`` until their own unsettled
         descendants drain (they do not accept new children anymore).
@@ -601,7 +619,7 @@ class PromisingContext:
         """
         from promising.promise import Promise  # noqa: PLC0415 (import-outside-top-level)
 
-        self._assert_awaiting_on_correct_event_loop()
+        self._assert_loop_running_and_correct()
 
         _hierarchy_logger.log_awaiting_children_started(parent=self)
 
@@ -609,6 +627,8 @@ class PromisingContext:
         # children may be spawned by existing ones while the existing ones
         # are being awaited
         while children := self.collect_unsettled_children(
+            # TODO [UNSETTLED CHILDREN] asyncio.gather() recursively instead of
+            #  building a (potentially) huge flat set of all the descendants
             whole_subtree=whole_subtree,
             awaitables_only=True,
         ):
@@ -620,7 +640,7 @@ class PromisingContext:
                     # it picks which "doneness" check to apply per child based
                     # on the unpacking mode. A flatter chain of boolean
                     # conditions covering the same logic would be harder to
-                    # follow.
+                    # read.
                     child.done()
                     if unpack_promises_fully or not isinstance(child, Promise)
                     else child.unpacked_once_or_done()
@@ -678,7 +698,7 @@ class PromisingContext:
             TimeoutError: If timeout expires before
                 completion.
         """
-        self._assert_no_sync_usage_deadlock()
+        self._guard_against_sync_op_deadlock()
 
         concurrent_future = asyncio.run_coroutine_threadsafe(
             self.await_children(
@@ -719,7 +739,11 @@ class PromisingContext:
         Returns:
             Set of child PromisingContexts matching the filter criteria.
         """
-        children = list[PromisingContext](self._unsettled_children)
+        children = self._send_sync_op_to_loop(
+            functools.partial(list, self._unsettled_children),
+            fire_and_forget=False,
+            fail_if_loop_not_running=True,
+        )
 
         if awaitables_only:
             result = {child for child in children if inspect.isawaitable(child)}
@@ -748,14 +772,14 @@ class PromisingContext:
         return self._thread_pool
 
     def __enter__(self) -> "PromisingContext":
-        # TODO [RACE CONDITIONS] Is the following GitHub issue relevant ?
-        #  https://github.com/teremterem/Promising/issues/98
-        if self._previous_token is not None:
-            raise ContextAlreadyActiveError(f"{self!r} is already active")
-        if self._context_closed:
-            raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
+        with self._threading_lock:
+            if self._previous_token is not None:
+                raise ContextAlreadyActiveError(f"{self!r} is already active")
+            if self._context_closed:
+                raise ContextAlreadyClosedError(f"{self!r} has already been closed and cannot be re-entered")
 
-        self._previous_token = self.__active_context.set(self)
+            self._previous_token = self.__active_context.set(self)
+
         return self
 
     def __exit__(
@@ -767,43 +791,57 @@ class PromisingContext:
         if exc_value is not None:
             # Attach this context to the in-flight exception as it leaves
             # the ``with`` block.
-            self.try_to_link_exception(exc_value)
+            self._send_sync_op_to_loop(
+                functools.partial(self.link_exception, exc_value, fail=False),
+                fire_and_forget=False,
+                fail_if_loop_not_running=True,
+            )
 
-        try:
-            if self._previous_token is None:
-                raise ContextNotActiveError(f"{self!r} is not active")
+        with self._threading_lock:
+            try:
+                if self._previous_token is None:
+                    raise ContextNotActiveError(f"{self!r} is not active")
 
-            self.__active_context.reset(self._previous_token)
-            self._previous_token = None
+                self.__active_context.reset(self._previous_token)
+                self._previous_token = None
 
-        except BaseException as exc:
-            if exc_value is None:
-                raise exc
-            else:
-                raise exc from exc_value
-
-        finally:
-            self.close_context_threadsafe()
+            finally:
+                self.close_context()
 
         return False  # Let's not suppress any exceptions
 
-    def close_context_threadsafe(self) -> None:
+    def close_context(self) -> None:
+        # TODO [NEW SYNC GENERAL] Figure out how race_conditions tests can be
+        #  modified so they don't need this method to exist as a public
+        #  method ? (It does not make much sense as something separate from
+        #  activation/deactivaton of the context in the ContextVar.)
+        self._send_sync_op_to_loop(
+            self._close_context_unsafe,
+            # The context should be closed before we return from `__exit__`
+            fire_and_forget=False,
+            fail_if_loop_not_running=True,
+        )
+
+    def _close_context_unsafe(self) -> None:
         """
         Mark this context as closed and unregister it from its parent if
         no unsettled descendants remain. Safe to call from any thread.
 
         Called automatically by ``__exit__`` (so a normal ``with`` block
         always closes the context). For a ``Promise``, the context is
-        also entered and exited from inside ``_unpack_once_from_loop``
+        also entered and exited from inside ``_unpack_once_unsafe``
         around the awaiting of the wrapped awaitable, so the close happens
         in lockstep with the unpacking step that produced its first
         result. After this runs, any further attempt to enter the context
         or to register children on it raises ``ContextAlreadyClosedError``.
+
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
         """
         self._context_closed = True
-        self._unregister_from_parent_if_time()
+        self._unregister_from_parent_if_time_unsafe()
 
-    def try_to_link_exception(self, exception: BaseException) -> None:
+    def link_exception(self, exception: BaseException, fail: bool = True) -> None:
         """
         Attach this context to the given exception by setting two
         attributes on it:
@@ -818,10 +856,12 @@ class PromisingContext:
 
         Idempotent (deepest level wins): if ``__promising_context__`` is
         already set on the exception, this call is a no-op, so a nested
-        context that already attributed itself is preserved. Failures
-        to set either attribute (e.g. on a frozen exception type) are
-        swallowed and logged at debug level — losing the breadcrumb must
-        not affect exception handling.
+        context that already attributed itself is preserved.
+
+        Failures to set either attribute (e.g. on a frozen exception
+        type) are always logged at debug level. What happens next is up
+        to ``fail``: when ``True`` (the default) the failure is
+        re-raised, when ``False`` it is swallowed.
         """
         try:
             if hasattr(exception, "__promising_context__"):
@@ -830,11 +870,7 @@ class PromisingContext:
                 return
             exception.__promising_context__: PromisingContext = self
             exception.__promising_collapse_traceback__: bool = self._collapse_tracebacks
-        except BaseException:
-            # TODO Should it be just `Exception` ? Any danger that
-            #  `KeyboardInterrupt` would get swallowed here ?
-            #  Contemplate on this GitHub issue along the way:
-            #  https://github.com/teremterem/Promising/issues/105
+        except Exception:
             _logger.debug(
                 "Failed to attach either __promising_context__ or "
                 "__promising_collapse_traceback__ to exception %r on %r",
@@ -844,27 +880,41 @@ class PromisingContext:
             )
             # TODO [TRACES] Should any kind of warning be printed besides the
             #  debug log ?
+            if fail:
+                raise
 
-    def is_on_correct_running_loop(self, *, raise_thread_loop_not_running: bool = False) -> bool:
-        running_loop = get_running_asyncio_loop(raise_if_none=raise_thread_loop_not_running)
+    def is_loop_running_and_correct(self, *, raise_if_loop_not_running: bool = False) -> bool:
+        running_loop = get_running_asyncio_loop(raise_if_none=raise_if_loop_not_running)
         return running_loop is self.loop
 
     def __repr__(self) -> str:
         namespace_prefix = "" if self.namespace is None else f"{self.namespace!r} "
         return f"<{namespace_prefix}{self.__class__.__name__} id={id(self)}>"
 
-    def _register_with_parent_thread_unsafe(self) -> None:
+    def _register_with_parent_unsafe(self) -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         # It is thread-safe for the parent but is unsafe for the child itself
         if self._parent is not None and not self.done():
-            self._parent._register_children_threadsafe(self)
+            self._parent._register_children_unsafe(self)
 
-    def _unregister_from_parent_if_time(self) -> None:
+    def _unregister_from_parent_if_time_unsafe(self) -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         if self.done() and self._parent is not None and not self._unsettled_children:
             _hierarchy_logger.log_unregistering_from_parent(parent=self._parent, child=self)
 
-            self._parent._unregister_children_threadsafe(self)
+            self._parent._unregister_children_unsafe(self)
 
-    def _register_children_threadsafe(self, *children: "PromisingContext") -> None:
+    def _register_children_unsafe(self, *children: "PromisingContext") -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         for child in children:
             if not isinstance(child, PromisingContext):
                 raise TypeError(
@@ -881,12 +931,16 @@ class PromisingContext:
 
         _hierarchy_logger.log_children_registered(parent=self, children=children)
 
-    def _unregister_children_threadsafe(self, *children: "PromisingContext") -> None:
+    def _unregister_children_unsafe(self, *children: "PromisingContext") -> None:
+        """
+        NOTE: This method should only be called from the event loop of the
+        same PromisingContext.
+        """
         self._unsettled_children.difference_update(children)
 
         _hierarchy_logger.log_children_unregistered(parent=self, children=children)
 
-        self._unregister_from_parent_if_time()
+        self._unregister_from_parent_if_time_unsafe()
 
     def _resolve_start_soon_default(self, start_soon_default: bool | Sentinel) -> bool:
         from promising import Defaults  # noqa: PLC0415 (import-outside-top-level)
@@ -982,25 +1036,18 @@ class PromisingContext:
             f"or a ThreadPoolExecutor instance, but `{type(thread_pool)}` was given for {self!r} instead"
         )
 
-    def _assert_event_loop_running_for_sync(self) -> None:
+    def _assert_loop_running_for_sync_op(self) -> None:
         """
         Assert that the event loop of the PromisingContext itself is running
         (regardless of whether we are on the same thread or not).
         """
         if not self.loop.is_running():
-            # TODO Are we sure we need to worry about this at all ? The loop
-            #  can start later (if it is on a different thread indeed), and
-            #  then all the scheduled callbacks and tasks will run and the
-            #  synchronous operations will be unblocked. Maybe it should be
-            #  just a warning ? Or maybe even nothing at all ? Maybe safeguard
-            #  against a stopped loop ?
-            #  https://github.com/teremterem/Promising/pull/102#discussion_r3182246188
             raise NoRunningEventLoopError(
                 f"Synchronous operations on {self!r} can only be performed if its event loop is running"
             )
 
-    def _assert_no_sync_usage_deadlock(self) -> None:
-        if self.is_on_correct_running_loop(raise_thread_loop_not_running=False):
+    def _guard_against_sync_op_deadlock(self) -> None:
+        if self.is_loop_running_and_correct(raise_if_loop_not_running=False):
             raise SyncUsageError(
                 f"Synchronous operations of {self!r} cannot be performed on "
                 f"its own event loop thread, as that typically leads to a "
@@ -1009,10 +1056,79 @@ class PromisingContext:
         # If we are on a different thread indeed, then let's make sure the event
         # loop of the PromisingContext itself is running, so we don't end up
         # waiting for something that might not happen at all
-        self._assert_event_loop_running_for_sync()
+        self._assert_loop_running_for_sync_op()
 
-    def _assert_awaiting_on_correct_event_loop(self) -> None:
-        if not self.is_on_correct_running_loop(raise_thread_loop_not_running=True):
+    def _assert_loop_running_and_correct(self) -> None:
+        """
+        Guard against awaiting from a wrong event loop.
+
+        Python's asyncio has a native guard for this (``Task.__step`` raises
+        ``RuntimeError: Task <...> got Future <...> attached to a different
+        loop``), but it only fires when a pending ``Future`` is actually
+        yielded to the wrong loop. A Promise that is already done never
+        yields one, so awaiting it from a wrong loop would quietly succeed.
+        Whether a cross-loop await blows up would then depend on the
+        Promise's completion state at that moment — a race the user has no
+        control over. This check makes the behavior deterministic: awaiting
+        from a wrong loop always fails, regardless of the Promise's status.
+
+        As a bonus, it fails fast (before any unpacking tasks get scheduled
+        on the Promise's own loop) and raises a typed ``EventLoopMismatchError``
+        with a cleaner message instead of a generic ``RuntimeError`` and a
+        noisy message.
+        """
+        if not self.is_loop_running_and_correct(raise_if_loop_not_running=True):
             raise EventLoopMismatchError(
                 f"Cannot await {self!r} from a different event loop than the one it belongs to."
             )
+
+    def _send_sync_op_to_loop(
+        self,
+        callable: Callable[[], Any],
+        *,
+        fire_and_forget: bool,
+        fail_if_loop_not_running: bool,
+    ) -> Any:
+        """
+        TODO [SYNC OP TO LOOP] Explain in the docstring that this private
+         method is the central primitive in solving synchronization between
+         synchronous and asynchronous paradigms combined by this framework.
+        """
+        if self.is_loop_running_and_correct(raise_if_loop_not_running=False):
+            # We are on the event loop of the Promise, so we can call the
+            # callable directly
+            result = callable()
+            if fire_and_forget:
+                # TODO [SYNC OP TO LOOP] What to do about potential exceptions
+                #  from the callable ? Let them bubble up ?
+                return None
+
+            return result
+
+        if fail_if_loop_not_running:
+            self._assert_loop_running_for_sync_op()
+
+        # We are on a different thread, so we need to schedule the callable on
+        # the loop
+        if not fire_and_forget:
+            # We are interested in the result, so we need to use a future to
+            # wait for it and get it
+            future = concurrent.futures.Future()
+
+            def callback():
+                try:
+                    result = callable()
+                except BaseException as exc:  # TODO [BASE EXCEPTION]
+                    # TODO [SYNC OP TO LOOP] Set as an internal error on the
+                    #  Promise itself instead ? (Would require moving the
+                    #  method to the Promise class.)
+                    future.set_exception(exc)
+                else:
+                    future.set_result(result)
+
+            self.loop.call_soon_threadsafe(callback)
+            return future.result()
+
+        # We don't care about the result (fire_and_forget=True), so we don't
+        # wait for anything
+        self.loop.call_soon_threadsafe(callable)

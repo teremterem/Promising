@@ -932,7 +932,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # also possible that the exception occurred outside the
             # ``with self:`` block (e.g. a framework bug), so lets try to
             # attach it here too.
-            self.try_to_link_exception(exception)
+            self.link_exception(exception, fail=False)
             self._exception = exception
             self._set_state_unsafe(terminal_state)
             # TODO [ASYNC WARNINGS] The fact that we have no "exception was
@@ -971,7 +971,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # after ``with self:`` has already exited, so it never passes
             # through ``__exit__``'s attribution. Attach the context
             # explicitly here.
-            self.try_to_link_exception(error)
+            self.link_exception(error, fail=False)
             self._exception = error
             self._set_state_unsafe(_FINISHED)
             # TODO [ASYNC WARNINGS] The fact that we have no "exception was

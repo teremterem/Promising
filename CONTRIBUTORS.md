@@ -92,7 +92,7 @@ Scheduling is driven by `_ensure_single_unpacking_scheduled_unsafe()` and `_ensu
 
 **Late parent registration.** `Promise.__init__` passes `register_with_parent=False` to `PromisingContext.__init__` and only calls `_register_with_parent_unsafe()` at the very end of its own constructor, after the state machine has been seeded (including the prefilled `_FINISHED` / exception path). This guarantees that a Promise whose construction raises is never visible to its parent's child set, and that the prefilled-Promise case described above falls out naturally — by the time `_register_with_parent_unsafe` runs, `done()` is already `True`, so the registration is skipped.
 
-**Exception breadcrumbs.** `try_to_link_exception` attaches the `PromisingContext` to an exception as `__promising_context__` and stamps `__promising_collapse_traceback__` (a boolean snapshot of the context's resolved `collapse_tracebacks` setting) alongside it — only at the deepest level (skips if `__promising_context__` is already set, so a nested context that already attributed itself is preserved; the two attributes are always stamped as a pair). Primary attribution happens in `PromisingContext.__exit__`; `_set_exception_unsafe` and `_force_internal_error_finish_unsafe` also call it as a safety net for paths that don't pass through `__exit__`. The `sys.excepthook` / `threading.excepthook` overrides in `promising/errors.py` use `__promising_context__` to walk the ancestor chain and render each `Promise`'s `frame_summary_tuple` snapshot, and read `__promising_collapse_traceback__` (a boolean) to decide whether to collapse promising-internal frames in those stacks (and in the exception's own traceback) or print them in full.
+**Exception breadcrumbs.** `link_exception` attaches the `PromisingContext` to an exception as `__promising_context__` and stamps `__promising_collapse_traceback__` (a boolean snapshot of the context's resolved `collapse_tracebacks` setting) alongside it — only at the deepest level (skips if `__promising_context__` is already set, so a nested context that already attributed itself is preserved; the two attributes are always stamped as a pair). Primary attribution happens in `PromisingContext.__exit__`; `_set_exception_unsafe` and `_force_internal_error_finish_unsafe` also call it as a safety net for paths that don't pass through `__exit__`. The `sys.excepthook` / `threading.excepthook` overrides in `promising/errors.py` use `__promising_context__` to walk the ancestor chain and render each `Promise`'s `frame_summary_tuple` snapshot, and read `__promising_collapse_traceback__` (a boolean) to decide whether to collapse promising-internal frames in those stacks (and in the exception's own traceback) or print them in full.
 
 **Unpacking semantics.** A `PromisingFunction` always returns a `Promise`, regardless of whether the underlying function returns a concrete value or another `Promise`. `await promise` and `promise.sync()` recursively chase nested `Promise`s until a non-`Promise` value is reached. `promise.unpack_once()` and `promise.unpack_once_sync()` unpack a single level — they return either a concrete value or the intermediate `Promise`.
 
@@ -114,7 +114,7 @@ flowchart TD
         pc_close_unsafe["_close_context_unsafe"]
         pc_register["_register_with_parent_unsafe"]
         send["_send_sync_op_to_loop<br/>(inner callback)"]
-        link["try_to_link_exception"]
+        link["link_exception"]
     end
 
     subgraph PR["Promise (promising/promise.py)"]
@@ -197,7 +197,7 @@ flowchart TD
     set_interm["Promise._set_intermediate_promise_unsafe"]
     set_result["Promise._set_result_unsafe"]
     force["Promise._force_internal_error_finish_unsafe"]
-    link["PromisingContext.try_to_link_exception"]
+    link["PromisingContext.link_exception"]
 
     fabricate --> set_exc
     once --> set_exc
@@ -218,7 +218,7 @@ What each handler does with what it catches:
 - `_set_intermediate_promise_unsafe` / `_set_result_unsafe` / `_set_exception_unsafe` — state-machine writers. A failure here is a framework bug (state validation raised, or parent unregistration failed), so the error is routed to `_force_internal_error_finish_unsafe`. The second site in `_set_exception_unsafe` guards `attach_context_to_error_chain_root`, which only chains the original exception onto the internal error for context and must not be allowed to fail.
 - `_force_internal_error_finish_unsafe` — last-resort path; logs and re-raises (the only handler that does not swallow).
 - `_fabricate_cancellation_unsafe` — guards the `close()` call on the never-driven awaitable (which exists only to silence the "coroutine was never awaited" warning).
-- `try_to_link_exception` — guards attribute assignment on the exception object (e.g. a frozen exception type); losing the breadcrumb must not affect exception handling.
+- `link_exception` — guards attribute assignment on the exception object (e.g. a frozen exception type); losing the breadcrumb must not affect exception handling.
 - `_send_sync_op_to_loop` — the inner `callback` catches whatever the dispatched callable raises on the loop thread and transfers it onto the `concurrent.futures.Future` that the calling thread is blocked on, so the exception re-raises there.
 
 ### DecoratorSupport and PromisingDecorator (`promising/decorator_support.py`)
@@ -263,7 +263,7 @@ This module also defines the private state-machine sentinels used by `Promise` (
 
 `_print_exception_with_promising_context` walks the standard `__cause__` / `__context__` chain (mirroring CPython's behavior, including `__suppress_context__`) via `_print_exception_chain`, and `_print_single_exception` prints each link of that chain with a per-link "promising trace". For each `PromisingContext` returned by `get_trace(ancestors_first=True)` that exposes a `frame_summary_tuple` (i.e. each `Promise`), the snapshot captured at construction time is rendered, with promising-internal frames optionally collapsed.
 
-Collapse is controlled by `__promising_collapse_traceback__` on the exception (stamped by `try_to_link_exception` from the context's resolved `collapse_tracebacks` setting). Three helpers do the trimming using the module-level absolute paths `_PACKAGE_ABS_PATH` (from `promising/__init__.py`, the whole `promising/` directory) and `_MODULE_ABS_PATH` (from `promising/promise.py`, the core Promise module):
+Collapse is controlled by `__promising_collapse_traceback__` on the exception (stamped by `link_exception` from the context's resolved `collapse_tracebacks` setting). Three helpers do the trimming using the module-level absolute paths `_PACKAGE_ABS_PATH` (from `promising/__init__.py`, the whole `promising/` directory) and `_MODULE_ABS_PATH` (from `promising/promise.py`, the core Promise module):
 
 - `_format_first_stack` — strips trailing framework frames off the outermost promise's stack so the user sees only their own code at the top of the trace.
 - `_format_middle_stack` — strips trailing framework frames *and* leading `promising/promise.py` plumbing, leaving only the user code that lives between two promises.

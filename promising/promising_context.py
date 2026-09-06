@@ -792,7 +792,7 @@ class PromisingContext:
             # Attach this context to the in-flight exception as it leaves
             # the ``with`` block.
             self._send_sync_op_to_loop(
-                functools.partial(self.try_to_link_exception, exc_value),
+                functools.partial(self.link_exception, exc_value, fail=False),
                 fire_and_forget=False,
                 fail_if_loop_not_running=True,
             )
@@ -841,7 +841,7 @@ class PromisingContext:
         self._context_closed = True
         self._unregister_from_parent_if_time_unsafe()
 
-    def try_to_link_exception(self, exception: BaseException) -> None:
+    def link_exception(self, exception: BaseException, fail: bool = True) -> None:
         """
         Attach this context to the given exception by setting two
         attributes on it:
@@ -878,6 +878,8 @@ class PromisingContext:
             )
             # TODO [TRACES] Should any kind of warning be printed besides the
             #  debug log ?
+            if fail:
+                raise
 
     def is_loop_running_and_correct(self, *, raise_if_loop_not_running: bool = False) -> bool:
         running_loop = get_running_asyncio_loop(raise_if_none=raise_if_loop_not_running)

@@ -945,12 +945,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # then force the Promise into a terminal state.
             try:
                 attach_context_to_error_chain_root(internal_error, context=exception)
-            except BaseException:
-                # TODO [BASE EXCEPTION] Should it be just `Exception` ? Any
-                #  danger that `KeyboardInterrupt` would get swallowed
-                #  here ?
-                #  - Contemplate on this GitHub issue along the way:
-                #    https://github.com/teremterem/Promising/issues/105
+            except Exception:
                 _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
             self._force_internal_error_finish_unsafe(internal_error)
 

@@ -943,10 +943,7 @@ class Promise(PromisingContext, Generic[T_co]):
             # Bug in the Promise class itself, or a misuse of the state
             # machine. Chain the original exception so context is not lost,
             # then force the Promise into a terminal state.
-            try:
-                attach_context_to_error_chain_root(internal_error, context=exception)
-            except Exception:
-                _logger.debug("Failed to chain original exception onto internal_error", exc_info=True)
+            attach_context_to_error_chain_root(internal_error, context=exception, fail=False)
             self._force_internal_error_finish_unsafe(internal_error)
 
     def _force_internal_error_finish_unsafe(self, error: BaseException) -> None:

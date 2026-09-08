@@ -1,11 +1,14 @@
 import asyncio
 import inspect
+import logging
 from asyncio import AbstractEventLoop
 from collections.abc import Awaitable
 from typing import Any
 
 from promising.errors import NoRunningEventLoopError
 from promising.types import DecoratableFunctionType
+
+_logger = logging.getLogger(__name__)
 
 
 def is_func_or_method_async(func_or_method: DecoratableFunctionType) -> bool:
@@ -78,7 +81,12 @@ async def awaitable_as_coroutine(awaitable: Awaitable[Any]) -> Any:
     return await awaitable
 
 
-def attach_context_to_error_chain_root(error: BaseException, *, context: BaseException) -> BaseException | None:
+def attach_context_to_error_chain_root(
+    error: BaseException,
+    *,
+    context: BaseException,
+    fail: bool = True,
+) -> BaseException | None:
     """
     Walk ``error``'s ``__context__`` chain to its root (the deepest
     exception with no ``__context__``) and attach ``context`` there.
@@ -88,23 +96,35 @@ def attach_context_to_error_chain_root(error: BaseException, *, context: BaseExc
     ``error``'s chain.
 
     Returns the exception that ``context`` was attached to, or ``None``
-    if no attachment happened.
+    if no attachment happened. If ``fail`` is ``True``, raises an exception
+    if the attachment fails.
     """
-    # Walk to the root of error's chain, recording every node so we can
-    # check for overlap below.
-    root = error
-    seen: set[int] = {id(root)}
-    while root.__context__ is not None:
-        root = root.__context__
-        seen.add(id(root))
+    try:
+        # Walk to the root of error's chain, recording every node so we can
+        # check for overlap below.
+        root = error
+        seen: set[int] = {id(root)}
+        while root.__context__ is not None:
+            root = root.__context__
+            seen.add(id(root))
 
-    # If context's own chain shares any node with error's chain, attaching
-    # to root would loop back to root through that shared node.
-    node: BaseException | None = context
-    while node is not None:
-        if id(node) in seen:
-            return None
-        node = node.__context__
+        # If context's own chain shares any node with error's chain, attaching
+        # to root would loop back to root through that shared node.
+        node: BaseException | None = context
+        while node is not None:
+            if id(node) in seen:
+                return None
+            node = node.__context__
 
-    root.__context__ = context
-    return root
+        root.__context__ = context
+        return root
+
+    except Exception:
+        # TODO Display the module name of the error classes too ? Because right
+        #  now it would look something like this: "Failed to chain)
+        #  ValueError('invalid value') onto PromiseNotDoneError('Promise is not
+        #  done yet') as context"
+        _logger.debug("Failed to chain %r onto %r as context", context, error, exc_info=True)
+        if fail:
+            raise
+        return None

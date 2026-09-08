@@ -864,8 +864,11 @@ class Promise(PromisingContext, Generic[T_co]):
             self._intermediate_promise = promise
             self._set_state_unsafe(_UNPACKED_ONCE)
 
-        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
+        except Exception as internal_error:
             self._force_internal_error_finish_unsafe(internal_error)
+        except BaseException as internal_error:
+            self._force_internal_error_finish_unsafe(internal_error)
+            raise
 
     def _set_result_unsafe(self, result: T_co) -> None:
         """
@@ -885,8 +888,11 @@ class Promise(PromisingContext, Generic[T_co]):
             self._result = result
             self._set_state_unsafe(_FINISHED)
 
-        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
+        except Exception as internal_error:
             self._force_internal_error_finish_unsafe(internal_error)
+        except BaseException as internal_error:
+            self._force_internal_error_finish_unsafe(internal_error)
+            raise
 
     def _set_exception_unsafe(self, exception: BaseException) -> None:
         """
@@ -939,12 +945,13 @@ class Promise(PromisingContext, Generic[T_co]):
             #  never fetched" warning might be a problem. (What about "result
             #  was never fetched" ?)
 
-        except BaseException as internal_error:  # TODO [BASE EXCEPTION]
-            # Bug in the Promise class itself, or a misuse of the state
-            # machine. Chain the original exception so context is not lost,
-            # then force the Promise into a terminal state.
+        except Exception as internal_error:
             attach_context_to_error_chain_root(internal_error, context=exception, fail=False)
             self._force_internal_error_finish_unsafe(internal_error)
+        except BaseException as internal_error:
+            attach_context_to_error_chain_root(internal_error, context=exception, fail=False)
+            self._force_internal_error_finish_unsafe(internal_error)
+            raise
 
     def _force_internal_error_finish_unsafe(self, error: BaseException) -> None:
         """
@@ -1037,6 +1044,8 @@ class Promise(PromisingContext, Generic[T_co]):
         # child never unregisters from its parent.
         self._close_context_unsafe()
 
+        # TODO [BASE EXCEPTION] Do we need try-finally in this method in some
+        #  form ?
         self._set_exception_unsafe(asyncio.CancelledError(msg) if msg is not None else asyncio.CancelledError())
 
         # Close the wrapped awaitable so a never-driven coroutine doesn't

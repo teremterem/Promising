@@ -780,6 +780,7 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_intermediate_promise_unsafe(result)
             else:
                 self._set_result_unsafe(result)
+
         finally:
             _unpacking_logger.log_single_unpacking_finished(promise=self)
 
@@ -840,6 +841,7 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_exception_unsafe(exc)
         else:
             self._set_result_unsafe(result)
+
         finally:
             _unpacking_logger.log_full_unpacking_finished(promise=self)
 

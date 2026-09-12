@@ -780,8 +780,8 @@ class Promise(PromisingContext, Generic[T_co]):
                 self._set_intermediate_promise_unsafe(result)
             else:
                 self._set_result_unsafe(result)
-
-        _unpacking_logger.log_single_unpacking_finished(promise=self)
+        finally:
+            _unpacking_logger.log_single_unpacking_finished(promise=self)
 
     async def _fully_unpack_unsafe(self) -> None:
         """
@@ -827,8 +827,8 @@ class Promise(PromisingContext, Generic[T_co]):
             #    (returned) Promises be treated as the same thing ?
             #  - No, I don't think so. Promises, that aren't in the hierarchy,
             #    originated elsewhere - their processing should not be affected
-            #    by whether the happen to "pass through" some other promise
-            #    that also happens to be being cancelled.
+            #    by whether they happen to "pass through" some other promise
+            #    that just so happens to be being cancelled.
             #  - How should the consumer of a promise, that is being cancelled,
             #    experience its "unpack once" vs "unpack fully" then ?
             while isinstance(result, Promise):
@@ -840,8 +840,8 @@ class Promise(PromisingContext, Generic[T_co]):
             self._set_exception_unsafe(exc)
         else:
             self._set_result_unsafe(result)
-
-        _unpacking_logger.log_full_unpacking_finished(promise=self)
+        finally:
+            _unpacking_logger.log_full_unpacking_finished(promise=self)
 
     def _set_intermediate_promise_unsafe(self, promise: "Promise[Any]") -> None:
         """

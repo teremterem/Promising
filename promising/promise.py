@@ -776,6 +776,9 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_unpacking_exception(promise=self, stage="_unpack_once_unsafe", exc=exc)
             self._set_exception_unsafe(exc)
         else:
+            # TODO What if CancelledError happens here, right before there is a
+            #  chance to set the intermediate_promise or the result (or,
+            #  similarly, an exception in the previous clause) ?
             if isinstance(result, Promise):
                 self._set_intermediate_promise_unsafe(result)
             else:
@@ -840,6 +843,9 @@ class Promise(PromisingContext, Generic[T_co]):
             _unpacking_logger.log_unpacking_exception(promise=self, stage="_fully_unpack_unsafe", exc=exc)
             self._set_exception_unsafe(exc)
         else:
+            # TODO What if CancelledError happens here, right before there is a
+            #  chance to set the result (or, similarly, an exception in the
+            #  previous clause) ?
             self._set_result_unsafe(result)
 
         finally:

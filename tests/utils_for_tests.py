@@ -10,6 +10,8 @@ import promising
 
 MARKERS_TO_XFAIL = [
     "xfail_cycle_detection_gh_issue_66",
+    "xfail_gh_issue_116",
+    "xfail_gh_issue_117",
 ]
 
 

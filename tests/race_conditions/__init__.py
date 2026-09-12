@@ -69,7 +69,7 @@ Map of the suite
 - ``test_context_lifecycle_races.py`` — ``PromisingContext`` enter/exit/
   close races (double-enter from two threads, close racing registration),
   the ``promising.context`` wrapper's shared CM state raced from two
-  threads, and idempotency of concurrent ``close_context_threadsafe()``.
+  threads, and idempotency of concurrent ``close_context()``.
 - ``test_multi_loop_races.py`` — several event loops in parallel threads
   sharing the global thread pool; contextvar isolation between trees and
   cross-loop consumption rules.

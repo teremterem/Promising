@@ -69,7 +69,7 @@ New coverage, incl. currently-protected regression nets
 │ Mixed herd — every consumption entry point at once on one nested promise       │ 1 in test_exactly_once_execution.py  │ pass                                                           │
 ├────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
 │ promising.context CM wrapper's shared _promising_context raced from 2 threads; │ 2 in test_context_lifecycle_races.py │ pass (overlap window exists but narrow — occupancy detector    │
-│  concurrent close_context_threadsafe idempotency + sibling survival            │                                      │ armed for refactor)                                            │
+│  concurrent close_context idempotency + sibling survival            │                                      │ armed for refactor)                                            │
 ├────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
 │ Loop shutdown while sync() blocked (fail fast, never hang); dead-loop          │ 2 in test_loop_lifecycle_races.py —  │ pass — guard is currently protecting; docstring flags          │
 │ NoRunningEventLoopError guards on all 4 sync entry points                      │ new file                             │ cancel()'s timeout-less future.result() hang hazard            │

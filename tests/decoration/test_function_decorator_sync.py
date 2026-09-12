@@ -120,13 +120,25 @@ async def test_exception_propagates_through_promise() -> None:
     An exception raised inside the sync function
     propagates through the Promise when awaited.
     """
+    call_count = 0
 
     @promising.function(use_thread_pool=True)
     def failing() -> None:
+        nonlocal call_count
+        call_count += 1
         raise ValueError("test error")
 
+    failing_promise = failing()
     with pytest.raises(ValueError, match="test error"):
-        await failing()
+        await failing_promise
+    with pytest.raises(ValueError, match="test error"):
+        await failing_promise
+    with pytest.raises(ValueError, match="test error"):
+        await failing_promise
+
+    assert type(failing_promise.exception()) is ValueError
+    assert str(failing_promise.exception()) == "test error"
+    assert call_count == 1
 
 
 @pytest.mark.parametrize(

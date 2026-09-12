@@ -4,7 +4,7 @@ Child registration racing the parent's closing/completion.
 A child registers with its parent at construction time — possibly from a
 worker thread — while the parent may simultaneously be closing (its
 ``with`` block exiting on the loop thread, or its own completion
-triggering ``close_context_threadsafe()``). The target windows in the
+triggering ``close_context()``). The target windows in the
 current implementation:
 
 - ``Promise.__init__`` schedules execution (``call_soon_threadsafe``)
@@ -12,7 +12,7 @@ current implementation:
   "TODO Activate the threading lock ?" — so a child rejected by
   registration has already been scheduled and runs anyway, orphaned;
 - ``_register_children_threadsafe`` (child side, any thread) vs
-  ``close_context_threadsafe`` + ``_unregister_from_parent_if_time``
+  ``close_context`` + ``_unregister_from_parent_if_time``
   (parent side, which reads ``_unsettled_children`` without the lock).
 
 The contract these tests pin down — **creation must be atomic**:
@@ -64,10 +64,10 @@ async def test_child_creation_racing_parent_context_close_is_atomic() -> None:
 
         _, errors = await run_racers(
             make_child_creator(ctx, loop, executions, box),
-            ctx.close_context_threadsafe,
+            ctx.close_context,
         )
         # Unwind the contextvar on the thread that entered the context
-        # (close_context_threadsafe above does not touch the contextvar).
+        # (close_context above does not touch the contextvar).
         ctx.__exit__(None, None, None)
         assert_no_errors(errors)
 
@@ -241,7 +241,7 @@ async def test_prefilled_child_creation_racing_parent_close_never_rejected() -> 
         def _create_prefilled(ctx: PromisingContext = ctx) -> Promise:
             return Promise(prefilled_result="prefilled", parent=ctx, loop=loop)
 
-        _, errors = await run_racers(_create_prefilled, ctx.close_context_threadsafe)
+        _, errors = await run_racers(_create_prefilled, ctx.close_context)
         ctx.__exit__(None, None, None)
         # ContextAlreadyClosedError (or anything else) here is a contract
         # violation — prefilled creation must always succeed.

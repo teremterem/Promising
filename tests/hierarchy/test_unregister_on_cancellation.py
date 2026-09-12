@@ -18,9 +18,9 @@ from promising import Promise
 
 async def test_cancel_pending_promise_unregisters_from_parent() -> None:
     """
-    Cancelling a never-started Promise (no underlying task — synthesize
-    path in ``_cancel_from_loop``) must close its context so that the
-    Promise unregisters from its parent. Without ``close_context_threadsafe()``
+    Cancelling a never-started Promise (no underlying task — fabricate
+    path in ``_cancel_unsafe``) must close its context so that the
+    Promise unregisters from its parent. Without ``_close_context_unsafe()``
     on that path, ``_context_closed`` stays False and the child is leaked
     in the parent's ``_unsettled_children``.
     """
@@ -43,8 +43,8 @@ async def test_cancel_pending_promise_unregisters_from_parent() -> None:
 
 async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent() -> None:
     """
-    Synthesize path reached via the thread-safe dispatch: cancel() is
-    called from a non-loop thread, which schedules ``_cancel_from_loop``
+    Fabricate path reached via the thread-safe dispatch: cancel() is
+    called from a non-loop thread, which schedules ``_cancel_unsafe``
     on the loop. The unregistration must still happen, just on the loop
     thread.
     """
@@ -68,7 +68,7 @@ async def test_cancel_pending_promise_from_other_thread_unregisters_from_parent(
         # Yield so the threadsafe callback (and the thread blocked on its
         # future) can run on this loop. Don't await the promise itself
         # here — that would start an unpacking task and race with the
-        # synthesize path we're trying to exercise.
+        # fabricate path we're trying to exercise.
         while not cancel_result:
             await asyncio.sleep(0.1)
         thread.join(timeout=2)
@@ -83,7 +83,7 @@ async def test_coroutine_raising_cancelled_error_unregisters_from_parent() -> No
     """
     When the coroutine itself raises ``CancelledError`` (no external
     cancel() call), the Promise still goes through the standard
-    ``_unpack_once_from_loop`` path whose ``with self:`` closes the
+    ``_unpack_once_unsafe`` path whose ``with self:`` closes the
     context. Verify the cancelled Promise unregisters from its parent.
     """
     with promising.context() as parent:
@@ -106,13 +106,13 @@ async def test_coroutine_raising_cancelled_error_unregisters_from_parent() -> No
 
 async def test_cancel_full_unpacking_task_before_first_step_transitions_promise() -> None:
     """
-    Cancelling the underlying ``_full_unpacking_task`` between
-    ``create_task`` and its first ``__step`` throws ``CancelledError``
-    into a not-yet-started coroutine — Python propagates that exception
-    out without entering the body's ``try/except BaseException``, so the
-    coroutine never calls ``_set_exception_from_loop`` itself. Without
-    the done-callback bridge, the Task ends cancelled while the Promise
-    stays ``_PENDING`` and leaks in its parent's ``_unsettled_children``.
+    Cancelling the underlying ``_full_unpacking_task`` between ``create_task``
+    and its first ``__step`` throws ``CancelledError`` into a not-yet-started
+    coroutine — Python propagates that exception out without entering the
+    body's ``try/except``, so the coroutine never calls
+    ``_set_exception_unsafe`` itself. Without the done-callback bridge, the
+    Task ends cancelled while the Promise stays ``_PENDING`` and leaks in its
+    parent's ``_unsettled_children``.
     """
     with promising.context() as parent:
 
@@ -120,20 +120,21 @@ async def test_cancel_full_unpacking_task_before_first_step_transitions_promise(
             return "unreachable"
 
         promise = Promise(coro(), start_soon=True)
-        # Let the threadsafe scheduling callback create the task without
-        # giving the task itself a chance to take its first step.
-        await asyncio.sleep(0)
         full_task = promise._full_unpacking_task
         assert full_task is not None
+        # TODO Are you sure the assert below is enough for us to be sure that
+        # the cancellation actually went through the done-callback route ? Any
+        # way to check if the task is also not started yet (not just not done) ?
         assert full_task.done() is False
 
         full_task.cancel("preemptive")
-        # Drain enough loop iterations for the cancel to land and for the
-        # done-callback to run.
-        for _ in range(3):
-            await asyncio.sleep(0)
 
-        # assert full_task.cancelled() is True
+        # Allow an asyncio task-switch for the cancel to land
+        await asyncio.sleep(0)
+        assert full_task.cancelled() is True
+
+        # Allow an asyncio task-switch for the done-callback to run
+        await asyncio.sleep(0)
         assert promise.done() is True
         assert promise.cancelled() is True
         assert promise._context_closed is True
@@ -159,20 +160,27 @@ async def test_cancel_single_unpacking_task_before_first_step_transitions_promis
             except asyncio.CancelledError:
                 pass
 
-        unpack_driver = asyncio.create_task(trigger_unpack_once())
+        asyncio.create_task(trigger_unpack_once())
+        assert promise._single_unpacking_task is None
+
         # Let `unpack_once` schedule the single-unpacking task and start
-        # awaiting it, but stop before the task itself runs its body.
+        # awaiting it, but stop before the task itself runs its body
         await asyncio.sleep(0)
         single_task = promise._single_unpacking_task
         assert single_task is not None
+        # TODO Are you sure the assert below is enough for us to be sure that
+        # the cancellation actually went through the done-callback route ? Any
+        # way to check if the task is also not started yet (not just not done) ?
         assert single_task.done() is False
 
         single_task.cancel("preemptive")
-        for _ in range(3):
-            await asyncio.sleep(0)
-        await unpack_driver
 
+        # Allow an asyncio task-switch for the cancel to land
+        await asyncio.sleep(0)
         assert single_task.cancelled() is True
+
+        # Allow an asyncio task-switch for the done-callback to run
+        await asyncio.sleep(0)
         assert promise.done() is True
         assert promise.cancelled() is True
         assert promise._context_closed is True

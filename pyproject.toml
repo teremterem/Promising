@@ -52,6 +52,8 @@ timeout = 5
 markers = [
     "do_not_patch_qualnames",
     "xfail_cycle_detection_gh_issue_66",
+    "xfail_gh_issue_116",
+    "xfail_gh_issue_117",
 ]
 
 [tool.coverage.run]
